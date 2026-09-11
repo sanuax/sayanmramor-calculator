@@ -136,6 +136,28 @@
     margin-bottom: 16px;
     display: none;
   }
+  .warning-box {
+    background: #3a2a12;
+    border: 1px solid #ff7a3d;
+    color: #ffcfa3;
+    padding: 10px 12px;
+    border-radius: 3px;
+    font-size: 12px;
+    line-height: 1.5;
+    margin-bottom: 16px;
+  }
+  .remainder-line {
+    font-size: 12px;
+    color: #8fd19e;
+    margin-top: -8px;
+    margin-bottom: 16px;
+  }
+  .info-block {
+    font-size: 12px;
+    color: #bbb;
+    line-height: 1.5;
+    margin-bottom: 20px;
+  }
 </style>
 </head>
 <body>
@@ -180,37 +202,38 @@
     <div class="result-panel">
       <div>
         <div class="result-label">Ориентировочная стоимость</div>
-        <div class="result-price" id="priceOut">от 0 до 0 ₽</div>
+        <div class="result-price" id="priceOut">—</div>
+        <div class="warning-box" id="warningOut" style="display:none"></div>
         <div class="result-breakdown" id="breakdown"></div>
+        <div class="remainder-line" id="remainderOut"></div>
+        <div class="info-block">Стоимость указана за весь слэб — остаток после раскроя бесплатно хранится на складе компании, клиент может использовать его для другого проекта или забрать себе.</div>
       </div>
       <div>
         <button class="cta-btn" id="ctaBtn">Получить точный расчёт</button>
+        <div class="disclaimer" id="updatedAtOut"></div>
         <div class="disclaimer">Расчёт ориентировочный. Финальная цена зависит от партии камня, сложности рисунка и логистики.</div>
       </div>
     </div>
   </div>
 </div>
 
+<script src="pricing.js"></script>
 <script>
   // ЦЕНЫ — ЗАМЕНИ НА РЕАЛЬНЫЕ ЗНАЧЕНИЯ КОМПАНИИ
   // pricePerM2: [минимум, максимум] за м² в рублях
   const PRODUCTS = {
-    stoleshnitsa: { label: "Столешница", complexityMultiplier: 1.0 },
-    podokonnik:   { label: "Подоконник", complexityMultiplier: 0.8 },
-    lestnitsa:    { label: "Лестница", complexityMultiplier: 1.8 },
-    kamin:        { label: "Каминный портал", complexityMultiplier: 1.5 },
-    stena:        { label: "Облицовка стены", complexityMultiplier: 1.1 },
-    fasad:        { label: "Фасад", complexityMultiplier: 1.3 },
-    stupeni:      { label: "Ступени", complexityMultiplier: 1.4 }
+    stoleshnitsa: { label: "Столешница", complexityMultiplier: 1.0, type: 'A' },
+    podokonnik:   { label: "Подоконник", complexityMultiplier: 0.8, type: 'A' },
+    lestnitsa:    { label: "Лестница", complexityMultiplier: 1.8, type: 'B' },
+    kamin:        { label: "Каминный портал", complexityMultiplier: 1.5, type: 'A' },
+    stena:        { label: "Облицовка стены", complexityMultiplier: 1.1, type: 'B' },
+    fasad:        { label: "Фасад", complexityMultiplier: 1.3, type: 'B' },
+    stupeni:      { label: "Ступени", complexityMultiplier: 1.4, type: 'A' }
   };
 
-  const MATERIALS = {
-    marble_white:  { label: "Мрамор белый", pricePerM2: [18000, 28000] },
-    marble_colored:{ label: "Мрамор цветной", pricePerM2: [25000, 40000] },
-    onyx:          { label: "Оникс", pricePerM2: [45000, 80000] },
-    granite:       { label: "Гранит", pricePerM2: [14000, 22000] },
-    travertine:    { label: "Травертин", pricePerM2: [12000, 19000] }
-  };
+  const SAW_MARGIN_CM = 4;
+  const AREA_WASTE_FACTOR = 1.3;
+  const WORK_MULTIPLIER = 2;
 
   const OPTION_SURCHARGE = {
     complex: 0.25,   // +25% за сложную форму
@@ -226,6 +249,9 @@
   const priceOut = document.getElementById('priceOut');
   const breakdown = document.getElementById('breakdown');
   const ctaBtn = document.getElementById('ctaBtn');
+  const warningOut = document.getElementById('warningOut');
+  const remainderOut = document.getElementById('remainderOut');
+  const updatedAtOut = document.getElementById('updatedAtOut');
 
   Object.entries(PRODUCTS).forEach(([key, val]) => {
     const opt = document.createElement('option');
@@ -234,39 +260,68 @@
     productSelect.appendChild(opt);
   });
 
-  Object.entries(MATERIALS).forEach(([key, val]) => {
-    const opt = document.createElement('option');
-    opt.value = key;
-    opt.textContent = val.label;
-    materialSelect.appendChild(opt);
-  });
+  let STONES_BY_ID = {};
+  let UPDATED_AT = null;
+  let DATA_LOADED = false;
+
+  materialSelect.innerHTML = '<option value="">Загрузка материалов…</option>';
+
+  fetch('data/slabs.json')
+    .then(r => r.json())
+    .then(data => {
+      UPDATED_AT = data.updated_at;
+      materialSelect.innerHTML = '';
+      (data.stones || []).forEach(stone => {
+        STONES_BY_ID[stone.id] = stone;
+        const opt = document.createElement('option');
+        opt.value = stone.id;
+        opt.textContent = stone.name;
+        materialSelect.appendChild(opt);
+      });
+      DATA_LOADED = true;
+      calculate();
+    })
+    .catch(() => {
+      materialSelect.innerHTML = '<option value="">Ошибка загрузки</option>';
+      warningOut.textContent = 'Не удалось загрузить data/slabs.json. Проверьте, что страница открыта через веб-сервер (не как локальный файл).';
+      warningOut.style.display = 'block';
+    });
 
   function formatRub(n) {
     return Math.round(n).toLocaleString('ru-RU') + ' ₽';
   }
 
+  function formatDate(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString('ru-RU');
+  }
+
   function calculate() {
+    if (!DATA_LOADED) return;
+
     const width = parseFloat(widthInput.value) || 0;
     const length = parseFloat(lengthInput.value) || 0;
-    const area = width * length;
 
-    if (area <= 0) {
+    warningOut.style.display = 'none';
+    warningOut.innerHTML = '';
+    remainderOut.textContent = '';
+
+    if (width <= 0 || length <= 0) {
       dimError.style.display = 'block';
-      priceOut.textContent = 'от 0 до 0 ₽';
+      priceOut.textContent = '—';
       breakdown.innerHTML = '';
+      updatedAtOut.textContent = '';
       return;
     }
     dimError.style.display = 'none';
 
     const product = PRODUCTS[productSelect.value];
-    const material = MATERIALS[materialSelect.value];
+    const stone = STONES_BY_ID[materialSelect.value];
 
-    let [minPrice, maxPrice] = material.pricePerM2;
-    minPrice = minPrice * area * product.complexityMultiplier;
-    maxPrice = maxPrice * area * product.complexityMultiplier;
-
-    let surchargeLabel = [];
     let multiplier = 1;
+    let surchargeLabel = [];
     if (document.getElementById('opt-complex').checked) {
       multiplier += OPTION_SURCHARGE.complex;
       surchargeLabel.push('сложная форма +' + (OPTION_SURCHARGE.complex * 100) + '%');
@@ -279,19 +334,59 @@
       multiplier += OPTION_SURCHARGE.install;
       surchargeLabel.push('монтаж +' + (OPTION_SURCHARGE.install * 100) + '%');
     }
+    const optionSurchargeSum = multiplier - 1;
 
-    minPrice *= multiplier;
-    maxPrice *= multiplier;
+    const result = Pricing.calculatePrice({
+      stone,
+      widthM: width,
+      lengthM: length,
+      productType: product.type,
+      complexityMultiplier: product.complexityMultiplier,
+      optionSurchargeSum,
+      marginCm: SAW_MARGIN_CM,
+      wasteFactor: AREA_WASTE_FACTOR,
+      workMultiplier: WORK_MULTIPLIER
+    });
 
-    priceOut.textContent = `от ${formatRub(minPrice)} до ${formatRub(maxPrice)}`;
+    if (!result.ok) {
+      priceOut.textContent = 'Нужно уточнить у менеджера';
+      let msg = 'Подходящего слэба нет в наличии — пришлите размеры менеджеру для точного расчёта.';
+      if (result.reason === 'no_slabs_for_stone') {
+        msg = 'Для этого камня сейчас нет данных о слэбах в наличии.';
+      }
+      warningOut.textContent = msg;
+      warningOut.style.display = 'block';
+      breakdown.innerHTML = '';
+      updatedAtOut.textContent = '';
+      return;
+    }
 
-    let html = `Площадь: <span>${area.toFixed(2)} м²</span><br>`;
-    html += `Материал: <span>${material.label}</span><br>`;
+    priceOut.textContent = '≈ ' + formatRub(result.total);
+
+    let html = `Площадь: <span>${(width * length).toFixed(2)} м²</span><br>`;
+    html += `Материал: <span>${stone.name}</span><br>`;
     html += `Изделие: <span>${product.label}</span>`;
     if (surchargeLabel.length) {
       html += `<br>Опции: <span>${surchargeLabel.join(', ')}</span>`;
     }
     breakdown.innerHTML = html;
+
+    if (product.type === 'A' && result.remainderM2 !== null) {
+      remainderOut.textContent = 'Остаток слэба после раскроя: ' + result.remainderM2.toFixed(2) + ' м²';
+    }
+
+    if (result.nSlabs > 1) {
+      warningOut.textContent = 'Потребуется ' + result.nSlabs + ' слэба со швом.';
+      warningOut.style.display = 'block';
+    }
+
+    if (productSelect.value === 'lestnitsa') {
+      const note = 'Точный расчёт лестницы требует уточнения количества и размера ступеней у менеджера — цена ориентировочная.';
+      warningOut.textContent = warningOut.textContent ? warningOut.textContent + ' ' + note : note;
+      warningOut.style.display = 'block';
+    }
+
+    updatedAtOut.textContent = 'Расчёт по ценам на ' + formatDate(UPDATED_AT) + ', точная цена подтверждается менеджером.';
   }
 
   [productSelect, materialSelect, widthInput, lengthInput].forEach(el => {
@@ -309,8 +404,6 @@
       dimError.style.display = 'block';
     }
   });
-
-  calculate();
 </script>
 </body>
 </html>
