@@ -45,5 +45,39 @@
     return { work, total };
   }
 
-  return { findBestTypeASlab, computeRemainderAreaM2, computeTypeBResult, computeWorkAndTotal };
+  function calculatePrice(params) {
+    const {
+      stone, widthM, lengthM, productType, complexityMultiplier,
+      optionSurchargeSum, marginCm, wasteFactor, workMultiplier
+    } = params;
+
+    const empty = { subtotal: null, work: null, total: null, nSlabs: 0, remainderM2: null, matchedSlab: null };
+
+    if (!(widthM > 0) || !(lengthM > 0)) {
+      return Object.assign({ ok: false, reason: 'invalid_dimensions' }, empty);
+    }
+    if (!stone || !stone.slabs || stone.slabs.length === 0) {
+      return Object.assign({ ok: false, reason: 'no_slabs_for_stone' }, empty);
+    }
+
+    if (productType === 'A') {
+      const slab = findBestTypeASlab(stone.slabs, widthM, lengthM, marginCm);
+      if (!slab) {
+        return Object.assign({ ok: false, reason: 'no_fitting_slab' }, empty);
+      }
+      const subtotal = slab.price_total_rub;
+      const { work, total } = computeWorkAndTotal(subtotal, workMultiplier, complexityMultiplier, optionSurchargeSum);
+      const remainderM2 = computeRemainderAreaM2(slab, widthM, lengthM);
+      return { ok: true, reason: null, subtotal, work, total, nSlabs: 1, remainderM2, matchedSlab: slab };
+    }
+
+    const typeBResult = computeTypeBResult(stone.slabs, widthM, lengthM, wasteFactor);
+    if (!typeBResult) {
+      return Object.assign({ ok: false, reason: 'no_slabs_for_stone' }, empty);
+    }
+    const { work, total } = computeWorkAndTotal(typeBResult.subtotal, workMultiplier, complexityMultiplier, optionSurchargeSum);
+    return { ok: true, reason: null, subtotal: typeBResult.subtotal, work, total, nSlabs: typeBResult.nSlabs, remainderM2: null, matchedSlab: typeBResult.slab };
+  }
+
+  return { findBestTypeASlab, computeRemainderAreaM2, computeTypeBResult, computeWorkAndTotal, calculatePrice };
 });

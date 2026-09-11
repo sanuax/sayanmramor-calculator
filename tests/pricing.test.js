@@ -59,3 +59,41 @@ test('computeWorkAndTotal compounds complexity and options', () => {
   assert.ok(Math.abs(work - 52673 * 2 * 1.8 * 1.25) < 0.001);
   assert.ok(Math.abs(total - (52673 + work)) < 0.001);
 });
+
+const stone = { name: 'Delicato Brown', slabs };
+
+test('calculatePrice: invalid dimensions', () => {
+  const r = Pricing.calculatePrice({ stone, widthM: 0, lengthM: 1, productType: 'A', complexityMultiplier: 1, optionSurchargeSum: 0, marginCm: 4, wasteFactor: 1.3, workMultiplier: 2 });
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'invalid_dimensions');
+});
+
+test('calculatePrice: no stone selected / no slabs', () => {
+  const r = Pricing.calculatePrice({ stone: { name: 'X', slabs: [] }, widthM: 1, lengthM: 1, productType: 'A', complexityMultiplier: 1, optionSurchargeSum: 0, marginCm: 4, wasteFactor: 1.3, workMultiplier: 2 });
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'no_slabs_for_stone');
+});
+
+test('calculatePrice: type A no fitting slab', () => {
+  const r = Pricing.calculatePrice({ stone, widthM: 3, lengthM: 2, productType: 'A', complexityMultiplier: 1, optionSurchargeSum: 0, marginCm: 4, wasteFactor: 1.3, workMultiplier: 2 });
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'no_fitting_slab');
+});
+
+test('calculatePrice: type A happy path matches spec-verified numbers', () => {
+  const r = Pricing.calculatePrice({ stone, widthM: 1.0, lengthM: 0.6, productType: 'A', complexityMultiplier: 1.0, optionSurchargeSum: 0, marginCm: 4, wasteFactor: 1.3, workMultiplier: 2 });
+  assert.equal(r.ok, true);
+  assert.equal(r.matchedSlab.article, 'P0444194');
+  assert.equal(r.subtotal, 52673);
+  assert.equal(r.total, 158019);
+  assert.equal(r.nSlabs, 1);
+  assert.ok(Math.abs(r.remainderM2 - 4.2852) < 0.0001);
+});
+
+test('calculatePrice: type B happy path', () => {
+  const r = Pricing.calculatePrice({ stone, widthM: 5, lengthM: 3, productType: 'B', complexityMultiplier: 1.1, optionSurchargeSum: 0, marginCm: 4, wasteFactor: 1.3, workMultiplier: 2 });
+  assert.equal(r.ok, true);
+  assert.equal(r.nSlabs, 4);
+  assert.equal(r.subtotal, 4 * 52673);
+  assert.equal(r.remainderM2, null);
+});
