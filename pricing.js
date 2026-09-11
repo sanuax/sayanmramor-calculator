@@ -26,5 +26,18 @@
     return slabAreaM2 - widthM * lengthM;
   }
 
-  return { findBestTypeASlab, computeRemainderAreaM2 };
+  function computeTypeBResult(slabs, widthM, lengthM, wasteFactor) {
+    if (!slabs.length) return null;
+    let cheapest = slabs[0];
+    for (const slab of slabs) {
+      if (slab.price_per_m2_rub < cheapest.price_per_m2_rub) cheapest = slab;
+    }
+    const areaNeeded = widthM * lengthM;
+    const slabAreaM2 = (cheapest.width_cm / 100) * (cheapest.length_cm / 100);
+    const nSlabs = Math.ceil((areaNeeded * wasteFactor) / slabAreaM2);
+    const subtotal = nSlabs * cheapest.price_total_rub;
+    return { slab: cheapest, nSlabs, subtotal };
+  }
+
+  return { findBestTypeASlab, computeRemainderAreaM2, computeTypeBResult };
 });

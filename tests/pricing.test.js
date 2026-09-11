@@ -33,3 +33,16 @@ test('computeRemainderAreaM2 uses full raw slab area', () => {
   const remainder = Pricing.computeRemainderAreaM2(slab, 1.0, 0.6);
   assert.ok(Math.abs(remainder - 4.2852) < 0.0001);
 });
+
+test('computeTypeBResult picks cheapest-per-m2 slab and computes slab count', () => {
+  // area 5*3=15 m2, waste 1.3 -> 19.5 m2 needed; cheapest per-m2 is P0444194 (11008), area 2.76*1.77=4.8852
+  // ceil(19.5 / 4.8852) = 4
+  const result = Pricing.computeTypeBResult(slabs, 5, 3, 1.3);
+  assert.equal(result.slab.article, 'P0444194');
+  assert.equal(result.nSlabs, 4);
+  assert.equal(result.subtotal, 4 * 52673);
+});
+
+test('computeTypeBResult returns null for empty slab list', () => {
+  assert.equal(Pricing.computeTypeBResult([], 1, 1, 1.3), null);
+});
