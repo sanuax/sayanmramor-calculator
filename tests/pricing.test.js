@@ -46,3 +46,16 @@ test('computeTypeBResult picks cheapest-per-m2 slab and computes slab count', ()
 test('computeTypeBResult returns null for empty slab list', () => {
   assert.equal(Pricing.computeTypeBResult([], 1, 1, 1.3), null);
 });
+
+test('computeWorkAndTotal matches spec-verified example (complexity 1.0, no options)', () => {
+  const { work, total } = Pricing.computeWorkAndTotal(52673, 2, 1.0, 0);
+  assert.equal(work, 105346);
+  assert.equal(total, 158019);
+});
+
+test('computeWorkAndTotal compounds complexity and options', () => {
+  // complexity 1.8 (лестница), one option +0.25 -> work = 52673 * 2 * 1.8 * 1.25
+  const { work, total } = Pricing.computeWorkAndTotal(52673, 2, 1.8, 0.25);
+  assert.ok(Math.abs(work - 52673 * 2 * 1.8 * 1.25) < 0.001);
+  assert.ok(Math.abs(total - (52673 + work)) < 0.001);
+});

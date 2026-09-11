@@ -39,5 +39,11 @@
     return { slab: cheapest, nSlabs, subtotal };
   }
 
-  return { findBestTypeASlab, computeRemainderAreaM2, computeTypeBResult };
+  function computeWorkAndTotal(subtotal, workMultiplier, complexityMultiplier, optionSurchargeSum) {
+    const work = subtotal * workMultiplier * complexityMultiplier * (1 + optionSurchargeSum);
+    const total = subtotal + work;
+    return { work, total };
+  }
+
+  return { findBestTypeASlab, computeRemainderAreaM2, computeTypeBResult, computeWorkAndTotal };
 });
