@@ -26,3 +26,10 @@ test('findBestTypeASlab returns null when nothing fits', () => {
   const none = Pricing.findBestTypeASlab(slabs, 3, 2, 4);
   assert.equal(none, null);
 });
+
+test('computeRemainderAreaM2 uses full raw slab area', () => {
+  const slab = { width_cm: 276, length_cm: 177 };
+  // 2.76*1.77 = 4.8852; product 1.0*0.6 = 0.6 -> remainder 4.2852
+  const remainder = Pricing.computeRemainderAreaM2(slab, 1.0, 0.6);
+  assert.ok(Math.abs(remainder - 4.2852) < 0.0001);
+});

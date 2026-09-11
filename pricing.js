@@ -21,5 +21,10 @@
     return best;
   }
 
-  return { findBestTypeASlab };
+  function computeRemainderAreaM2(slab, widthM, lengthM) {
+    const slabAreaM2 = (slab.width_cm / 100) * (slab.length_cm / 100);
+    return slabAreaM2 - widthM * lengthM;
+  }
+
+  return { findBestTypeASlab, computeRemainderAreaM2 };
 });
