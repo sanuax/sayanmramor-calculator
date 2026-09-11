@@ -91,8 +91,10 @@ test('findBestTypeASlab picks the cheapest slab that fits with margin', () => {
 });
 
 test('findBestTypeASlab allows rotation', () => {
-  // 1.7m x 2.7m needs a slab that is 178x274 min (rotated fits into 276x177 as 177x276)
-  const best = Pricing.findBestTypeASlab(slabs, 1.70, 2.70, 4);
+  // 1.0m x 1.70m needs 108cm x 178cm; P0444194 (276x177) fails direct
+  // (177 < 178) but fits rotated (276>=178 and 177>=108) and is cheapest
+  // overall vs M0517386/P0517523 which fit directly without rotation.
+  const best = Pricing.findBestTypeASlab(slabs, 1.0, 1.70, 4);
   assert.equal(best.article, 'P0444194');
 });
 
