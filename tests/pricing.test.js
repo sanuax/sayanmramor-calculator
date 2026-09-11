@@ -35,16 +35,23 @@ test('computeRemainderAreaM2 uses full raw slab area', () => {
 });
 
 test('computeTypeBResult picks cheapest-per-m2 slab and computes slab count', () => {
-  // area 5*3=15 m2, waste 1.3 -> 19.5 m2 needed; cheapest per-m2 is P0444194 (11008), area 2.76*1.77=4.8852
-  // ceil(19.5 / 4.8852) = 4
-  const result = Pricing.computeTypeBResult(slabs, 5, 3, 1.3);
+  // area 3*3=9 m2, waste 1.3 -> 11.7 m2 needed; cheapest per-m2 is P0444194 (11008), area 2.76*1.77=4.8852
+  // ceil(11.7 / 4.8852) = 3, which fits within the 3-slab fixture
+  const result = Pricing.computeTypeBResult(slabs, 3, 3, 1.3);
   assert.equal(result.slab.article, 'P0444194');
-  assert.equal(result.nSlabs, 4);
-  assert.equal(result.subtotal, 4 * 52673);
+  assert.equal(result.nSlabs, 3);
+  assert.equal(result.subtotal, 3 * 52673);
 });
 
 test('computeTypeBResult returns null for empty slab list', () => {
   assert.equal(Pricing.computeTypeBResult([], 1, 1, 1.3), null);
+});
+
+test('computeTypeBResult returns null when nSlabs would exceed the stone\'s actual slab count', () => {
+  // area 5*3=15 m2, waste 1.3 -> 19.5 m2 needed; ceil(19.5 / 4.8852) = 4, but the
+  // fixture only has 3 slabs in stock -- must not quote more slabs than exist.
+  const result = Pricing.computeTypeBResult(slabs, 5, 3, 1.3);
+  assert.equal(result, null);
 });
 
 test('computeWorkAndTotal matches spec-verified example (complexity 1.0, no options)', () => {
@@ -91,9 +98,11 @@ test('calculatePrice: type A happy path matches spec-verified numbers', () => {
 });
 
 test('calculatePrice: type B happy path', () => {
-  const r = Pricing.calculatePrice({ stone, widthM: 5, lengthM: 3, productType: 'B', complexityMultiplier: 1.1, optionSurchargeSum: 0, marginCm: 4, wasteFactor: 1.3, workMultiplier: 2 });
+  // widthM 3 x lengthM 3 against the 3-slab fixture -> nSlabs 3, within stock (see
+  // computeTypeBResult tests above for the area/slab-count math).
+  const r = Pricing.calculatePrice({ stone, widthM: 3, lengthM: 3, productType: 'B', complexityMultiplier: 1.1, optionSurchargeSum: 0, marginCm: 4, wasteFactor: 1.3, workMultiplier: 2 });
   assert.equal(r.ok, true);
-  assert.equal(r.nSlabs, 4);
-  assert.equal(r.subtotal, 4 * 52673);
+  assert.equal(r.nSlabs, 3);
+  assert.equal(r.subtotal, 3 * 52673);
   assert.equal(r.remainderM2, null);
 });

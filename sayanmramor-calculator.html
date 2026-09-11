@@ -206,7 +206,7 @@
         <div class="warning-box" id="warningOut" style="display:none"></div>
         <div class="result-breakdown" id="breakdown"></div>
         <div class="remainder-line" id="remainderOut"></div>
-        <div class="info-block">Стоимость указана за весь слэб — остаток после раскроя бесплатно хранится на складе компании, клиент может использовать его для другого проекта или забрать себе.</div>
+        <div class="info-block" id="infoBlock">Стоимость указана за весь слэб — остаток после раскроя бесплатно хранится на складе компании, клиент может использовать его для другого проекта или забрать себе.</div>
       </div>
       <div>
         <button class="cta-btn" id="ctaBtn">Получить точный расчёт</button>
@@ -219,8 +219,6 @@
 
 <script src="pricing.js"></script>
 <script>
-  // ЦЕНЫ — ЗАМЕНИ НА РЕАЛЬНЫЕ ЗНАЧЕНИЯ КОМПАНИИ
-  // pricePerM2: [минимум, максимум] за м² в рублях
   const PRODUCTS = {
     stoleshnitsa: { label: "Столешница", complexityMultiplier: 1.0, type: 'A' },
     podokonnik:   { label: "Подоконник", complexityMultiplier: 0.8, type: 'A' },
@@ -252,6 +250,7 @@
   const warningOut = document.getElementById('warningOut');
   const remainderOut = document.getElementById('remainderOut');
   const updatedAtOut = document.getElementById('updatedAtOut');
+  const infoBlock = document.getElementById('infoBlock');
 
   Object.entries(PRODUCTS).forEach(([key, val]) => {
     const opt = document.createElement('option');
@@ -298,6 +297,22 @@
     return d.toLocaleDateString('ru-RU');
   }
 
+  function pluralizeSlabs(n) {
+    const mod10 = n % 10, mod100 = n % 100;
+    if (mod10 === 1 && mod100 !== 11) return 'слэб';
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'слэба';
+    return 'слэбов';
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   function calculate() {
     if (!DATA_LOADED) return;
 
@@ -313,6 +328,7 @@
       priceOut.textContent = '—';
       breakdown.innerHTML = '';
       updatedAtOut.textContent = '';
+      infoBlock.style.display = 'none';
       return;
     }
     dimError.style.display = 'none';
@@ -358,13 +374,16 @@
       warningOut.style.display = 'block';
       breakdown.innerHTML = '';
       updatedAtOut.textContent = '';
+      infoBlock.style.display = 'none';
       return;
     }
+
+    infoBlock.style.display = '';
 
     priceOut.textContent = '≈ ' + formatRub(result.total);
 
     let html = `Площадь: <span>${(width * length).toFixed(2)} м²</span><br>`;
-    html += `Материал: <span>${stone.name}</span><br>`;
+    html += `Материал: <span>${escapeHtml(stone.name)}</span><br>`;
     html += `Изделие: <span>${product.label}</span>`;
     if (surchargeLabel.length) {
       html += `<br>Опции: <span>${surchargeLabel.join(', ')}</span>`;
@@ -376,7 +395,7 @@
     }
 
     if (result.nSlabs > 1) {
-      warningOut.textContent = 'Потребуется ' + result.nSlabs + ' слэба со швом.';
+      warningOut.textContent = 'Потребуется ' + result.nSlabs + ' ' + pluralizeSlabs(result.nSlabs) + ' со швом.';
       warningOut.style.display = 'block';
     }
 

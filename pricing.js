@@ -35,6 +35,7 @@
     const areaNeeded = widthM * lengthM;
     const slabAreaM2 = (cheapest.width_cm / 100) * (cheapest.length_cm / 100);
     const nSlabs = Math.ceil((areaNeeded * wasteFactor) / slabAreaM2);
+    if (nSlabs > slabs.length) return null;
     const subtotal = nSlabs * cheapest.price_total_rub;
     return { slab: cheapest, nSlabs, subtotal };
   }
