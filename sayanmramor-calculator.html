@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Калькулятор стоимости изделий из камня — Саянмрамор</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Arial', 'Helvetica Neue', sans-serif;
+    background: #f4f4f4;
+    color: #1a1a1a;
+    padding: 40px 20px;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; }
+  h1 {
+    font-size: 32px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: -0.5px;
+    margin-bottom: 8px;
+  }
+  .subtitle {
+    color: #666;
+    font-size: 15px;
+    margin-bottom: 32px;
+    max-width: 520px;
+    line-height: 1.5;
+  }
+  .card {
+    background: #fff;
+    border-radius: 4px;
+    padding: 32px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+  }
+  @media (max-width: 700px) {
+    .card { grid-template-columns: 1fr; }
+  }
+  .field { margin-bottom: 20px; }
+  label {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #333;
+    margin-bottom: 8px;
+  }
+  select, input[type="number"] {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    font-size: 15px;
+    background: #fafafa;
+    color: #1a1a1a;
+  }
+  select:focus, input:focus {
+    outline: none;
+    border-color: #ff5a1f;
+    background: #fff;
+  }
+  .dims { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .checkboxes { margin-top: 24px; }
+  .checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    font-size: 14px;
+    color: #333;
+    cursor: pointer;
+  }
+  .checkbox-row input { width: 16px; height: 16px; accent-color: #ff5a1f; cursor: pointer; }
+
+  .result-panel {
+    background: #1a1a1a;
+    color: #fff;
+    border-radius: 4px;
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .result-label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #999;
+    margin-bottom: 6px;
+  }
+  .result-price {
+    font-size: 30px;
+    font-weight: 900;
+    color: #ff7a3d;
+    margin-bottom: 24px;
+    line-height: 1.15;
+    min-height: 76px;
+  }
+  .result-breakdown {
+    font-size: 13px;
+    color: #bbb;
+    line-height: 1.9;
+    border-top: 1px solid #333;
+    padding-top: 16px;
+    margin-bottom: 24px;
+  }
+  .result-breakdown span { color: #fff; float: right; }
+  .cta-btn {
+    background: #ff5a1f;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 16px;
+    font-size: 14px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    width: 100%;
+    transition: background 0.15s;
+  }
+  .cta-btn:hover { background: #e64f16; }
+  .disclaimer {
+    font-size: 11px;
+    color: #777;
+    margin-top: 14px;
+    line-height: 1.5;
+  }
+  .error {
+    color: #ff5a1f;
+    font-size: 13px;
+    margin-top: -12px;
+    margin-bottom: 16px;
+    display: none;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Рассчитайте стоимость изделия</h1>
+  <p class="subtitle">Выберите тип изделия, материал и размеры — получите ориентировочную стоимость за несколько секунд. Точную цену рассчитает наш специалист после уточнения деталей проекта.</p>
+
+  <div class="card">
+    <div class="form-side">
+      <div class="field">
+        <label for="product">Тип изделия</label>
+        <select id="product"></select>
+      </div>
+
+      <div class="field">
+        <label for="material">Материал</label>
+        <select id="material"></select>
+      </div>
+
+      <div class="field">
+        <label>Размеры, м</label>
+        <div class="dims">
+          <input type="number" id="width" placeholder="Ширина" min="0" step="0.01">
+          <input type="number" id="length" placeholder="Длина" min="0" step="0.01">
+        </div>
+        <div class="error" id="dimError">Укажите ширину и длину больше нуля</div>
+      </div>
+
+      <div class="checkboxes">
+        <label class="checkbox-row">
+          <input type="checkbox" id="opt-complex"> Сложная форма / фигурный рез
+        </label>
+        <label class="checkbox-row">
+          <input type="checkbox" id="opt-polish"> Дополнительная полировка
+        </label>
+        <label class="checkbox-row">
+          <input type="checkbox" id="opt-install"> Монтаж на объекте
+        </label>
+      </div>
+    </div>
+
+    <div class="result-panel">
+      <div>
+        <div class="result-label">Ориентировочная стоимость</div>
+        <div class="result-price" id="priceOut">от 0 до 0 ₽</div>
+        <div class="result-breakdown" id="breakdown"></div>
+      </div>
+      <div>
+        <button class="cta-btn" id="ctaBtn">Получить точный расчёт</button>
+        <div class="disclaimer">Расчёт ориентировочный. Финальная цена зависит от партии камня, сложности рисунка и логистики.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ЦЕНЫ — ЗАМЕНИ НА РЕАЛЬНЫЕ ЗНАЧЕНИЯ КОМПАНИИ
+  // pricePerM2: [минимум, максимум] за м² в рублях
+  const PRODUCTS = {
+    stoleshnitsa: { label: "Столешница", complexityMultiplier: 1.0 },
+    podokonnik:   { label: "Подоконник", complexityMultiplier: 0.8 },
+    lestnitsa:    { label: "Лестница", complexityMultiplier: 1.8 },
+    kamin:        { label: "Каминный портал", complexityMultiplier: 1.5 },
+    stena:        { label: "Облицовка стены", complexityMultiplier: 1.1 },
+    fasad:        { label: "Фасад", complexityMultiplier: 1.3 },
+    stupeni:      { label: "Ступени", complexityMultiplier: 1.4 }
+  };
+
+  const MATERIALS = {
+    marble_white:  { label: "Мрамор белый", pricePerM2: [18000, 28000] },
+    marble_colored:{ label: "Мрамор цветной", pricePerM2: [25000, 40000] },
+    onyx:          { label: "Оникс", pricePerM2: [45000, 80000] },
+    granite:       { label: "Гранит", pricePerM2: [14000, 22000] },
+    travertine:    { label: "Травертин", pricePerM2: [12000, 19000] }
+  };
+
+  const OPTION_SURCHARGE = {
+    complex: 0.25,   // +25% за сложную форму
+    polish: 0.10,    // +10% за доп. полировку
+    install: 0.15    // +15% за монтаж
+  };
+
+  const productSelect = document.getElementById('product');
+  const materialSelect = document.getElementById('material');
+  const widthInput = document.getElementById('width');
+  const lengthInput = document.getElementById('length');
+  const dimError = document.getElementById('dimError');
+  const priceOut = document.getElementById('priceOut');
+  const breakdown = document.getElementById('breakdown');
+  const ctaBtn = document.getElementById('ctaBtn');
+
+  Object.entries(PRODUCTS).forEach(([key, val]) => {
+    const opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = val.label;
+    productSelect.appendChild(opt);
+  });
+
+  Object.entries(MATERIALS).forEach(([key, val]) => {
+    const opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = val.label;
+    materialSelect.appendChild(opt);
+  });
+
+  function formatRub(n) {
+    return Math.round(n).toLocaleString('ru-RU') + ' ₽';
+  }
+
+  function calculate() {
+    const width = parseFloat(widthInput.value) || 0;
+    const length = parseFloat(lengthInput.value) || 0;
+    const area = width * length;
+
+    if (area <= 0) {
+      dimError.style.display = 'block';
+      priceOut.textContent = 'от 0 до 0 ₽';
+      breakdown.innerHTML = '';
+      return;
+    }
+    dimError.style.display = 'none';
+
+    const product = PRODUCTS[productSelect.value];
+    const material = MATERIALS[materialSelect.value];
+
+    let [minPrice, maxPrice] = material.pricePerM2;
+    minPrice = minPrice * area * product.complexityMultiplier;
+    maxPrice = maxPrice * area * product.complexityMultiplier;
+
+    let surchargeLabel = [];
+    let multiplier = 1;
+    if (document.getElementById('opt-complex').checked) {
+      multiplier += OPTION_SURCHARGE.complex;
+      surchargeLabel.push('сложная форма +' + (OPTION_SURCHARGE.complex * 100) + '%');
+    }
+    if (document.getElementById('opt-polish').checked) {
+      multiplier += OPTION_SURCHARGE.polish;
+      surchargeLabel.push('полировка +' + (OPTION_SURCHARGE.polish * 100) + '%');
+    }
+    if (document.getElementById('opt-install').checked) {
+      multiplier += OPTION_SURCHARGE.install;
+      surchargeLabel.push('монтаж +' + (OPTION_SURCHARGE.install * 100) + '%');
+    }
+
+    minPrice *= multiplier;
+    maxPrice *= multiplier;
+
+    priceOut.textContent = `от ${formatRub(minPrice)} до ${formatRub(maxPrice)}`;
+
+    let html = `Площадь: <span>${area.toFixed(2)} м²</span><br>`;
+    html += `Материал: <span>${material.label}</span><br>`;
+    html += `Изделие: <span>${product.label}</span>`;
+    if (surchargeLabel.length) {
+      html += `<br>Опции: <span>${surchargeLabel.join(', ')}</span>`;
+    }
+    breakdown.innerHTML = html;
+  }
+
+  [productSelect, materialSelect, widthInput, lengthInput].forEach(el => {
+    el.addEventListener('input', calculate);
+    el.addEventListener('change', calculate);
+  });
+  document.querySelectorAll('.checkbox-row input').forEach(el => {
+    el.addEventListener('change', calculate);
+  });
+
+  ctaBtn.addEventListener('click', () => {
+    if (parseFloat(widthInput.value) > 0 && parseFloat(lengthInput.value) > 0) {
+      alert('Здесь будет открываться форма заявки с уже заполненными данными расчёта (тип, материал, размеры).');
+    } else {
+      dimError.style.display = 'block';
+    }
+  });
+
+  calculate();
+</script>
+</body>
+</html>
