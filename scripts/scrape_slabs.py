@@ -155,24 +155,38 @@ def fetch_rendered_html(url, debug=False):
         page = browser.new_page()
         page.goto(url, wait_until='networkidle')
 
-        previous_height = -1
-        stable_rounds = 0
-        for _ in range(60):
-            page.mouse.wheel(0, 2000)
-            page.wait_for_timeout(500)
-            height = page.evaluate('document.body.scrollHeight')
-            if height == previous_height:
-                stable_rounds += 1
-                if stable_rounds >= 3:
-                    break
-            else:
-                stable_rounds = 0
-            previous_height = height
+        # Each party block (.prt) is a Headless UI Disclosure (accordion):
+        # its slab rows are already in the DOM but collapsed, and only
+        # appear in page.content() once its disclosure button is clicked
+        # open. Neither scrolling nor visibility triggers this — it takes
+        # an actual click on each of the 15 party blocks.
+        parties = page.query_selector_all('.prt')
+        if debug:
+            print(f'  [debug] found {len(parties)} party blocks')
 
-        page.wait_for_load_state('networkidle')
+        for i, party in enumerate(parties):
+            try:
+                target = party.query_selector('[id^="headlessui-disclosure-button"]') \
+                    or party.query_selector('.stretched-link')
+                if target:
+                    target.scroll_into_view_if_needed()
+                    target.click(timeout=3000)
+            except Exception as e:
+                if debug:
+                    print(f'  [debug] party {i + 1}/{len(parties)}, click failed: {e!r}')
+            page.wait_for_timeout(150)
+            if debug:
+                height = page.evaluate('document.body.scrollHeight')
+                print(f'  [debug] party {i + 1}/{len(parties)}, scrollHeight={height}')
+
+        # No final networkidle wait here: clicking a disclosure button is a
+        # local DOM/CSS toggle, not a network request, and the page keeps
+        # firing background analytics traffic that never lets networkidle
+        # settle once hundreds of rows are rendered.
+        page.wait_for_timeout(1500)
         html = page.content()
         if debug:
-            print(f'  [debug] final scrollHeight={previous_height}')
+            print(f'  [debug] final scrollHeight={page.evaluate("document.body.scrollHeight")}')
         browser.close()
         return html
 
