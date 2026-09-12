@@ -145,3 +145,86 @@ def merge_stone_into_data(data, stone):
     new_data = dict(data)
     new_data['stones'] = new_stones
     return new_data, False
+
+
+def fetch_rendered_html(url, debug=False):
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.goto(url, wait_until='networkidle')
+
+        previous_height = -1
+        stable_rounds = 0
+        for _ in range(60):
+            page.mouse.wheel(0, 2000)
+            page.wait_for_timeout(500)
+            height = page.evaluate('document.body.scrollHeight')
+            if height == previous_height:
+                stable_rounds += 1
+                if stable_rounds >= 3:
+                    break
+            else:
+                stable_rounds = 0
+            previous_height = height
+
+        page.wait_for_load_state('networkidle')
+        html = page.content()
+        if debug:
+            print(f'  [debug] final scrollHeight={previous_height}')
+        browser.close()
+        return html
+
+
+import argparse
+import json
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_URLS_PATH = PROJECT_ROOT / 'scripts' / 'stone_urls.txt'
+DEFAULT_OUTPUT_PATH = PROJECT_ROOT / 'data' / 'slabs.json'
+
+
+def load_existing_data(path):
+    if not path.exists():
+        return {'updated_at': None, 'stones': []}
+    with open(path, encoding='utf-8') as f:
+        return json.load(f)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description='Scrape veneziastone.com slab pages into slabs.json')
+    parser.add_argument('--urls', default=str(DEFAULT_URLS_PATH))
+    parser.add_argument('--output', default=str(DEFAULT_OUTPUT_PATH))
+    parser.add_argument('--debug', action='store_true')
+    args = parser.parse_args(argv)
+
+    urls = load_stone_urls(args.urls)
+    data = load_existing_data(Path(args.output))
+
+    for url in urls:
+        print(f'Scraping {url} ...')
+        html = fetch_rendered_html(url, debug=args.debug)
+        stone, skipped = extract_slabs_from_html(html, url)
+        if args.debug:
+            print(f'  {stone["id"]}: kept {len(stone["slabs"])}, skipped {len(skipped)}')
+            for row in skipped:
+                print('   skipped:', row)
+        data, was_skipped = merge_stone_into_data(data, stone)
+        if was_skipped:
+            print(f'  WARNING: no available slabs found for {url}, keeping previous data for this stone', file=sys.stderr)
+
+    data['updated_at'] = datetime.now(timezone.utc).astimezone().isoformat(timespec='seconds')
+
+    output_path = Path(args.output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    print(f'Wrote {output_path}')
+
+
+if __name__ == '__main__':
+    main()
