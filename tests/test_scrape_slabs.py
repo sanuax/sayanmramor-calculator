@@ -167,5 +167,40 @@ class LoadStoneUrlsTests(unittest.TestCase):
             os.unlink(path)
 
 
+class MergeStoneIntoDataTests(unittest.TestCase):
+    def test_inserts_new_stone(self):
+        data = {'updated_at': None, 'stones': []}
+        stone = {'id': 'delicato-brown', 'name': 'Delicato Brown', 'slabs': [{'article': 'A1'}]}
+        new_data, skipped = scrape_slabs.merge_stone_into_data(data, stone)
+        self.assertFalse(skipped)
+        self.assertEqual(len(new_data['stones']), 1)
+        self.assertEqual(new_data['stones'][0]['id'], 'delicato-brown')
+
+    def test_updates_existing_stone_without_touching_others(self):
+        data = {
+            'updated_at': None,
+            'stones': [
+                {'id': 'delicato-brown', 'name': 'Old', 'slabs': [{'article': 'OLD'}]},
+                {'id': 'other-stone', 'name': 'Other', 'slabs': [{'article': 'X1'}]},
+            ],
+        }
+        stone = {'id': 'delicato-brown', 'name': 'New', 'slabs': [{'article': 'NEW'}]}
+        new_data, skipped = scrape_slabs.merge_stone_into_data(data, stone)
+        self.assertFalse(skipped)
+        by_id = {s['id']: s for s in new_data['stones']}
+        self.assertEqual(by_id['delicato-brown']['name'], 'New')
+        self.assertEqual(by_id['other-stone']['slabs'][0]['article'], 'X1')
+
+    def test_skips_and_preserves_data_when_new_slabs_empty(self):
+        data = {
+            'updated_at': None,
+            'stones': [{'id': 'delicato-brown', 'name': 'Old', 'slabs': [{'article': 'OLD'}]}],
+        }
+        stone = {'id': 'delicato-brown', 'name': 'New', 'slabs': []}
+        new_data, skipped = scrape_slabs.merge_stone_into_data(data, stone)
+        self.assertTrue(skipped)
+        self.assertEqual(new_data, data)
+
+
 if __name__ == '__main__':
     unittest.main()

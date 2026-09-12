@@ -124,3 +124,24 @@ def load_stone_urls(path):
                 continue
             urls.append(line)
     return urls
+
+
+def merge_stone_into_data(data, stone):
+    if not stone.get('slabs'):
+        return data, True
+
+    stones = data.get('stones', [])
+    new_stones = []
+    updated = False
+    for existing in stones:
+        if existing.get('id') == stone['id']:
+            new_stones.append(stone)
+            updated = True
+        else:
+            new_stones.append(existing)
+    if not updated:
+        new_stones.append(stone)
+
+    new_data = dict(data)
+    new_data['stones'] = new_stones
+    return new_data, False
