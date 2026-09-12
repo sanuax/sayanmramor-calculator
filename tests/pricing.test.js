@@ -47,11 +47,15 @@ test('computeTypeBResult returns null for empty slab list', () => {
   assert.equal(Pricing.computeTypeBResult([], 1, 1, 1.3), null);
 });
 
-test('computeTypeBResult returns null when nSlabs would exceed the stone\'s actual slab count', () => {
+test('computeTypeBResult reports insufficient stock (not a bare null) when nSlabs exceeds the stone\'s slab count', () => {
   // area 5*3=15 m2, waste 1.3 -> 19.5 m2 needed; ceil(19.5 / 4.8852) = 4, but the
-  // fixture only has 3 slabs in stock -- must not quote more slabs than exist.
+  // fixture only has 3 slabs in stock -- must not quote more slabs than exist,
+  // but must still say how many are needed vs available (not "no data at all").
   const result = Pricing.computeTypeBResult(slabs, 5, 3, 1.3);
-  assert.equal(result, null);
+  assert.equal(result.subtotal, null);
+  assert.equal(result.nSlabs, 4);
+  assert.equal(result.availableCount, 3);
+  assert.equal(result.slab.article, 'P0444194');
 });
 
 test('computeWorkAndTotal matches spec-verified example (complexity 1.0, no options)', () => {
@@ -105,4 +109,15 @@ test('calculatePrice: type B happy path', () => {
   assert.equal(r.nSlabs, 3);
   assert.equal(r.subtotal, 3 * 52673);
   assert.equal(r.remainderM2, null);
+  assert.equal(r.availableCount, 3);
+});
+
+test('calculatePrice: type B reports insufficient_stock with counts, not a generic no-data message', () => {
+  // widthM 5 x lengthM 3 = 15 m2 against the 3-slab fixture -> needs 4 slabs, only 3 in stock.
+  const r = Pricing.calculatePrice({ stone, widthM: 5, lengthM: 3, productType: 'B', complexityMultiplier: 1.1, optionSurchargeSum: 0, marginCm: 4, wasteFactor: 1.3, workMultiplier: 2 });
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'insufficient_stock');
+  assert.equal(r.nSlabs, 4);
+  assert.equal(r.availableCount, 3);
+  assert.equal(r.matchedSlab.article, 'P0444194');
 });

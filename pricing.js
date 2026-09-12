@@ -35,9 +35,12 @@
     const areaNeeded = widthM * lengthM;
     const slabAreaM2 = (cheapest.width_cm / 100) * (cheapest.length_cm / 100);
     const nSlabs = Math.ceil((areaNeeded * wasteFactor) / slabAreaM2);
-    if (nSlabs > slabs.length) return null;
+    const availableCount = slabs.length;
+    if (nSlabs > availableCount) {
+      return { slab: cheapest, nSlabs, subtotal: null, availableCount };
+    }
     const subtotal = nSlabs * cheapest.price_total_rub;
-    return { slab: cheapest, nSlabs, subtotal };
+    return { slab: cheapest, nSlabs, subtotal, availableCount };
   }
 
   function computeWorkAndTotal(subtotal, workMultiplier, complexityMultiplier, optionSurchargeSum) {
@@ -52,7 +55,7 @@
       optionSurchargeSum, marginCm, wasteFactor, workMultiplier
     } = params;
 
-    const empty = { subtotal: null, work: null, total: null, nSlabs: 0, remainderM2: null, matchedSlab: null };
+    const empty = { subtotal: null, work: null, total: null, nSlabs: 0, remainderM2: null, matchedSlab: null, availableCount: null };
 
     if (!(widthM > 0) || !(lengthM > 0)) {
       return Object.assign({ ok: false, reason: 'invalid_dimensions' }, empty);
@@ -76,8 +79,13 @@
     if (!typeBResult) {
       return Object.assign({ ok: false, reason: 'no_slabs_for_stone' }, empty);
     }
+    if (typeBResult.subtotal === null) {
+      return Object.assign({ ok: false, reason: 'insufficient_stock' }, empty, {
+        nSlabs: typeBResult.nSlabs, matchedSlab: typeBResult.slab, availableCount: typeBResult.availableCount
+      });
+    }
     const { work, total } = computeWorkAndTotal(typeBResult.subtotal, workMultiplier, complexityMultiplier, optionSurchargeSum);
-    return { ok: true, reason: null, subtotal: typeBResult.subtotal, work, total, nSlabs: typeBResult.nSlabs, remainderM2: null, matchedSlab: typeBResult.slab };
+    return { ok: true, reason: null, subtotal: typeBResult.subtotal, work, total, nSlabs: typeBResult.nSlabs, remainderM2: null, matchedSlab: typeBResult.slab, availableCount: typeBResult.availableCount };
   }
 
   return { findBestTypeASlab, computeRemainderAreaM2, computeTypeBResult, computeWorkAndTotal, calculatePrice };

@@ -369,6 +369,10 @@
       let msg = 'Подходящего слэба нет в наличии — пришлите размеры менеджеру для точного расчёта.';
       if (result.reason === 'no_slabs_for_stone') {
         msg = 'Для этого камня сейчас нет данных о слэбах в наличии.';
+      } else if (result.reason === 'insufficient_stock') {
+        msg = 'Для этой площади нужно ' + result.nSlabs + ' ' + pluralizeSlabs(result.nSlabs) +
+          ', в наличии только ' + result.availableCount + ' ' + pluralizeSlabs(result.availableCount) +
+          ' — пришлите размеры менеджеру для точного расчёта.';
       }
       warningOut.textContent = msg;
       warningOut.style.display = 'block';
