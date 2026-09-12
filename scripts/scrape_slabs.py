@@ -25,3 +25,10 @@ def stone_id_and_category_from_url(url):
     stone_id = parts[-1] if parts else None
     category = parts[-2] if len(parts) >= 2 else None
     return stone_id, category
+
+
+def stone_name_from_h1(h1_text):
+    m = re.match(r'^\S+\s+(.+?)\s+в слэбах\s*$', h1_text.strip())
+    if m:
+        return m.group(1)
+    return h1_text.strip()

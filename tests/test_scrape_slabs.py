@@ -39,5 +39,19 @@ class StoneIdFromUrlTests(unittest.TestCase):
         self.assertEqual(category, 'onyx')
 
 
+class StoneNameFromH1Tests(unittest.TestCase):
+    def test_typical_h1(self):
+        self.assertEqual(
+            scrape_slabs.stone_name_from_h1('Мрамор Delicato Brown в слэбах'),
+            'Delicato Brown'
+        )
+
+    def test_falls_back_to_raw_text_on_mismatch(self):
+        self.assertEqual(
+            scrape_slabs.stone_name_from_h1('  Какой-то другой заголовок  '),
+            'Какой-то другой заголовок'
+        )
+
+
 if __name__ == '__main__':
     unittest.main()
