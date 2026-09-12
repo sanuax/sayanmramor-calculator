@@ -23,5 +23,21 @@ class ParseRuNumberTests(unittest.TestCase):
         self.assertEqual(scrape_slabs.parse_ru_number('12 231 ₽'), 12231.0)
 
 
+class StoneIdFromUrlTests(unittest.TestCase):
+    def test_typical_slabs_url(self):
+        stone_id, category = scrape_slabs.stone_id_and_category_from_url(
+            'https://veneziastone.com/marble/delicato-brown/slabs/'
+        )
+        self.assertEqual(stone_id, 'delicato-brown')
+        self.assertEqual(category, 'marble')
+
+    def test_url_without_trailing_slash(self):
+        stone_id, category = scrape_slabs.stone_id_and_category_from_url(
+            'https://veneziastone.com/onyx/white-onyx/slabs'
+        )
+        self.assertEqual(stone_id, 'white-onyx')
+        self.assertEqual(category, 'onyx')
+
+
 if __name__ == '__main__':
     unittest.main()
