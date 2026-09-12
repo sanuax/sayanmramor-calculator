@@ -113,3 +113,14 @@ def extract_slabs_from_html(html, source_url):
         'slabs': slabs,
     }
     return stone, skipped
+
+
+def load_stone_urls(path):
+    urls = []
+    with open(path, encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            urls.append(line)
+    return urls

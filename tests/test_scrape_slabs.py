@@ -147,5 +147,25 @@ def _make_synthetic_batch_html(article, status_text, include_request_button):
     '''
 
 
+import tempfile
+import os
+
+
+class LoadStoneUrlsTests(unittest.TestCase):
+    def test_skips_blank_lines_and_comments(self):
+        content = "# comment\n\nhttps://veneziastone.com/marble/delicato-brown/slabs/\n  \n# another\nhttps://veneziastone.com/onyx/white/slabs/\n"
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
+            f.write(content)
+            path = f.name
+        try:
+            urls = scrape_slabs.load_stone_urls(path)
+            self.assertEqual(urls, [
+                'https://veneziastone.com/marble/delicato-brown/slabs/',
+                'https://veneziastone.com/onyx/white/slabs/',
+            ])
+        finally:
+            os.unlink(path)
+
+
 if __name__ == '__main__':
     unittest.main()
