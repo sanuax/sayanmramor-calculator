@@ -1,0 +1,173 @@
+{
+  "updated_at": "2026-09-12T18:55:52+03:00",
+  "stones": [
+    {
+      "id": "delicato-brown",
+      "name": "Delicato Brown",
+      "category": "marble",
+      "source_url": "https://veneziastone.com/marble/delicato-brown/slabs/",
+      "slabs": [
+        {
+          "article": "P0444194",
+          "party": "13168",
+          "pachka": "BLP02316",
+          "city": "Санкт-Петербург",
+          "width_cm": 276,
+          "length_cm": 177,
+          "price_per_m2_rub": 10996.0,
+          "price_total_rub": 52614.0
+        },
+        {
+          "article": "M0517386",
+          "party": "14011",
+          "pachka": "BLM18905",
+          "city": "Москва",
+          "width_cm": 280,
+          "length_cm": 185,
+          "price_per_m2_rub": 10996.0,
+          "price_total_rub": 56957.0
+        },
+        {
+          "article": "M0517383",
+          "party": "14011",
+          "pachka": "BLM18905",
+          "city": "Москва",
+          "width_cm": 280,
+          "length_cm": 185,
+          "price_per_m2_rub": 10996.0,
+          "price_total_rub": 56957.0
+        },
+        {
+          "article": "P0517523",
+          "party": "14012",
+          "pachka": "BLP03079",
+          "city": "Санкт-Петербург",
+          "width_cm": 283,
+          "length_cm": 187,
+          "price_per_m2_rub": 11122.0,
+          "price_total_rub": 58524.0
+        },
+        {
+          "article": "P0517493",
+          "party": "14012",
+          "pachka": "BLP03076",
+          "city": "Санкт-Петербург",
+          "width_cm": 280,
+          "length_cm": 184,
+          "price_per_m2_rub": 12218.0,
+          "price_total_rub": 62944.0
+        },
+        {
+          "article": "P0517495",
+          "party": "14012",
+          "pachka": "BLP03076",
+          "city": "Санкт-Петербург",
+          "width_cm": 280,
+          "length_cm": 184,
+          "price_per_m2_rub": 12218.0,
+          "price_total_rub": 62944.0
+        },
+        {
+          "article": "P0517494",
+          "party": "14012",
+          "pachka": "BLP03076",
+          "city": "Санкт-Петербург",
+          "width_cm": 280,
+          "length_cm": 184,
+          "price_per_m2_rub": 12218.0,
+          "price_total_rub": 62944.0
+        },
+        {
+          "article": "P0517499",
+          "party": "14012",
+          "pachka": "BLP03076",
+          "city": "Санкт-Петербург",
+          "width_cm": 280,
+          "length_cm": 184,
+          "price_per_m2_rub": 12218.0,
+          "price_total_rub": 62944.0
+        },
+        {
+          "article": "P0517500",
+          "party": "14012",
+          "pachka": "BLP03076",
+          "city": "Санкт-Петербург",
+          "width_cm": 280,
+          "length_cm": 184,
+          "price_per_m2_rub": 12218.0,
+          "price_total_rub": 62944.0
+        },
+        {
+          "article": "P0517497",
+          "party": "14012",
+          "pachka": "BLP03076",
+          "city": "Санкт-Петербург",
+          "width_cm": 280,
+          "length_cm": 184,
+          "price_per_m2_rub": 12218.0,
+          "price_total_rub": 62944.0
+        },
+        {
+          "article": "P0517498",
+          "party": "14012",
+          "pachka": "BLP03076",
+          "city": "Санкт-Петербург",
+          "width_cm": 280,
+          "length_cm": 184,
+          "price_per_m2_rub": 12218.0,
+          "price_total_rub": 62944.0
+        },
+        {
+          "article": "P0517496",
+          "party": "14012",
+          "pachka": "BLP03076",
+          "city": "Санкт-Петербург",
+          "width_cm": 280,
+          "length_cm": 184,
+          "price_per_m2_rub": 12218.0,
+          "price_total_rub": 62944.0
+        },
+        {
+          "article": "P0517534",
+          "party": "14012",
+          "pachka": "BLP03079",
+          "city": "Санкт-Петербург",
+          "width_cm": 283,
+          "length_cm": 187,
+          "price_per_m2_rub": 12218.0,
+          "price_total_rub": 64288.0
+        },
+        {
+          "article": "P0517518",
+          "party": "14012",
+          "pachka": "BLP03078",
+          "city": "Санкт-Петербург",
+          "width_cm": 283,
+          "length_cm": 186,
+          "price_per_m2_rub": 12218.0,
+          "price_total_rub": 63823.0
+        },
+        {
+          "article": "P0517512",
+          "party": "14012",
+          "pachka": "BLP03078",
+          "city": "Санкт-Петербург",
+          "width_cm": 283,
+          "length_cm": 186,
+          "price_per_m2_rub": 12218.0,
+          "price_total_rub": 63823.0
+        },
+        {
+          "article": "P0517519",
+          "party": "14012",
+          "pachka": "BLP03078",
+          "city": "Санкт-Петербург",
+          "width_cm": 283,
+          "length_cm": 186,
+          "price_per_m2_rub": 12218.0,
+          "price_total_rub": 63823.0
+        }
+      ]
+    }
+  ]
+}

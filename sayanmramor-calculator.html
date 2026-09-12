@@ -132,8 +132,8 @@
   .error {
     color: #ff5a1f;
     font-size: 13px;
-    margin-top: -12px;
-    margin-bottom: 16px;
+    margin-top: 6px;
+    margin-bottom: 10px;
     display: none;
   }
   .warning-box {
@@ -220,13 +220,19 @@
 <script src="pricing.js"></script>
 <script>
   const PRODUCTS = {
-    stoleshnitsa: { label: "Столешница", complexityMultiplier: 1.0, type: 'A' },
-    podokonnik:   { label: "Подоконник", complexityMultiplier: 0.8, type: 'A' },
-    lestnitsa:    { label: "Лестница", complexityMultiplier: 1.8, type: 'B' },
-    kamin:        { label: "Каминный портал", complexityMultiplier: 1.5, type: 'A' },
-    stena:        { label: "Облицовка стены", complexityMultiplier: 1.1, type: 'B' },
-    fasad:        { label: "Фасад", complexityMultiplier: 1.3, type: 'B' },
-    stupeni:      { label: "Ступени", complexityMultiplier: 1.4, type: 'A' }
+    lestnitsa:            { label: "Лестницы", complexityMultiplier: 1.8, type: 'B' },
+    panno:                { label: "Панно", complexityMultiplier: 1.6, type: 'B' },
+    podokonnik:           { label: "Подоконники", complexityMultiplier: 0.8, type: 'A' },
+    pol:                  { label: "Полы", complexityMultiplier: 1.0, type: 'B' },
+    stena:                { label: "Стены", complexityMultiplier: 1.1, type: 'B' },
+    fasad:                { label: "Фасады", complexityMultiplier: 1.3, type: 'B' },
+    stoleshnitsa_vannaya: { label: "Столешницы в ванную", complexityMultiplier: 0.9, type: 'A' },
+    // TODO: кухонные столешницы нуждаются в отдельной фильтрации камня по
+    // устойчивости к мех./хим. воздействиям (нож, вино и т.д.) — не весь
+    // камень из общего каталога годится для кухни. Фильтрации пока нет,
+    // добавим отдельным шагом, когда определим критерий классификации камня.
+    stoleshnitsa_kuhnya:  { label: "Столешницы на кухню", complexityMultiplier: 1.15, type: 'A' },
+    stupeni:              { label: "Ступени", complexityMultiplier: 1.4, type: 'A' }
   };
 
   const SAW_MARGIN_CM = 4;
@@ -361,7 +367,8 @@
       optionSurchargeSum,
       marginCm: SAW_MARGIN_CM,
       wasteFactor: AREA_WASTE_FACTOR,
-      workMultiplier: WORK_MULTIPLIER
+      workMultiplier: WORK_MULTIPLIER,
+      allowSeam: product.allowSeam !== false
     });
 
     if (!result.ok) {
@@ -373,6 +380,13 @@
         msg = 'Для этой площади нужно ' + result.nSlabs + ' ' + pluralizeSlabs(result.nSlabs) +
           ', в наличии только ' + result.availableCount + ' ' + pluralizeSlabs(result.availableCount) +
           ' — пришлите размеры менеджеру для точного расчёта.';
+      } else if (result.reason === 'no_fitting_slab') {
+        // Type A only (Type B never returns this reason): the seam can only
+        // run along the length, so an over-wide product is a geometry limit
+        // of this product type, not a stock shortage -- don't quote slab
+        // sizes here, that would wrongly read as "not enough stone".
+        msg = 'Указанная ширина слишком большая для цельного изделия такого типа — шов возможен только по длине. ' +
+          'Пришлите точные размеры менеджеру — подберём решение под ваш проект.';
       }
       warningOut.textContent = msg;
       warningOut.style.display = 'block';

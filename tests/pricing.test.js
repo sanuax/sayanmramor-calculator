@@ -85,10 +85,61 @@ test('calculatePrice: no stone selected / no slabs', () => {
   assert.equal(r.reason, 'no_slabs_for_stone');
 });
 
-test('calculatePrice: type A no fitting slab', () => {
-  const r = Pricing.calculatePrice({ stone, widthM: 3, lengthM: 2, productType: 'A', complexityMultiplier: 1, optionSurchargeSum: 0, marginCm: 4, wasteFactor: 1.3, workMultiplier: 2 });
+test('calculatePrice: type A no fitting slab even with a seam (cross dimension exceeds every slab side)', () => {
+  // 3x3 needs a 308cm cross dimension in every orientation, but the largest
+  // slab side in the fixture is 283cm -- no amount of splitting along one
+  // axis can fit a 308cm cross-section, so this must fall back to "ask a manager".
+  const r = Pricing.calculatePrice({ stone, widthM: 3, lengthM: 3, productType: 'A', complexityMultiplier: 1, optionSurchargeSum: 0, marginCm: 4, wasteFactor: 1.3, workMultiplier: 2 });
   assert.equal(r.ok, false);
   assert.equal(r.reason, 'no_fitting_slab');
+});
+
+test('calculatePrice: type A with allowSeam:false skips the segmented fallback (panels look wrong with a seam)', () => {
+  // Same 5x0.6 case that succeeds as a 1-slab seam when allowSeam defaults to
+  // true (see the countertop test below) -- with allowSeam:false it must go
+  // straight to "ask a manager" instead of silently proposing a seam.
+  const plentySlabs = [].concat(slabs, slabs, slabs, slabs, slabs);
+  const r = Pricing.calculatePrice({
+    stone: { name: 'X', slabs: plentySlabs }, widthM: 5, lengthM: 0.6, productType: 'A',
+    complexityMultiplier: 1, optionSurchargeSum: 0, marginCm: 4, wasteFactor: 1.3, workMultiplier: 2,
+    allowSeam: false
+  });
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'no_fitting_slab');
+});
+
+test('calculatePrice: type A allowSeam defaults to true when omitted', () => {
+  const r = Pricing.calculatePrice({ stone, widthM: 1.0, lengthM: 0.6, productType: 'A', complexityMultiplier: 1.0, optionSurchargeSum: 0, marginCm: 4, wasteFactor: 1.3, workMultiplier: 2 });
+  assert.equal(r.ok, true);
+});
+
+test('slabCapacityForCross: a slab yields multiple parallel strips, not just one', () => {
+  // 276x177 slab, cross=68 (a 0.6m-wide piece plus margin): 68 fits along
+  // either side, so it's cheaper to stack strips than to burn a whole slab
+  // per strip -- floor(276/68)=4 strips of length 177 (capacity 708) beats
+  // floor(177/68)=2 strips of length 276 (capacity 552); take the max.
+  const slab = { width_cm: 276, length_cm: 177 };
+  assert.equal(Pricing.slabCapacityForCross(slab, 68), 708);
+});
+
+test('slabCapacityForCross: cross bigger than every side returns 0', () => {
+  const slab = { width_cm: 276, length_cm: 177 };
+  assert.equal(Pricing.slabCapacityForCross(slab, 300), 0);
+});
+
+test('findTypeASegmentedResult: 3x2 splits into 2 segments along the long axis', () => {
+  // need_w=308, need_l=208 -> cross=208, long=308. Cheapest slab by price_per_m2
+  // is P0444194 (276x177); cross (208) only fits its long side (276), and only
+  // one strip fits (floor(276/208)=1), giving capacity 1*177=177: ceil(308/177)=2.
+  const r = Pricing.findTypeASegmentedResult(slabs, 3, 2, 4);
+  assert.equal(r.slab.article, 'P0444194');
+  assert.equal(r.segments, 2);
+  assert.equal(r.subtotal, 2 * 52673);
+});
+
+test('findTypeASegmentedResult: cross dimension bigger than every slab side returns null', () => {
+  const r = Pricing.findTypeASegmentedResult(slabs, 3, 3, 4);
+  assert.equal(r, null);
 });
 
 test('calculatePrice: type A happy path matches spec-verified numbers', () => {
@@ -99,6 +150,43 @@ test('calculatePrice: type A happy path matches spec-verified numbers', () => {
   assert.equal(r.total, 158019);
   assert.equal(r.nSlabs, 1);
   assert.ok(Math.abs(r.remainderM2 - 4.2852) < 0.0001);
+});
+
+const plentySlabs = [].concat(slabs, slabs, slabs, slabs, slabs); // 15 slabs, enough stock for seam scenarios
+
+test('calculatePrice: type A, 10x0.6 countertop needs a seam (far too long for one slab)', () => {
+  // need_l=1008cm, cross=68cm -> best capacity per slab is floor(276/68)*177=708
+  // (see slabCapacityForCross test above): ceil(1008/708) = 2 slabs, not 4 --
+  // a slab yields more than one strip, so segments-per-slab must be counted.
+  const r = Pricing.calculatePrice({ stone: { name: 'X', slabs: plentySlabs }, widthM: 10, lengthM: 0.6, productType: 'A', complexityMultiplier: 1, optionSurchargeSum: 0, marginCm: 4, wasteFactor: 1.3, workMultiplier: 2 });
+  assert.equal(r.ok, true);
+  assert.equal(r.nSlabs, 2);
+  assert.equal(r.subtotal, 2 * 52673);
+  assert.equal(r.remainderM2, null);
+});
+
+test('calculatePrice: type A, 5x0.6 countertop fits a single slab cut into two pieces (area alone would be misleading)', () => {
+  // Area check would be misleading here: 5*0.6=3m2 fits inside a single slab's
+  // ~4.8m2, but geometrically the 5m length exceeds every slab's longest side
+  // (2.83m) in any rotation, so findBestTypeASlab (whole-piece fit) fails and
+  // this falls through to the seam path. But the seam path must recognize that
+  // one slab can supply two strips (708cm of achievable length, see above),
+  // which comfortably covers the needed 508cm as one slab cut in two, not two
+  // separate slabs.
+  const r = Pricing.calculatePrice({ stone: { name: 'X', slabs: plentySlabs }, widthM: 5, lengthM: 0.6, productType: 'A', complexityMultiplier: 1, optionSurchargeSum: 0, marginCm: 4, wasteFactor: 1.3, workMultiplier: 2 });
+  assert.equal(r.ok, true);
+  assert.equal(r.nSlabs, 1);
+  assert.equal(r.subtotal, 52673);
+  assert.equal(r.remainderM2, null);
+});
+
+test('calculatePrice: type A, 2x1.5 countertop still fits a single slab (no seam)', () => {
+  const r = Pricing.calculatePrice({ stone, widthM: 2, lengthM: 1.5, productType: 'A', complexityMultiplier: 1, optionSurchargeSum: 0, marginCm: 4, wasteFactor: 1.3, workMultiplier: 2 });
+  assert.equal(r.ok, true);
+  assert.equal(r.nSlabs, 1);
+  assert.equal(r.matchedSlab.article, 'P0444194');
+  assert.equal(r.subtotal, 52673);
+  assert.ok(r.remainderM2 > 0);
 });
 
 test('calculatePrice: type B happy path', () => {
