@@ -261,6 +261,48 @@ class MergeStoneIntoDataTests(unittest.TestCase):
         self.assertTrue(skipped)
         self.assertEqual(new_data, data)
 
+    def test_inserts_new_stone_with_empty_slabs_instead_of_dropping(self):
+        data = {'updated_at': None, 'stones': []}
+        stone = {'id': 'new-stone', 'name': 'New Stone', 'slabs': []}
+        new_data, was_empty = scrape_slabs.merge_stone_into_data(data, stone)
+        self.assertTrue(was_empty)
+        self.assertEqual(len(new_data['stones']), 1)
+        self.assertEqual(new_data['stones'][0]['id'], 'new-stone')
+        self.assertEqual(new_data['stones'][0]['slabs'], [])
+
+    def test_new_stone_defaults_image_to_none(self):
+        data = {'updated_at': None, 'stones': []}
+        stone = {'id': 'delicato-brown', 'name': 'Delicato Brown', 'slabs': [{'article': 'A1'}]}
+        new_data, _ = scrape_slabs.merge_stone_into_data(data, stone)
+        self.assertIsNone(new_data['stones'][0]['image'])
+
+    def test_carries_forward_image_when_new_stone_omits_it(self):
+        data = {
+            'updated_at': None,
+            'stones': [{
+                'id': 'delicato-brown', 'name': 'Old',
+                'image': 'images/delicato-brown.jpg', 'slabs': [{'article': 'OLD'}],
+            }],
+        }
+        stone = {'id': 'delicato-brown', 'name': 'New', 'slabs': [{'article': 'NEW'}]}
+        new_data, _ = scrape_slabs.merge_stone_into_data(data, stone)
+        self.assertEqual(new_data['stones'][0]['image'], 'images/delicato-brown.jpg')
+
+    def test_keeps_new_image_when_new_stone_sets_it(self):
+        data = {
+            'updated_at': None,
+            'stones': [{
+                'id': 'delicato-brown', 'name': 'Old',
+                'image': 'images/old.jpg', 'slabs': [{'article': 'OLD'}],
+            }],
+        }
+        stone = {
+            'id': 'delicato-brown', 'name': 'New',
+            'image': 'images/delicato-brown.jpg', 'slabs': [{'article': 'NEW'}],
+        }
+        new_data, _ = scrape_slabs.merge_stone_into_data(data, stone)
+        self.assertEqual(new_data['stones'][0]['image'], 'images/delicato-brown.jpg')
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -185,24 +185,29 @@ def load_stone_urls(path):
 
 
 def merge_stone_into_data(data, stone):
-    if not stone.get('slabs'):
-        return data, True
-
     stones = data.get('stones', [])
-    new_stones = []
-    updated = False
-    for existing in stones:
-        if existing.get('id') == stone['id']:
-            new_stones.append(stone)
-            updated = True
-        else:
-            new_stones.append(existing)
-    if not updated:
-        new_stones.append(stone)
+    is_empty = not stone.get('slabs')
+    existing = next((s for s in stones if s.get('id') == stone.get('id')), None)
+
+    if existing is not None:
+        if is_empty:
+            # A stone we already have real slab data for came back empty
+            # this run (temporary stockout, or a scrape glitch) -- keep
+            # what we already know rather than wiping it out.
+            return data, True
+        if 'image' not in stone:
+            stone['image'] = existing.get('image')
+        new_stones = [stone if s.get('id') == stone['id'] else s for s in stones]
+    else:
+        # A stone we've never seen before: keep it even with slabs: [] so
+        # the calculator can show it as "out of stock" instead of it simply
+        # not existing anywhere in the catalog.
+        stone.setdefault('image', None)
+        new_stones = stones + [stone]
 
     new_data = dict(data)
     new_data['stones'] = new_stones
-    return new_data, False
+    return new_data, is_empty
 
 
 # Party rows (.prt) and, for stones with more than one category/surface
