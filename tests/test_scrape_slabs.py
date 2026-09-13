@@ -66,8 +66,19 @@ class ExtractSlabsFromHtmlTests(unittest.TestCase):
         stone, _ = scrape_slabs.extract_slabs_from_html(self.html, FIXTURE_URL)
         self.assertEqual(stone['id'], 'delicato-brown')
         self.assertEqual(stone['category'], 'marble')
+        self.assertEqual(stone['hardness_category'], 1)
         self.assertEqual(stone['name'], 'Delicato Brown')
         self.assertEqual(stone['source_url'], FIXTURE_URL)
+
+    def test_hardness_category_by_segment(self):
+        cases = [
+            ('https://veneziastone.com/granite/absolute-black/slabs/', 2),
+            ('https://veneziastone.com/agate/agate-delta/slabs/', 3),
+            ('https://veneziastone.com/some-future-stone/x/slabs/', None),
+        ]
+        for url, expected in cases:
+            stone, _ = scrape_slabs.extract_slabs_from_html(self.html, url)
+            self.assertEqual(stone['hardness_category'], expected, url)
 
     def test_keeps_available_slabs_with_correct_fields(self):
         stone, _ = scrape_slabs.extract_slabs_from_html(self.html, FIXTURE_URL)

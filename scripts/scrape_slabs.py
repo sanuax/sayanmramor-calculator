@@ -2,6 +2,44 @@ import re
 
 from bs4 import BeautifulSoup
 
+# Processing-difficulty tier per stone category (URL segment), used to scale
+# the work multiplier in the pricing calculator. Values are provisional --
+# assigned by category, not yet backed by real order data; expect this
+# mapping and the multipliers that key off it (see sayanmramor-calculator.html)
+# to be replaced once that data exists. A category not listed here (a new
+# stone type not yet seen in the catalog) gets None and the calculator falls
+# back to its pre-tier default multiplier.
+HARDNESS_CATEGORY_BY_SEGMENT = {
+    # 1 - лёгкая
+    'marble': 1,
+    'oniks': 1,
+    'travertin': 1,
+    'limestone': 1,
+    'soapstone': 1,          # Талькохлорит
+    'terrazzo': 1,           # Терраццо -- not seen in the catalog yet
+    'pescanik': 1,           # Песчаник
+    'artificial-marble': 1,
+    'specennyi-kamen': 1,    # Спечённый камень
+    # 2 - средняя
+    'quartz-agglomerate': 2,
+    'granite': 2,
+    'quartzite': 2,
+    'labradorite': 2,
+    'slate': 2,
+    'kvarc': 2,
+    # 3 - твёрдая
+    'agate': 3,
+    'amethyst': 3,
+    'malaxit': 3,            # Малахит
+    'obsidian': 3,
+    'jasper': 3,             # Яшма
+    'apatite': 3,
+    'septariya': 3,          # Септария
+    'tigrovyi-glaz': 3,      # Тигровый глаз
+    'petrified-wood': 3,
+    'aragonit': 3,           # Арагонит
+}
+
 
 def parse_ru_number(s):
     if s is None:
@@ -109,6 +147,7 @@ def extract_slabs_from_html(html, source_url):
         'id': stone_id,
         'name': name,
         'category': category,
+        'hardness_category': HARDNESS_CATEGORY_BY_SEGMENT.get(category),
         'source_url': source_url,
         'slabs': slabs,
     }
