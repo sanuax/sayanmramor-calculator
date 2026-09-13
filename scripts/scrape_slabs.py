@@ -100,8 +100,21 @@ def extract_price_from_cell(td):
     return parse_ru_number(divs[-1].get_text())
 
 
+def extract_main_image_url(soup):
+    og_image = soup.find('meta', property='og:image')
+    if og_image and og_image.get('content'):
+        return og_image['content']
+    main = soup.find('main')
+    if main:
+        img = main.find('img')
+        if img and img.get('src'):
+            return img['src']
+    return None
+
+
 def extract_slabs_from_html(html, source_url):
     soup = BeautifulSoup(html, 'html.parser')
+    image_url = extract_main_image_url(soup)
     h1 = soup.find('h1')
     name = stone_name_from_h1(h1.get_text()) if h1 else None
     stone_id, category = stone_id_and_category_from_url(source_url)
@@ -170,7 +183,7 @@ def extract_slabs_from_html(html, source_url):
         'source_url': source_url,
         'slabs': slabs,
     }
-    return stone, skipped
+    return stone, skipped, image_url
 
 
 def load_stone_urls(path):
@@ -363,7 +376,7 @@ def main(argv=None):
             print(f'Scraping {url} ...')
             try:
                 html = fetch_rendered_html(page, url, debug=args.debug)
-                stone, skipped = extract_slabs_from_html(html, url)
+                stone, skipped, image_url = extract_slabs_from_html(html, url)
                 if stone.get('name') is None:
                     # No <h1> means the site served its ErrorPage / fallback
                     # shell instead of the real stone page (seen under load —

@@ -2,6 +2,8 @@ import sys
 import unittest
 from pathlib import Path
 
+from bs4 import BeautifulSoup
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'scripts'))
 import scrape_slabs
 
@@ -71,6 +73,39 @@ class StoneNameFromH1Tests(unittest.TestCase):
         )
 
 
+class ExtractMainImageUrlTests(unittest.TestCase):
+    def test_prefers_og_image_meta_tag(self):
+        html = '''
+        <html><head>
+          <meta property="og:image" content="https://veneziastone.com/img/hero.jpg">
+        </head><body>
+          <main><img src="https://veneziastone.com/img/thumb.jpg"></main>
+        </body></html>
+        '''
+        soup = BeautifulSoup(html, 'html.parser')
+        self.assertEqual(
+            scrape_slabs.extract_main_image_url(soup),
+            'https://veneziastone.com/img/hero.jpg'
+        )
+
+    def test_falls_back_to_first_img_in_main_when_no_og_image(self):
+        html = '''
+        <html><body>
+          <main><img src="https://veneziastone.com/img/thumb.jpg"></main>
+        </body></html>
+        '''
+        soup = BeautifulSoup(html, 'html.parser')
+        self.assertEqual(
+            scrape_slabs.extract_main_image_url(soup),
+            'https://veneziastone.com/img/thumb.jpg'
+        )
+
+    def test_none_when_no_image_found_anywhere(self):
+        html = '<html><body><main><p>no images here</p></main></body></html>'
+        soup = BeautifulSoup(html, 'html.parser')
+        self.assertIsNone(scrape_slabs.extract_main_image_url(soup))
+
+
 FIXTURE_PATH = Path(__file__).resolve().parent / 'fixtures' / 'delicato-brown-slabs.html'
 FIXTURE_URL = 'https://veneziastone.com/marble/delicato-brown/slabs/'
 
@@ -81,7 +116,7 @@ class ExtractSlabsFromHtmlTests(unittest.TestCase):
             self.html = f.read()
 
     def test_stone_metadata(self):
-        stone, _ = scrape_slabs.extract_slabs_from_html(self.html, FIXTURE_URL)
+        stone, _, _ = scrape_slabs.extract_slabs_from_html(self.html, FIXTURE_URL)
         self.assertEqual(stone['id'], 'delicato-brown')
         self.assertEqual(stone['category'], 'marble')
         self.assertEqual(stone['hardness_category'], 1)
@@ -95,11 +130,11 @@ class ExtractSlabsFromHtmlTests(unittest.TestCase):
             ('https://veneziastone.com/some-future-stone/x/slabs/', None),
         ]
         for url, expected in cases:
-            stone, _ = scrape_slabs.extract_slabs_from_html(self.html, url)
+            stone, _, _ = scrape_slabs.extract_slabs_from_html(self.html, url)
             self.assertEqual(stone['hardness_category'], expected, url)
 
     def test_keeps_available_slabs_with_correct_fields(self):
-        stone, _ = scrape_slabs.extract_slabs_from_html(self.html, FIXTURE_URL)
+        stone, _, _ = scrape_slabs.extract_slabs_from_html(self.html, FIXTURE_URL)
         self.assertEqual(len(stone['slabs']), 16)
         by_article = {s['article']: s for s in stone['slabs']}
         self.assertIn('P0444194', by_article)
@@ -113,7 +148,7 @@ class ExtractSlabsFromHtmlTests(unittest.TestCase):
         self.assertEqual(slab['city'], 'Санкт-Петербург')
 
     def test_excludes_reserved_and_sold_rows(self):
-        stone, skipped = scrape_slabs.extract_slabs_from_html(self.html, FIXTURE_URL)
+        stone, skipped, _ = scrape_slabs.extract_slabs_from_html(self.html, FIXTURE_URL)
         kept_articles = {s['article'] for s in stone['slabs']}
         self.assertNotIn('P0444195', kept_articles)  # В резерве
         self.assertNotIn('P0517504', kept_articles)  # Продано
@@ -126,19 +161,19 @@ class ExtractSlabsFromHtmlTests(unittest.TestCase):
             article='ART1', status_text='По запросу',
             include_request_button=True,
         )
-        stone, skipped = scrape_slabs.extract_slabs_from_html(html, 'https://example.test/marble/x/slabs/')
+        stone, skipped, _ = scrape_slabs.extract_slabs_from_html(html, 'https://example.test/marble/x/slabs/')
         self.assertEqual(stone['slabs'], [])
         self.assertEqual(skipped[0]['status'], 'По запросу')
 
     def test_excludes_row_with_only_request_button_no_status_span(self):
         html = _make_synthetic_batch_html(article='ART2', status_text=None, include_request_button=True)
-        stone, skipped = scrape_slabs.extract_slabs_from_html(html, 'https://example.test/marble/x/slabs/')
+        stone, skipped, _ = scrape_slabs.extract_slabs_from_html(html, 'https://example.test/marble/x/slabs/')
         self.assertEqual(stone['slabs'], [])
         self.assertTrue(skipped[0]['has_request_btn'])
 
     def test_keeps_row_with_no_status_and_cart_button(self):
         html = _make_synthetic_batch_html(article='ART3', status_text=None, include_request_button=False)
-        stone, skipped = scrape_slabs.extract_slabs_from_html(html, 'https://example.test/marble/x/slabs/')
+        stone, skipped, _ = scrape_slabs.extract_slabs_from_html(html, 'https://example.test/marble/x/slabs/')
         self.assertEqual(len(stone['slabs']), 1)
         self.assertEqual(stone['slabs'][0]['article'], 'ART3')
         self.assertEqual(skipped, [])
@@ -150,10 +185,19 @@ class ExtractSlabsFromHtmlTests(unittest.TestCase):
         # name to tell "error page" apart from "stone genuinely has 0 slabs
         # in stock" (which still has a real <h1>).
         html = '<html><body><div>Товар не найден</div></body></html>'
-        stone, skipped = scrape_slabs.extract_slabs_from_html(html, 'https://example.test/agate/x/slabs/')
+        stone, skipped, _ = scrape_slabs.extract_slabs_from_html(html, 'https://example.test/agate/x/slabs/')
         self.assertIsNone(stone['name'])
         self.assertEqual(stone['slabs'], [])
         self.assertEqual(skipped, [])
+
+    def test_returns_main_image_url_as_third_value(self):
+        _, _, image_url = scrape_slabs.extract_slabs_from_html(self.html, FIXTURE_URL)
+        self.assertEqual(
+            image_url,
+            'https://cdn.veneziastone.com/234dfwer3r/resize:fill:850:500/enlarge:1/'
+            'gravity:ce/format:webp/plain/https://storage.yandexcloud.net/'
+            'venezia-photo/textures1710/00354.JPG'
+        )
 
 
 def _make_synthetic_batch_html(article, status_text, include_request_button):
