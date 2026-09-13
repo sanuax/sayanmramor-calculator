@@ -67,11 +67,30 @@ def stone_id_and_category_from_url(url):
     return stone_id, category
 
 
+# Russian words that show up inside an otherwise-English stone name and have
+# a real English equivalent worth keeping (an origin, or -- for polockii, a
+# stone with no separate English name at all) -- as opposed to a bare
+# category word like "Мрамор"/"Агломерат", which stone_name_from_h1 strips
+# outright instead of translating.
+RUSSIAN_WORD_TRANSLATIONS = {
+    'Сирийский': 'Syrian',
+    'Турецкий': 'Turkish',
+    'Испанский': 'Spanish',
+    'Полоцкий': 'Polotskiy',
+}
+
+
+def translate_russian_words(name):
+    return ' '.join(RUSSIAN_WORD_TRANSLATIONS.get(word, word) for word in name.split(' '))
+
+
 def stone_name_from_h1(h1_text):
-    m = re.match(r'^\S+\s+(.+?)\s+в слэбах\s*$', h1_text.strip())
-    if m:
-        return m.group(1)
-    return h1_text.strip()
+    # The leading \S+ is a category word ("Мрамор", "Агломерат", ...); most
+    # category pages' h1 ends with "в слэбах" but some don't, so that suffix
+    # is optional rather than required for the category word to be stripped.
+    m = re.match(r'^\S+\s+(.+?)(?:\s+в слэбах)?\s*$', h1_text.strip())
+    name = m.group(1) if m else h1_text.strip()
+    return translate_russian_words(name)
 
 
 def extract_price_from_cell(td):

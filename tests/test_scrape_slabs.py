@@ -48,8 +48,26 @@ class StoneNameFromH1Tests(unittest.TestCase):
 
     def test_falls_back_to_raw_text_on_mismatch(self):
         self.assertEqual(
-            scrape_slabs.stone_name_from_h1('  Какой-то другой заголовок  '),
-            'Какой-то другой заголовок'
+            scrape_slabs.stone_name_from_h1('  ЕдинственноеСлово  '),
+            'ЕдинственноеСлово'
+        )
+
+    def test_strips_leading_category_word_without_v_slabah_suffix(self):
+        self.assertEqual(
+            scrape_slabs.stone_name_from_h1('мрамор Arabescato Vagli'),
+            'Arabescato Vagli'
+        )
+
+    def test_translates_known_russian_origin_word(self):
+        self.assertEqual(
+            scrape_slabs.stone_name_from_h1('Мрамор Crema Marfil Сирийский в слэбах'),
+            'Crema Marfil Syrian'
+        )
+
+    def test_transliterates_polockii_with_no_english_name(self):
+        self.assertEqual(
+            scrape_slabs.stone_name_from_h1('Мрамор Полоцкий в слэбах'),
+            'Polotskiy'
         )
 
 
