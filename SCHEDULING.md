@@ -21,9 +21,13 @@
 
 Картинки камней меняются намного реже цен, поэтому их скачивание —
 отдельная задача на своём, более редком расписании (раз в неделю),
-а не часть ежедневного прогона:
+а не часть ежедневного прогона. Время запуска (04:00) намеренно не
+совпадает с ежедневной задачей в 07:00: обе задачи после каждого
+камня целиком перечитывают и перезаписывают `data/slabs.json`, и при
+пересечении по времени та, что завершится последней, молча затрёт
+результат другой.
 
-    schtasks /create /tn "VeneziaStone-ScrapeSlabsImages" /tr "python D:\calculator\scripts\scrape_slabs.py --fetch-images" /sc weekly /d SUN /st 07:00 /f
+    schtasks /create /tn "VeneziaStone-ScrapeSlabsImages" /tr "python D:\calculator\scripts\scrape_slabs.py --fetch-images" /sc weekly /d SUN /st 04:00 /f
 
 Запустить вручную для проверки: `schtasks /run /tn "VeneziaStone-ScrapeSlabsImages"`
 Удалить задачу: `schtasks /delete /tn "VeneziaStone-ScrapeSlabsImages" /f`

@@ -1,5 +1,6 @@
 import mimetypes
 import re
+from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
@@ -101,15 +102,20 @@ def extract_price_from_cell(td):
     return parse_ru_number(divs[-1].get_text())
 
 
-def extract_main_image_url(soup):
+def extract_main_image_url(soup, source_url):
+    # urljoin leaves an already-absolute URL unchanged, so applying it
+    # unconditionally (rather than only to the fallback branch, where it's
+    # actually needed) makes "always returns an absolute URL or None" an
+    # unconditional contract instead of one that relies on the convention
+    # that og:image is always absolute holding true.
     og_image = soup.find('meta', property='og:image')
     if og_image and og_image.get('content'):
-        return og_image['content']
+        return urljoin(source_url, og_image['content'])
     main = soup.find('main')
     if main:
         img = main.find('img')
         if img and img.get('src'):
-            return img['src']
+            return urljoin(source_url, img['src'])
     return None
 
 
@@ -139,7 +145,7 @@ def download_stone_image(request_context, image_url, images_dir, stone_id):
 
 def extract_slabs_from_html(html, source_url):
     soup = BeautifulSoup(html, 'html.parser')
-    image_url = extract_main_image_url(soup)
+    image_url = extract_main_image_url(soup, source_url)
     h1 = soup.find('h1')
     name = stone_name_from_h1(h1.get_text()) if h1 else None
     stone_id, category = stone_id_and_category_from_url(source_url)
@@ -231,7 +237,18 @@ def merge_stone_into_data(data, stone):
         if is_empty:
             # A stone we already have real slab data for came back empty
             # this run (temporary stockout, or a scrape glitch) -- keep
-            # what we already know rather than wiping it out.
+            # what we already know rather than wiping it out. But if a
+            # --fetch-images run just downloaded a fresh image for this
+            # stone (the file is already on disk by the time we get here),
+            # apply that one field so disk and JSON don't go out of sync --
+            # everything else about the existing record stays untouched.
+            if stone.get('image') and stone['image'] != existing.get('image'):
+                updated_existing = dict(existing)
+                updated_existing['image'] = stone['image']
+                new_data = dict(data)
+                new_data['stones'] = [updated_existing if s.get('id') == stone.get('id') else s
+                                       for s in stones]
+                return new_data, True
             return data, True
         if 'image' not in stone:
             stone['image'] = existing.get('image')

@@ -73,6 +73,9 @@ class StoneNameFromH1Tests(unittest.TestCase):
         )
 
 
+SOURCE_URL_PLACEHOLDER = 'https://veneziastone.com/marble/test-stone/slabs/'
+
+
 class ExtractMainImageUrlTests(unittest.TestCase):
     def test_prefers_og_image_meta_tag(self):
         html = '''
@@ -84,7 +87,7 @@ class ExtractMainImageUrlTests(unittest.TestCase):
         '''
         soup = BeautifulSoup(html, 'html.parser')
         self.assertEqual(
-            scrape_slabs.extract_main_image_url(soup),
+            scrape_slabs.extract_main_image_url(soup, SOURCE_URL_PLACEHOLDER),
             'https://veneziastone.com/img/hero.jpg'
         )
 
@@ -96,14 +99,26 @@ class ExtractMainImageUrlTests(unittest.TestCase):
         '''
         soup = BeautifulSoup(html, 'html.parser')
         self.assertEqual(
-            scrape_slabs.extract_main_image_url(soup),
+            scrape_slabs.extract_main_image_url(soup, SOURCE_URL_PLACEHOLDER),
+            'https://veneziastone.com/img/thumb.jpg'
+        )
+
+    def test_resolves_relative_fallback_img_src_against_source_url(self):
+        html = '''
+        <html><body>
+          <main><img src="/img/thumb.jpg"></main>
+        </body></html>
+        '''
+        soup = BeautifulSoup(html, 'html.parser')
+        self.assertEqual(
+            scrape_slabs.extract_main_image_url(soup, SOURCE_URL_PLACEHOLDER),
             'https://veneziastone.com/img/thumb.jpg'
         )
 
     def test_none_when_no_image_found_anywhere(self):
         html = '<html><body><main><p>no images here</p></main></body></html>'
         soup = BeautifulSoup(html, 'html.parser')
-        self.assertIsNone(scrape_slabs.extract_main_image_url(soup))
+        self.assertIsNone(scrape_slabs.extract_main_image_url(soup, SOURCE_URL_PLACEHOLDER))
 
 
 FIXTURE_PATH = Path(__file__).resolve().parent / 'fixtures' / 'delicato-brown-slabs.html'
@@ -304,6 +319,29 @@ class MergeStoneIntoDataTests(unittest.TestCase):
         new_data, skipped = scrape_slabs.merge_stone_into_data(data, stone)
         self.assertTrue(skipped)
         self.assertEqual(new_data, data)
+
+    def test_updates_image_when_new_slabs_empty_but_image_changed(self):
+        # A --fetch-images run can download a fresh image for a stone that
+        # comes back with zero slabs this run (temporarily out of stock).
+        # The file is already written to disk by the time this runs, so the
+        # image path must be applied even though the (real, non-empty) slabs
+        # from the previous run are correctly being preserved untouched.
+        data = {
+            'updated_at': None,
+            'stones': [{
+                'id': 'delicato-brown', 'name': 'Old',
+                'image': 'images/old.jpg', 'slabs': [{'article': 'OLD'}],
+            }],
+        }
+        stone = {
+            'id': 'delicato-brown', 'name': 'New',
+            'image': 'images/new.webp', 'slabs': [],
+        }
+        new_data, skipped = scrape_slabs.merge_stone_into_data(data, stone)
+        self.assertTrue(skipped)
+        by_id = {s['id']: s for s in new_data['stones']}
+        self.assertEqual(by_id['delicato-brown']['image'], 'images/new.webp')
+        self.assertEqual(by_id['delicato-brown']['slabs'], [{'article': 'OLD'}])
 
     def test_inserts_new_stone_with_empty_slabs_instead_of_dropping(self):
         data = {'updated_at': None, 'stones': []}
