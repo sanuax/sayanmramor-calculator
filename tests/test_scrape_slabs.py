@@ -114,6 +114,18 @@ class ExtractSlabsFromHtmlTests(unittest.TestCase):
         self.assertEqual(stone['slabs'][0]['article'], 'ART3')
         self.assertEqual(skipped, [])
 
+    def test_no_h1_gives_none_name_not_a_fake_empty_stone(self):
+        # The site occasionally serves its ErrorPage/fallback shell (HTTP 200,
+        # no product data) instead of a real stone page under load. That page
+        # has no <h1>, unlike every real stone page -- callers use a None
+        # name to tell "error page" apart from "stone genuinely has 0 slabs
+        # in stock" (which still has a real <h1>).
+        html = '<html><body><div>Товар не найден</div></body></html>'
+        stone, skipped = scrape_slabs.extract_slabs_from_html(html, 'https://example.test/agate/x/slabs/')
+        self.assertIsNone(stone['name'])
+        self.assertEqual(stone['slabs'], [])
+        self.assertEqual(skipped, [])
+
 
 def _make_synthetic_batch_html(article, status_text, include_request_button):
     status_span = f'<span class="font-bold">{status_text}</span>' if status_text else ''
@@ -162,6 +174,25 @@ class LoadStoneUrlsTests(unittest.TestCase):
             self.assertEqual(urls, [
                 'https://veneziastone.com/marble/delicato-brown/slabs/',
                 'https://veneziastone.com/onyx/white/slabs/',
+            ])
+        finally:
+            os.unlink(path)
+
+
+class LogFailedUrlTests(unittest.TestCase):
+    def test_round_trips_cleanly_through_load_stone_urls(self):
+        # A url+error glued onto one line (the original bug) would come back
+        # out of load_stone_urls as one bogus "url" containing the error
+        # text, breaking a retry run built on the same file.
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
+            path = f.name
+        try:
+            scrape_slabs.log_failed_url(path, 'https://veneziastone.com/agate/athena/slabs/', TimeoutError('boom'))
+            scrape_slabs.log_failed_url(path, 'https://veneziastone.com/agate/aura/slabs/', TimeoutError('boom2'))
+            urls = scrape_slabs.load_stone_urls(path)
+            self.assertEqual(urls, [
+                'https://veneziastone.com/agate/athena/slabs/',
+                'https://veneziastone.com/agate/aura/slabs/',
             ])
         finally:
             os.unlink(path)

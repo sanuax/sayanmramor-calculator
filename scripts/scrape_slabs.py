@@ -147,59 +147,95 @@ def merge_stone_into_data(data, stone):
     return new_data, False
 
 
-def fetch_rendered_html(url, debug=False):
-    from playwright.sync_api import sync_playwright
+# Party rows (.prt) and, for stones with more than one category/surface
+# group, the group itself (e.g. two different "Категория" values) are both
+# the same Headless UI Disclosure component, just at different nesting
+# depths -- there's no fixed number of levels: a group closed by default
+# hides its parties from the DOM entirely (they don't just stay hidden via
+# CSS), so a second group's parties can be completely invisible to a
+# selector that only ever looks at .prt. This selects any closed disclosure
+# button anywhere under <main>, at whatever depth, so a click-and-requery
+# loop can open every level without assuming how many there are. Scoped to
+# <main> (rather than unscoped) to skip the site's mobile nav drawer and
+# footer accordions, which reuse the same component but are permanently
+# invisible in a desktop-viewport headless run -- clicking them only wastes
+# time across a large batch for no benefit.
+CLOSED_DISCLOSURE_SELECTOR = 'main [id^="headlessui-disclosure-button"][aria-expanded="false"]'
+EXPAND_MAX_PASSES = 6
+EXPAND_ACTION_TIMEOUT_MS = 2000
+EXPAND_WALL_CLOCK_BUDGET_S = 20
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
-        page.goto(url, wait_until='networkidle')
 
-        # Each party block (.prt) is a Headless UI Disclosure (accordion):
-        # its slab rows are already in the DOM but collapsed, and only
-        # appear in page.content() once its disclosure button is clicked
-        # open. Neither scrolling nor visibility triggers this — it takes
-        # an actual click on each of the 15 party blocks.
-        parties = page.query_selector_all('.prt')
+def dismiss_overlays(page):
+    # A `.cbk-window-bgr` callback/chat-widget overlay can appear and
+    # intercept pointer events, blocking every click underneath it.
+    page.evaluate("document.querySelectorAll('.cbk-window-bgr').forEach(el => el.remove())")
+
+
+def expand_all_parties(page, debug=False):
+    # Only clicks disclosures that are actually closed (aria-expanded
+    # "false"). Clicking one that's already open would collapse it and
+    # make its slab table disappear from the captured HTML -- this is what
+    # silently produced zero slabs for stones whose single party the site
+    # already expands by default.
+    start = time.monotonic()
+    for pass_num in range(1, EXPAND_MAX_PASSES + 1):
+        if time.monotonic() - start > EXPAND_WALL_CLOCK_BUDGET_S:
+            if debug:
+                print(f'  [debug] expand loop: {EXPAND_WALL_CLOCK_BUDGET_S}s wall-clock budget exceeded')
+            break
+
+        dismiss_overlays(page)
+
+        closed = page.query_selector_all(CLOSED_DISCLOSURE_SELECTOR)
         if debug:
-            print(f'  [debug] found {len(parties)} party blocks')
+            print(f'  [debug] expand pass {pass_num}: {len(closed)} closed disclosure(s)')
+        if not closed:
+            break
 
-        for i, party in enumerate(parties):
+        for btn in closed:
+            if time.monotonic() - start > EXPAND_WALL_CLOCK_BUDGET_S:
+                break
             try:
-                target = party.query_selector('[id^="headlessui-disclosure-button"]') \
-                    or party.query_selector('.stretched-link')
-                if target:
-                    target.scroll_into_view_if_needed()
-                    target.click(timeout=3000)
+                btn.scroll_into_view_if_needed(timeout=EXPAND_ACTION_TIMEOUT_MS)
+                btn.click(timeout=EXPAND_ACTION_TIMEOUT_MS)
             except Exception as e:
                 if debug:
-                    print(f'  [debug] party {i + 1}/{len(parties)}, click failed: {e!r}')
-            page.wait_for_timeout(150)
-            if debug:
-                height = page.evaluate('document.body.scrollHeight')
-                print(f'  [debug] party {i + 1}/{len(parties)}, scrollHeight={height}')
+                    print(f'  [debug] expand click failed: {e!r}')
+        page.wait_for_timeout(300)
 
-        # No final networkidle wait here: clicking a disclosure button is a
-        # local DOM/CSS toggle, not a network request, and the page keeps
-        # firing background analytics traffic that never lets networkidle
-        # settle once hundreds of rows are rendered.
-        page.wait_for_timeout(1500)
-        html = page.content()
-        if debug:
-            print(f'  [debug] final scrollHeight={page.evaluate("document.body.scrollHeight")}')
-        browser.close()
-        return html
+
+def fetch_rendered_html(page, url, debug=False):
+    # `page` is a Playwright page reused across every stone in a run — see
+    # main(): opening/closing a whole Chromium instance per stone is wasteful
+    # when scraping hundreds of them.
+    page.goto(url, wait_until='networkidle')
+
+    expand_all_parties(page, debug=debug)
+
+    # No final networkidle wait here: clicking a disclosure button is a
+    # local DOM/CSS toggle, not a network request, and the page keeps
+    # firing background analytics traffic that never lets networkidle
+    # settle once hundreds of rows are rendered.
+    page.wait_for_timeout(1500)
+    html = page.content()
+    if debug:
+        print(f'  [debug] final scrollHeight={page.evaluate("document.body.scrollHeight")}')
+    return html
 
 
 import argparse
 import json
+import random
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_URLS_PATH = PROJECT_ROOT / 'scripts' / 'stone_urls.txt'
 DEFAULT_OUTPUT_PATH = PROJECT_ROOT / 'data' / 'slabs.json'
+DEFAULT_FAILED_LOG_PATH = PROJECT_ROOT / 'scripts' / 'failed_urls.txt'
 
 
 def load_existing_data(path):
@@ -209,34 +245,96 @@ def load_existing_data(path):
         return json.load(f)
 
 
+def save_data(data, output_path):
+    data = dict(data)
+    data['updated_at'] = datetime.now(timezone.utc).astimezone().isoformat(timespec='seconds')
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    return data
+
+
+def write_url_list(path, urls):
+    with open(path, 'w', encoding='utf-8') as f:
+        for u in urls:
+            f.write(u + '\n')
+
+
+def log_failed_url(path, url, error):
+    # The error goes on its own '#' comment line so failed_urls.txt stays a
+    # valid input for --urls on a retry (load_stone_urls already skips '#'
+    # lines) -- a url+error glued onto one line would get treated as a
+    # single, invalid "url" on the next run.
+    with open(path, 'a', encoding='utf-8') as f:
+        f.write(f'# {error!r}\n{url}\n')
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description='Scrape veneziastone.com slab pages into slabs.json')
     parser.add_argument('--urls', default=str(DEFAULT_URLS_PATH))
     parser.add_argument('--output', default=str(DEFAULT_OUTPUT_PATH))
     parser.add_argument('--debug', action='store_true')
+    parser.add_argument('--limit', type=int, default=None,
+                         help='process at most N urls this run, leaving the rest queued for next time')
+    parser.add_argument('--consume-queue', action='store_true',
+                         help='rewrite --urls after each stone to drop it from the file (for large, resumable '
+                              'catalog runs); without this flag --urls is left untouched, as for the small '
+                              'curated stone_urls.txt list')
+    parser.add_argument('--failed-log', default=str(DEFAULT_FAILED_LOG_PATH))
+    parser.add_argument('--delay-min', type=float, default=3.0, help='min seconds to wait between stones')
+    parser.add_argument('--delay-max', type=float, default=7.0, help='max seconds to wait between stones')
     args = parser.parse_args(argv)
 
     urls = load_stone_urls(args.urls)
-    data = load_existing_data(Path(args.output))
-
-    for url in urls:
-        print(f'Scraping {url} ...')
-        html = fetch_rendered_html(url, debug=args.debug)
-        stone, skipped = extract_slabs_from_html(html, url)
-        if args.debug:
-            print(f'  {stone["id"]}: kept {len(stone["slabs"])}, skipped {len(skipped)}')
-            for row in skipped:
-                print('   skipped:', row)
-        data, was_skipped = merge_stone_into_data(data, stone)
-        if was_skipped:
-            print(f'  WARNING: no available slabs found for {url}, keeping previous data for this stone', file=sys.stderr)
-
-    data['updated_at'] = datetime.now(timezone.utc).astimezone().isoformat(timespec='seconds')
-
+    batch = urls[:args.limit] if args.limit is not None else urls
     output_path = Path(args.output)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(output_path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    data = load_existing_data(output_path)
+
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+
+        for i, url in enumerate(batch):
+            print(f'Scraping {url} ...')
+            try:
+                html = fetch_rendered_html(page, url, debug=args.debug)
+                stone, skipped = extract_slabs_from_html(html, url)
+                if stone.get('name') is None:
+                    # No <h1> means the site served its ErrorPage / fallback
+                    # shell instead of the real stone page (seen under load —
+                    # a 200 response with no product data, not a fetch
+                    # exception), not a stone that's genuinely out of stock.
+                    # Queue it for a retry instead of a silent stderr warning
+                    # that's easy to miss across hundreds of stones.
+                    print(f'  ERROR: {url} served no <h1> (likely an error/fallback page, not the real stone page)',
+                          file=sys.stderr)
+                    log_failed_url(Path(args.failed_log), url, 'no <h1> found — likely served an error page')
+                else:
+                    if args.debug:
+                        print(f'  {stone["id"]}: kept {len(stone["slabs"])}, skipped {len(skipped)}')
+                        for row in skipped:
+                            print('   skipped:', row)
+                    data, was_skipped = merge_stone_into_data(data, stone)
+                    if was_skipped:
+                        print(f'  WARNING: no available slabs found for {url}, keeping previous data for this stone',
+                              file=sys.stderr)
+            except Exception as e:
+                print(f'  ERROR scraping {url}: {e!r}', file=sys.stderr)
+                log_failed_url(Path(args.failed_log), url, e)
+
+            # Persist after every single stone (success or failure) so a
+            # crash mid-run never loses progress already made.
+            data = save_data(data, output_path)
+            if args.consume_queue:
+                write_url_list(Path(args.urls), urls[i + 1:])
+
+            if i < len(batch) - 1:
+                time.sleep(random.uniform(args.delay_min, args.delay_max))
+
+        browser.close()
+
     print(f'Wrote {output_path}')
 
 
