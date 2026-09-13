@@ -1,3 +1,4 @@
+import mimetypes
 import re
 
 from bs4 import BeautifulSoup
@@ -110,6 +111,30 @@ def extract_main_image_url(soup):
         if img and img.get('src'):
             return img['src']
     return None
+
+
+def content_type_to_extension(content_type):
+    if not content_type:
+        return None
+    content_type = content_type.split(';')[0].strip().lower()
+    return mimetypes.guess_extension(content_type)
+
+
+def replace_stone_image_file(images_dir, stone_id, image_bytes, extension):
+    images_dir.mkdir(parents=True, exist_ok=True)
+    for existing_file in images_dir.glob(f'{stone_id}.*'):
+        existing_file.unlink()
+    dest_path = images_dir / f'{stone_id}{extension}'
+    dest_path.write_bytes(image_bytes)
+    return dest_path
+
+
+def download_stone_image(request_context, image_url, images_dir, stone_id):
+    response = request_context.get(image_url)
+    if not response.ok:
+        raise RuntimeError(f'image download failed: HTTP {response.status} for {image_url}')
+    extension = content_type_to_extension(response.headers.get('content-type')) or '.jpg'
+    return replace_stone_image_file(images_dir, stone_id, response.body(), extension)
 
 
 def extract_slabs_from_html(html, source_url):

@@ -348,5 +348,117 @@ class MergeStoneIntoDataTests(unittest.TestCase):
         self.assertEqual(new_data['stones'][0]['image'], 'images/delicato-brown.jpg')
 
 
+class ContentTypeToExtensionTests(unittest.TestCase):
+    def test_jpeg(self):
+        self.assertEqual(scrape_slabs.content_type_to_extension('image/jpeg'), '.jpg')
+
+    def test_webp(self):
+        self.assertEqual(scrape_slabs.content_type_to_extension('image/webp'), '.webp')
+
+    def test_strips_charset_suffix(self):
+        self.assertEqual(scrape_slabs.content_type_to_extension('image/png; charset=binary'), '.png')
+
+    def test_none_when_missing(self):
+        self.assertIsNone(scrape_slabs.content_type_to_extension(None))
+
+
+class ReplaceStoneImageFileTests(unittest.TestCase):
+    def test_writes_new_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            images_dir = Path(tmp)
+            dest = scrape_slabs.replace_stone_image_file(images_dir, 'delicato-brown', b'fake-bytes', '.jpg')
+            self.assertEqual(dest, images_dir / 'delicato-brown.jpg')
+            self.assertEqual(dest.read_bytes(), b'fake-bytes')
+
+    def test_removes_old_extension_before_writing_new_one(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            images_dir = Path(tmp)
+            images_dir.mkdir(parents=True, exist_ok=True)
+            (images_dir / 'delicato-brown.jpg').write_bytes(b'old')
+            dest = scrape_slabs.replace_stone_image_file(images_dir, 'delicato-brown', b'new-bytes', '.webp')
+            self.assertFalse((images_dir / 'delicato-brown.jpg').exists())
+            self.assertEqual(dest, images_dir / 'delicato-brown.webp')
+            self.assertEqual(dest.read_bytes(), b'new-bytes')
+
+    def test_does_not_touch_other_stones(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            images_dir = Path(tmp)
+            images_dir.mkdir(parents=True, exist_ok=True)
+            (images_dir / 'other-stone.jpg').write_bytes(b'other')
+            scrape_slabs.replace_stone_image_file(images_dir, 'delicato-brown', b'new-bytes', '.jpg')
+            self.assertTrue((images_dir / 'other-stone.jpg').exists())
+
+
+class FakeImageResponse:
+    def __init__(self, ok, status, content_type, body_bytes):
+        self.ok = ok
+        self.status = status
+        self.headers = {'content-type': content_type} if content_type else {}
+        self._body_bytes = body_bytes
+
+    def body(self):
+        return self._body_bytes
+
+
+class FakeRequestContext:
+    def __init__(self, response):
+        self._response = response
+
+    def get(self, url):
+        return self._response
+
+
+class DownloadStoneImageTests(unittest.TestCase):
+    def test_successful_download_writes_file_and_returns_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            images_dir = Path(tmp)
+            request_context = FakeRequestContext(
+                FakeImageResponse(ok=True, status=200, content_type='image/webp', body_bytes=b'image-bytes')
+            )
+            dest = scrape_slabs.download_stone_image(
+                request_context, 'https://example.test/img.webp', images_dir, 'delicato-brown'
+            )
+            self.assertEqual(dest, images_dir / 'delicato-brown.webp')
+            self.assertEqual(dest.read_bytes(), b'image-bytes')
+
+    def test_failed_download_raises_and_does_not_write_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            images_dir = Path(tmp)
+            request_context = FakeRequestContext(
+                FakeImageResponse(ok=False, status=404, content_type=None, body_bytes=b'')
+            )
+            with self.assertRaises(RuntimeError):
+                scrape_slabs.download_stone_image(
+                    request_context, 'https://example.test/missing.jpg', images_dir, 'delicato-brown'
+                )
+            images_dir.mkdir(parents=True, exist_ok=True)
+            self.assertEqual(list(images_dir.glob('*')), [])
+
+    def test_failed_download_does_not_delete_existing_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            images_dir = Path(tmp)
+            images_dir.mkdir(parents=True, exist_ok=True)
+            (images_dir / 'delicato-brown.jpg').write_bytes(b'old-bytes')
+            request_context = FakeRequestContext(
+                FakeImageResponse(ok=False, status=500, content_type=None, body_bytes=b'')
+            )
+            with self.assertRaises(RuntimeError):
+                scrape_slabs.download_stone_image(
+                    request_context, 'https://example.test/img.jpg', images_dir, 'delicato-brown'
+                )
+            self.assertEqual((images_dir / 'delicato-brown.jpg').read_bytes(), b'old-bytes')
+
+    def test_unknown_content_type_falls_back_to_jpg_extension(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            images_dir = Path(tmp)
+            request_context = FakeRequestContext(
+                FakeImageResponse(ok=True, status=200, content_type=None, body_bytes=b'bytes')
+            )
+            dest = scrape_slabs.download_stone_image(
+                request_context, 'https://example.test/img', images_dir, 'delicato-brown'
+            )
+            self.assertEqual(dest, images_dir / 'delicato-brown.jpg')
+
+
 if __name__ == '__main__':
     unittest.main()
