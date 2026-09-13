@@ -375,6 +375,10 @@ def main(argv=None):
     parser.add_argument('--urls', default=str(DEFAULT_URLS_PATH))
     parser.add_argument('--output', default=str(DEFAULT_OUTPUT_PATH))
     parser.add_argument('--debug', action='store_true')
+    parser.add_argument('--fetch-images', action='store_true',
+                         help="also download each stone's main texture image; run this on its own, less "
+                              "frequent schedule than the price scrape (e.g. weekly) since it downloads "
+                              "binary files instead of just reading text")
     parser.add_argument('--limit', type=int, default=None,
                          help='process at most N urls this run, leaving the rest queued for next time')
     parser.add_argument('--consume-queue', action='store_true',
@@ -417,6 +421,13 @@ def main(argv=None):
                         print(f'  {stone["id"]}: kept {len(stone["slabs"])}, skipped {len(skipped)}')
                         for row in skipped:
                             print('   skipped:', row)
+                    if args.fetch_images and image_url:
+                        try:
+                            images_dir = output_path.parent / 'images'
+                            dest_path = download_stone_image(page.context.request, image_url, images_dir, stone['id'])
+                            stone['image'] = f'images/{dest_path.name}'
+                        except Exception as e:
+                            print(f'  ERROR downloading image for {url}: {e!r}', file=sys.stderr)
                     data, was_skipped = merge_stone_into_data(data, stone)
                     if was_skipped:
                         print(f'  WARNING: no available slabs found for {url}, keeping previous data for this stone',

@@ -1,6 +1,7 @@
 /delicato-brown-slabs.html
 /delicato-brown-slabs_files/
 data/slabs.json
+data/images/
 __pycache__/
 scripts/catalog_queue.txt
 scripts/failed_urls.txt

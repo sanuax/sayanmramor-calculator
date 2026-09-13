@@ -17,6 +17,17 @@
 Запустить вручную для проверки: `schtasks /run /tn "VeneziaStone-ScrapeSlabs"`
 Удалить задачу: `schtasks /delete /tn "VeneziaStone-ScrapeSlabs" /f`
 
+## Отдельная задача для картинок
+
+Картинки камней меняются намного реже цен, поэтому их скачивание —
+отдельная задача на своём, более редком расписании (раз в неделю),
+а не часть ежедневного прогона:
+
+    schtasks /create /tn "VeneziaStone-ScrapeSlabsImages" /tr "python D:\calculator\scripts\scrape_slabs.py --fetch-images" /sc weekly /d SUN /st 07:00 /f
+
+Запустить вручную для проверки: `schtasks /run /tn "VeneziaStone-ScrapeSlabsImages"`
+Удалить задачу: `schtasks /delete /tn "VeneziaStone-ScrapeSlabsImages" /f`
+
 ## Вариант 2: через графический Task Scheduler
 
 1. Открыть "Планировщик заданий" (Task Scheduler).
