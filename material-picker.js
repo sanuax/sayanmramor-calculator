@@ -26,18 +26,23 @@
 
   function sortStones(stones, sortKey) {
     const copy = stones.slice();
-    if (sortKey === 'price') {
+    const [field, direction] = (sortKey || 'name-asc').split('-');
+    const mult = direction === 'desc' ? -1 : 1;
+    if (field === 'price') {
       copy.sort((a, b) => {
         const pa = minPricePerM2(a);
         const pb = minPricePerM2(b);
+        // Null prices always sort last, regardless of direction -- "no
+        // price data" isn't a value that should jump to the front just
+        // because the sort reversed.
         if (pa === null && pb === null) return a.name.localeCompare(b.name, 'ru');
         if (pa === null) return 1;
         if (pb === null) return -1;
-        if (pa !== pb) return pa - pb;
+        if (pa !== pb) return (pa - pb) * mult;
         return a.name.localeCompare(b.name, 'ru');
       });
     } else {
-      copy.sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+      copy.sort((a, b) => a.name.localeCompare(b.name, 'ru') * mult);
     }
     return copy;
   }
@@ -63,9 +68,14 @@
     const lightboxClose = document.getElementById('lightboxClose');
     const lightboxImg = document.getElementById('lightboxImg');
 
+    const SORT_LABELS = {
+      'name-asc': 'A-Z', 'name-desc': 'Z-A',
+      'price-asc': 'Цена ↑', 'price-desc': 'Цена ↓',
+    };
+
     let currentQuery = '';
     let currentHardnesses = [];
-    let currentSortKey = 'name';
+    let currentSortKey = 'name-asc';
     let filteredList = [];
     let renderedCount = 0;
     let isLoadingBatch = false;
@@ -164,10 +174,27 @@
       });
     });
 
+    function applySortButtonLabels() {
+      sortButtons.forEach(btn => {
+        btn.textContent = SORT_LABELS[btn.dataset.sortField + '-' + btn.dataset.sortDir];
+      });
+    }
+    applySortButtonLabels();
+
     sortButtons.forEach(btn => {
       btn.addEventListener('click', () => {
-        currentSortKey = btn.dataset.sort;
-        sortButtons.forEach(b => b.classList.toggle('active', b === btn));
+        const wasActive = btn.classList.contains('active');
+        if (wasActive) {
+          // Same button clicked again -- flip its direction.
+          btn.dataset.sortDir = btn.dataset.sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+          // Switching to the other field always starts at its default
+          // (ascending) direction rather than remembering the last one.
+          sortButtons.forEach(b => { if (b !== btn) b.dataset.sortDir = 'asc'; });
+          sortButtons.forEach(b => b.classList.toggle('active', b === btn));
+        }
+        applySortButtonLabels();
+        currentSortKey = btn.dataset.sortField + '-' + btn.dataset.sortDir;
         resetAndRender();
       });
     });
@@ -198,10 +225,14 @@
     function open() {
       currentQuery = '';
       currentHardnesses = [];
-      currentSortKey = 'name';
+      currentSortKey = 'name-asc';
       searchInput.value = '';
       chips.forEach(c => c.classList.remove('active'));
-      sortButtons.forEach(b => b.classList.toggle('active', b.dataset.sort === 'name'));
+      sortButtons.forEach(b => {
+        b.dataset.sortDir = 'asc';
+        b.classList.toggle('active', b.dataset.sortField === 'name');
+      });
+      applySortButtonLabels();
       resetAndRender();
       overlay.hidden = false;
       searchInput.focus();

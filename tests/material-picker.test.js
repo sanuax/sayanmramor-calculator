@@ -45,25 +45,35 @@ test('matchesHardnessFilter matches any selected hardness (OR)', () => {
   assert.equal(MaterialPicker.matchesHardnessFilter(stones[1], [1, 3]), false);
 });
 
-test('sortStones by name sorts alphabetically', () => {
-  const sorted = MaterialPicker.sortStones(stones, 'name');
+test('sortStones by name-asc sorts alphabetically A-Z', () => {
+  const sorted = MaterialPicker.sortStones(stones, 'name-asc');
   assert.deepEqual(sorted.map(s => s.id), ['b', 'c', 'a', 'd']);
 });
 
-test('sortStones by price sorts ascending with null prices last', () => {
-  const sorted = MaterialPicker.sortStones(stones, 'price');
+test('sortStones by name-desc sorts alphabetically Z-A', () => {
+  const sorted = MaterialPicker.sortStones(stones, 'name-desc');
+  assert.deepEqual(sorted.map(s => s.id), ['d', 'a', 'c', 'b']);
+});
+
+test('sortStones by price-asc sorts ascending with null prices last', () => {
+  const sorted = MaterialPicker.sortStones(stones, 'price-asc');
   assert.deepEqual(sorted.map(s => s.id), ['a', 'b', 'c', 'd']);
+});
+
+test('sortStones by price-desc sorts descending with null prices still last', () => {
+  const sorted = MaterialPicker.sortStones(stones, 'price-desc');
+  assert.deepEqual(sorted.map(s => s.id), ['c', 'b', 'a', 'd']);
 });
 
 test('sortStones does not mutate the input array', () => {
   const copy = stones.slice();
-  MaterialPicker.sortStones(stones, 'name');
+  MaterialPicker.sortStones(stones, 'name-asc');
   assert.deepEqual(stones, copy);
 });
 
 test('filterAndSort combines search, hardness filter, and sort', () => {
   const result = MaterialPicker.filterAndSort(stones, {
-    query: '', hardnesses: [1], sortKey: 'price',
+    query: '', hardnesses: [1], sortKey: 'price-asc',
   });
   assert.deepEqual(result.map(s => s.id), ['a', 'd']);
 });
