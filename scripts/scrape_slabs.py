@@ -246,6 +246,9 @@ def load_stone_urls(path):
     return urls
 
 
+AVAILABLE_EMPTY_SCRAPE_THRESHOLD = 2
+
+
 def merge_stone_into_data(data, stone):
     stones = data.get('stones', [])
     is_empty = not stone.get('slabs')
@@ -254,28 +257,37 @@ def merge_stone_into_data(data, stone):
     if existing is not None:
         if is_empty:
             # A stone we already have real slab data for came back empty
-            # this run (temporary stockout, or a scrape glitch) -- keep
-            # what we already know rather than wiping it out. But if a
-            # --fetch-images run just downloaded a fresh image for this
-            # stone (the file is already on disk by the time we get here),
-            # apply that one field so disk and JSON don't go out of sync --
-            # everything else about the existing record stays untouched.
+            # this run -- keep the stale slabs/prices as a reference rather
+            # than wiping them, and only flip `available` to False once
+            # enough consecutive empty runs rule out a one-off scrape
+            # glitch (AVAILABLE_EMPTY_SCRAPE_THRESHOLD).
+            updated_existing = dict(existing)
+            updated_existing['consecutive_empty_scrapes'] = existing.get('consecutive_empty_scrapes', 0) + 1
+            updated_existing['available'] = (
+                updated_existing['consecutive_empty_scrapes'] < AVAILABLE_EMPTY_SCRAPE_THRESHOLD
+            )
+            # A --fetch-images run can download a fresh image for a stone
+            # that comes back with zero slabs this run -- the file is
+            # already on disk by the time this runs, so apply that one
+            # field even though slabs are being preserved untouched.
             if stone.get('image') and stone['image'] != existing.get('image'):
-                updated_existing = dict(existing)
                 updated_existing['image'] = stone['image']
-                new_data = dict(data)
-                new_data['stones'] = [updated_existing if s.get('id') == stone.get('id') else s
-                                       for s in stones]
-                return new_data, True
-            return data, True
+            new_data = dict(data)
+            new_data['stones'] = [updated_existing if s.get('id') == stone.get('id') else s
+                                   for s in stones]
+            return new_data, True
         if 'image' not in stone:
             stone['image'] = existing.get('image')
+        stone['consecutive_empty_scrapes'] = 0
+        stone['available'] = True
         new_stones = [stone if s.get('id') == stone['id'] else s for s in stones]
     else:
         # A stone we've never seen before: keep it even with slabs: [] so
         # the calculator can show it as "out of stock" instead of it simply
         # not existing anywhere in the catalog.
         stone.setdefault('image', None)
+        stone['consecutive_empty_scrapes'] = 1 if is_empty else 0
+        stone['available'] = stone['consecutive_empty_scrapes'] < AVAILABLE_EMPTY_SCRAPE_THRESHOLD
         new_stones = stones + [stone]
 
     new_data = dict(data)

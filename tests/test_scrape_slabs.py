@@ -310,7 +310,7 @@ class MergeStoneIntoDataTests(unittest.TestCase):
         self.assertEqual(by_id['delicato-brown']['name'], 'New')
         self.assertEqual(by_id['other-stone']['slabs'][0]['article'], 'X1')
 
-    def test_skips_and_preserves_data_when_new_slabs_empty(self):
+    def test_first_empty_scrape_keeps_available_true(self):
         data = {
             'updated_at': None,
             'stones': [{'id': 'delicato-brown', 'name': 'Old', 'slabs': [{'article': 'OLD'}]}],
@@ -318,7 +318,60 @@ class MergeStoneIntoDataTests(unittest.TestCase):
         stone = {'id': 'delicato-brown', 'name': 'New', 'slabs': []}
         new_data, skipped = scrape_slabs.merge_stone_into_data(data, stone)
         self.assertTrue(skipped)
-        self.assertEqual(new_data, data)
+        updated = new_data['stones'][0]
+        self.assertTrue(updated['available'])
+        self.assertEqual(updated['consecutive_empty_scrapes'], 1)
+        self.assertEqual(updated['slabs'], [{'article': 'OLD'}])
+        self.assertEqual(updated['name'], 'Old')
+
+    def test_second_consecutive_empty_scrape_marks_unavailable(self):
+        data = {
+            'updated_at': None,
+            'stones': [{
+                'id': 'delicato-brown', 'name': 'Old', 'slabs': [{'article': 'OLD'}],
+                'available': True, 'consecutive_empty_scrapes': 1,
+            }],
+        }
+        stone = {'id': 'delicato-brown', 'name': 'New', 'slabs': []}
+        new_data, skipped = scrape_slabs.merge_stone_into_data(data, stone)
+        self.assertTrue(skipped)
+        updated = new_data['stones'][0]
+        self.assertFalse(updated['available'])
+        self.assertEqual(updated['consecutive_empty_scrapes'], 2)
+        self.assertEqual(updated['slabs'], [{'article': 'OLD'}])
+
+    def test_non_empty_scrape_resets_counter_and_marks_available(self):
+        data = {
+            'updated_at': None,
+            'stones': [{
+                'id': 'delicato-brown', 'name': 'Old', 'slabs': [{'article': 'OLD'}],
+                'available': False, 'consecutive_empty_scrapes': 2,
+            }],
+        }
+        stone = {'id': 'delicato-brown', 'name': 'New', 'slabs': [{'article': 'NEW'}]}
+        new_data, skipped = scrape_slabs.merge_stone_into_data(data, stone)
+        self.assertFalse(skipped)
+        updated = new_data['stones'][0]
+        self.assertTrue(updated['available'])
+        self.assertEqual(updated['consecutive_empty_scrapes'], 0)
+        self.assertEqual(updated['slabs'], [{'article': 'NEW'}])
+
+    def test_new_stone_empty_on_first_sighting_gets_available_true_and_counter_one(self):
+        data = {'updated_at': None, 'stones': []}
+        stone = {'id': 'new-stone', 'name': 'New Stone', 'slabs': []}
+        new_data, was_empty = scrape_slabs.merge_stone_into_data(data, stone)
+        self.assertTrue(was_empty)
+        inserted = new_data['stones'][0]
+        self.assertTrue(inserted['available'])
+        self.assertEqual(inserted['consecutive_empty_scrapes'], 1)
+
+    def test_new_stone_with_slabs_gets_available_true_and_counter_zero(self):
+        data = {'updated_at': None, 'stones': []}
+        stone = {'id': 'delicato-brown', 'name': 'Delicato Brown', 'slabs': [{'article': 'A1'}]}
+        new_data, _ = scrape_slabs.merge_stone_into_data(data, stone)
+        inserted = new_data['stones'][0]
+        self.assertTrue(inserted['available'])
+        self.assertEqual(inserted['consecutive_empty_scrapes'], 0)
 
     def test_updates_image_when_new_slabs_empty_but_image_changed(self):
         # A --fetch-images run can download a fresh image for a stone that
