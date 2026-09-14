@@ -55,6 +55,7 @@
     const closeBtn = document.getElementById('pickerClose');
     const chips = Array.from(document.querySelectorAll('#pickerChips .chip'));
     const sortButtons = Array.from(document.querySelectorAll('#pickerSort .sort-btn'));
+    const results = document.getElementById('pickerResults');
     const grid = document.getElementById('pickerGrid');
     const sentinel = document.getElementById('pickerSentinel');
     const emptyMessage = document.getElementById('pickerEmpty');
@@ -105,6 +106,15 @@
 
       card.appendChild(imageWrap);
       card.appendChild(name);
+
+      const price = minPricePerM2(stone);
+      if (price !== null) {
+        const priceEl = document.createElement('div');
+        priceEl.className = 'stone-card-price';
+        priceEl.textContent = 'от ' + Math.round(price).toLocaleString('ru-RU') + ' ₽/м²';
+        card.appendChild(priceEl);
+      }
+
       card.addEventListener('click', () => {
         onSelect(stone.id);
         close();
@@ -130,6 +140,7 @@
       renderedCount = 0;
       emptyMessage.hidden = filteredList.length > 0;
       sentinel.hidden = filteredList.length === 0;
+      results.scrollTop = 0;
       renderNextBatch();
     }
 

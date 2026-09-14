@@ -301,6 +301,11 @@
   }
   .stone-card:hover .stone-card-name { color: var(--pick-ink); }
 
+  .stone-card-price {
+    font-size: 12px; line-height: 1.35;
+    margin-top: 2px; color: var(--pick-accent); font-weight: 500;
+  }
+
   .picker-empty {
     display: block; text-align: center; padding: 76px 20px;
     color: var(--pick-ink); font-size: 15px; font-weight: 700;
@@ -458,9 +463,9 @@
       </div>
 
       <div class="field">
-        <label id="materialLabel">Материал</label>
+        <label id="materialLabel" for="materialField">Материал</label>
         <button type="button" class="material-field" id="materialField"
-                aria-labelledby="materialLabel" aria-haspopup="dialog" disabled>
+                aria-labelledby="materialLabel materialFieldText" aria-haspopup="dialog" disabled>
           <span class="material-field-thumb" id="materialFieldThumb" hidden><img alt=""></span>
           <span class="material-field-text" id="materialFieldText">Загрузка материалов…</span>
           <span class="material-field-chevron" aria-hidden="true">▾</span>
@@ -521,7 +526,7 @@
     <button type="button" class="sort-btn active" data-sort="name">А-Я</button>
     <button type="button" class="sort-btn" data-sort="price">Цена ↑</button>
   </div>
-  <div class="picker-results">
+  <div class="picker-results" id="pickerResults">
     <div class="picker-grid" id="pickerGrid"></div>
     <div class="picker-sentinel" id="pickerSentinel"></div>
     <div class="picker-empty" id="pickerEmpty" hidden>Ничего не найдено</div>
@@ -576,6 +581,9 @@
   const materialField = document.getElementById('materialField');
   const materialFieldThumb = document.getElementById('materialFieldThumb');
   const materialFieldThumbImg = materialFieldThumb.querySelector('img');
+  materialFieldThumbImg.addEventListener('error', () => {
+    materialFieldThumb.hidden = true;
+  });
   const materialFieldText = document.getElementById('materialFieldText');
   let selectedStoneId = null;
   let picker = null;
@@ -694,6 +702,17 @@
       return;
     }
     const stone = STONES_BY_ID[selectedStoneId];
+
+    if (stone.available === false) {
+      priceOut.textContent = 'Нужно уточнить у менеджера';
+      warningOut.textContent = 'Этот камень сейчас распродан — пришлите размеры менеджеру для точного расчёта.';
+      warningOut.style.display = 'block';
+      breakdown.innerHTML = '';
+      remainderOut.textContent = '';
+      updatedAtOut.textContent = '';
+      infoBlock.style.display = 'none';
+      return;
+    }
 
     let multiplier = 1;
     let surchargeLabel = [];
