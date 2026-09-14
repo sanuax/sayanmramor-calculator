@@ -438,36 +438,63 @@ class FakeImageResponse:
         return self._body_bytes
 
 
-class FakeRequestContext:
+class FakeImagePage:
     def __init__(self, response):
         self._response = response
+        self.closed = False
 
-    def get(self, url):
+    def goto(self, url):
         return self._response
+
+    def close(self):
+        self.closed = True
+
+
+class FakeBrowser:
+    def __init__(self, response):
+        self._response = response
+        self.pages_created = []
+
+    def new_page(self):
+        page = FakeImagePage(self._response)
+        self.pages_created.append(page)
+        return page
 
 
 class DownloadStoneImageTests(unittest.TestCase):
     def test_successful_download_writes_file_and_returns_path(self):
         with tempfile.TemporaryDirectory() as tmp:
             images_dir = Path(tmp)
-            request_context = FakeRequestContext(
+            browser = FakeBrowser(
                 FakeImageResponse(ok=True, status=200, content_type='image/webp', body_bytes=b'image-bytes')
             )
             dest = scrape_slabs.download_stone_image(
-                request_context, 'https://example.test/img.webp', images_dir, 'delicato-brown'
+                browser, 'https://example.test/img.webp', images_dir, 'delicato-brown'
             )
             self.assertEqual(dest, images_dir / 'delicato-brown.webp')
             self.assertEqual(dest.read_bytes(), b'image-bytes')
 
+    def test_closes_the_page_it_opened(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            images_dir = Path(tmp)
+            browser = FakeBrowser(
+                FakeImageResponse(ok=True, status=200, content_type='image/webp', body_bytes=b'image-bytes')
+            )
+            scrape_slabs.download_stone_image(
+                browser, 'https://example.test/img.webp', images_dir, 'delicato-brown'
+            )
+            self.assertEqual(len(browser.pages_created), 1)
+            self.assertTrue(browser.pages_created[0].closed)
+
     def test_failed_download_raises_and_does_not_write_file(self):
         with tempfile.TemporaryDirectory() as tmp:
             images_dir = Path(tmp)
-            request_context = FakeRequestContext(
+            browser = FakeBrowser(
                 FakeImageResponse(ok=False, status=404, content_type=None, body_bytes=b'')
             )
             with self.assertRaises(RuntimeError):
                 scrape_slabs.download_stone_image(
-                    request_context, 'https://example.test/missing.jpg', images_dir, 'delicato-brown'
+                    browser, 'https://example.test/missing.jpg', images_dir, 'delicato-brown'
                 )
             images_dir.mkdir(parents=True, exist_ok=True)
             self.assertEqual(list(images_dir.glob('*')), [])
@@ -477,23 +504,23 @@ class DownloadStoneImageTests(unittest.TestCase):
             images_dir = Path(tmp)
             images_dir.mkdir(parents=True, exist_ok=True)
             (images_dir / 'delicato-brown.jpg').write_bytes(b'old-bytes')
-            request_context = FakeRequestContext(
+            browser = FakeBrowser(
                 FakeImageResponse(ok=False, status=500, content_type=None, body_bytes=b'')
             )
             with self.assertRaises(RuntimeError):
                 scrape_slabs.download_stone_image(
-                    request_context, 'https://example.test/img.jpg', images_dir, 'delicato-brown'
+                    browser, 'https://example.test/img.jpg', images_dir, 'delicato-brown'
                 )
             self.assertEqual((images_dir / 'delicato-brown.jpg').read_bytes(), b'old-bytes')
 
     def test_unknown_content_type_falls_back_to_jpg_extension(self):
         with tempfile.TemporaryDirectory() as tmp:
             images_dir = Path(tmp)
-            request_context = FakeRequestContext(
+            browser = FakeBrowser(
                 FakeImageResponse(ok=True, status=200, content_type=None, body_bytes=b'bytes')
             )
             dest = scrape_slabs.download_stone_image(
-                request_context, 'https://example.test/img', images_dir, 'delicato-brown'
+                browser, 'https://example.test/img', images_dir, 'delicato-brown'
             )
             self.assertEqual(dest, images_dir / 'delicato-brown.jpg')
 

@@ -135,12 +135,30 @@ def replace_stone_image_file(images_dir, stone_id, image_bytes, extension):
     return dest_path
 
 
-def download_stone_image(request_context, image_url, images_dir, stone_id):
-    response = request_context.get(image_url)
-    if not response.ok:
-        raise RuntimeError(f'image download failed: HTTP {response.status} for {image_url}')
-    extension = content_type_to_extension(response.headers.get('content-type')) or '.jpg'
-    return replace_stone_image_file(images_dir, stone_id, response.body(), extension)
+def download_stone_image(browser, image_url, images_dir, stone_id):
+    # Downloads through an actual browser page (Chromium's network stack)
+    # rather than APIRequestContext (Node's own TLS client): the CDN's WAF
+    # fingerprints TLS handshakes and silently drops non-browser clients --
+    # APIRequestContext's requests got dropped mid-handshake, which Node
+    # surfaced as a misleading "unable to verify the first certificate"
+    # even though the actual certificate chain was never the problem.
+    #
+    # Takes `browser`, not the scrape page's own `page.context`: that context
+    # was created by browser.new_page()'s shorthand and only ever holds that
+    # one page, so a second new_page() on it raises "Please use
+    # browser.new_context()". browser.new_page() instead opens its own fresh
+    # context per call and closes that context automatically when the page
+    # closes.
+    img_page = browser.new_page()
+    try:
+        response = img_page.goto(image_url)
+        if not response or not response.ok:
+            status = response.status if response else 'no response'
+            raise RuntimeError(f'image download failed: HTTP {status} for {image_url}')
+        extension = content_type_to_extension(response.headers.get('content-type')) or '.jpg'
+        return replace_stone_image_file(images_dir, stone_id, response.body(), extension)
+    finally:
+        img_page.close()
 
 
 def extract_slabs_from_html(html, source_url):
@@ -441,7 +459,7 @@ def main(argv=None):
                     if args.fetch_images and image_url:
                         try:
                             images_dir = output_path.parent / 'images'
-                            dest_path = download_stone_image(page.context.request, image_url, images_dir, stone['id'])
+                            dest_path = download_stone_image(browser, image_url, images_dir, stone['id'])
                             stone['image'] = f'images/{dest_path.name}'
                         except Exception as e:
                             print(f'  ERROR downloading image for {url}: {e!r}', file=sys.stderr)
