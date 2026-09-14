@@ -6,6 +6,21 @@
 <title>Калькулятор стоимости изделий из камня — Саянмрамор</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* Material picker palette. Neutrals are deliberately warm: the catalogue is
+     full of beige/tan/cream stone, and a cold grey chrome fights it. The only
+     saturated colour in the picker is the page accent, spent on one thing --
+     the active filter. */
+  :root {
+    --pick-ink: #1a1a1a;
+    --pick-accent: #ff5a1f;
+    --pick-muted: #6e6a65;
+    --pick-line: #e7e4e0;
+    --pick-fill: #f2f0ed;
+    --pick-tile: #edeae6;
+    --pick-ease: cubic-bezier(0.22, 0.68, 0.24, 1);
+  }
+
   body {
     font-family: 'Arial', 'Helvetica Neue', sans-serif;
     background: #f4f4f4;
@@ -75,9 +90,13 @@
   }
   .checkbox-row input { width: 16px; height: 16px; accent-color: #ff5a1f; cursor: pointer; }
 
+  /* The picker's trigger deliberately keeps the same silhouette as the <select>
+     and number inputs beside it -- it is one more field in the same form, and
+     changing its shape would make it read as a different kind of control. */
   .material-field {
     width: 100%;
-    padding: 12px 14px;
+    padding: 8px 12px 8px 14px;
+    min-height: 46px;
     border: 1px solid #ddd;
     border-radius: 3px;
     font-size: 15px;
@@ -89,61 +108,256 @@
     cursor: pointer;
     text-align: left;
     font-family: inherit;
+    transition: border-color 0.15s, background-color 0.15s;
+  }
+  .material-field:hover:not(:disabled) { border-color: #bdb9b4; background: #fff; }
+  .material-field:focus-visible {
+    outline: none;
+    border-color: var(--pick-accent);
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(255, 90, 31, 0.16);
   }
   .material-field:disabled { color: #999; cursor: default; }
-  .material-field-thumb img { width: 28px; height: 28px; object-fit: cover; border-radius: 3px; display: block; }
+  .material-field-thumb { display: flex; }
+  .material-field-thumb[hidden] { display: none; }
+  .material-field-thumb img {
+    width: 30px; height: 30px; object-fit: cover; border-radius: 5px; display: block;
+    box-shadow: inset 0 0 0 1px rgba(26, 24, 22, 0.1);
+  }
   .material-field-text { flex: 1; }
-  .material-field-chevron { color: #999; }
+  .material-field-chevron { color: #a8a49f; font-size: 12px; }
 
+  /* ---- Material picker -------------------------------------------------
+     A full-screen sample wall. The sheet is plain white so stone colour reads
+     true, all chrome lives above one hairline, and the grid below it is the
+     only place colour appears. */
   .picker-overlay {
     position: fixed; inset: 0; background: #fff; z-index: 1000;
-    display: flex; flex-direction: column; padding: 16px;
+    display: flex; flex-direction: column;
+    padding: max(14px, env(safe-area-inset-top)) 0 0;
   }
   .picker-overlay[hidden] { display: none; }
-  .picker-header { display: flex; gap: 8px; margin-bottom: 12px; }
-  #pickerSearch { flex: 1; padding: 10px 12px; border: 1px solid #ddd; border-radius: 3px; font-size: 15px; }
-  #pickerClose { background: none; border: none; font-size: 20px; cursor: pointer; padding: 4px 10px; }
-  .picker-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
-  .chip { padding: 6px 12px; border: 1px solid #ddd; border-radius: 16px; background: #fafafa; font-size: 13px; cursor: pointer; }
-  .chip.active { background: #ff5a1f; border-color: #ff5a1f; color: #fff; }
-  .picker-sort { display: flex; gap: 8px; margin-bottom: 12px; }
-  .sort-btn { padding: 6px 12px; border: 1px solid #ddd; border-radius: 3px; background: #fff; font-size: 13px; cursor: pointer; }
-  .sort-btn.active { border-color: #ff5a1f; color: #ff5a1f; font-weight: 700; }
+
+  /* One orchestrated entrance: the sheet comes forward while the results
+     settle underneath it. Nothing else on the page animates unprompted. */
+  .picker-overlay:not([hidden]) { animation: picker-sheet-in 180ms var(--pick-ease); }
+  .picker-overlay:not([hidden]) .picker-results { animation: picker-results-in 300ms 40ms var(--pick-ease) backwards; }
+  @keyframes picker-sheet-in {
+    from { opacity: 0; transform: scale(1.012); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes picker-results-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: none; }
+  }
+
+  .picker-header {
+    display: flex; gap: 12px; align-items: center;
+    padding: 0 20px; margin-bottom: 14px;
+  }
+  /* Search leads -- it is the fastest route through 200 stones -- but it is
+     capped to a reading measure instead of stretching across a wide screen. */
+  #pickerSearch {
+    flex: 1 1 240px; max-width: 420px;
+    padding: 13px 14px 13px 42px;
+    border: 1.5px solid transparent; border-radius: 12px;
+    font-size: 16px; font-family: inherit; color: var(--pick-ink);
+    background: var(--pick-fill)
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236e6a65' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20.5 20.5L16.2 16.2'/%3E%3C/svg%3E")
+      no-repeat 14px center / 17px 17px;
+    transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s;
+  }
+  #pickerSearch::placeholder { color: var(--pick-muted); }
+  #pickerSearch:focus {
+    outline: none; background-color: #fff;
+    border-color: var(--pick-accent);
+    box-shadow: 0 0 0 3px rgba(255, 90, 31, 0.16);
+  }
+  #pickerClose {
+    margin-left: auto; flex: none;
+    width: 38px; height: 38px; border-radius: 50%;
+    background: none; border: none; font-size: 16px; line-height: 1;
+    color: var(--pick-muted); cursor: pointer;
+    transition: background-color 0.15s, color 0.15s;
+  }
+  #pickerClose:hover { background: var(--pick-fill); color: var(--pick-ink); }
+
+  /* Chips are multi-select, so they are pills that fill in when on. */
+  .picker-chips {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    padding: 0 20px; margin-bottom: 12px;
+  }
+  .chip {
+    padding: 8px 15px; border: 1px solid var(--pick-line); border-radius: 999px;
+    background: #fff; font-size: 13.5px; font-family: inherit; font-weight: 500;
+    color: #45413d; cursor: pointer;
+    transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+  }
+  .chip:hover { border-color: #cdc8c2; }
+  /* Weight deliberately stays at 500 when active: the accent fill already
+     carries the state, and bolding the label would change the pill's width
+     and re-wrap the row under the user's cursor on every toggle. */
+  .chip.active {
+    background: var(--pick-accent); border-color: var(--pick-accent);
+    color: #fff;
+  }
+  .chip.active:hover { background: #ef4f16; border-color: #ef4f16; }
+
+  /* Sort is one-of-N, so it is a segmented track with a moving thumb -- a
+     visibly different control from the filter pills above it. */
+  .picker-sort {
+    align-self: flex-end; margin: 0 20px 14px;
+    display: inline-flex; gap: 2px;
+    padding: 3px; background: var(--pick-fill); border-radius: 999px;
+  }
+  /* Once there is room, sort moves up beside the search field rather than
+     sitting alone on a row of its own -- it pairs with search (both shape the
+     list) and it buys back a whole row of header height above the grid. */
+  @media (min-width: 760px) {
+    .picker-sort {
+      position: absolute;
+      top: calc(max(14px, env(safe-area-inset-top)) + 6px);
+      right: 74px;
+      margin: 0;
+    }
+  }
+  .sort-btn {
+    padding: 7px 16px; border: none; border-radius: 999px;
+    background: transparent; font-size: 13px; font-family: inherit;
+    font-weight: 500; color: var(--pick-muted); cursor: pointer;
+    transition: background-color 0.15s, color 0.15s;
+  }
+  .sort-btn:hover { color: var(--pick-ink); }
+  /* Same reason as .chip.active -- a bold label would resize the track. */
+  .sort-btn.active {
+    background: #fff; color: var(--pick-ink);
+    box-shadow: 0 1px 2px rgba(26, 24, 22, 0.14);
+  }
+
+  .picker-overlay :focus-visible {
+    outline: 2px solid var(--pick-accent); outline-offset: 2px;
+  }
+  #pickerSearch:focus-visible { outline: none; }
+
   .picker-results {
     /* Scroll container for the grid+sentinel+empty-message: the sentinel
        must be a descendant of the element that actually scrolls, otherwise
        its on-screen position never changes and IntersectionObserver (which
        tracks position relative to the viewport) only fires once. */
     flex: 1; overflow-y: auto;
+    border-top: 1px solid var(--pick-line);
+    padding: 20px 20px 56px;
   }
   .picker-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(158px, 1fr));
+    /* Row gap is larger than column gap: every tile carries a caption under
+       it, and the extra space keeps each row reading as its own band. */
+    gap: 22px 16px;
   }
-  .stone-card { cursor: pointer; }
-  .stone-card-image { position: relative; aspect-ratio: 1; border-radius: 4px; overflow: hidden; background: #eee; }
-  .stone-card-image img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+  /* The image is the card. No frame, no shadow, no padded container -- these
+     are samples laid on a wall, not content in boxes. */
+  .stone-card { cursor: pointer; transition: transform 0.12s var(--pick-ease); }
+  .stone-card:active { transform: scale(0.972); }
+  .stone-card-image {
+    position: relative; aspect-ratio: 1; border-radius: 10px;
+    overflow: hidden; background: var(--pick-tile);
+    /* A pale marble on a white ground needs an edge to sit against. */
+    box-shadow: inset 0 0 0 1px rgba(26, 24, 22, 0.09);
+  }
+  .stone-card-image img {
+    width: 100%; height: 100%; object-fit: cover; display: block;
+    transition: transform 0.45s var(--pick-ease), opacity 0.2s;
+  }
+  /* Hover leans into the texture rather than lifting the card off the page. */
+  .stone-card:hover .stone-card-image img { transform: scale(1.06); }
   .stone-card-image.image-broken::after {
-    content: '—'; display: flex; align-items: center; justify-content: center;
-    position: absolute; inset: 0; color: #999; font-size: 12px;
+    content: '';
+    position: absolute; left: 50%; top: 50%;
+    width: 22px; height: 1.5px; margin: -1px 0 0 -11px;
+    background: #b3ada5; border-radius: 1px;
   }
+
   .badge-oos {
-    position: absolute; bottom: 4px; left: 4px; right: 4px;
-    background: rgba(26,26,26,0.85); color: #fff; font-size: 10px;
-    text-align: center; padding: 3px 4px; border-radius: 2px;
+    position: absolute; bottom: 8px; left: 8px; right: auto;
+    background: rgba(20, 19, 18, 0.86);
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    color: #fff; font-size: 10.5px; font-weight: 700; letter-spacing: 0.1px;
+    text-align: left; padding: 4px 9px; border-radius: 999px;
   }
-  .stone-card-name { font-size: 12px; margin-top: 4px; color: #1a1a1a; }
-  .picker-empty { text-align: center; color: #999; padding: 40px 0; }
+  /* Dim the sample as well as badging it, so out-of-stock reads across a whole
+     screen of tiles at a glance. The badge alone still carries the meaning
+     where :has() is unsupported. */
+  .stone-card-image:has(.badge-oos) img { opacity: 0.5; }
+  .stone-card:hover .stone-card-image:has(.badge-oos) img { opacity: 0.78; }
+
+  .stone-card-name {
+    font-size: 13px; line-height: 1.35; letter-spacing: -0.006em;
+    margin-top: 10px; color: var(--pick-muted);
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+    overflow: hidden;
+    transition: color 0.15s;
+  }
+  .stone-card:hover .stone-card-name { color: var(--pick-ink); }
+
+  .picker-empty {
+    display: block; text-align: center; padding: 76px 20px;
+    color: var(--pick-ink); font-size: 15px; font-weight: 700;
+  }
+  .picker-empty[hidden] { display: none; }
+  .picker-empty::after {
+    content: 'Попробуйте другое название или снимите фильтры.';
+    display: block; margin-top: 8px;
+    font-size: 13.5px; font-weight: 400; color: var(--pick-muted);
+  }
   .picker-sentinel { height: 1px; }
+  .picker-sentinel[hidden] { display: none; }
+
   .lightbox-overlay {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 1100;
-    display: flex; align-items: center; justify-content: center;
+    position: fixed; inset: 0; background: rgba(14, 13, 12, 0.94); z-index: 1100;
+    display: flex; align-items: center; justify-content: center; padding: 24px;
+    animation: lightbox-in 160ms var(--pick-ease);
   }
   .lightbox-overlay[hidden] { display: none; }
-  .lightbox-overlay img { max-width: 90vw; max-height: 90vh; object-fit: contain; }
+  .lightbox-overlay img {
+    max-width: min(92vw, 860px); max-height: 86vh; object-fit: contain;
+    border-radius: 6px; box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+    animation: lightbox-img-in 240ms var(--pick-ease);
+  }
+  @keyframes lightbox-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes lightbox-img-in {
+    from { opacity: 0; transform: scale(0.94); }
+    to { opacity: 1; transform: none; }
+  }
   #lightboxClose {
-    position: absolute; top: 16px; right: 16px; background: none; border: none;
-    color: #fff; font-size: 24px; cursor: pointer;
+    position: absolute; top: 16px; right: 16px;
+    width: 40px; height: 40px; border-radius: 50%;
+    background: rgba(255, 255, 255, 0.12); border: none;
+    color: #fff; font-size: 17px; line-height: 1; cursor: pointer;
+    transition: background-color 0.15s;
+  }
+  #lightboxClose:hover { background: rgba(255, 255, 255, 0.24); }
+  #lightboxClose:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+  @media (max-width: 600px) {
+    .picker-header { gap: 8px; padding: 0 14px; margin-bottom: 12px; }
+    .picker-chips { padding: 0 14px; gap: 6px; }
+    .chip { padding: 7px 13px; font-size: 13px; }
+    .picker-sort { margin: 0 14px 12px; }
+    .picker-results { padding: 16px 14px 48px; }
+    .picker-grid { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 16px 10px; }
+    .stone-card-name { font-size: 12px; margin-top: 8px; }
+    .badge-oos { font-size: 9.5px; padding: 3px 7px; bottom: 6px; left: 6px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .picker-overlay:not([hidden]),
+    .picker-overlay:not([hidden]) .picker-results,
+    .lightbox-overlay, .lightbox-overlay img { animation: none; }
+    .stone-card, .stone-card-image img, .stone-card-name { transition: none; }
+    .stone-card:hover .stone-card-image img { transform: none; }
+    .stone-card:active { transform: none; }
   }
 
   .result-panel {
