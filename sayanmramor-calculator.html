@@ -75,6 +75,77 @@
   }
   .checkbox-row input { width: 16px; height: 16px; accent-color: #ff5a1f; cursor: pointer; }
 
+  .material-field {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    font-size: 15px;
+    background: #fafafa;
+    color: #1a1a1a;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+  }
+  .material-field:disabled { color: #999; cursor: default; }
+  .material-field-thumb img { width: 28px; height: 28px; object-fit: cover; border-radius: 3px; display: block; }
+  .material-field-text { flex: 1; }
+  .material-field-chevron { color: #999; }
+
+  .picker-overlay {
+    position: fixed; inset: 0; background: #fff; z-index: 1000;
+    display: flex; flex-direction: column; padding: 16px;
+  }
+  .picker-overlay[hidden] { display: none; }
+  .picker-header { display: flex; gap: 8px; margin-bottom: 12px; }
+  #pickerSearch { flex: 1; padding: 10px 12px; border: 1px solid #ddd; border-radius: 3px; font-size: 15px; }
+  #pickerClose { background: none; border: none; font-size: 20px; cursor: pointer; padding: 4px 10px; }
+  .picker-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+  .chip { padding: 6px 12px; border: 1px solid #ddd; border-radius: 16px; background: #fafafa; font-size: 13px; cursor: pointer; }
+  .chip.active { background: #ff5a1f; border-color: #ff5a1f; color: #fff; }
+  .picker-sort { display: flex; gap: 8px; margin-bottom: 12px; }
+  .sort-btn { padding: 6px 12px; border: 1px solid #ddd; border-radius: 3px; background: #fff; font-size: 13px; cursor: pointer; }
+  .sort-btn.active { border-color: #ff5a1f; color: #ff5a1f; font-weight: 700; }
+  .picker-results {
+    /* Scroll container for the grid+sentinel+empty-message: the sentinel
+       must be a descendant of the element that actually scrolls, otherwise
+       its on-screen position never changes and IntersectionObserver (which
+       tracks position relative to the viewport) only fires once. */
+    flex: 1; overflow-y: auto;
+  }
+  .picker-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px;
+  }
+  .stone-card { cursor: pointer; }
+  .stone-card-image { position: relative; aspect-ratio: 1; border-radius: 4px; overflow: hidden; background: #eee; }
+  .stone-card-image img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .stone-card-image.image-broken::after {
+    content: '—'; display: flex; align-items: center; justify-content: center;
+    position: absolute; inset: 0; color: #999; font-size: 12px;
+  }
+  .badge-oos {
+    position: absolute; bottom: 4px; left: 4px; right: 4px;
+    background: rgba(26,26,26,0.85); color: #fff; font-size: 10px;
+    text-align: center; padding: 3px 4px; border-radius: 2px;
+  }
+  .stone-card-name { font-size: 12px; margin-top: 4px; color: #1a1a1a; }
+  .picker-empty { text-align: center; color: #999; padding: 40px 0; }
+  .picker-sentinel { height: 1px; }
+  .lightbox-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 1100;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .lightbox-overlay[hidden] { display: none; }
+  .lightbox-overlay img { max-width: 90vw; max-height: 90vh; object-fit: contain; }
+  #lightboxClose {
+    position: absolute; top: 16px; right: 16px; background: none; border: none;
+    color: #fff; font-size: 24px; cursor: pointer;
+  }
+
   .result-panel {
     background: #1a1a1a;
     color: #fff;
@@ -173,8 +244,13 @@
       </div>
 
       <div class="field">
-        <label for="material">Материал</label>
-        <select id="material"></select>
+        <label id="materialLabel">Материал</label>
+        <button type="button" class="material-field" id="materialField"
+                aria-labelledby="materialLabel" aria-haspopup="dialog" disabled>
+          <span class="material-field-thumb" id="materialFieldThumb" hidden><img alt=""></span>
+          <span class="material-field-text" id="materialFieldText">Загрузка материалов…</span>
+          <span class="material-field-chevron" aria-hidden="true">▾</span>
+        </button>
       </div>
 
       <div class="field">
@@ -217,7 +293,34 @@
   </div>
 </div>
 
+<div class="picker-overlay" id="pickerOverlay" hidden role="dialog" aria-modal="true" aria-label="Выбор камня">
+  <div class="picker-header">
+    <input type="search" id="pickerSearch" placeholder="Поиск по названию…" autocomplete="off">
+    <button type="button" id="pickerClose" aria-label="Закрыть">✕</button>
+  </div>
+  <div class="picker-chips" id="pickerChips">
+    <button type="button" class="chip" data-hardness="1">Лёгкая обработка</button>
+    <button type="button" class="chip" data-hardness="2">Средняя обработка</button>
+    <button type="button" class="chip" data-hardness="3">Сложная обработка</button>
+  </div>
+  <div class="picker-sort" id="pickerSort">
+    <button type="button" class="sort-btn active" data-sort="name">А-Я</button>
+    <button type="button" class="sort-btn" data-sort="price">Цена ↑</button>
+  </div>
+  <div class="picker-results">
+    <div class="picker-grid" id="pickerGrid"></div>
+    <div class="picker-sentinel" id="pickerSentinel"></div>
+    <div class="picker-empty" id="pickerEmpty" hidden>Ничего не найдено</div>
+  </div>
+</div>
+
+<div class="lightbox-overlay" id="lightboxOverlay" hidden>
+  <button type="button" id="lightboxClose" aria-label="Закрыть">✕</button>
+  <img id="lightboxImg" alt="">
+</div>
+
 <script src="pricing.js"></script>
+<script src="material-picker.js"></script>
 <script>
   const PRODUCTS = {
     lestnitsa:            { label: "Лестницы", complexityMultiplier: 1.8, type: 'B' },
@@ -256,7 +359,12 @@
   };
 
   const productSelect = document.getElementById('product');
-  const materialSelect = document.getElementById('material');
+  const materialField = document.getElementById('materialField');
+  const materialFieldThumb = document.getElementById('materialFieldThumb');
+  const materialFieldThumbImg = materialFieldThumb.querySelector('img');
+  const materialFieldText = document.getElementById('materialFieldText');
+  let selectedStoneId = null;
+  let picker = null;
   const widthInput = document.getElementById('width');
   const lengthInput = document.getElementById('length');
   const dimError = document.getElementById('dimError');
@@ -279,28 +387,40 @@
   let UPDATED_AT = null;
   let DATA_LOADED = false;
 
-  materialSelect.innerHTML = '<option value="">Загрузка материалов…</option>';
-
   fetch('data/slabs.json')
     .then(r => r.json())
     .then(data => {
       UPDATED_AT = data.updated_at;
-      materialSelect.innerHTML = '';
-      (data.stones || []).forEach(stone => {
-        STONES_BY_ID[stone.id] = stone;
-        const opt = document.createElement('option');
-        opt.value = stone.id;
-        opt.textContent = stone.name;
-        materialSelect.appendChild(opt);
-      });
+      (data.stones || []).forEach(stone => { STONES_BY_ID[stone.id] = stone; });
+      picker = MaterialPicker.init({ stones: data.stones || [], onSelect: handleMaterialSelected });
+      materialField.disabled = false;
+      materialFieldText.textContent = 'Выберите камень';
       DATA_LOADED = true;
       calculate();
     })
     .catch(() => {
-      materialSelect.innerHTML = '<option value="">Ошибка загрузки</option>';
+      materialField.disabled = true;
+      materialFieldText.textContent = 'Ошибка загрузки';
       warningOut.textContent = 'Не удалось загрузить data/slabs.json. Проверьте, что страница открыта через веб-сервер (не как локальный файл).';
       warningOut.style.display = 'block';
     });
+
+  function handleMaterialSelected(stoneId) {
+    const stone = STONES_BY_ID[stoneId];
+    selectedStoneId = stoneId;
+    materialFieldText.textContent = stone.name;
+    if (stone.image) {
+      materialFieldThumbImg.src = 'data/' + stone.image;
+      materialFieldThumb.hidden = false;
+    } else {
+      materialFieldThumb.hidden = true;
+    }
+    calculate();
+  }
+
+  materialField.addEventListener('click', () => {
+    if (picker) picker.open();
+  });
 
   function formatRub(n) {
     return Math.round(n).toLocaleString('ru-RU') + ' ₽';
@@ -350,7 +470,16 @@
     dimError.style.display = 'none';
 
     const product = PRODUCTS[productSelect.value];
-    const stone = STONES_BY_ID[materialSelect.value];
+
+    if (!selectedStoneId) {
+      priceOut.textContent = '—';
+      breakdown.innerHTML = '';
+      warningOut.style.display = 'none';
+      updatedAtOut.textContent = '';
+      infoBlock.style.display = 'none';
+      return;
+    }
+    const stone = STONES_BY_ID[selectedStoneId];
 
     let multiplier = 1;
     let surchargeLabel = [];
@@ -436,7 +565,7 @@
     updatedAtOut.textContent = 'Расчёт по ценам на ' + formatDate(UPDATED_AT) + ', точная цена подтверждается менеджером.';
   }
 
-  [productSelect, materialSelect, widthInput, lengthInput].forEach(el => {
+  [productSelect, widthInput, lengthInput].forEach(el => {
     el.addEventListener('input', calculate);
     el.addEventListener('change', calculate);
   });
