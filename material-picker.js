@@ -107,7 +107,7 @@
       card.appendChild(imageWrap);
       card.appendChild(name);
 
-      const price = minPricePerM2(stone);
+      const price = stone.available !== false ? minPricePerM2(stone) : null;
       if (price !== null) {
         const priceEl = document.createElement('div');
         priceEl.className = 'stone-card-price';
