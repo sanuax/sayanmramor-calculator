@@ -1,3 +1,4 @@
 # Одна строка — один URL страницы слэбов конкретного камня.
 # Строки, начинающиеся с #, и пустые строки игнорируются.
 https://veneziastone.com/marble/delicato-brown/slabs/
+https://veneziastone.com/granite/absolute-black/slabs/
