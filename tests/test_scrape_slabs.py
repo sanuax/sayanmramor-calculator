@@ -72,6 +72,33 @@ class StoneNameFromH1Tests(unittest.TestCase):
             'Polotskiy'
         )
 
+    def test_strips_two_word_category_name_for_quartz_agglomerate(self):
+        # "Кварцевый агломерат" is two Russian words; stripping only the
+        # first ("Кварцевый") left "агломерат" stuck to every quartz-
+        # agglomerate stone's name (e.g. "агломерат Black Mirror").
+        self.assertEqual(
+            scrape_slabs.stone_name_from_h1('Кварцевый агломерат Black Mirror', category='quartz-agglomerate'),
+            'Black Mirror'
+        )
+
+    def test_strips_two_word_category_name_for_artificial_marble(self):
+        self.assertEqual(
+            scrape_slabs.stone_name_from_h1('Искусственный мрамор Calacatta Vagli', category='artificial-marble'),
+            'Calacatta Vagli'
+        )
+
+    def test_strips_two_word_category_name_with_v_slabah_suffix(self):
+        self.assertEqual(
+            scrape_slabs.stone_name_from_h1('Окаменелое дерево Petrified Wood Beige в слэбах', category='petrified-wood'),
+            'Petrified Wood Beige'
+        )
+
+    def test_unknown_category_still_defaults_to_one_word_strip(self):
+        self.assertEqual(
+            scrape_slabs.stone_name_from_h1('Мрамор Delicato Brown в слэбах', category='marble'),
+            'Delicato Brown'
+        )
+
 
 SOURCE_URL_PLACEHOLDER = 'https://veneziastone.com/marble/test-stone/slabs/'
 
@@ -245,6 +272,50 @@ def _make_synthetic_batch_html(article, status_text, include_request_button):
     </div>
     </body></html>
     '''
+
+
+def _make_synthetic_batch_html_without_total_column(article, area_text, price_per_m2_text):
+    # quartz-agglomerate's table has no dedicated "total price per slab"
+    # column at all -- cells[9] here is the actions cell (cart/menu
+    # buttons), one column short of marble/granite's layout where cells[9]
+    # holds the ready-made total price and cells[10] holds these buttons.
+    return f'''
+    <html><body>
+    <h1>Кварцевый агломерат Test Stone в слэбах</h1>
+    <div>
+      <div class="prt-container">Партия #1</div>
+      <table class="pr-table"><tbody>
+        <tr class="pr-tr">
+          <td class="pr-td"></td>
+          <td class="pr-td"><div><button>{article} </button></div></td>
+          <td class="pr-td">PACHKA1</td>
+          <td class="pr-td">Москва</td>
+          <td class="pr-td">2,00 x 1,00</td>
+          <td class="pr-td">—</td>
+          <td class="pr-td">{area_text}</td>
+          <td class="pr-td">0%</td>
+          <td class="pr-td"><div class="price-sale">65 300 ₽</div><div>{price_per_m2_text}</div></td>
+          <td class="pr-td"><button aria-label="В корзину">В корзину</button><button aria-label="Меню">Меню</button></td>
+        </tr>
+      </tbody></table>
+    </div>
+    </body></html>
+    '''
+
+
+class ExtractSlabsFromHtmlNoTotalColumnTests(unittest.TestCase):
+    def test_computes_total_price_from_area_when_category_has_no_total_column(self):
+        html = _make_synthetic_batch_html_without_total_column(
+            article='BM1', area_text='2,56', price_per_m2_text='52 240 ₽'
+        )
+        stone, skipped, _ = scrape_slabs.extract_slabs_from_html(
+            html, 'https://veneziastone.com/quartz-agglomerate/black-mirror/slabs/'
+        )
+        self.assertEqual(len(stone['slabs']), 1)
+        slab = stone['slabs'][0]
+        self.assertEqual(slab['price_per_m2_rub'], 52240.0)
+        self.assertAlmostEqual(slab['price_total_rub'], 133734.4)  # 52240 * 2.56
+        self.assertEqual(skipped, [])
 
 
 import tempfile

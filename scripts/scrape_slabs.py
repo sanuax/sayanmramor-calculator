@@ -86,12 +86,33 @@ def translate_russian_words(name):
     return ' '.join(RUSSIAN_WORD_TRANSLATIONS.get(word, word) for word in name.split(' '))
 
 
-def stone_name_from_h1(h1_text):
-    # The leading \S+ is a category word ("Мрамор", "Агломерат", ...); most
-    # category pages' h1 ends with "в слэбах" but some don't, so that suffix
-    # is optional rather than required for the category word to be stripped.
-    m = re.match(r'^\S+\s+(.+?)(?:\s+в слэбах)?\s*$', h1_text.strip())
-    name = m.group(1) if m else h1_text.strip()
+# Category segments whose Russian catalog name is two words rather than one
+# ("Кварцевый агломерат", not just "Агломерат") -- stone_name_from_h1 can't
+# tell a two-word category name apart from a two-word product name (e.g. an
+# origin word plus the stone name) just by looking at the words, so it needs
+# to know the word count per category up front. Stripping a fixed one word
+# left the category's second word stuck to the actual name for these five
+# (e.g. "агломерат Black Mirror" instead of "Black Mirror").
+CATEGORY_NAME_WORD_COUNT = {
+    'artificial-marble': 2,
+    'quartz-agglomerate': 2,
+    'specennyi-kamen': 2,
+    'tigrovyi-glaz': 2,
+    'petrified-wood': 2,
+}
+
+
+def stone_name_from_h1(h1_text, category=None):
+    # The leading word(s) are the category name ("Мрамор", "Кварцевый
+    # агломерат", ...) -- how many to strip depends on the category (see
+    # CATEGORY_NAME_WORD_COUNT). Most category pages' h1 ends with "в
+    # слэбах"; that suffix is optional since some don't have it.
+    words = h1_text.strip().split()
+    prefix_len = CATEGORY_NAME_WORD_COUNT.get(category, 1)
+    rest = words[prefix_len:]
+    if len(rest) >= 2 and rest[-2:] == ['в', 'слэбах']:
+        rest = rest[:-2]
+    name = ' '.join(rest) if rest else h1_text.strip()
     return translate_russian_words(name)
 
 
@@ -165,8 +186,8 @@ def extract_slabs_from_html(html, source_url):
     soup = BeautifulSoup(html, 'html.parser')
     image_url = extract_main_image_url(soup, source_url)
     h1 = soup.find('h1')
-    name = stone_name_from_h1(h1.get_text()) if h1 else None
     stone_id, category = stone_id_and_category_from_url(source_url)
+    name = stone_name_from_h1(h1.get_text(), category) if h1 else None
 
     slabs = []
     skipped = []
@@ -212,6 +233,19 @@ def extract_slabs_from_html(html, source_url):
 
             price_per_m2 = extract_price_from_cell(cells[8])
             price_total = extract_price_from_cell(cells[9])
+            if price_total is None and price_per_m2 is not None:
+                # Some categories (quartz-agglomerate observed so far) don't
+                # show a ready-made total-per-slab price on the site at all
+                # -- cells[9] there is the actions cell (cart/menu buttons),
+                # one column short of categories that have a dedicated total
+                # price column before it. Fall back to computing it from the
+                # per-m2 price and the slab's own listed area (cells[6]),
+                # which already accounts for any "Вычет" deduction rather
+                # than the raw width x length.
+                area_m2 = parse_ru_number(cells[6].get_text()) if len(cells) > 6 else None
+                if area_m2 is None:
+                    area_m2 = width_m * length_m
+                price_total = round(price_per_m2 * area_m2, 2)
 
             slabs.append({
                 'article': article,
