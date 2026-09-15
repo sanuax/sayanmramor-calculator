@@ -628,7 +628,24 @@
   // Simple single-color line icons (24x24 viewBox) for the product-type
   // cards -- inner markup only, wrapped uniformly when the cards are built.
   const PRODUCT_ICONS = {
-    lestnitsa: '<path d="M3 20h4v-4h4v-4h4v-4h4v-4"/>',
+    // Straight staircase, side view, solid flat-icon style (matches the
+    // reference photo): 4 equal steps (tread run = riser rise = 4.5, a true
+    // diagonal offset per step), closed by ONE diagonal from the top-left
+    // corner to the bottom-right corner of an extended final riser. The
+    // final riser is deliberately taller than the other 3 (7 vs 4.5) --
+    // with all 4 risers equal, the closing diagonal would run exactly
+    // through every inner step corner (same slope) and collapse the fill
+    // into a near-zero-width zigzag, which is what "just a thin line with
+    // bends" was. Stretching only the last riser tilts the diagonal's slope
+    // just enough to clear all 3 inner corners with growing margin, so the
+    // shape reads as one solid mass, not a sliver. Fill AND a matching
+    // round-joined stroke (this is the one PRODUCT_ICONS entry that sets
+    // its own paint -- all others stay outline-only via the shared svg
+    // fill="none") so the sharp path corners render softened, like the
+    // reference's rounded outline. Distinct from "Ступени" below, which is
+    // the same stepped idea left unfilled and open.
+    lestnitsa: '<path d="M2 2h4.5v4.5h4.5v4.5h4.5v4.5h4.5v7Z" fill="currentColor" ' +
+      'stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>',
     // "Seed of life" rosette (6 circles of equal radius, each centered on
     // the ring at that same radius, so every circle passes through the
     // frame's center) in a square frame -- a genuinely decorative floral
@@ -651,17 +668,27 @@
       '<rect x="3" y="15" width="8.5" height="4" rx="0.4"/><rect x="12.5" y="15" width="8.5" height="4" rx="0.4"/>',
     fasad: '<path d="M4 21V9l8-5 8 5v12"/><path d="M4 21h16"/><rect x="10" y="14" width="4" height="7"/>' +
       '<rect x="6" y="11" width="3" height="3"/><rect x="15" y="11" width="3" height="3"/>',
-    // Same counter-slab base as the kitchen version below, with a bold
-    // inset oval basin + faucet on top instead of burners. The faucet is
-    // one continuous subpath (not two M-started ones) so stroke-linejoin
-    // rounds its elbow into a clean curve instead of stacking two line-cap
-    // circles at the joint.
-    stoleshnitsa_vannaya: '<rect x="3" y="13" width="18" height="7" rx="1.2"/><ellipse cx="12" cy="9.5" rx="5" ry="2.8"/><path d="M14.5 7.6v-2.4h-2"/>',
-    // Same counter-slab base as the vanity version above, with two bold
-    // burners on top instead of a basin -- a single row reads as a cooktop
-    // just as clearly as a 2x2 grid, with fewer elements.
-    stoleshnitsa_kuhnya: '<rect x="3" y="13" width="18" height="7" rx="1.2"/>' +
-      '<circle cx="8.5" cy="9.5" r="2.2"/><circle cx="15.5" cy="9.5" r="2.2"/>',
+    // A basin (rim ellipse + bowl curve) sitting on a slab, with a
+    // gooseneck faucet -- reads as a vanity countertop rather than a
+    // generic rectangle. The two short strokes by the faucet base are the
+    // aerator/handle buttons visible in the reference photo.
+    stoleshnitsa_vannaya: '<rect x="2" y="15.4" width="20" height="4.4" rx="0.8"/>' +
+      '<ellipse cx="12" cy="11.6" rx="5.6" ry="2"/>' +
+      '<path d="M6.4 11.6c0 2.6 1.6 3.8 5.6 3.8s5.6-1.2 5.6-3.8"/>' +
+      '<path d="M13.6 11.2V7.6C13.6 5.8 16.6 5.8 16.6 7.6V10.4"/>' +
+      '<path d="M12.1 10.6v1.1M15.1 10.6v1.1"/>',
+    // Kitchen counter, front view: a base cabinet (box + one center seam for
+    // its two doors) with a countertop slab overhanging on top, an inset
+    // sink basin recessed into the slab, and a gooseneck faucet behind it --
+    // reads as "kitchen table/cabinet with a sink" rather than the earlier
+    // bar-counter-and-stool silhouette. The cabinet body is what
+    // distinguishes it from "Столешницы в ванную" below, which has no base.
+    stoleshnitsa_kuhnya: '<rect x="3" y="13.4" width="18" height="7.2" rx="0.5"/>' +
+      '<path d="M12 13.4v7.2"/>' +
+      '<rect x="2" y="11.2" width="20" height="2.6" rx="0.6"/>' +
+      '<ellipse cx="8" cy="10.4" rx="3.6" ry="1.2"/>' +
+      '<path d="M14.8 11V7.4C14.8 5.6 17.8 5.6 17.8 7.4V10.2"/>' +
+      '<path d="M13.3 10.4v1.1M16.3 10.4v1.1" stroke-width="1"/>',
     // "Ступени" reuses the staircase motif but as two broad steps rather
     // than a full flight, to read as distinct from "Лестницы" above.
     stupeni: '<path d="M4 20h6v-6h6v-6h6"/>',
