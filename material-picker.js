@@ -24,6 +24,16 @@
     return selectedHardnesses.includes(stone.hardness_category);
   }
 
+  function matchesCategoryFilter(stone, selected) {
+    if (!selected || selected.length === 0) return true;
+    return selected.includes(stone.category);
+  }
+
+  function matchesColorFilter(stone, selected) {
+    if (!selected || selected.length === 0) return true;
+    return (stone.colors || []).some(c => selected.includes(c.segment));
+  }
+
   function sortStones(stones, sortKey) {
     const copy = stones.slice();
     const [field, direction] = (sortKey || 'name-asc').split('-');
@@ -47,18 +57,96 @@
     return copy;
   }
 
-  function filterAndSort(stones, { query, hardnesses, sortKey }) {
-    const filtered = stones.filter(s => matchesSearch(s, query) && matchesHardnessFilter(s, hardnesses));
+  function filterAndSort(stones, { query, hardnesses, categories, colors, sortKey }) {
+    const filtered = stones.filter(s =>
+      matchesSearch(s, query)
+      && matchesHardnessFilter(s, hardnesses)
+      && matchesCategoryFilter(s, categories)
+      && matchesColorFilter(s, colors)
+    );
     return sortStones(filtered, sortKey);
   }
 
   const BATCH_SIZE = 40;
 
+  const HARDNESS_LABELS = { 1: 'Лёгкая обработка', 2: 'Средняя обработка', 3: 'Сложная обработка' };
+
+  // One reusable "dropdown with checkboxes inside" component backs all
+  // three filters (hardness/type/color) -- each gets its own instance, but
+  // the open/close/label-count behavior is shared instead of duplicated
+  // per filter.
+  function createFilterDropdown({ dropdownEl, label, options, onChange, registerCloser }) {
+    const btn = dropdownEl.querySelector('.filter-dropdown-btn');
+    const panel = dropdownEl.querySelector('.filter-dropdown-panel');
+
+    const labelSpan = document.createElement('span');
+    labelSpan.className = 'filter-dropdown-label';
+    const caret = document.createElement('span');
+    caret.className = 'caret';
+    caret.setAttribute('aria-hidden', 'true');
+    caret.textContent = '▾';
+    btn.appendChild(labelSpan);
+    btn.appendChild(caret);
+
+    options.forEach(opt => {
+      const optionEl = document.createElement('label');
+      optionEl.className = 'filter-option';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.value = opt.value;
+      checkbox.addEventListener('change', () => {
+        updateLabel();
+        onChange(getSelected());
+      });
+      const text = document.createElement('span');
+      text.textContent = opt.text;
+      optionEl.appendChild(checkbox);
+      optionEl.appendChild(text);
+      panel.appendChild(optionEl);
+    });
+
+    function getSelected() {
+      return Array.from(panel.querySelectorAll('input:checked')).map(i => i.value);
+    }
+
+    function updateLabel() {
+      const count = getSelected().length;
+      labelSpan.textContent = count > 0 ? label + ' (' + count + ')' : label;
+      btn.classList.toggle('active', count > 0);
+    }
+    updateLabel();
+
+    function closePanel() {
+      panel.hidden = true;
+      btn.setAttribute('aria-expanded', 'false');
+    }
+    function openPanel() {
+      panel.hidden = false;
+      btn.setAttribute('aria-expanded', 'true');
+    }
+    registerCloser(closePanel);
+
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const wasOpen = !panel.hidden;
+      registerCloser.closeAll();
+      if (!wasOpen) openPanel();
+    });
+    panel.addEventListener('click', (e) => e.stopPropagation());
+
+    function reset() {
+      panel.querySelectorAll('input').forEach(i => { i.checked = false; });
+      updateLabel();
+      closePanel();
+    }
+
+    return { getSelected, reset, closePanel };
+  }
+
   function init({ stones, onSelect }) {
     const overlay = document.getElementById('pickerOverlay');
     const searchInput = document.getElementById('pickerSearch');
     const closeBtn = document.getElementById('pickerClose');
-    const chips = Array.from(document.querySelectorAll('#pickerChips .chip'));
     const sortButtons = Array.from(document.querySelectorAll('#pickerSort .sort-btn'));
     const results = document.getElementById('pickerResults');
     const grid = document.getElementById('pickerGrid');
@@ -75,10 +163,54 @@
 
     let currentQuery = '';
     let currentHardnesses = [];
+    let currentCategories = [];
+    let currentColors = [];
     let currentSortKey = 'name-asc';
     let filteredList = [];
     let renderedCount = 0;
     let isLoadingBatch = false;
+
+    const dropdownClosers = [];
+    function registerCloser(closer) {
+      dropdownClosers.push(closer);
+    }
+    registerCloser.closeAll = () => dropdownClosers.forEach(c => c());
+    document.addEventListener('click', () => registerCloser.closeAll());
+
+    function uniqueOptionsFrom(items, getValue, getText) {
+      const byValue = new Map();
+      items.forEach(item => {
+        const value = getValue(item);
+        const text = getText(item);
+        if (value && text && !byValue.has(value)) byValue.set(value, text);
+      });
+      return Array.from(byValue, ([value, text]) => ({ value, text }))
+        .sort((a, b) => a.text.localeCompare(b.text, 'ru'));
+    }
+
+    const hardnessDropdown = createFilterDropdown({
+      dropdownEl: document.querySelector('[data-filter="hardness"]'),
+      label: 'Твёрдость',
+      options: [1, 2, 3].map(h => ({ value: String(h), text: HARDNESS_LABELS[h] })),
+      onChange: (values) => { currentHardnesses = values.map(Number); resetAndRender(); },
+      registerCloser,
+    });
+    const categoryDropdown = createFilterDropdown({
+      dropdownEl: document.querySelector('[data-filter="category"]'),
+      label: 'Тип',
+      options: uniqueOptionsFrom(stones, s => s.category, s => s.category_label_ru),
+      onChange: (values) => { currentCategories = values; resetAndRender(); },
+      registerCloser,
+    });
+    const colorDropdown = createFilterDropdown({
+      dropdownEl: document.querySelector('[data-filter="color"]'),
+      label: 'Цвет',
+      options: uniqueOptionsFrom(
+        stones.flatMap(s => s.colors || []), c => c.segment, c => c.label_ru
+      ),
+      onChange: (values) => { currentColors = values; resetAndRender(); },
+      registerCloser,
+    });
 
     function buildCard(stone) {
       const card = document.createElement('div');
@@ -117,6 +249,13 @@
       card.appendChild(imageWrap);
       card.appendChild(name);
 
+      if (stone.category_label_ru) {
+        const type = document.createElement('div');
+        type.className = 'stone-card-type';
+        type.textContent = stone.category_label_ru;
+        card.appendChild(type);
+      }
+
       const price = stone.available !== false ? minPricePerM2(stone) : null;
       if (price !== null) {
         const priceEl = document.createElement('div');
@@ -144,7 +283,9 @@
 
     function resetAndRender() {
       filteredList = filterAndSort(stones, {
-        query: currentQuery, hardnesses: currentHardnesses, sortKey: currentSortKey,
+        query: currentQuery, hardnesses: currentHardnesses,
+        categories: currentCategories, colors: currentColors,
+        sortKey: currentSortKey,
       });
       grid.innerHTML = '';
       renderedCount = 0;
@@ -162,16 +303,6 @@
     searchInput.addEventListener('input', () => {
       currentQuery = searchInput.value.trim();
       resetAndRender();
-    });
-
-    chips.forEach(chip => {
-      chip.addEventListener('click', () => {
-        chip.classList.toggle('active');
-        currentHardnesses = chips
-          .filter(c => c.classList.contains('active'))
-          .map(c => Number(c.dataset.hardness));
-        resetAndRender();
-      });
     });
 
     function applySortButtonLabels() {
@@ -215,9 +346,15 @@
     overlay.addEventListener('click', (e) => {
       if (e.target === overlay) close();
     });
+    const filterPanels = Array.from(document.querySelectorAll('.filter-dropdown-panel'));
+    function anyDropdownOpen() {
+      return filterPanels.some(p => !p.hidden);
+    }
+
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         if (!lightboxOverlay.hidden) { closeLightbox(); return; }
+        if (anyDropdownOpen()) { registerCloser.closeAll(); return; }
         if (!overlay.hidden) close();
       }
     });
@@ -225,9 +362,13 @@
     function open() {
       currentQuery = '';
       currentHardnesses = [];
+      currentCategories = [];
+      currentColors = [];
       currentSortKey = 'name-asc';
       searchInput.value = '';
-      chips.forEach(c => c.classList.remove('active'));
+      hardnessDropdown.reset();
+      categoryDropdown.reset();
+      colorDropdown.reset();
       sortButtons.forEach(b => {
         b.dataset.sortDir = 'asc';
         b.classList.toggle('active', b.dataset.sortField === 'name');
@@ -241,5 +382,8 @@
     return { open, close };
   }
 
-  return { minPricePerM2, matchesSearch, matchesHardnessFilter, sortStones, filterAndSort, init };
+  return {
+    minPricePerM2, matchesSearch, matchesHardnessFilter, matchesCategoryFilter, matchesColorFilter,
+    sortStones, filterAndSort, init,
+  };
 });

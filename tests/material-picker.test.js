@@ -71,6 +71,30 @@ test('sortStones does not mutate the input array', () => {
   assert.deepEqual(stones, copy);
 });
 
+test('matchesCategoryFilter with nothing selected matches everything', () => {
+  assert.equal(MaterialPicker.matchesCategoryFilter({ category: 'marble' }, []), true);
+});
+
+test('matchesCategoryFilter matches any selected category (OR)', () => {
+  assert.equal(MaterialPicker.matchesCategoryFilter({ category: 'marble' }, ['marble', 'granite']), true);
+  assert.equal(MaterialPicker.matchesCategoryFilter({ category: 'onyx' }, ['marble', 'granite']), false);
+});
+
+test('matchesColorFilter with nothing selected matches everything', () => {
+  assert.equal(MaterialPicker.matchesColorFilter({ colors: [{ segment: 'beige' }] }, []), true);
+});
+
+test('matchesColorFilter matches when any of the stone\'s colors is selected (OR)', () => {
+  const stone = { colors: [{ segment: 'beige' }, { segment: 'white' }] };
+  assert.equal(MaterialPicker.matchesColorFilter(stone, ['white']), true);
+  assert.equal(MaterialPicker.matchesColorFilter(stone, ['black']), false);
+});
+
+test('matchesColorFilter treats a stone with no colors as matching nothing selected', () => {
+  assert.equal(MaterialPicker.matchesColorFilter({}, ['beige']), false);
+  assert.equal(MaterialPicker.matchesColorFilter({}, []), true);
+});
+
 test('filterAndSort combines search, hardness filter, and sort', () => {
   const result = MaterialPicker.filterAndSort(stones, {
     query: '', hardnesses: [1], sortKey: 'price-asc',

@@ -148,6 +148,58 @@ class ExtractMainImageUrlTests(unittest.TestCase):
         self.assertIsNone(scrape_slabs.extract_main_image_url(soup, SOURCE_URL_PLACEHOLDER))
 
 
+class ExtractCharacteristicTests(unittest.TestCase):
+    def _soup(self, label_text, value_html):
+        html = f'''
+        <html><body><div>
+          <div class="flex items-center text-sm md:text-base">
+            <div class="text-blue-gray grow border-b border-dotted dark:text-gray-300">{label_text}</div>
+            <div class="lg:text-right">{value_html}</div>
+          </div>
+        </div></body></html>
+        '''
+        return BeautifulSoup(html, 'html.parser')
+
+    def test_single_link_value(self):
+        soup = self._soup('Тип материала', '<a class="inv-link" href="https://veneziastone.com/marble/">Мрамор</a>')
+        self.assertEqual(
+            scrape_slabs.extract_characteristic(soup, 'Тип материала'),
+            [{'label_ru': 'Мрамор', 'segment': 'marble'}]
+        )
+
+    def test_link_wrapped_in_span_still_found(self):
+        soup = self._soup(
+            'Цвет',
+            '<span><a class="inv-link inline-flex!" href="https://veneziastone.com/marble/beige/">Бежевый</a></span>'
+        )
+        self.assertEqual(
+            scrape_slabs.extract_characteristic(soup, 'Цвет'),
+            [{'label_ru': 'Бежевый', 'segment': 'beige'}]
+        )
+
+    def test_multiple_links_returns_multiple_entries(self):
+        soup = self._soup(
+            'Цвет',
+            '<a class="inv-link" href="https://veneziastone.com/marble/beige/">Бежевый</a>'
+            '<a class="inv-link" href="https://veneziastone.com/marble/white/">Белый</a>'
+        )
+        self.assertEqual(
+            scrape_slabs.extract_characteristic(soup, 'Цвет'),
+            [
+                {'label_ru': 'Бежевый', 'segment': 'beige'},
+                {'label_ru': 'Белый', 'segment': 'white'},
+            ]
+        )
+
+    def test_label_not_found_returns_empty_list(self):
+        soup = self._soup('Страна', '<a class="inv-link" href="https://veneziastone.com/marble/oman/">Оман</a>')
+        self.assertEqual(scrape_slabs.extract_characteristic(soup, 'Тип материала'), [])
+
+    def test_no_characteristics_block_at_all_returns_empty_list(self):
+        soup = BeautifulSoup('<html><body><p>nothing here</p></body></html>', 'html.parser')
+        self.assertEqual(scrape_slabs.extract_characteristic(soup, 'Цвет'), [])
+
+
 FIXTURE_PATH = Path(__file__).resolve().parent / 'fixtures' / 'delicato-brown-slabs.html'
 FIXTURE_URL = 'https://veneziastone.com/marble/delicato-brown/slabs/'
 
@@ -164,6 +216,24 @@ class ExtractSlabsFromHtmlTests(unittest.TestCase):
         self.assertEqual(stone['hardness_category'], 1)
         self.assertEqual(stone['name'], 'Delicato Brown')
         self.assertEqual(stone['source_url'], FIXTURE_URL)
+
+    def test_stone_characteristics(self):
+        stone, _, _ = scrape_slabs.extract_slabs_from_html(self.html, FIXTURE_URL)
+        self.assertEqual(stone['category_label_ru'], 'Мрамор')
+        self.assertEqual(stone['colors'], [{'label_ru': 'Бежевый', 'segment': 'beige'}])
+        self.assertEqual(stone['countries'], [{'label_ru': 'Оман', 'segment': 'oman'}])
+
+    def test_no_characteristics_block_gives_none_and_empty_lists(self):
+        html = '''
+        <html><body>
+        <h1>Мрамор Test Stone в слэбах</h1>
+        <div class="prt-container">Партия #1</div>
+        </body></html>
+        '''
+        stone, _, _ = scrape_slabs.extract_slabs_from_html(html, 'https://example.test/marble/test-stone/slabs/')
+        self.assertIsNone(stone['category_label_ru'])
+        self.assertEqual(stone['colors'], [])
+        self.assertEqual(stone['countries'], [])
 
     def test_hardness_category_by_segment(self):
         cases = [

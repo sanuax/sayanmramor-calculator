@@ -116,6 +116,26 @@ def stone_name_from_h1(h1_text, category=None):
     return translate_russian_words(name)
 
 
+def extract_characteristic(soup, label):
+    # The label is matched by exact text, not by the surrounding div's CSS
+    # classes -- those are Tailwind-generated utility classes that could
+    # coincidentally match unrelated elements elsewhere on the page.
+    label_div = soup.find(lambda tag: tag.name == 'div'
+                           and 'text-blue-gray' in (tag.get('class') or [])
+                           and tag.get_text(strip=True) == label)
+    if label_div is None:
+        return []
+    value_cell = label_div.find_next_sibling('div')
+    if value_cell is None:
+        return []
+    results = []
+    for link in value_cell.find_all('a', class_='inv-link'):
+        href = link.get('href') or ''
+        segments = [s for s in href.split('/') if s]
+        results.append({'label_ru': link.get_text(strip=True), 'segment': segments[-1] if segments else None})
+    return results
+
+
 def extract_price_from_cell(td):
     divs = td.find_all('div')
     if not divs:
@@ -280,6 +300,9 @@ def extract_slabs_from_html(html, source_url):
         'id': stone_id,
         'name': name,
         'category': category,
+        'category_label_ru': (extract_characteristic(soup, 'Тип материала') or [{}])[0].get('label_ru'),
+        'colors': extract_characteristic(soup, 'Цвет'),
+        'countries': extract_characteristic(soup, 'Страна'),
         'hardness_category': HARDNESS_CATEGORY_BY_SEGMENT.get(category),
         'source_url': source_url,
         'slabs': slabs,

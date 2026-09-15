@@ -204,26 +204,56 @@
   }
   #pickerClose:hover { background: var(--pick-fill); color: var(--pick-ink); }
 
-  /* Chips are multi-select, so they are pills that fill in when on. */
-  .picker-chips {
+  /* Three uniform dropdowns (hardness/type/color) rather than a chip row --
+     each opens its own checkbox panel, so multiple values within one filter
+     stay multi-select without the pill row growing unbounded as more
+     colors/types show up in the catalog. */
+  .picker-filters {
     display: flex; flex-wrap: wrap; gap: 8px;
     padding: 0 20px; margin-bottom: 12px;
   }
-  .chip {
-    padding: 8px 15px; border: 1px solid var(--pick-line); border-radius: 999px;
+  .filter-dropdown { position: relative; }
+  .filter-dropdown-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 14px; border: 1px solid var(--pick-line); border-radius: 999px;
     background: #fff; font-size: 13.5px; font-family: inherit; font-weight: 500;
     color: #45413d; cursor: pointer;
     transition: background-color 0.15s, border-color 0.15s, color 0.15s;
   }
-  .chip:hover { border-color: #cdc8c2; }
-  /* Weight deliberately stays at 500 when active: the accent fill already
-     carries the state, and bolding the label would change the pill's width
-     and re-wrap the row under the user's cursor on every toggle. */
-  .chip.active {
+  .filter-dropdown-btn:hover { border-color: #cdc8c2; }
+  .filter-dropdown-btn .caret {
+    font-size: 10px; opacity: 0.65; transition: transform 0.15s var(--pick-ease);
+  }
+  .filter-dropdown-btn[aria-expanded="true"] .caret { transform: rotate(180deg); }
+  /* Same reasoning as the old chip.active: weight stays put so the fill
+     alone carries the state and the pill doesn't resize on toggle. */
+  .filter-dropdown-btn.active {
     background: var(--pick-accent); border-color: var(--pick-accent);
     color: #fff;
   }
-  .chip.active:hover { background: #ef4f16; border-color: #ef4f16; }
+  .filter-dropdown-btn.active:hover { background: #ef4f16; border-color: #ef4f16; }
+  .filter-dropdown-btn.active .caret { opacity: 0.9; }
+  .filter-dropdown-panel {
+    position: absolute; top: calc(100% + 8px); left: 0; z-index: 5;
+    min-width: 208px; max-height: 280px; overflow-y: auto;
+    background: #fff; border: 1px solid var(--pick-line); border-radius: 14px;
+    box-shadow: 0 10px 28px rgba(26, 24, 22, 0.14);
+    padding: 8px; animation: picker-panel-in 140ms var(--pick-ease);
+  }
+  .filter-dropdown-panel[hidden] { display: none; }
+  @keyframes picker-panel-in {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: none; }
+  }
+  .filter-option {
+    display: flex; align-items: center; gap: 9px;
+    padding: 8px 9px; border-radius: 8px;
+    font-size: 13.5px; color: var(--pick-ink); cursor: pointer;
+  }
+  .filter-option:hover { background: var(--pick-fill); }
+  .filter-option input {
+    width: 16px; height: 16px; accent-color: var(--pick-accent); cursor: pointer;
+  }
 
   /* Sort is one-of-N, so it is a segmented track with a moving thumb -- a
      visibly different control from the filter pills above it. */
@@ -250,7 +280,7 @@
     transition: background-color 0.15s, color 0.15s;
   }
   .sort-btn:hover { color: var(--pick-ink); }
-  /* Same reason as .chip.active -- a bold label would resize the track. */
+  /* Same reason as .filter-dropdown-btn.active -- a bold label would resize the track. */
   .sort-btn.active {
     background: #fff; color: var(--pick-ink);
     box-shadow: 0 1px 2px rgba(26, 24, 22, 0.14);
@@ -323,6 +353,12 @@
   }
   .stone-card:hover .stone-card-name { color: var(--pick-ink); }
 
+  .stone-card-type {
+    font-size: 11px; line-height: 1.3; letter-spacing: 0.02em;
+    text-transform: uppercase; color: var(--pick-muted); opacity: 0.75;
+    margin-top: 3px;
+  }
+
   .stone-card-price {
     font-size: 12px; line-height: 1.35;
     margin-top: 2px; color: var(--pick-accent); font-weight: 500;
@@ -369,8 +405,9 @@
 
   @media (max-width: 600px) {
     .picker-header { gap: 8px; padding: 0 14px; margin-bottom: 12px; }
-    .picker-chips { padding: 0 14px; gap: 6px; }
-    .chip { padding: 7px 13px; font-size: 13px; }
+    .picker-filters { padding: 0 14px; gap: 6px; }
+    .filter-dropdown-btn { padding: 7px 12px; font-size: 13px; }
+    .filter-dropdown-panel { min-width: 0; width: min(240px, calc(100vw - 28px)); }
     .picker-sort { margin: 0 14px 12px; }
     .picker-results { padding: 16px 14px 48px; }
     .picker-grid { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 16px 10px; }
@@ -539,10 +576,19 @@
     <input type="search" id="pickerSearch" placeholder="Поиск по названию…" autocomplete="off">
     <button type="button" id="pickerClose" aria-label="Закрыть">✕</button>
   </div>
-  <div class="picker-chips" id="pickerChips">
-    <button type="button" class="chip" data-hardness="1">Лёгкая обработка</button>
-    <button type="button" class="chip" data-hardness="2">Средняя обработка</button>
-    <button type="button" class="chip" data-hardness="3">Сложная обработка</button>
+  <div class="picker-filters" id="pickerFilters">
+    <div class="filter-dropdown" data-filter="hardness">
+      <button type="button" class="filter-dropdown-btn" aria-haspopup="true" aria-expanded="false"></button>
+      <div class="filter-dropdown-panel" hidden></div>
+    </div>
+    <div class="filter-dropdown" data-filter="category">
+      <button type="button" class="filter-dropdown-btn" aria-haspopup="true" aria-expanded="false"></button>
+      <div class="filter-dropdown-panel" hidden></div>
+    </div>
+    <div class="filter-dropdown" data-filter="color">
+      <button type="button" class="filter-dropdown-btn" aria-haspopup="true" aria-expanded="false"></button>
+      <div class="filter-dropdown-panel" hidden></div>
+    </div>
   </div>
   <div class="picker-sort" id="pickerSort">
     <button type="button" class="sort-btn active" data-sort-field="name" data-sort-dir="asc">A-Z</button>
