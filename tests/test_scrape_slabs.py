@@ -481,6 +481,57 @@ class MergeStoneIntoDataTests(unittest.TestCase):
         self.assertEqual(updated['consecutive_empty_scrapes'], 2)
         self.assertEqual(updated['slabs'], [{'article': 'OLD'}])
 
+    def test_second_consecutive_empty_scrape_backfills_characteristics_once_sold_out(self):
+        # A backfill run against a stone that's genuinely out of stock (not
+        # a one-off glitch) still gets a real page with a characteristics
+        # block, even though the slabs table is empty -- those fields
+        # describe the stone itself, not its current stock, so once the
+        # stone is confirmed sold out they're worth keeping instead of
+        # being dropped forever alongside the stale slabs.
+        data = {
+            'updated_at': None,
+            'stones': [{
+                'id': 'delicato-brown', 'name': 'Old', 'slabs': [{'article': 'OLD'}],
+                'available': True, 'consecutive_empty_scrapes': 1,
+            }],
+        }
+        stone = {
+            'id': 'delicato-brown', 'name': 'New', 'slabs': [],
+            'category_label_ru': 'Мрамор',
+            'colors': [{'label_ru': 'Бежевый', 'segment': 'beige'}],
+            'countries': [{'label_ru': 'Оман', 'segment': 'oman'}],
+        }
+        new_data, skipped = scrape_slabs.merge_stone_into_data(data, stone)
+        self.assertTrue(skipped)
+        updated = new_data['stones'][0]
+        self.assertFalse(updated['available'])
+        self.assertEqual(updated['category_label_ru'], 'Мрамор')
+        self.assertEqual(updated['colors'], [{'label_ru': 'Бежевый', 'segment': 'beige'}])
+        self.assertEqual(updated['countries'], [{'label_ru': 'Оман', 'segment': 'oman'}])
+
+    def test_first_empty_scrape_does_not_backfill_characteristics_while_still_available(self):
+        # Still within the grace window -- the stone might just recover on
+        # the next scrape, at which point a normal non-empty merge will set
+        # these fields correctly. No need to trust a possibly-glitchy fetch
+        # yet.
+        data = {
+            'updated_at': None,
+            'stones': [{'id': 'delicato-brown', 'name': 'Old', 'slabs': [{'article': 'OLD'}]}],
+        }
+        stone = {
+            'id': 'delicato-brown', 'name': 'New', 'slabs': [],
+            'category_label_ru': 'Мрамор',
+            'colors': [{'label_ru': 'Бежевый', 'segment': 'beige'}],
+            'countries': [{'label_ru': 'Оман', 'segment': 'oman'}],
+        }
+        new_data, skipped = scrape_slabs.merge_stone_into_data(data, stone)
+        self.assertTrue(skipped)
+        updated = new_data['stones'][0]
+        self.assertTrue(updated['available'])
+        self.assertNotIn('category_label_ru', updated)
+        self.assertNotIn('colors', updated)
+        self.assertNotIn('countries', updated)
+
     def test_non_empty_scrape_resets_counter_and_marks_available(self):
         data = {
             'updated_at': None,

@@ -347,6 +347,17 @@ def merge_stone_into_data(data, stone):
             # field even though slabs are being preserved untouched.
             if stone.get('image') and stone['image'] != existing.get('image'):
                 updated_existing['image'] = stone['image']
+            if not updated_existing['available']:
+                # Once a stone is confirmed sold out (not just a one-off
+                # scrape blip), its characteristics -- unlike its slabs --
+                # describe the stone itself, not its stock, so they're
+                # still worth trusting from this fetch. Without this, a
+                # permanently out-of-stock stone could never pick up
+                # category_label_ru/colors/countries, since every future
+                # scrape of it keeps hitting this same empty-slabs branch.
+                for field in ('category_label_ru', 'colors', 'countries'):
+                    if field in stone:
+                        updated_existing[field] = stone[field]
             new_data = dict(data)
             new_data['stones'] = [updated_existing if s.get('id') == stone.get('id') else s
                                    for s in stones]
