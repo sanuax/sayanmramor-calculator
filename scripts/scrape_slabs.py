@@ -156,7 +156,7 @@ def replace_stone_image_file(images_dir, stone_id, image_bytes, extension):
     return dest_path
 
 
-def download_stone_image(browser, image_url, images_dir, stone_id):
+def download_stone_image(browser, image_url, images_dir, stone_id, max_attempts=3, retry_delay_s=2.0):
     # Downloads through an actual browser page (Chromium's network stack)
     # rather than APIRequestContext (Node's own TLS client): the CDN's WAF
     # fingerprints TLS handshakes and silently drops non-browser clients --
@@ -170,16 +170,34 @@ def download_stone_image(browser, image_url, images_dir, stone_id):
     # browser.new_context()". browser.new_page() instead opens its own fresh
     # context per call and closes that context automatically when the page
     # closes.
-    img_page = browser.new_page()
-    try:
-        response = img_page.goto(image_url)
-        if not response or not response.ok:
-            status = response.status if response else 'no response'
-            raise RuntimeError(f'image download failed: HTTP {status} for {image_url}')
-        extension = content_type_to_extension(response.headers.get('content-type')) or '.jpg'
-        return replace_stone_image_file(images_dir, stone_id, response.body(), extension)
-    finally:
-        img_page.close()
+    #
+    # image_url points at cdn.veneziastone.com's on-the-fly resize endpoint,
+    # not a static file -- on a cold cache it can take much longer than a
+    # plain page load to generate the resized image. wait_until='commit'
+    # (just the response headers, the earliest point response.ok/headers are
+    # available) instead of the default 'load' avoids waiting on a "loaded"
+    # signal that a bare image response may be slow to fire even after the
+    # bytes are ready; response.body() below is what actually waits for the
+    # full body. Retrying a few times with a short pause covers the same
+    # transient-timeout pattern seen scraping the stone pages themselves
+    # rather than treating one slow resize as a permanent failure.
+    last_error = None
+    for attempt in range(1, max_attempts + 1):
+        img_page = browser.new_page()
+        try:
+            response = img_page.goto(image_url, wait_until='commit', timeout=60000)
+            if not response or not response.ok:
+                status = response.status if response else 'no response'
+                raise RuntimeError(f'image download failed: HTTP {status} for {image_url}')
+            extension = content_type_to_extension(response.headers.get('content-type')) or '.jpg'
+            return replace_stone_image_file(images_dir, stone_id, response.body(), extension)
+        except Exception as e:
+            last_error = e
+            if attempt < max_attempts and retry_delay_s:
+                time.sleep(retry_delay_s)
+        finally:
+            img_page.close()
+    raise last_error
 
 
 def extract_slabs_from_html(html, source_url):
@@ -418,6 +436,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_URLS_PATH = PROJECT_ROOT / 'scripts' / 'stone_urls.txt'
 DEFAULT_OUTPUT_PATH = PROJECT_ROOT / 'data' / 'slabs.json'
 DEFAULT_FAILED_LOG_PATH = PROJECT_ROOT / 'scripts' / 'failed_urls.txt'
+DEFAULT_FAILED_IMAGE_LOG_PATH = PROJECT_ROOT / 'scripts' / 'failed_image_urls.txt'
 
 
 def load_existing_data(path):
@@ -467,6 +486,9 @@ def main(argv=None):
                               'catalog runs); without this flag --urls is left untouched, as for the small '
                               'curated stone_urls.txt list')
     parser.add_argument('--failed-log', default=str(DEFAULT_FAILED_LOG_PATH))
+    parser.add_argument('--failed-image-log', default=str(DEFAULT_FAILED_IMAGE_LOG_PATH),
+                         help='stones whose image download failed after retries go here (same format as '
+                              '--failed-log), so a bad batch can be identified without combing through stderr')
     parser.add_argument('--delay-min', type=float, default=3.0, help='min seconds to wait between stones')
     parser.add_argument('--delay-max', type=float, default=7.0, help='max seconds to wait between stones')
     args = parser.parse_args(argv)
@@ -509,6 +531,7 @@ def main(argv=None):
                             stone['image'] = f'images/{dest_path.name}'
                         except Exception as e:
                             print(f'  ERROR downloading image for {url}: {e!r}', file=sys.stderr)
+                            log_failed_url(Path(args.failed_image_log), url, e)
                     data, was_skipped = merge_stone_into_data(data, stone)
                     if was_skipped:
                         print(f'  WARNING: no available slabs found for {url}, keeping previous data for this stone',

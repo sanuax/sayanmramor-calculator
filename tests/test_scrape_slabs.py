@@ -563,26 +563,45 @@ class FakeImageResponse:
 
 
 class FakeImagePage:
-    def __init__(self, response):
-        self._response = response
+    def __init__(self, outcome):
+        self._outcome = outcome
         self.closed = False
+        self.goto_calls = []
 
-    def goto(self, url):
-        return self._response
+    def goto(self, url, **kwargs):
+        self.goto_calls.append({'url': url, **kwargs})
+        if isinstance(self._outcome, BaseException):
+            raise self._outcome
+        return self._outcome
 
     def close(self):
         self.closed = True
 
 
 class FakeBrowser:
-    def __init__(self, response):
-        self._response = response
+    def __init__(self, outcomes):
+        # A single outcome (a FakeImageResponse) is reused for every
+        # new_page() call, as every existing caller of FakeBrowser expects.
+        # A list of outcomes (responses and/or exception instances) is
+        # consumed one per call instead, to exercise download_stone_image's
+        # retry loop, which opens a fresh page per attempt.
+        if isinstance(outcomes, (list, tuple)):
+            self._sequence = list(outcomes)
+            self._single = None
+        else:
+            self._sequence = None
+            self._single = outcomes
         self.pages_created = []
 
     def new_page(self):
-        page = FakeImagePage(self._response)
+        outcome = self._sequence.pop(0) if self._sequence is not None else self._single
+        page = FakeImagePage(outcome)
         self.pages_created.append(page)
         return page
+
+    @property
+    def goto_calls(self):
+        return [call for page in self.pages_created for call in page.goto_calls]
 
 
 class DownloadStoneImageTests(unittest.TestCase):
@@ -618,10 +637,15 @@ class DownloadStoneImageTests(unittest.TestCase):
             )
             with self.assertRaises(RuntimeError):
                 scrape_slabs.download_stone_image(
-                    browser, 'https://example.test/missing.jpg', images_dir, 'delicato-brown'
+                    browser, 'https://example.test/missing.jpg', images_dir, 'delicato-brown',
+                    retry_delay_s=0
                 )
             images_dir.mkdir(parents=True, exist_ok=True)
             self.assertEqual(list(images_dir.glob('*')), [])
+            # A 404 is retried the same as any other failure (see
+            # DownloadStoneImageRetryTests) -- every attempt opens and
+            # closes its own page.
+            self.assertTrue(all(p.closed for p in browser.pages_created))
 
     def test_failed_download_does_not_delete_existing_file(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -633,7 +657,8 @@ class DownloadStoneImageTests(unittest.TestCase):
             )
             with self.assertRaises(RuntimeError):
                 scrape_slabs.download_stone_image(
-                    browser, 'https://example.test/img.jpg', images_dir, 'delicato-brown'
+                    browser, 'https://example.test/img.jpg', images_dir, 'delicato-brown',
+                    retry_delay_s=0
                 )
             self.assertEqual((images_dir / 'delicato-brown.jpg').read_bytes(), b'old-bytes')
 
@@ -647,6 +672,72 @@ class DownloadStoneImageTests(unittest.TestCase):
                 browser, 'https://example.test/img', images_dir, 'delicato-brown'
             )
             self.assertEqual(dest, images_dir / 'delicato-brown.jpg')
+
+    def test_navigates_with_commit_and_a_60s_timeout(self):
+        # cdn.veneziastone.com resizes images on request; waiting for the
+        # default 'load' event (rather than just the response headers) and
+        # Playwright's default 30s timeout is what produced the timeouts
+        # seen scraping quartzite/amethyst and 14 other stones on a cold
+        # cache -- see chat for context.
+        with tempfile.TemporaryDirectory() as tmp:
+            images_dir = Path(tmp)
+            browser = FakeBrowser(
+                FakeImageResponse(ok=True, status=200, content_type='image/webp', body_bytes=b'bytes')
+            )
+            scrape_slabs.download_stone_image(
+                browser, 'https://example.test/img.webp', images_dir, 'delicato-brown'
+            )
+            self.assertEqual(browser.goto_calls[0]['wait_until'], 'commit')
+            self.assertEqual(browser.goto_calls[0]['timeout'], 60000)
+
+
+class DownloadStoneImageRetryTests(unittest.TestCase):
+    def test_retries_after_a_transient_error_then_succeeds(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            images_dir = Path(tmp)
+            browser = FakeBrowser([
+                TimeoutError('Page.goto: Timeout 30000ms exceeded.'),
+                FakeImageResponse(ok=True, status=200, content_type='image/webp', body_bytes=b'ok-bytes'),
+            ])
+            dest = scrape_slabs.download_stone_image(
+                browser, 'https://example.test/img.webp', images_dir, 'black-6', retry_delay_s=0
+            )
+            self.assertEqual(dest.read_bytes(), b'ok-bytes')
+            self.assertEqual(len(browser.pages_created), 2)
+            self.assertTrue(all(p.closed for p in browser.pages_created))
+
+    def test_gives_up_and_raises_the_last_error_after_max_attempts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            images_dir = Path(tmp)
+            timeout_error = TimeoutError('Page.goto: Timeout 30000ms exceeded.')
+            browser = FakeBrowser([timeout_error, timeout_error, timeout_error])
+            with self.assertRaises(TimeoutError):
+                scrape_slabs.download_stone_image(
+                    browser, 'https://example.test/img.webp', images_dir, 'black-6',
+                    max_attempts=3, retry_delay_s=0
+                )
+            # One fresh page per attempt, all three used up -- not retried
+            # forever, and each opened page was closed even on failure.
+            self.assertEqual(len(browser.pages_created), 3)
+            self.assertTrue(all(p.closed for p in browser.pages_created))
+
+    def test_does_not_sleep_after_the_final_attempt(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            images_dir = Path(tmp)
+            timeout_error = TimeoutError('Page.goto: Timeout 30000ms exceeded.')
+            browser = FakeBrowser([timeout_error, timeout_error])
+            sleep_calls = []
+            original_sleep = scrape_slabs.time.sleep
+            scrape_slabs.time.sleep = lambda s: sleep_calls.append(s)
+            try:
+                with self.assertRaises(TimeoutError):
+                    scrape_slabs.download_stone_image(
+                        browser, 'https://example.test/img.webp', images_dir, 'black-6',
+                        max_attempts=2, retry_delay_s=5
+                    )
+            finally:
+                scrape_slabs.time.sleep = original_sleep
+            self.assertEqual(sleep_calls, [5])
 
 
 if __name__ == '__main__':
