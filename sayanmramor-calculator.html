@@ -448,6 +448,12 @@
     line-height: 1.15;
     min-height: 76px;
   }
+  .result-price.placeholder {
+    font-size: 15px;
+    font-weight: 600;
+    color: #999;
+    line-height: 1.5;
+  }
   .result-breakdown {
     font-size: 13px;
     color: #bbb;
@@ -556,7 +562,7 @@
     <div class="result-panel">
       <div>
         <div class="result-label">Ориентировочная стоимость</div>
-        <div class="result-price" id="priceOut">—</div>
+        <div class="result-price placeholder" id="priceOut">Выберите тип изделия, материал и размеры, чтобы увидеть расчёт</div>
         <div class="warning-box" id="warningOut" style="display:none"></div>
         <div class="result-breakdown" id="breakdown"></div>
         <div class="remainder-line" id="remainderOut"></div>
@@ -663,9 +669,9 @@
     // Running-bond brick cladding: 3 even rows, offset middle row, equal
     // gaps and symmetric top/bottom margins for a tidier grid than a plain,
     // unevenly-spaced brick layout.
-    stena: '<rect x="3" y="5" width="8.5" height="4" rx="0.4"/><rect x="12.5" y="5" width="8.5" height="4" rx="0.4"/>' +
-      '<rect x="3" y="10" width="4" height="4" rx="0.4"/><rect x="8" y="10" width="8" height="4" rx="0.4"/><rect x="17" y="10" width="4" height="4" rx="0.4"/>' +
-      '<rect x="3" y="15" width="8.5" height="4" rx="0.4"/><rect x="12.5" y="15" width="8.5" height="4" rx="0.4"/>',
+    stena: '<rect x="3" y="3" width="8.5" height="5" rx="0.4"/><rect x="12.5" y="3" width="8.5" height="5" rx="0.4"/>' +
+      '<rect x="3" y="9.5" width="4" height="5" rx="0.4"/><rect x="8" y="9.5" width="8" height="5" rx="0.4"/><rect x="17" y="9.5" width="4" height="5" rx="0.4"/>' +
+      '<rect x="3" y="16" width="8.5" height="5" rx="0.4"/><rect x="12.5" y="16" width="8.5" height="5" rx="0.4"/>',
     fasad: '<path d="M4 21V9l8-5 8 5v12"/><path d="M4 21h16"/><rect x="10" y="14" width="4" height="7"/>' +
       '<rect x="6" y="11" width="3" height="3"/><rect x="15" y="11" width="3" height="3"/>',
     // A basin (rim ellipse + bowl curve) sitting on a slab, with a
@@ -725,6 +731,7 @@
   const materialFieldText = document.getElementById('materialFieldText');
   let selectedStoneId = null;
   let picker = null;
+  let dimsTouched = false;
   const widthInput = document.getElementById('width');
   const lengthInput = document.getElementById('length');
   const dimError = document.getElementById('dimError');
@@ -835,6 +842,18 @@
       .replace(/'/g, '&#39;');
   }
 
+  const INCOMPLETE_HINT = 'Выберите тип изделия, материал и размеры, чтобы увидеть расчёт';
+
+  function setPriceHint(text) {
+    priceOut.textContent = text;
+    priceOut.classList.add('placeholder');
+  }
+
+  function setPriceValue(text) {
+    priceOut.textContent = text;
+    priceOut.classList.remove('placeholder');
+  }
+
   function calculate() {
     if (!DATA_LOADED) return;
 
@@ -846,8 +865,8 @@
     remainderOut.textContent = '';
 
     if (width <= 0 || length <= 0) {
-      dimError.style.display = 'block';
-      priceOut.textContent = '—';
+      dimError.style.display = dimsTouched ? 'block' : 'none';
+      setPriceHint(INCOMPLETE_HINT);
       breakdown.innerHTML = '';
       updatedAtOut.textContent = '';
       infoBlock.style.display = 'none';
@@ -856,7 +875,7 @@
     dimError.style.display = 'none';
 
     if (!selectedProductKey) {
-      priceOut.textContent = '—';
+      setPriceHint(INCOMPLETE_HINT);
       breakdown.innerHTML = '';
       warningOut.style.display = 'none';
       updatedAtOut.textContent = '';
@@ -866,7 +885,7 @@
     const product = PRODUCTS[selectedProductKey];
 
     if (!selectedStoneId) {
-      priceOut.textContent = '—';
+      setPriceHint(INCOMPLETE_HINT);
       breakdown.innerHTML = '';
       warningOut.style.display = 'none';
       updatedAtOut.textContent = '';
@@ -876,7 +895,7 @@
     const stone = STONES_BY_ID[selectedStoneId];
 
     if (stone.available === false) {
-      priceOut.textContent = 'Нужно уточнить у менеджера';
+      setPriceValue('Нужно уточнить у менеджера');
       warningOut.textContent = 'Этот камень сейчас распродан — пришлите размеры менеджеру для точного расчёта.';
       warningOut.style.display = 'block';
       breakdown.innerHTML = '';
@@ -916,7 +935,7 @@
     });
 
     if (!result.ok) {
-      priceOut.textContent = 'Нужно уточнить у менеджера';
+      setPriceValue('Нужно уточнить у менеджера');
       let msg = 'Подходящего слэба нет в наличии — пришлите размеры менеджеру для точного расчёта.';
       if (result.reason === 'no_slabs_for_stone') {
         msg = 'Для этого камня сейчас нет данных о слэбах в наличии.';
@@ -947,7 +966,7 @@
 
     infoBlock.style.display = '';
 
-    priceOut.textContent = '≈ ' + formatRub(result.total);
+    setPriceValue('≈ ' + formatRub(result.total));
 
     let html = `Площадь: <span>${(width * length).toFixed(2)} м²</span><br>`;
     html += `Материал: <span>${escapeHtml(stone.name)}</span><br>`;
@@ -976,8 +995,8 @@
   }
 
   [widthInput, lengthInput].forEach(el => {
-    el.addEventListener('input', calculate);
-    el.addEventListener('change', calculate);
+    el.addEventListener('input', () => { dimsTouched = true; calculate(); });
+    el.addEventListener('change', () => { dimsTouched = true; calculate(); });
   });
   document.querySelectorAll('.checkbox-row input').forEach(el => {
     el.addEventListener('change', calculate);
@@ -987,6 +1006,7 @@
     if (parseFloat(widthInput.value) > 0 && parseFloat(lengthInput.value) > 0) {
       alert('Здесь будет открываться форма заявки с уже заполненными данными расчёта (тип, материал, размеры).');
     } else {
+      dimsTouched = true;
       dimError.style.display = 'block';
     }
   });
