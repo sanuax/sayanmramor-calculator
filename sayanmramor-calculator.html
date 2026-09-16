@@ -687,7 +687,7 @@
     stupeni: '<path d="M4 20h6v-6h6v-6h6"/>',
   };
 
-  const { SAW_MARGIN_CM, AREA_WASTE_FACTOR, WORK_MULTIPLIER, HARDNESS_WORK_MULTIPLIER, OPTION_SURCHARGE } = ProductTypes;
+  const { SAW_MARGIN_CM, AREA_WASTE_FACTOR, WORK_RATES, MISC_FLAT_SUM, MISC_RATE_PER_M2, COMPLEX_SHAPE_MULTIPLIER } = ProductTypes;
 
   const productGrid = document.getElementById('productGrid');
   let selectedProductKey = null;
@@ -874,32 +874,35 @@
       return;
     }
 
-    let multiplier = 1;
-    let surchargeLabel = [];
-    if (document.getElementById('opt-complex').checked) {
-      multiplier += OPTION_SURCHARGE.complex;
-      surchargeLabel.push('сложная форма +' + (OPTION_SURCHARGE.complex * 100) + '%');
-    }
-    if (document.getElementById('opt-polish').checked) {
-      multiplier += OPTION_SURCHARGE.polish;
-      surchargeLabel.push('полировка +' + (OPTION_SURCHARGE.polish * 100) + '%');
-    }
-    if (document.getElementById('opt-install').checked) {
-      multiplier += OPTION_SURCHARGE.install;
-      surchargeLabel.push('монтаж +' + (OPTION_SURCHARGE.install * 100) + '%');
-    }
-    const optionSurchargeSum = multiplier - 1;
+    const complexEnabled = document.getElementById('opt-complex').checked;
+    const polishEnabled = document.getElementById('opt-polish').checked;
+    const installEnabled = document.getElementById('opt-install').checked;
+    const surchargeLabel = [];
+    if (complexEnabled) surchargeLabel.push('сложная форма');
+    if (polishEnabled) surchargeLabel.push('полировка');
+    if (installEnabled) surchargeLabel.push('монтаж');
+
+    const productRates = WORK_RATES[selectedProductKey];
+    const rates = {
+      fabricationRatePerM2: productRates.fabricationRatePerM2,
+      installationRatePerM2: productRates.installationRatePerM2,
+      polishRatePerM2: productRates.polishRatePerM2,
+      miscFlatSum: MISC_FLAT_SUM,
+      miscRatePerM2: MISC_RATE_PER_M2,
+      complexShapeMultiplier: COMPLEX_SHAPE_MULTIPLIER
+    };
 
     const result = Pricing.calculatePrice({
       stone,
       widthM: width,
       lengthM: length,
       productType: product.type,
-      complexityMultiplier: product.complexityMultiplier,
-      optionSurchargeSum,
+      rates,
+      installEnabled,
+      polishEnabled,
+      complexEnabled,
       marginCm: SAW_MARGIN_CM,
       wasteFactor: AREA_WASTE_FACTOR,
-      workMultiplier: HARDNESS_WORK_MULTIPLIER[stone.hardness_category] || WORK_MULTIPLIER,
       allowSeam: product.allowSeam !== false
     });
 
