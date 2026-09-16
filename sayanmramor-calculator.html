@@ -614,22 +614,9 @@
 
 <script src="pricing.js"></script>
 <script src="material-picker.js"></script>
+<script src="product-types.js"></script>
 <script>
-  const PRODUCTS = {
-    lestnitsa:            { label: "Лестницы", complexityMultiplier: 1.8, type: 'B' },
-    panno:                { label: "Панно", complexityMultiplier: 1.6, type: 'B' },
-    podokonnik:           { label: "Подоконники", complexityMultiplier: 0.8, type: 'A' },
-    pol:                  { label: "Полы", complexityMultiplier: 1.0, type: 'B' },
-    stena:                { label: "Стены", complexityMultiplier: 1.1, type: 'B' },
-    fasad:                { label: "Фасады", complexityMultiplier: 1.3, type: 'B' },
-    stoleshnitsa_vannaya: { label: "Столешницы в ванную", complexityMultiplier: 0.9, type: 'A' },
-    // TODO: кухонные столешницы нуждаются в отдельной фильтрации камня по
-    // устойчивости к мех./хим. воздействиям (нож, вино и т.д.) — не весь
-    // камень из общего каталога годится для кухни. Фильтрации пока нет,
-    // добавим отдельным шагом, когда определим критерий классификации камня.
-    stoleshnitsa_kuhnya:  { label: "Столешницы на кухню", complexityMultiplier: 1.15, type: 'A' },
-    stupeni:              { label: "Ступени", complexityMultiplier: 1.4, type: 'A' }
-  };
+  const { PRODUCTS } = ProductTypes;
 
   // Simple single-color line icons (24x24 viewBox) for the product-type
   // cards -- inner markup only, wrapped uniformly when the cards are built.
@@ -700,25 +687,7 @@
     stupeni: '<path d="M4 20h6v-6h6v-6h6"/>',
   };
 
-  const SAW_MARGIN_CM = 4;
-  const AREA_WASTE_FACTOR = 1.3;
-  const WORK_MULTIPLIER = 2;
-
-  // Work multiplier by stone processing-difficulty tier (1/2/3, see
-  // hardness_category in slabs.json — assigned per stone category in
-  // scripts/scrape_slabs.py). Values are provisional, to be replaced once
-  // real order-cost data is available; category 1 intentionally matches
-  // WORK_MULTIPLIER so today's pricing for easy stones doesn't change.
-  // Stones without a hardness_category (not yet re-scraped since this was
-  // added, or a stone type not in the mapping yet) fall back to
-  // WORK_MULTIPLIER so pricing for them is unaffected either way.
-  const HARDNESS_WORK_MULTIPLIER = { 1: WORK_MULTIPLIER, 2: 2.3, 3: 2.8 };
-
-  const OPTION_SURCHARGE = {
-    complex: 0.25,   // +25% за сложную форму
-    polish: 0.10,    // +10% за доп. полировку
-    install: 0.15    // +15% за монтаж
-  };
+  const { SAW_MARGIN_CM, AREA_WASTE_FACTOR, WORK_MULTIPLIER, HARDNESS_WORK_MULTIPLIER, OPTION_SURCHARGE } = ProductTypes;
 
   const productGrid = document.getElementById('productGrid');
   let selectedProductKey = null;
