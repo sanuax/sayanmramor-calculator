@@ -60,29 +60,73 @@ test('computeTypeBResult reports insufficient stock as {slabs:null, subtotal:nul
   assert.equal(result.slabs, null);
 });
 
-test('computeWorkAndTotal matches spec-verified example (complexity 1.0, no options)', () => {
-  const { work, total } = Pricing.computeWorkAndTotal(52673, 2, 1.0, 0);
-  assert.equal(work, 105346);
-  assert.equal(total, 158019);
+const SAMPLE_RATES = {
+  fabricationRatePerM2: 30000,
+  installationRatePerM2: 15000,
+  polishRatePerM2: 10000,
+  miscFlatSum: 5000,
+  miscRatePerM2: 2000,
+  complexShapeMultiplier: 1.5,
+};
+const ZERO_RATES = { fabricationRatePerM2: 0, installationRatePerM2: 0, polishRatePerM2: 0, miscFlatSum: 0, miscRatePerM2: 0, complexShapeMultiplier: 1 };
+const NO_OPTIONS = { installEnabled: false, polishEnabled: false, complexEnabled: false };
+
+test('computeWorkAndTotal: base case, no options -- work is fabrication plus misc only', () => {
+  // area=2: fabrication=30000*2=60000, misc=5000+2000*2=9000, install/polish off
+  const r = Pricing.computeWorkAndTotal(100000, 2, SAMPLE_RATES, NO_OPTIONS);
+  assert.equal(r.fabrication, 60000);
+  assert.equal(r.installation, 0);
+  assert.equal(r.polish, 0);
+  assert.equal(r.misc, 9000);
+  assert.equal(r.work, 69000);
+  assert.equal(r.total, 169000);
 });
 
-test('computeWorkAndTotal compounds complexity and options', () => {
-  // complexity 1.8 (лестница), one option +0.25 -> work = 52673 * 2 * 1.8 * 1.25
-  const { work, total } = Pricing.computeWorkAndTotal(52673, 2, 1.8, 0.25);
-  assert.ok(Math.abs(work - 52673 * 2 * 1.8 * 1.25) < 0.001);
-  assert.ok(Math.abs(total - (52673 + work)) < 0.001);
+test('computeWorkAndTotal: complexEnabled scales fabrication only, not installation/polish/misc', () => {
+  const r = Pricing.computeWorkAndTotal(100000, 2, SAMPLE_RATES, { installEnabled: true, polishEnabled: true, complexEnabled: true });
+  // fabrication=30000*1.5*2=90000, installation=15000*2=30000, polish=10000*2=20000, misc=9000
+  assert.equal(r.fabrication, 90000);
+  assert.equal(r.installation, 30000);
+  assert.equal(r.polish, 20000);
+  assert.equal(r.misc, 9000);
+  assert.equal(r.work, 90000 + 30000 + 20000 + 9000);
+  assert.equal(r.total, 100000 + r.work);
+});
+
+test('computeWorkAndTotal: installEnabled and polishEnabled toggle independently', () => {
+  const installOnly = Pricing.computeWorkAndTotal(100000, 2, SAMPLE_RATES, { installEnabled: true, polishEnabled: false, complexEnabled: false });
+  assert.equal(installOnly.installation, 30000);
+  assert.equal(installOnly.polish, 0);
+
+  const polishOnly = Pricing.computeWorkAndTotal(100000, 2, SAMPLE_RATES, { installEnabled: false, polishEnabled: true, complexEnabled: false });
+  assert.equal(polishOnly.installation, 0);
+  assert.equal(polishOnly.polish, 20000);
+});
+
+test('computeWorkAndTotal: null miscFlatSum/miscRatePerM2 (no real data yet) are treated as 0, not NaN', () => {
+  const ratesWithoutMisc = { fabricationRatePerM2: 0, installationRatePerM2: 0, polishRatePerM2: 0, miscFlatSum: null, miscRatePerM2: null, complexShapeMultiplier: 1 };
+  const r = Pricing.computeWorkAndTotal(100000, 2, ratesWithoutMisc, NO_OPTIONS);
+  assert.equal(r.misc, 0);
+  assert.equal(r.work, 0);
+  assert.equal(r.total, 100000);
+});
+
+test('computeWorkAndTotal: all-zero rates leave total equal to subtotal (isolates geometry tests from the pricing formula)', () => {
+  const r = Pricing.computeWorkAndTotal(52673, 0.6, ZERO_RATES, NO_OPTIONS);
+  assert.equal(r.work, 0);
+  assert.equal(r.total, 52673);
 });
 
 const stone = { name: 'Delicato Brown', slabs };
 
 test('calculatePrice: invalid dimensions', () => {
-  const r = Pricing.calculatePrice({ stone, widthM: 0, lengthM: 1, productType: 'A', complexityMultiplier: 1, optionSurchargeSum: 0, marginCm: 4, wasteFactor: 1.3, workMultiplier: 2 });
+  const r = Pricing.calculatePrice({ stone, widthM: 0, lengthM: 1, productType: 'A', rates: ZERO_RATES, ...NO_OPTIONS, marginCm: 4, wasteFactor: 1.3 });
   assert.equal(r.ok, false);
   assert.equal(r.reason, 'invalid_dimensions');
 });
 
 test('calculatePrice: no stone selected / no slabs', () => {
-  const r = Pricing.calculatePrice({ stone: { name: 'X', slabs: [] }, widthM: 1, lengthM: 1, productType: 'A', complexityMultiplier: 1, optionSurchargeSum: 0, marginCm: 4, wasteFactor: 1.3, workMultiplier: 2 });
+  const r = Pricing.calculatePrice({ stone: { name: 'X', slabs: [] }, widthM: 1, lengthM: 1, productType: 'A', rates: ZERO_RATES, ...NO_OPTIONS, marginCm: 4, wasteFactor: 1.3 });
   assert.equal(r.ok, false);
   assert.equal(r.reason, 'no_slabs_for_stone');
 });
@@ -91,19 +135,16 @@ test('calculatePrice: type A no fitting slab even with a seam (cross dimension e
   // 3x3 needs a 308cm cross dimension in every orientation, but the largest
   // slab side in the fixture is 283cm -- no amount of splitting along one
   // axis can fit a 308cm cross-section, so this must fall back to "ask a manager".
-  const r = Pricing.calculatePrice({ stone, widthM: 3, lengthM: 3, productType: 'A', complexityMultiplier: 1, optionSurchargeSum: 0, marginCm: 4, wasteFactor: 1.3, workMultiplier: 2 });
+  const r = Pricing.calculatePrice({ stone, widthM: 3, lengthM: 3, productType: 'A', rates: ZERO_RATES, ...NO_OPTIONS, marginCm: 4, wasteFactor: 1.3 });
   assert.equal(r.ok, false);
   assert.equal(r.reason, 'no_fitting_slab');
 });
 
 test('calculatePrice: type A with allowSeam:false skips the segmented fallback (panels look wrong with a seam)', () => {
-  // Same 5x0.6 case that succeeds as a 1-slab seam when allowSeam defaults to
-  // true (see the countertop test below) -- with allowSeam:false it must go
-  // straight to "ask a manager" instead of silently proposing a seam.
   const plentySlabs = [].concat(slabs, slabs, slabs, slabs, slabs);
   const r = Pricing.calculatePrice({
     stone: { name: 'X', slabs: plentySlabs }, widthM: 5, lengthM: 0.6, productType: 'A',
-    complexityMultiplier: 1, optionSurchargeSum: 0, marginCm: 4, wasteFactor: 1.3, workMultiplier: 2,
+    rates: ZERO_RATES, ...NO_OPTIONS, marginCm: 4, wasteFactor: 1.3,
     allowSeam: false
   });
   assert.equal(r.ok, false);
@@ -111,7 +152,7 @@ test('calculatePrice: type A with allowSeam:false skips the segmented fallback (
 });
 
 test('calculatePrice: type A allowSeam defaults to true when omitted', () => {
-  const r = Pricing.calculatePrice({ stone, widthM: 1.0, lengthM: 0.6, productType: 'A', complexityMultiplier: 1.0, optionSurchargeSum: 0, marginCm: 4, wasteFactor: 1.3, workMultiplier: 2 });
+  const r = Pricing.calculatePrice({ stone, widthM: 1.0, lengthM: 0.6, productType: 'A', rates: ZERO_RATES, ...NO_OPTIONS, marginCm: 4, wasteFactor: 1.3 });
   assert.equal(r.ok, true);
 });
 
@@ -148,12 +189,12 @@ test('findTypeASegmentedResult: cross dimension bigger than every slab side retu
   assert.equal(r, null);
 });
 
-test('calculatePrice: type A happy path matches spec-verified numbers', () => {
-  const r = Pricing.calculatePrice({ stone, widthM: 1.0, lengthM: 0.6, productType: 'A', complexityMultiplier: 1.0, optionSurchargeSum: 0, marginCm: 4, wasteFactor: 1.3, workMultiplier: 2 });
+test('calculatePrice: type A happy path, zero rates -- total equals subtotal (the formula itself is tested in the computeWorkAndTotal tests above)', () => {
+  const r = Pricing.calculatePrice({ stone, widthM: 1.0, lengthM: 0.6, productType: 'A', rates: ZERO_RATES, ...NO_OPTIONS, marginCm: 4, wasteFactor: 1.3 });
   assert.equal(r.ok, true);
   assert.equal(r.matchedSlab.article, 'P0444194');
   assert.equal(r.subtotal, 52673);
-  assert.equal(r.total, 158019);
+  assert.equal(r.total, 52673);
   assert.equal(r.nSlabs, 1);
   assert.ok(Math.abs(r.remainderM2 - 4.2852) < 0.0001);
 });
@@ -164,7 +205,7 @@ test('calculatePrice: type A, 10x0.6 countertop needs a seam (far too long for o
   // need_l=1008cm, cross=68cm -> best capacity per slab is floor(276/68)*177=708
   // (see slabCapacityForCross test above): ceil(1008/708) = 2 slabs, not 4 --
   // a slab yields more than one strip, so segments-per-slab must be counted.
-  const r = Pricing.calculatePrice({ stone: { name: 'X', slabs: plentySlabs }, widthM: 10, lengthM: 0.6, productType: 'A', complexityMultiplier: 1, optionSurchargeSum: 0, marginCm: 4, wasteFactor: 1.3, workMultiplier: 2 });
+  const r = Pricing.calculatePrice({ stone: { name: 'X', slabs: plentySlabs }, widthM: 10, lengthM: 0.6, productType: 'A', rates: ZERO_RATES, ...NO_OPTIONS, marginCm: 4, wasteFactor: 1.3 });
   assert.equal(r.ok, true);
   assert.equal(r.nSlabs, 2);
   assert.equal(r.subtotal, 2 * 52673);
@@ -172,14 +213,7 @@ test('calculatePrice: type A, 10x0.6 countertop needs a seam (far too long for o
 });
 
 test('calculatePrice: type A, 5x0.6 countertop fits a single slab cut into two pieces (area alone would be misleading)', () => {
-  // Area check would be misleading here: 5*0.6=3m2 fits inside a single slab's
-  // ~4.8m2, but geometrically the 5m length exceeds every slab's longest side
-  // (2.83m) in any rotation, so findBestTypeASlab (whole-piece fit) fails and
-  // this falls through to the seam path. But the seam path must recognize that
-  // one slab can supply two strips (708cm of achievable length, see above),
-  // which comfortably covers the needed 508cm as one slab cut in two, not two
-  // separate slabs.
-  const r = Pricing.calculatePrice({ stone: { name: 'X', slabs: plentySlabs }, widthM: 5, lengthM: 0.6, productType: 'A', complexityMultiplier: 1, optionSurchargeSum: 0, marginCm: 4, wasteFactor: 1.3, workMultiplier: 2 });
+  const r = Pricing.calculatePrice({ stone: { name: 'X', slabs: plentySlabs }, widthM: 5, lengthM: 0.6, productType: 'A', rates: ZERO_RATES, ...NO_OPTIONS, marginCm: 4, wasteFactor: 1.3 });
   assert.equal(r.ok, true);
   assert.equal(r.nSlabs, 1);
   assert.equal(r.subtotal, 52673);
@@ -187,7 +221,7 @@ test('calculatePrice: type A, 5x0.6 countertop fits a single slab cut into two p
 });
 
 test('calculatePrice: type A, 2x1.5 countertop still fits a single slab (no seam)', () => {
-  const r = Pricing.calculatePrice({ stone, widthM: 2, lengthM: 1.5, productType: 'A', complexityMultiplier: 1, optionSurchargeSum: 0, marginCm: 4, wasteFactor: 1.3, workMultiplier: 2 });
+  const r = Pricing.calculatePrice({ stone, widthM: 2, lengthM: 1.5, productType: 'A', rates: ZERO_RATES, ...NO_OPTIONS, marginCm: 4, wasteFactor: 1.3 });
   assert.equal(r.ok, true);
   assert.equal(r.nSlabs, 1);
   assert.equal(r.matchedSlab.article, 'P0444194');
@@ -196,10 +230,7 @@ test('calculatePrice: type A, 2x1.5 countertop still fits a single slab (no seam
 });
 
 test('calculatePrice: type B happy path uses the real combined cost of the distinct slabs actually needed', () => {
-  // widthM 3 x lengthM 3 against the 3-slab fixture -> all 3 distinct slabs
-  // required (see computeTypeBResult test above), priced at their real sum,
-  // exposed via matchedSlabs (matchedSlab kept as matchedSlabs[0] for compat).
-  const r = Pricing.calculatePrice({ stone, widthM: 3, lengthM: 3, productType: 'B', complexityMultiplier: 1.1, optionSurchargeSum: 0, marginCm: 4, wasteFactor: 1.3, workMultiplier: 2 });
+  const r = Pricing.calculatePrice({ stone, widthM: 3, lengthM: 3, productType: 'B', rates: ZERO_RATES, ...NO_OPTIONS, marginCm: 4, wasteFactor: 1.3 });
   assert.equal(r.ok, true);
   assert.equal(r.nSlabs, 3);
   assert.equal(r.subtotal, 52673 + 57021 + 58589);
@@ -209,11 +240,7 @@ test('calculatePrice: type B happy path uses the real combined cost of the disti
 });
 
 test('calculatePrice: type B reports insufficient_stock without guessing a slab count', () => {
-  // widthM 5 x lengthM 3 = 15 m2 against the 3-slab fixture -- even all 3
-  // combined fall short (see computeTypeBResult test above), so this must
-  // report infeasibility plainly rather than a specific (and now meaningless)
-  // "need N, have M" slab count.
-  const r = Pricing.calculatePrice({ stone, widthM: 5, lengthM: 3, productType: 'B', complexityMultiplier: 1.1, optionSurchargeSum: 0, marginCm: 4, wasteFactor: 1.3, workMultiplier: 2 });
+  const r = Pricing.calculatePrice({ stone, widthM: 5, lengthM: 3, productType: 'B', rates: ZERO_RATES, ...NO_OPTIONS, marginCm: 4, wasteFactor: 1.3 });
   assert.equal(r.ok, false);
   assert.equal(r.reason, 'insufficient_stock');
   assert.equal(r.total, null);
@@ -361,7 +388,7 @@ test('findTypeASegmentedResult: when 2 distinct slabs are both required, sums th
 test('calculatePrice: stone with slabs but none priced reports a distinct "no price data" reason, not ≈0 ₽', () => {
   const r = Pricing.calculatePrice({
     stone: { name: 'Black Mirror', slabs: nullPricedSlabs }, widthM: 3.5, lengthM: 0.7, productType: 'A',
-    complexityMultiplier: 1, optionSurchargeSum: 0, marginCm: 4, wasteFactor: 1.3, workMultiplier: 2
+    rates: ZERO_RATES, ...NO_OPTIONS, marginCm: 4, wasteFactor: 1.3
   });
   assert.equal(r.ok, false);
   assert.equal(r.reason, 'no_priced_slab');
@@ -371,9 +398,36 @@ test('calculatePrice: stone with slabs but none priced reports a distinct "no pr
 test('calculatePrice: type B stone with slabs but none priced reports "no price data", not ≈0 ₽', () => {
   const r = Pricing.calculatePrice({
     stone: { name: 'Black Mirror', slabs: nullPricedSlabs }, widthM: 1, lengthM: 1, productType: 'B',
-    complexityMultiplier: 1, optionSurchargeSum: 0, marginCm: 4, wasteFactor: 1.3, workMultiplier: 2
+    rates: ZERO_RATES, ...NO_OPTIONS, marginCm: 4, wasteFactor: 1.3
   });
   assert.equal(r.ok, false);
   assert.equal(r.reason, 'no_priced_slab');
   assert.equal(r.total, null);
+});
+
+test('calculatePrice: rates and option flags flow through to the top-level result', () => {
+  const r = Pricing.calculatePrice({
+    stone, widthM: 1.0, lengthM: 0.6, productType: 'A',
+    rates: SAMPLE_RATES, installEnabled: true, polishEnabled: true, complexEnabled: true,
+    marginCm: 4, wasteFactor: 1.3
+  });
+  assert.equal(r.ok, true);
+  assert.equal(r.subtotal, 52673);
+  const area = 1.0 * 0.6;
+  const fabrication = SAMPLE_RATES.fabricationRatePerM2 * SAMPLE_RATES.complexShapeMultiplier * area;
+  const installation = SAMPLE_RATES.installationRatePerM2 * area;
+  const polish = SAMPLE_RATES.polishRatePerM2 * area;
+  const misc = SAMPLE_RATES.miscFlatSum + SAMPLE_RATES.miscRatePerM2 * area;
+  assert.ok(Math.abs(r.fabrication - fabrication) < 0.001);
+  assert.ok(Math.abs(r.installation - installation) < 0.001);
+  assert.ok(Math.abs(r.polish - polish) < 0.001);
+  assert.ok(Math.abs(r.misc - misc) < 0.001);
+  assert.ok(Math.abs(r.total - (r.subtotal + fabrication + installation + polish + misc)) < 0.001);
+});
+
+test('calculatePrice: installEnabled/polishEnabled/complexEnabled default to false when omitted', () => {
+  const r = Pricing.calculatePrice({ stone, widthM: 1.0, lengthM: 0.6, productType: 'A', rates: SAMPLE_RATES, marginCm: 4, wasteFactor: 1.3 });
+  assert.equal(r.installation, 0);
+  assert.equal(r.polish, 0);
+  assert.equal(r.fabrication, SAMPLE_RATES.fabricationRatePerM2 * (1.0 * 0.6));
 });

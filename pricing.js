@@ -162,20 +162,34 @@
     return { slabs: covered.chosen, subtotal: covered.cost };
   }
 
-  function computeWorkAndTotal(subtotal, workMultiplier, complexityMultiplier, optionSurchargeSum) {
-    const work = subtotal * workMultiplier * complexityMultiplier * (1 + optionSurchargeSum);
+  function computeWorkAndTotal(subtotal, area, rates, options) {
+    const { installEnabled, polishEnabled, complexEnabled } = options;
+    const fabricationRate = rates.fabricationRatePerM2 * (complexEnabled ? rates.complexShapeMultiplier : 1);
+    const fabrication = fabricationRate * area;
+    const installation = installEnabled ? rates.installationRatePerM2 * area : 0;
+    const polish = polishEnabled ? rates.polishRatePerM2 * area : 0;
+    // miscFlatSum/miscRatePerM2 are `null` in product-types.js until real
+    // КП data for "прочее" is available -- treat that as "not charged yet",
+    // not NaN.
+    const miscFlatSum = rates.miscFlatSum ?? 0;
+    const miscRatePerM2 = rates.miscRatePerM2 ?? 0;
+    const misc = miscFlatSum + miscRatePerM2 * area;
+    const work = fabrication + installation + polish + misc;
     const total = subtotal + work;
-    return { work, total };
+    return { fabrication, installation, polish, misc, work, total };
   }
 
   function calculatePrice(params) {
     const {
-      stone, widthM, lengthM, productType, complexityMultiplier,
-      optionSurchargeSum, marginCm, wasteFactor, workMultiplier,
+      stone, widthM, lengthM, productType, marginCm, wasteFactor,
+      rates, installEnabled = false, polishEnabled = false, complexEnabled = false,
       allowSeam = true
     } = params;
 
-    const empty = { subtotal: null, work: null, total: null, nSlabs: 0, remainderM2: null, matchedSlab: null, matchedSlabs: [] };
+    const empty = {
+      subtotal: null, fabrication: null, installation: null, polish: null, misc: null,
+      work: null, total: null, nSlabs: 0, remainderM2: null, matchedSlab: null, matchedSlabs: []
+    };
 
     if (!(widthM > 0) || !(lengthM > 0)) {
       return Object.assign({ ok: false, reason: 'invalid_dimensions' }, empty);
@@ -192,13 +206,19 @@
       return Object.assign({ ok: false, reason: 'no_priced_slab' }, empty);
     }
 
+    const area = widthM * lengthM;
+    const options = { installEnabled, polishEnabled, complexEnabled };
+
     if (productType === 'A') {
       const slab = findBestTypeASlab(stone.slabs, widthM, lengthM, marginCm);
       if (slab) {
         const subtotal = slab.price_total_rub;
-        const { work, total } = computeWorkAndTotal(subtotal, workMultiplier, complexityMultiplier, optionSurchargeSum);
+        const { fabrication, installation, polish, misc, work, total } = computeWorkAndTotal(subtotal, area, rates, options);
         const remainderM2 = computeRemainderAreaM2(slab, widthM, lengthM);
-        return { ok: true, reason: null, subtotal, work, total, nSlabs: 1, remainderM2, matchedSlab: slab, matchedSlabs: [slab] };
+        return {
+          ok: true, reason: null, subtotal, fabrication, installation, polish, misc, work, total,
+          nSlabs: 1, remainderM2, matchedSlab: slab, matchedSlabs: [slab]
+        };
       }
 
       // Some Type A products (e.g. decorative panels) look wrong with a seam,
@@ -215,9 +235,9 @@
       if (segmented.subtotal === null) {
         return Object.assign({ ok: false, reason: 'insufficient_stock' }, empty);
       }
-      const { work, total } = computeWorkAndTotal(segmented.subtotal, workMultiplier, complexityMultiplier, optionSurchargeSum);
+      const { fabrication, installation, polish, misc, work, total } = computeWorkAndTotal(segmented.subtotal, area, rates, options);
       return {
-        ok: true, reason: null, subtotal: segmented.subtotal, work, total,
+        ok: true, reason: null, subtotal: segmented.subtotal, fabrication, installation, polish, misc, work, total,
         nSlabs: segmented.slabs.length, remainderM2: null,
         matchedSlab: segmented.slabs[0], matchedSlabs: segmented.slabs
       };
@@ -230,9 +250,9 @@
     if (typeBResult.subtotal === null) {
       return Object.assign({ ok: false, reason: 'insufficient_stock' }, empty);
     }
-    const { work, total } = computeWorkAndTotal(typeBResult.subtotal, workMultiplier, complexityMultiplier, optionSurchargeSum);
+    const { fabrication, installation, polish, misc, work, total } = computeWorkAndTotal(typeBResult.subtotal, area, rates, options);
     return {
-      ok: true, reason: null, subtotal: typeBResult.subtotal, work, total,
+      ok: true, reason: null, subtotal: typeBResult.subtotal, fabrication, installation, polish, misc, work, total,
       nSlabs: typeBResult.slabs.length, remainderM2: null,
       matchedSlab: typeBResult.slabs[0], matchedSlabs: typeBResult.slabs
     };
