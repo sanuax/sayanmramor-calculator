@@ -845,6 +845,12 @@
   function calculate() {
     if (!DATA_LOADED) return;
 
+    // Must run before any early return below -- the extras block toggles
+    // on product selection alone, independent of whether dimensions/stone
+    // are filled in yet.
+    const product = selectedProductKey ? PRODUCTS[selectedProductKey] : null;
+    countertopExtrasField.style.display = product && product.supportsCountertopExtras ? '' : 'none';
+
     const width = parseFloat(widthInput.value) || 0;
     const length = parseFloat(lengthInput.value) || 0;
 
@@ -870,9 +876,6 @@
       infoBlock.style.display = 'none';
       return;
     }
-    const product = PRODUCTS[selectedProductKey];
-    countertopExtrasField.style.display = product.supportsCountertopExtras ? '' : 'none';
-
     if (!selectedStoneId) {
       setPriceHint(INCOMPLETE_HINT);
       breakdown.innerHTML = '';
