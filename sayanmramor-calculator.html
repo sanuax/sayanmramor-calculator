@@ -557,6 +557,15 @@
           <input type="checkbox" id="opt-install" checked> Монтаж на объекте
         </label>
       </div>
+
+      <div class="field" id="countertopExtras" style="display:none">
+        <label>Дополнительные позиции</label>
+        <div class="dims">
+          <input type="number" id="extra-bortik" placeholder="Бортик, м.п." min="0" step="0.01">
+          <input type="number" id="extra-fartuk" placeholder="Фартук, м²" min="0" step="0.01">
+          <input type="number" id="extra-ostrov" placeholder="Остров/полуостров, м²" min="0" step="0.01">
+        </div>
+      </div>
     </div>
 
     <div class="result-panel">
@@ -687,7 +696,7 @@
     stupeni: '<path d="M4 20h6v-6h6v-6h6"/>',
   };
 
-  const { SAW_MARGIN_CM, AREA_WASTE_FACTOR, WORK_RATES, MISC_FLAT_SUM, MISC_RATE_PER_M2, COMPLEX_SHAPE_MULTIPLIER } = ProductTypes;
+  const { SAW_MARGIN_CM, AREA_WASTE_FACTOR, WORK_RATES, MISC_FLAT_SUM, MISC_RATE_PER_M2, COMPLEX_SHAPE_MULTIPLIER, COUNTERTOP_EXTRAS_RATES } = ProductTypes;
 
   const productGrid = document.getElementById('productGrid');
   let selectedProductKey = null;
@@ -711,6 +720,10 @@
   const remainderOut = document.getElementById('remainderOut');
   const updatedAtOut = document.getElementById('updatedAtOut');
   const infoBlock = document.getElementById('infoBlock');
+  const countertopExtrasField = document.getElementById('countertopExtras');
+  const extraBortikInput = document.getElementById('extra-bortik');
+  const extraFartukInput = document.getElementById('extra-fartuk');
+  const extraOstrovInput = document.getElementById('extra-ostrov');
 
   Object.entries(PRODUCTS).forEach(([key, val]) => {
     const card = document.createElement('label');
@@ -852,6 +865,7 @@
       return;
     }
     const product = PRODUCTS[selectedProductKey];
+    countertopExtrasField.style.display = product.supportsCountertopExtras ? '' : 'none';
 
     if (!selectedStoneId) {
       setPriceHint(INCOMPLETE_HINT);
@@ -882,6 +896,20 @@
     if (polishEnabled) optionLabels.push('полировка');
     if (installEnabled) optionLabels.push('монтаж');
 
+    // Defensive zeroing: a value left in these fields from a previously
+    // selected product must never leak into a product type that doesn't
+    // support these extras (e.g. switching from a countertop to "Полы").
+    let extraDimensions = { bortikLengthM: 0, fartukAreaM2: 0, ostrovAreaM2: 0 };
+    if (product.supportsCountertopExtras) {
+      const bortikLengthM = parseFloat(extraBortikInput.value) || 0;
+      const fartukAreaM2 = parseFloat(extraFartukInput.value) || 0;
+      const ostrovAreaM2 = parseFloat(extraOstrovInput.value) || 0;
+      extraDimensions = { bortikLengthM, fartukAreaM2, ostrovAreaM2 };
+      if (bortikLengthM > 0) optionLabels.push(`бортик: ${bortikLengthM} м.п.`);
+      if (fartukAreaM2 > 0) optionLabels.push(`фартук: ${fartukAreaM2} м²`);
+      if (ostrovAreaM2 > 0) optionLabels.push(`остров/полуостров: ${ostrovAreaM2} м²`);
+    }
+
     const productRates = WORK_RATES[selectedProductKey];
     const rates = {
       fabricationRatePerM2: productRates.fabricationRatePerM2,
@@ -889,7 +917,10 @@
       polishRatePerM2: productRates.polishRatePerM2,
       miscFlatSum: MISC_FLAT_SUM,
       miscRatePerM2: MISC_RATE_PER_M2,
-      complexShapeMultiplier: COMPLEX_SHAPE_MULTIPLIER
+      complexShapeMultiplier: COMPLEX_SHAPE_MULTIPLIER,
+      bortikRatePerM: COUNTERTOP_EXTRAS_RATES.bortikRatePerM,
+      fartukRatePerM2: COUNTERTOP_EXTRAS_RATES.fartukRatePerM2,
+      ostrovRatePerM2: COUNTERTOP_EXTRAS_RATES.ostrovRatePerM2
     };
 
     const result = Pricing.calculatePrice({
@@ -901,6 +932,7 @@
       installEnabled,
       polishEnabled,
       complexEnabled,
+      extraDimensions,
       marginCm: SAW_MARGIN_CM,
       wasteFactor: AREA_WASTE_FACTOR,
       allowSeam: product.allowSeam !== false
@@ -972,6 +1004,9 @@
   });
   document.querySelectorAll('.checkbox-row input').forEach(el => {
     el.addEventListener('change', calculate);
+  });
+  [extraBortikInput, extraFartukInput, extraOstrovInput].forEach(el => {
+    el.addEventListener('input', calculate);
   });
 
   ctaBtn.addEventListener('click', () => {
