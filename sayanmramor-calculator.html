@@ -546,6 +546,19 @@
         <div class="error" id="dimError">Укажите ширину и длину больше нуля</div>
       </div>
 
+      <div class="field" id="countertopExtras" style="display:none">
+        <label>Дополнительные позиции</label>
+        <input type="number" id="extra-bortik" placeholder="Бортик, м.п." min="0" step="0.01">
+        <div class="dims" style="margin-top:12px">
+          <input type="number" id="extra-fartuk-width" placeholder="Фартук, ширина м" min="0" step="0.01">
+          <input type="number" id="extra-fartuk-length" placeholder="Фартук, длина м" min="0" step="0.01">
+        </div>
+        <div class="dims" style="margin-top:12px">
+          <input type="number" id="extra-ostrov-width" placeholder="Остров, ширина м" min="0" step="0.01">
+          <input type="number" id="extra-ostrov-length" placeholder="Остров, длина м" min="0" step="0.01">
+        </div>
+      </div>
+
       <div class="checkboxes">
         <label class="checkbox-row">
           <input type="checkbox" id="opt-complex"> Сложная форма / фигурный рез
@@ -556,15 +569,6 @@
         <label class="checkbox-row">
           <input type="checkbox" id="opt-install" checked> Монтаж на объекте
         </label>
-      </div>
-
-      <div class="field" id="countertopExtras" style="display:none">
-        <label>Дополнительные позиции</label>
-        <div class="dims">
-          <input type="number" id="extra-bortik" placeholder="Бортик, м.п." min="0" step="0.01">
-          <input type="number" id="extra-fartuk" placeholder="Фартук, м²" min="0" step="0.01">
-          <input type="number" id="extra-ostrov" placeholder="Остров/полуостров, м²" min="0" step="0.01">
-        </div>
       </div>
     </div>
 
@@ -722,8 +726,10 @@
   const infoBlock = document.getElementById('infoBlock');
   const countertopExtrasField = document.getElementById('countertopExtras');
   const extraBortikInput = document.getElementById('extra-bortik');
-  const extraFartukInput = document.getElementById('extra-fartuk');
-  const extraOstrovInput = document.getElementById('extra-ostrov');
+  const extraFartukWidthInput = document.getElementById('extra-fartuk-width');
+  const extraFartukLengthInput = document.getElementById('extra-fartuk-length');
+  const extraOstrovWidthInput = document.getElementById('extra-ostrov-width');
+  const extraOstrovLengthInput = document.getElementById('extra-ostrov-length');
 
   Object.entries(PRODUCTS).forEach(([key, val]) => {
     const card = document.createElement('label');
@@ -902,12 +908,16 @@
     let extraDimensions = { bortikLengthM: 0, fartukAreaM2: 0, ostrovAreaM2: 0 };
     if (product.supportsCountertopExtras) {
       const bortikLengthM = parseFloat(extraBortikInput.value) || 0;
-      const fartukAreaM2 = parseFloat(extraFartukInput.value) || 0;
-      const ostrovAreaM2 = parseFloat(extraOstrovInput.value) || 0;
+      const fartukWidthM = parseFloat(extraFartukWidthInput.value) || 0;
+      const fartukLengthM = parseFloat(extraFartukLengthInput.value) || 0;
+      const ostrovWidthM = parseFloat(extraOstrovWidthInput.value) || 0;
+      const ostrovLengthM = parseFloat(extraOstrovLengthInput.value) || 0;
+      const fartukAreaM2 = fartukWidthM * fartukLengthM;
+      const ostrovAreaM2 = ostrovWidthM * ostrovLengthM;
       extraDimensions = { bortikLengthM, fartukAreaM2, ostrovAreaM2 };
       if (bortikLengthM > 0) optionLabels.push(`бортик: ${bortikLengthM} м.п.`);
-      if (fartukAreaM2 > 0) optionLabels.push(`фартук: ${fartukAreaM2} м²`);
-      if (ostrovAreaM2 > 0) optionLabels.push(`остров/полуостров: ${ostrovAreaM2} м²`);
+      if (fartukAreaM2 > 0) optionLabels.push(`фартук: ${fartukAreaM2.toFixed(2)} м²`);
+      if (ostrovAreaM2 > 0) optionLabels.push(`остров/полуостров: ${ostrovAreaM2.toFixed(2)} м²`);
     }
 
     const productRates = WORK_RATES[selectedProductKey];
@@ -1005,7 +1015,7 @@
   document.querySelectorAll('.checkbox-row input').forEach(el => {
     el.addEventListener('change', calculate);
   });
-  [extraBortikInput, extraFartukInput, extraOstrovInput].forEach(el => {
+  [extraBortikInput, extraFartukWidthInput, extraFartukLengthInput, extraOstrovWidthInput, extraOstrovLengthInput].forEach(el => {
     el.addEventListener('input', calculate);
   });
 
