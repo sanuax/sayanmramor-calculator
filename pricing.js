@@ -171,8 +171,8 @@
     // miscFlatSum/miscRatePerM2 are `null` in product-types.js until real
     // КП data for "прочее" is available -- treat that as "not charged yet",
     // not NaN.
-    const miscFlatSum = rates.miscFlatSum ?? 0;
-    const miscRatePerM2 = rates.miscRatePerM2 ?? 0;
+    const miscFlatSum = rates.miscFlatSum || 0;
+    const miscRatePerM2 = rates.miscRatePerM2 || 0;
     const misc = miscFlatSum + miscRatePerM2 * area;
     const work = fabrication + installation + polish + misc;
     const total = subtotal + work;

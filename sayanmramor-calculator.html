@@ -554,7 +554,7 @@
           <input type="checkbox" id="opt-polish"> Дополнительная полировка
         </label>
         <label class="checkbox-row">
-          <input type="checkbox" id="opt-install"> Монтаж на объекте
+          <input type="checkbox" id="opt-install" checked> Монтаж на объекте
         </label>
       </div>
     </div>
@@ -877,10 +877,10 @@
     const complexEnabled = document.getElementById('opt-complex').checked;
     const polishEnabled = document.getElementById('opt-polish').checked;
     const installEnabled = document.getElementById('opt-install').checked;
-    const surchargeLabel = [];
-    if (complexEnabled) surchargeLabel.push('сложная форма');
-    if (polishEnabled) surchargeLabel.push('полировка');
-    if (installEnabled) surchargeLabel.push('монтаж');
+    const optionLabels = [];
+    if (complexEnabled) optionLabels.push('сложная форма');
+    if (polishEnabled) optionLabels.push('полировка');
+    if (installEnabled) optionLabels.push('монтаж');
 
     const productRates = WORK_RATES[selectedProductKey];
     const rates = {
@@ -943,8 +943,8 @@
     let html = `Площадь: <span>${(width * length).toFixed(2)} м²</span><br>`;
     html += `Материал: <span>${escapeHtml(stone.name)}</span><br>`;
     html += `Изделие: <span>${product.label}</span>`;
-    if (surchargeLabel.length) {
-      html += `<br>Опции: <span>${surchargeLabel.join(', ')}</span>`;
+    if (optionLabels.length) {
+      html += `<br>Опции: <span>${optionLabels.join(', ')}</span>`;
     }
     breakdown.innerHTML = html;
 
