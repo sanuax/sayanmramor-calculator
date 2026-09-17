@@ -13,12 +13,12 @@
     pol:                  { label: "Полы", type: 'B' },
     stena:                { label: "Стены", type: 'B' },
     fasad:                { label: "Фасады", type: 'B' },
-    stoleshnitsa_vannaya: { label: "Столешницы в ванную", type: 'A' },
+    stoleshnitsa_vannaya: { label: "Столешницы в ванную", type: 'A', supportsCountertopExtras: true },
     // TODO: кухонные столешницы нуждаются в отдельной фильтрации камня по
     // устойчивости к мех./хим. воздействиям (нож, вино и т.д.) — не весь
     // камень из общего каталога годится для кухни. Фильтрации пока нет,
     // добавим отдельным шагом, когда определим критерий классификации камня.
-    stoleshnitsa_kuhnya:  { label: "Столешницы на кухню", type: 'A' },
+    stoleshnitsa_kuhnya:  { label: "Столешницы на кухню", type: 'A', supportsCountertopExtras: true },
     stupeni:              { label: "Ступени", type: 'A' }
   };
 
@@ -106,8 +106,22 @@
   // более умеренную оценку до появления второго наблюдения.
   const COMPLEX_SHAPE_MULTIPLIER = 1.5;
 
+  // Ставки для доп. позиций столешницы (бортик/фартук/остров). Ни один из
+  // 7 разобранных КП не даёт эти суммы отдельной строкой от базовой
+  // столешницы (в Tundra Grey бортик+остров учтены одной суммой внутри
+  // "изготовления" — 135300 ₽ на 5.32 м², что уже превышает ставку
+  // столешницы 37500 ₽/м² почти вдвое, если считать всё как одну
+  // столешницу). ТРЕБУЕТ ЗАПОЛНЕНИЯ реальными данными, когда появится
+  // КП с этими позициями, выделенными отдельно.
+  const COUNTERTOP_EXTRAS_RATES = {
+    bortikRatePerM: null,
+    fartukRatePerM2: null,
+    ostrovRatePerM2: null
+  };
+
   return {
     PRODUCTS, SAW_MARGIN_CM, AREA_WASTE_FACTOR,
-    WORK_RATES, MISC_FLAT_SUM, MISC_RATE_PER_M2, COMPLEX_SHAPE_MULTIPLIER
+    WORK_RATES, MISC_FLAT_SUM, MISC_RATE_PER_M2, COMPLEX_SHAPE_MULTIPLIER,
+    COUNTERTOP_EXTRAS_RATES
   };
 });

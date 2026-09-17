@@ -38,3 +38,18 @@ test('the old multiplier-based constants are removed', () => {
   assert.equal(ProductTypes.HARDNESS_WORK_MULTIPLIER, undefined);
   assert.equal(ProductTypes.OPTION_SURCHARGE, undefined);
 });
+
+test('COUNTERTOP_EXTRAS_RATES has exactly the three expected fields, all null until real data is available', () => {
+  assert.deepEqual(Object.keys(ProductTypes.COUNTERTOP_EXTRAS_RATES).sort(), ['bortikRatePerM', 'fartukRatePerM2', 'ostrovRatePerM2']);
+  assert.equal(ProductTypes.COUNTERTOP_EXTRAS_RATES.bortikRatePerM, null);
+  assert.equal(ProductTypes.COUNTERTOP_EXTRAS_RATES.fartukRatePerM2, null);
+  assert.equal(ProductTypes.COUNTERTOP_EXTRAS_RATES.ostrovRatePerM2, null);
+});
+
+test('supportsCountertopExtras is true on exactly stoleshnitsa_kuhnya and stoleshnitsa_vannaya', () => {
+  const flagged = Object.entries(ProductTypes.PRODUCTS)
+    .filter(([, product]) => product.supportsCountertopExtras === true)
+    .map(([key]) => key)
+    .sort();
+  assert.deepEqual(flagged, ['stoleshnitsa_kuhnya', 'stoleshnitsa_vannaya']);
+});
