@@ -162,9 +162,9 @@
     return { slabs: covered.chosen, subtotal: covered.cost };
   }
 
-  function computeWorkAndTotal(subtotal, area, rates, options, extraDimensions = {}) {
+  function computeWorkAndTotal(subtotal, area, rates, options, extraDimensions) {
     const { installEnabled, polishEnabled, complexEnabled } = options;
-    const { bortikLengthM = 0, fartukAreaM2 = 0, ostrovAreaM2 = 0 } = extraDimensions;
+    const { bortikLengthM = 0, fartukAreaM2 = 0, ostrovAreaM2 = 0 } = extraDimensions || {};
     const fabricationRate = rates.fabricationRatePerM2 * (complexEnabled ? rates.complexShapeMultiplier : 1);
     const fabrication = fabricationRate * area;
     const installation = installEnabled ? rates.installationRatePerM2 * area : 0;
@@ -178,7 +178,9 @@
     const bortikRatePerM = rates.bortikRatePerM || 0;
     const fartukRatePerM2 = rates.fartukRatePerM2 || 0;
     const ostrovRatePerM2 = rates.ostrovRatePerM2 || 0;
-    const extras = bortikLengthM * bortikRatePerM + fartukAreaM2 * fartukRatePerM2 + ostrovAreaM2 * ostrovRatePerM2;
+    const extras = Math.max(0, bortikLengthM) * bortikRatePerM
+                 + Math.max(0, fartukAreaM2) * fartukRatePerM2
+                 + Math.max(0, ostrovAreaM2) * ostrovRatePerM2;
     const work = fabrication + installation + polish + misc + extras;
     const total = subtotal + work;
     return { fabrication, installation, polish, misc, extras, work, total };

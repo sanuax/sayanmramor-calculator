@@ -151,6 +151,19 @@ test('computeWorkAndTotal: null bortik/fartuk/ostrov rates (no real data yet) ar
   assert.equal(r.extras, 0);
 });
 
+test('computeWorkAndTotal: negative bortik/fartuk/ostrov dimensions are clamped to 0, never reduce the total', () => {
+  const ratesWithExtras = Object.assign({}, SAMPLE_RATES, {
+    bortikRatePerM: 4000, fartukRatePerM2: 12000, ostrovRatePerM2: 45000
+  });
+  const r = Pricing.computeWorkAndTotal(100000, 2, ratesWithExtras, NO_OPTIONS, { bortikLengthM: -10, fartukAreaM2: -5, ostrovAreaM2: -1 });
+  assert.equal(r.extras, 0);
+});
+
+test('computeWorkAndTotal: explicit null extraDimensions does not throw, defaults extras to 0', () => {
+  const r = Pricing.computeWorkAndTotal(100000, 2, SAMPLE_RATES, NO_OPTIONS, null);
+  assert.equal(r.extras, 0);
+});
+
 const stone = { name: 'Delicato Brown', slabs };
 
 test('calculatePrice: invalid dimensions', () => {
