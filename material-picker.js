@@ -19,9 +19,9 @@
     return stone.name.toLowerCase().includes(query.toLowerCase());
   }
 
-  function matchesHardnessFilter(stone, selectedHardnesses) {
-    if (!selectedHardnesses || selectedHardnesses.length === 0) return true;
-    return selectedHardnesses.includes(stone.hardness_category);
+  function matchesCountryFilter(stone, selected) {
+    if (!selected || selected.length === 0) return true;
+    return (stone.countries || []).some(c => selected.includes(c.segment));
   }
 
   function matchesCategoryFilter(stone, selected) {
@@ -57,10 +57,10 @@
     return copy;
   }
 
-  function filterAndSort(stones, { query, hardnesses, categories, colors, sortKey }) {
+  function filterAndSort(stones, { query, countries, categories, colors, sortKey }) {
     const filtered = stones.filter(s =>
       matchesSearch(s, query)
-      && matchesHardnessFilter(s, hardnesses)
+      && matchesCountryFilter(s, countries)
       && matchesCategoryFilter(s, categories)
       && matchesColorFilter(s, colors)
     );
@@ -69,10 +69,8 @@
 
   const BATCH_SIZE = 40;
 
-  const HARDNESS_LABELS = { 1: 'Лёгкая обработка', 2: 'Средняя обработка', 3: 'Сложная обработка' };
-
   // One reusable "dropdown with checkboxes inside" component backs all
-  // three filters (hardness/type/color) -- each gets its own instance, but
+  // three filters (country/type/color) -- each gets its own instance, but
   // the open/close/label-count behavior is shared instead of duplicated
   // per filter.
   function createFilterDropdown({ dropdownEl, label, options, onChange, registerCloser }) {
@@ -162,7 +160,7 @@
     };
 
     let currentQuery = '';
-    let currentHardnesses = [];
+    let currentCountries = [];
     let currentCategories = [];
     let currentColors = [];
     let currentSortKey = 'name-asc';
@@ -188,11 +186,13 @@
         .sort((a, b) => a.text.localeCompare(b.text, 'ru'));
     }
 
-    const hardnessDropdown = createFilterDropdown({
-      dropdownEl: document.querySelector('[data-filter="hardness"]'),
-      label: 'Твёрдость',
-      options: [1, 2, 3].map(h => ({ value: String(h), text: HARDNESS_LABELS[h] })),
-      onChange: (values) => { currentHardnesses = values.map(Number); resetAndRender(); },
+    const countryDropdown = createFilterDropdown({
+      dropdownEl: document.querySelector('[data-filter="country"]'),
+      label: 'Страна',
+      options: uniqueOptionsFrom(
+        stones.flatMap(s => s.countries || []), c => c.segment, c => c.label_ru
+      ),
+      onChange: (values) => { currentCountries = values; resetAndRender(); },
       registerCloser,
     });
     const categoryDropdown = createFilterDropdown({
@@ -283,7 +283,7 @@
 
     function resetAndRender() {
       filteredList = filterAndSort(stones, {
-        query: currentQuery, hardnesses: currentHardnesses,
+        query: currentQuery, countries: currentCountries,
         categories: currentCategories, colors: currentColors,
         sortKey: currentSortKey,
       });
@@ -361,12 +361,12 @@
 
     function open() {
       currentQuery = '';
-      currentHardnesses = [];
+      currentCountries = [];
       currentCategories = [];
       currentColors = [];
       currentSortKey = 'name-asc';
       searchInput.value = '';
-      hardnessDropdown.reset();
+      countryDropdown.reset();
       categoryDropdown.reset();
       colorDropdown.reset();
       sortButtons.forEach(b => {
@@ -383,7 +383,7 @@
   }
 
   return {
-    minPricePerM2, matchesSearch, matchesHardnessFilter, matchesCategoryFilter, matchesColorFilter,
+    minPricePerM2, matchesSearch, matchesCountryFilter, matchesCategoryFilter, matchesColorFilter,
     sortStones, filterAndSort, init,
   };
 });

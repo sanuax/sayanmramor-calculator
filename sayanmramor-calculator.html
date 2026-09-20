@@ -204,7 +204,7 @@
   }
   #pickerClose:hover { background: var(--pick-fill); color: var(--pick-ink); }
 
-  /* Three uniform dropdowns (hardness/type/color) rather than a chip row --
+  /* Three uniform dropdowns (country/type/color) rather than a chip row --
      each opens its own checkbox panel, so multiple values within one filter
      stay multi-select without the pill row growing unbounded as more
      colors/types show up in the catalog. */
@@ -596,7 +596,7 @@
     <button type="button" id="pickerClose" aria-label="Закрыть">✕</button>
   </div>
   <div class="picker-filters" id="pickerFilters">
-    <div class="filter-dropdown" data-filter="hardness">
+    <div class="filter-dropdown" data-filter="country">
       <button type="button" class="filter-dropdown-btn" aria-haspopup="true" aria-expanded="false"></button>
       <div class="filter-dropdown-panel" hidden></div>
     </div>

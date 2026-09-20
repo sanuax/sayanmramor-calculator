@@ -3,13 +3,13 @@ const assert = require('node:assert/strict');
 const MaterialPicker = require('../material-picker.js');
 
 const stones = [
-  { id: 'a', name: 'Bianco Carrara', hardness_category: 1, available: true,
+  { id: 'a', name: 'Bianco Carrara', countries: [{ segment: 'italy', label_ru: 'Италия' }], available: true,
     slabs: [{ price_per_m2_rub: 5000 }, { price_per_m2_rub: 4000 }] },
-  { id: 'b', name: 'Absolute Black', hardness_category: 2, available: true,
+  { id: 'b', name: 'Absolute Black', countries: [{ segment: 'india', label_ru: 'Индия' }], available: true,
     slabs: [{ price_per_m2_rub: 9000 }] },
-  { id: 'c', name: 'Agate Moon', hardness_category: 3, available: false,
+  { id: 'c', name: 'Agate Moon', countries: [{ segment: 'oman', label_ru: 'Оман' }], available: false,
     slabs: [{ price_per_m2_rub: 12000 }] },
-  { id: 'd', name: 'Delicato Brown', hardness_category: 1, available: false,
+  { id: 'd', name: 'Delicato Brown', countries: [{ segment: 'italy', label_ru: 'Италия' }], available: false,
     slabs: [] },
 ];
 
@@ -36,13 +36,18 @@ test('matchesSearch with an empty query matches everything', () => {
   assert.equal(MaterialPicker.matchesSearch(stones[0], ''), true);
 });
 
-test('matchesHardnessFilter with no chips selected matches everything', () => {
-  assert.equal(MaterialPicker.matchesHardnessFilter(stones[0], []), true);
+test('matchesCountryFilter with nothing selected matches everything', () => {
+  assert.equal(MaterialPicker.matchesCountryFilter(stones[0], []), true);
 });
 
-test('matchesHardnessFilter matches any selected hardness (OR)', () => {
-  assert.equal(MaterialPicker.matchesHardnessFilter(stones[0], [1, 3]), true);
-  assert.equal(MaterialPicker.matchesHardnessFilter(stones[1], [1, 3]), false);
+test('matchesCountryFilter matches any selected country (OR)', () => {
+  assert.equal(MaterialPicker.matchesCountryFilter(stones[0], ['italy', 'oman']), true);
+  assert.equal(MaterialPicker.matchesCountryFilter(stones[1], ['italy', 'oman']), false);
+});
+
+test('matchesCountryFilter treats a stone with no countries as matching nothing selected', () => {
+  assert.equal(MaterialPicker.matchesCountryFilter({}, ['italy']), false);
+  assert.equal(MaterialPicker.matchesCountryFilter({}, []), true);
 });
 
 test('sortStones by name-asc sorts alphabetically A-Z', () => {
@@ -95,9 +100,9 @@ test('matchesColorFilter treats a stone with no colors as matching nothing selec
   assert.equal(MaterialPicker.matchesColorFilter({}, []), true);
 });
 
-test('filterAndSort combines search, hardness filter, and sort', () => {
+test('filterAndSort combines search, country filter, and sort', () => {
   const result = MaterialPicker.filterAndSort(stones, {
-    query: '', hardnesses: [1], sortKey: 'price-asc',
+    query: '', countries: ['italy'], sortKey: 'price-asc',
   });
   assert.deepEqual(result.map(s => s.id), ['a', 'd']);
 });
