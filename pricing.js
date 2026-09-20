@@ -162,7 +162,7 @@
     return { slabs: covered.chosen, subtotal: covered.cost };
   }
 
-  function computeWorkAndTotal(subtotal, area, rates, options, extraDimensions) {
+  function computeWorkAndTotal(subtotal, area, rates, options, extraDimensions, extraLineItems) {
     const { installEnabled, polishEnabled, complexEnabled } = options;
     const { bortikLengthM = 0, fartukAreaM2 = 0, ostrovAreaM2 = 0 } = extraDimensions || {};
     const fabricationRate = rates.fabricationRatePerM2 * (complexEnabled ? rates.complexShapeMultiplier : 1);
@@ -181,21 +181,29 @@
     const extras = Math.max(0, bortikLengthM) * bortikRatePerM
                  + Math.max(0, fartukAreaM2) * fartukRatePerM2
                  + Math.max(0, ostrovAreaM2) * ostrovRatePerM2;
-    const work = fabrication + installation + polish + misc + extras;
+    // Generic sum for the rate-catalog-backed additional works (cuts, holes,
+    // edge treatment, and the expanded "Дополнительно" items) -- each entry
+    // already carries its own resolved rate (or null, until the company
+    // fills in rate-catalog.js), so this needs no lookup of its own.
+    const catalogExtras = (extraLineItems || []).reduce(
+      (sum, item) => sum + Math.max(0, item.quantity) * (item.rate || 0),
+      0
+    );
+    const work = fabrication + installation + polish + misc + extras + catalogExtras;
     const total = subtotal + work;
-    return { fabrication, installation, polish, misc, extras, work, total };
+    return { fabrication, installation, polish, misc, extras, catalogExtras, work, total };
   }
 
   function calculatePrice(params) {
     const {
       stone, widthM, lengthM, productType, marginCm, wasteFactor,
       rates, installEnabled = false, polishEnabled = false, complexEnabled = false,
-      extraDimensions = {}, allowSeam = true
+      extraDimensions = {}, extraLineItems = [], allowSeam = true
     } = params;
 
     const empty = {
       subtotal: null, fabrication: null, installation: null, polish: null, misc: null, extras: null,
-      work: null, total: null, nSlabs: 0, remainderM2: null, matchedSlab: null, matchedSlabs: []
+      catalogExtras: null, work: null, total: null, nSlabs: 0, remainderM2: null, matchedSlab: null, matchedSlabs: []
     };
 
     if (!(widthM > 0) || !(lengthM > 0)) {
@@ -220,10 +228,10 @@
       const slab = findBestTypeASlab(stone.slabs, widthM, lengthM, marginCm);
       if (slab) {
         const subtotal = slab.price_total_rub;
-        const { fabrication, installation, polish, misc, extras, work, total } = computeWorkAndTotal(subtotal, area, rates, options, extraDimensions);
+        const { fabrication, installation, polish, misc, extras, catalogExtras, work, total } = computeWorkAndTotal(subtotal, area, rates, options, extraDimensions, extraLineItems);
         const remainderM2 = computeRemainderAreaM2(slab, widthM, lengthM);
         return {
-          ok: true, reason: null, subtotal, fabrication, installation, polish, misc, extras, work, total,
+          ok: true, reason: null, subtotal, fabrication, installation, polish, misc, extras, catalogExtras, work, total,
           nSlabs: 1, remainderM2, matchedSlab: slab, matchedSlabs: [slab]
         };
       }
@@ -242,9 +250,9 @@
       if (segmented.subtotal === null) {
         return Object.assign({ ok: false, reason: 'insufficient_stock' }, empty);
       }
-      const { fabrication, installation, polish, misc, extras, work, total } = computeWorkAndTotal(segmented.subtotal, area, rates, options, extraDimensions);
+      const { fabrication, installation, polish, misc, extras, catalogExtras, work, total } = computeWorkAndTotal(segmented.subtotal, area, rates, options, extraDimensions, extraLineItems);
       return {
-        ok: true, reason: null, subtotal: segmented.subtotal, fabrication, installation, polish, misc, extras, work, total,
+        ok: true, reason: null, subtotal: segmented.subtotal, fabrication, installation, polish, misc, extras, catalogExtras, work, total,
         nSlabs: segmented.slabs.length, remainderM2: null,
         matchedSlab: segmented.slabs[0], matchedSlabs: segmented.slabs
       };
@@ -257,9 +265,9 @@
     if (typeBResult.subtotal === null) {
       return Object.assign({ ok: false, reason: 'insufficient_stock' }, empty);
     }
-    const { fabrication, installation, polish, misc, extras, work, total } = computeWorkAndTotal(typeBResult.subtotal, area, rates, options, extraDimensions);
+    const { fabrication, installation, polish, misc, extras, catalogExtras, work, total } = computeWorkAndTotal(typeBResult.subtotal, area, rates, options, extraDimensions, extraLineItems);
     return {
-      ok: true, reason: null, subtotal: typeBResult.subtotal, fabrication, installation, polish, misc, extras, work, total,
+      ok: true, reason: null, subtotal: typeBResult.subtotal, fabrication, installation, polish, misc, extras, catalogExtras, work, total,
       nSlabs: typeBResult.slabs.length, remainderM2: null,
       matchedSlab: typeBResult.slabs[0], matchedSlabs: typeBResult.slabs
     };

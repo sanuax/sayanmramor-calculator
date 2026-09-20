@@ -164,6 +164,35 @@ test('computeWorkAndTotal: explicit null extraDimensions does not throw, default
   assert.equal(r.extras, 0);
 });
 
+test('computeWorkAndTotal: extraLineItems sum independently with their own rates', () => {
+  const r = Pricing.computeWorkAndTotal(100000, 2, SAMPLE_RATES, NO_OPTIONS, null, [
+    { rate: 500, quantity: 3 },
+    { rate: 1200, quantity: 2 }
+  ]);
+  assert.equal(r.catalogExtras, 500 * 3 + 1200 * 2);
+  assert.equal(r.work, r.fabrication + r.installation + r.polish + r.misc + r.extras + r.catalogExtras);
+});
+
+test('computeWorkAndTotal: null rate in an extraLineItems entry is treated as 0, not NaN', () => {
+  const r = Pricing.computeWorkAndTotal(100000, 2, SAMPLE_RATES, NO_OPTIONS, null, [{ rate: null, quantity: 5 }]);
+  assert.equal(r.catalogExtras, 0);
+});
+
+test('computeWorkAndTotal: negative quantity in an extraLineItems entry is clamped to 0', () => {
+  const r = Pricing.computeWorkAndTotal(100000, 2, SAMPLE_RATES, NO_OPTIONS, null, [{ rate: 500, quantity: -4 }]);
+  assert.equal(r.catalogExtras, 0);
+});
+
+test('computeWorkAndTotal: omitting extraLineItems defaults catalogExtras to 0 (backward compatible)', () => {
+  const r = Pricing.computeWorkAndTotal(100000, 2, SAMPLE_RATES, NO_OPTIONS);
+  assert.equal(r.catalogExtras, 0);
+});
+
+test('computeWorkAndTotal: empty extraLineItems array defaults catalogExtras to 0', () => {
+  const r = Pricing.computeWorkAndTotal(100000, 2, SAMPLE_RATES, NO_OPTIONS, null, []);
+  assert.equal(r.catalogExtras, 0);
+});
+
 const stone = { name: 'Delicato Brown', slabs };
 
 test('calculatePrice: invalid dimensions', () => {
@@ -498,4 +527,20 @@ test('calculatePrice: extraDimensions flow through to the top-level extras field
 test('calculatePrice: extraDimensions defaults to zero extras when omitted (backward compatible)', () => {
   const r = Pricing.calculatePrice({ stone, widthM: 1.0, lengthM: 0.6, productType: 'A', rates: SAMPLE_RATES, marginCm: 4, wasteFactor: 1.3 });
   assert.equal(r.extras, 0);
+});
+
+test('calculatePrice: extraLineItems flow through to the top-level catalogExtras field', () => {
+  const r = Pricing.calculatePrice({
+    stone, widthM: 1.0, lengthM: 0.6, productType: 'A', rates: SAMPLE_RATES,
+    extraLineItems: [{ rate: 700, quantity: 4 }],
+    marginCm: 4, wasteFactor: 1.3
+  });
+  assert.equal(r.ok, true);
+  assert.equal(r.catalogExtras, 2800);
+  assert.equal(r.total, r.subtotal + r.fabrication + r.installation + r.polish + r.misc + r.extras + r.catalogExtras);
+});
+
+test('calculatePrice: extraLineItems defaults to zero catalogExtras when omitted (backward compatible)', () => {
+  const r = Pricing.calculatePrice({ stone, widthM: 1.0, lengthM: 0.6, productType: 'A', rates: SAMPLE_RATES, marginCm: 4, wasteFactor: 1.3 });
+  assert.equal(r.catalogExtras, 0);
 });
