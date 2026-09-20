@@ -72,3 +72,32 @@ test('getAdditionalWorkRate returns null for every existing row (no real rates y
 test('getAdditionalWorkRate returns null for an unknown id', () => {
   assert.equal(RateCatalog.getAdditionalWorkRate('NOPE-99'), null);
 });
+
+test('INSTALLATION_RATES has exactly 9 rows', () => {
+  assert.equal(RateCatalog.INSTALLATION_RATES.length, 9);
+});
+
+test('INSTALLATION_RATES ids are all unique and start with INST-', () => {
+  const ids = RateCatalog.INSTALLATION_RATES.map(r => r.id);
+  assert.equal(new Set(ids).size, ids.length);
+  ids.forEach(id => assert.equal(id.startsWith('INST-'), true));
+});
+
+test('INSTALLATION_RATES rows all start with rate/currency null', () => {
+  RateCatalog.INSTALLATION_RATES.forEach(row => {
+    assert.equal(row.rate, null);
+    assert.equal(row.currency, null);
+  });
+});
+
+test('getInstallationRow finds exactly one row for every PRODUCTS category', () => {
+  Object.values(ProductTypes.PRODUCTS).forEach(product => {
+    const row = RateCatalog.getInstallationRow(product.label);
+    assert.notEqual(row, null, `no installation row for ${product.label}`);
+    assert.equal(row.categoryLabel, product.label);
+  });
+});
+
+test('getInstallationRow returns null for an unknown category', () => {
+  assert.equal(RateCatalog.getInstallationRow('Несуществующий тип'), null);
+});

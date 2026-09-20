@@ -89,6 +89,25 @@
     { id: 'EXTRA-07', group: 'Дополнительно', operation: 'Барная стойка', variant: 'Сложная / радиусная', unit: 'м²', rate: null, currency: null },
   ];
 
+  // The 9 INST-* rows from «Ставки изделий» -- kept as their own array, in
+  // the same row shape as PRODUCT_SUBCATEGORIES, because there is exactly
+  // one per product category (not several shape/variant options) and it is
+  // a distinct pricing concept that already has a live UI+field (the
+  // "Монтаж на объекте" checkbox -> WORK_RATES[key].installationRatePerM2
+  // in product-types.js). Kept for completeness/traceability of the source
+  // spreadsheet; nothing reads from this array yet.
+  const INSTALLATION_RATES = [
+    { id: 'INST-100', categoryLabel: 'Лестницы', shape: 'Монтаж', variant: 'Монтаж на объекте', unit: 'м²', rate: null, currency: null },
+    { id: 'INST-101', categoryLabel: 'Панно', shape: 'Монтаж', variant: 'Монтаж на объекте', unit: 'м²', rate: null, currency: null },
+    { id: 'INST-102', categoryLabel: 'Подоконники', shape: 'Монтаж', variant: 'Монтаж на объекте', unit: 'м²', rate: null, currency: null },
+    { id: 'INST-103', categoryLabel: 'Полы', shape: 'Монтаж', variant: 'Монтаж на объекте', unit: 'м²', rate: null, currency: null },
+    { id: 'INST-104', categoryLabel: 'Стены', shape: 'Монтаж', variant: 'Монтаж на объекте', unit: 'м²', rate: null, currency: null },
+    { id: 'INST-105', categoryLabel: 'Фасады', shape: 'Монтаж', variant: 'Монтаж на объекте', unit: 'м²', rate: null, currency: null },
+    { id: 'INST-106', categoryLabel: 'Столешницы в ванную', shape: 'Монтаж', variant: 'Монтаж на объекте', unit: 'м²', rate: null, currency: null },
+    { id: 'INST-107', categoryLabel: 'Столешницы на кухню', shape: 'Монтаж', variant: 'Монтаж на объекте', unit: 'м²', rate: null, currency: null },
+    { id: 'INST-108', categoryLabel: 'Ступени', shape: 'Монтаж', variant: 'Монтаж на объекте', unit: 'м²', rate: null, currency: null },
+  ];
+
   function getSubcategoriesForProduct(categoryLabel) {
     return PRODUCT_SUBCATEGORIES.filter(row => row.categoryLabel === categoryLabel);
   }
@@ -98,8 +117,13 @@
     return row ? row.rate : null;
   }
 
+  function getInstallationRow(categoryLabel) {
+    return INSTALLATION_RATES.find(row => row.categoryLabel === categoryLabel) || null;
+  }
+
   return {
     PRODUCT_SUBCATEGORIES, getSubcategoriesForProduct,
     ADDITIONAL_WORKS, getAdditionalWorkRate,
+    INSTALLATION_RATES, getInstallationRow,
   };
 });
