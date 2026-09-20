@@ -538,24 +538,24 @@
       </div>
 
       <div class="field">
-        <label>Размеры, м</label>
+        <label>Размеры, мм</label>
         <div class="dims">
-          <input type="number" id="width" placeholder="Ширина" min="0" step="0.01">
-          <input type="number" id="length" placeholder="Длина" min="0" step="0.01">
+          <input type="number" id="width" placeholder="Ширина, мм" min="0" step="1">
+          <input type="number" id="length" placeholder="Длина, мм" min="0" step="1">
         </div>
         <div class="error" id="dimError">Укажите ширину и длину больше нуля</div>
       </div>
 
       <div class="field" id="countertopExtras" style="display:none">
         <label>Дополнительные позиции</label>
-        <input type="number" id="extra-bortik" placeholder="Бортик, м.п." min="0" step="0.01">
+        <input type="number" id="extra-bortik" placeholder="Бортик, мм (погонный размер)" min="0" step="1">
         <div class="dims" style="margin-top:12px">
-          <input type="number" id="extra-fartuk-width" placeholder="Фартук, ширина м" min="0" step="0.01">
-          <input type="number" id="extra-fartuk-length" placeholder="Фартук, длина м" min="0" step="0.01">
+          <input type="number" id="extra-fartuk-width" placeholder="Фартук, ширина мм" min="0" step="1">
+          <input type="number" id="extra-fartuk-length" placeholder="Фартук, длина мм" min="0" step="1">
         </div>
         <div class="dims" style="margin-top:12px">
-          <input type="number" id="extra-ostrov-width" placeholder="Остров, ширина м" min="0" step="0.01">
-          <input type="number" id="extra-ostrov-length" placeholder="Остров, длина м" min="0" step="0.01">
+          <input type="number" id="extra-ostrov-width" placeholder="Остров, ширина мм" min="0" step="1">
+          <input type="number" id="extra-ostrov-length" placeholder="Остров, длина мм" min="0" step="1">
         </div>
       </div>
 
@@ -803,6 +803,14 @@
     if (picker) picker.open();
   });
 
+  // Every dimension the client types in is millimeters; the geometry and
+  // pricing logic (pricing.js/product-types.js) works entirely in meters, so
+  // this is the single conversion point between the two -- callers read a
+  // field's raw mm value and convert here rather than each doing its own /1000.
+  function mmToM(mmValue) {
+    return mmValue / 1000;
+  }
+
   function formatRub(n) {
     return Math.round(n).toLocaleString('ru-RU') + ' ₽';
   }
@@ -851,8 +859,8 @@
     const product = selectedProductKey ? PRODUCTS[selectedProductKey] : null;
     countertopExtrasField.style.display = product && product.supportsCountertopExtras ? '' : 'none';
 
-    const width = parseFloat(widthInput.value) || 0;
-    const length = parseFloat(lengthInput.value) || 0;
+    const width = mmToM(parseFloat(widthInput.value) || 0);
+    const length = mmToM(parseFloat(lengthInput.value) || 0);
 
     warningOut.style.display = 'none';
     warningOut.innerHTML = '';
@@ -910,11 +918,11 @@
     // support these extras (e.g. switching from a countertop to "Полы").
     let extraDimensions = { bortikLengthM: 0, fartukAreaM2: 0, ostrovAreaM2: 0 };
     if (product.supportsCountertopExtras) {
-      const bortikLengthM = parseFloat(extraBortikInput.value) || 0;
-      const fartukWidthM = parseFloat(extraFartukWidthInput.value) || 0;
-      const fartukLengthM = parseFloat(extraFartukLengthInput.value) || 0;
-      const ostrovWidthM = parseFloat(extraOstrovWidthInput.value) || 0;
-      const ostrovLengthM = parseFloat(extraOstrovLengthInput.value) || 0;
+      const bortikLengthM = mmToM(parseFloat(extraBortikInput.value) || 0);
+      const fartukWidthM = mmToM(parseFloat(extraFartukWidthInput.value) || 0);
+      const fartukLengthM = mmToM(parseFloat(extraFartukLengthInput.value) || 0);
+      const ostrovWidthM = mmToM(parseFloat(extraOstrovWidthInput.value) || 0);
+      const ostrovLengthM = mmToM(parseFloat(extraOstrovLengthInput.value) || 0);
       const fartukAreaM2 = fartukWidthM * fartukLengthM;
       const ostrovAreaM2 = ostrovWidthM * ostrovLengthM;
       extraDimensions = { bortikLengthM, fartukAreaM2, ostrovAreaM2 };
