@@ -125,35 +125,176 @@ company edits and resends it.
   which point that task also decides how a filled-in subcategory rate
   should relate to `WORK_RATES[key].fabricationRatePerM2`.
 
+## Availability configuration: declarative per-product capability flags
+
+**Revised 2026-09-20, before implementation started on this section.**
+The first draft of this spec gated «Кромка» on "any product type" and
+gated the rest of the additional-works UI on the single existing
+`supportsCountertopExtras` flag for both countertop product types
+identically. Real-world UX review found this too coarse in both
+directions: some non-countertop products (Полы, Стены, Фасады, Панно)
+have no business showing an open-edge finishing option at all, and the
+two countertop types themselves need different additional-work items
+(a bathroom vanity has no cooktop, island, or bar counter).
+
+The fix is **declarative per-product capability flags on `PRODUCTS` in
+`product-types.js`**, read by the UI as plain booleans — never a chain
+like `if (selectedProductKey === 'pol') { ... }`. Every additional-work
+UI block/field checks exactly one boolean on the currently selected
+product; adding a new work item later means adding one new flag and
+one new `if (product.newFlag) { ... }` block, without touching any
+other block's code.
+
+Two flag "levels" are needed, chosen to keep the existing,
+already-shipped `supportsCountertopExtras` flag (predates this spec,
+gates the original bortik/fartuk/rectangular-island feature) working
+exactly as it does today, unrenamed and unmoved:
+
+```js
+// product-types.js -- PRODUCTS entries gain up to three new fields.
+// Absent = false everywhere (existing truthy checks on supportsCountertopExtras
+// already treat "missing" as falsy, so no product needs an explicit `false`
+// unless it wants to document one for a human reader).
+const PRODUCTS = {
+  lestnitsa:            { label: "Лестницы",              type: 'B', supportsEdgeWork: true },
+  panno:                { label: "Панно",                 type: 'B' },
+  podokonnik:            { label: "Подоконники",           type: 'A', supportsEdgeWork: true },
+  pol:                   { label: "Полы",                  type: 'B' },
+  stena:                 { label: "Стены",                 type: 'B' },
+  fasad:                 { label: "Фасады",                type: 'B' },
+  stoleshnitsa_vannaya:  {
+    label: "Столешницы в ванную", type: 'A',
+    supportsEdgeWork: true,
+    supportsCountertopExtras: true,        // unchanged flag, unchanged meaning
+    additionalWorks: { cooktopCutout: false, island: false, barCounter: false }
+  },
+  stoleshnitsa_kuhnya:   {
+    label: "Столешницы на кухню", type: 'A',
+    supportsEdgeWork: true,
+    supportsCountertopExtras: true,
+    additionalWorks: { cooktopCutout: true, island: true, barCounter: true }
+  },
+  stupeni:               { label: "Ступени",               type: 'A', supportsEdgeWork: true }
+};
+```
+
+- **`supportsEdgeWork`** (new, flat boolean, same style as the existing
+  `supportsCountertopExtras`) -- gates the whole «Кромка» block as one
+  unit for all 5 edge variants. There is no per-edge-variant flag: the
+  matrix below never needs one variant of «Кромка» on but another off
+  for the same product.
+- **`supportsCountertopExtras`** (existing flag, meaning unchanged) --
+  still gates the base countertop-extras group exactly as it does
+  today: sink cutouts (3 variants), all 3 holes, бортик, фартук,
+  стеновая панель. `COUNTERTOP_EXTRAS_RATES` and its wiring
+  (`bortikRatePerM`/`fartukRatePerM2`/`ostrovRatePerM2` in
+  `pricing.js`) are **not touched or renamed** by this revision.
+- **`additionalWorks: { cooktopCutout, island, barCounter }`** (new,
+  nested -- only these three items differ between the two countertop
+  product types, so they get their own flags rather than forcing a
+  third top-level boolean per item). Read as `product.additionalWorks
+  && product.additionalWorks.X`, matching the plain ES5-safe syntax
+  the rest of `sayanmramor-calculator.html` already uses (no optional
+  chaining).
+
+**Rejected alternative:** folding `supportsCountertopExtras` itself
+into `additionalWorks` (e.g. `additionalWorks.sinkCutout`,
+`.bortik`, `.fartuk`, `.wallPanel`, alongside `.cooktopCutout`,
+`.island`, `.barCounter`) for full uniformity. Rejected because
+`supportsCountertopExtras` is read today by code that predates this
+entire spec (the original bortik/fartuk/island feature); renaming or
+relocating it would require touching and re-verifying that
+already-shipped, already-tested code path for no behavioral gain. If
+a future redesign wants full uniformity, that is its own task.
+
+`ADDITIONAL_WORKS` in `rate-catalog.js` is **not changed by this
+revision** -- it stays the single global catalog of every possible
+additional-work row (all 19, `EDGE-*`/`CUT-*`/`EXTRA-*`), regardless of
+which products currently expose which rows in their UI. Availability
+is entirely a `PRODUCTS`-config concern; the rate catalog never
+shrinks just because today's UI doesn't surface one of its rows for a
+given product.
+
+## Availability matrix
+
+✅ = the field/block is shown for this product. ❌ = hidden. Every row
+is driven by the flags above -- no per-product `if` in the UI logic.
+
+| Product | Кромка (`supportsEdgeWork`) | Вырез: раковина ×3 | Вырез: варочная панель (`additionalWorks.cooktopCutout`) | Отверстия ×3 | Бортик | Фартук | Стеновая панель | Остров ×2 (`additionalWorks.island`) | Барная стойка ×2 (`additionalWorks.barCounter`) |
+|---|---|---|---|---|---|---|---|---|---|
+| Лестницы | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Панно | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Подоконники | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Полы | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Стены | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Фасады | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Столешницы в ванную | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Столешницы на кухню | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Ступени | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+
+The "вырез: раковина ×3 / отверстия ×3 / бортик / фартук / стеновая
+панель" columns are all driven by the same single
+`supportsCountertopExtras` flag (always on together, always off
+together, in this matrix) -- listed as separate columns only for
+readability against the source matrix, not because each has its own
+flag.
+
+**Design principle for future work items (Панно / Стены / Фасады):**
+if the company later wants edge-like finishing on a panel edge, a wall
+corner/niche, or a façade element's edge, that is a **new, separate**
+additional-work item (a new `rate-catalog.js` row + a new capability
+flag + a new UI field) -- never achieved by flipping `supportsEdgeWork`
+to `true` for those products and reusing the generic «Кромка» rows.
+The generic «Кромка» concept (`EDGE-01/03/04/05/06`) means "an open
+stone edge on a slab-like product where edge finishing is standard
+practice" (столешницы, подоконники, лестницы, ступени) -- it is not a
+catch-all for "any product that might someday need some edge treated."
+
+**Design principle for Полы:** a floor's perimeter is not treated as
+«Кромка» -- showing 5 edge-length inputs for an ordinary floor area
+would be confusing UI noise for a field that (per the company) isn't
+priced as edge work in practice. Skirting boards, thresholds, borders,
+and similar floor-specific trim are, if the company ever introduces
+them, separate future additional-work items with their own capability
+flag -- not routed through `supportsEdgeWork`.
+
 ## UI: additional-works block
 
-Replaces and extends the current `#countertopExtras` block:
+Replaces and extends the current `#countertopExtras` block. Every
+sub-block below is gated by reading the relevant flag from the
+currently selected `PRODUCTS[key]` entry (see the availability matrix
+above) -- the UI code itself contains no product-identity branching.
 
 - **Кромка** (5 number inputs, м.п. — прямая/фигурная/скругление/
-  скос/подгиб камнем, catalog ids `EDGE-01,03,04,05,06`) — shown for
-  **all 9 product types**, since an edge treatment can apply to any
-  flat stone piece.
-- **Вырезы** (4 quantity inputs, шт. — раковина накладная/подшивная/
-  интегрированная, варочная панель, ids `CUT-01..04`) and
-  **Отверстия** (3 quantity inputs, шт. — смеситель/розетка/дозатор,
-  ids `CUT-05..07`) — shown only when `product.supportsCountertopExtras`
-  (unchanged flag, still exactly `stoleshnitsa_vannaya` and
-  `stoleshnitsa_kuhnya`), since cutouts for a sink/cooktop have no
-  meaning outside a countertop.
-- **Дополнительно**, same `supportsCountertopExtras` gate:
+  скос/подгиб камнем, catalog ids `EDGE-01,03,04,05,06`) — shown when
+  `product.supportsEdgeWork` is true.
+- **Вырезы**: раковина накладная/подшивная/интегрированная (3 quantity
+  inputs, шт., ids `CUT-01..03`) shown when `product.supportsCountertopExtras`;
+  варочная панель (1 quantity input, шт., id `CUT-04`) shown only when
+  `product.supportsCountertopExtras && product.additionalWorks &&
+  product.additionalWorks.cooktopCutout` (true only for
+  `stoleshnitsa_kuhnya` today).
+- **Отверстия** (3 quantity inputs, шт. — смеситель/розетка/дозатор,
+  ids `CUT-05..07`) — shown when `product.supportsCountertopExtras`.
+- **Дополнительно**, `product.supportsCountertopExtras` gate unless noted:
   - Бортик (`extra-bortik`, м.п.) and Фартук (`extra-fartuk-width/length`,
     м²) — **existing fields, unchanged**, still wired to
     `COUNTERTOP_EXTRAS_RATES.bortikRatePerM` /
     `fartukRatePerM2` exactly as today.
-  - Остров — existing `extra-ostrov-width/length` pair is relabeled
-    "Остров прямоугольный" and keeps its existing wiring to
+  - Стеновая панель (width+length, `EXTRA-03`) — shown when
+    `product.supportsCountertopExtras`.
+  - Остров прямоугольный — existing `extra-ostrov-width/length` pair,
+    relabeled "Остров прямоугольный", keeps its existing wiring to
     `ostrovRatePerM2` unchanged (catalog id `EXTRA-04`, for
-    traceability only — not read from the catalog).
-  - New: "Остров фигурный/радиусный" (width+length, `EXTRA-05`),
-    "Стеновая панель" (width+length, `EXTRA-03`), "Барная стойка
-    стандартная" and "Барная стойка сложная/радиусная" (width+length
-    each, `EXTRA-06`/`EXTRA-07`) — four new width+length pairs, same
-    UX pattern as фартук/остров today.
+    traceability only — not read from the catalog). Shown when
+    `product.supportsCountertopExtras && product.additionalWorks &&
+    product.additionalWorks.island`.
+  - Остров фигурный/радиусный (width+length, `EXTRA-05`) — same
+    `additionalWorks.island` gate as the rectangular pair, so both
+    island variants appear/disappear together.
+  - Барная стойка стандартная и сложная/радиусная (width+length each,
+    `EXTRA-06`/`EXTRA-07`) — shown when `product.supportsCountertopExtras
+    && product.additionalWorks && product.additionalWorks.barCounter`.
 
 ## Installation rows (`INST-*`): kept as data, not wired or rendered yet
 
@@ -189,21 +330,28 @@ follow-up task that will decide how the filled-in Excel rates
 `computeWorkAndTotal`/`calculatePrice` stay exactly as implemented and
 tested today — no changes to their fields, defaults, or clamping.
 
-A new optional parameter is added alongside them:
+A new optional parameter is added alongside them. Note this is a
+correction from an earlier draft of this spec, applied during planning:
+`pricing.js` must stay a dependency-free pure module (it never
+`require`s `rate-catalog.js`, exactly like it never required
+`product-types.js` before), so the **caller** (the HTML script)
+resolves `rateId → rate` via `RateCatalog.getAdditionalWorkRate`
+*before* building `extraLineItems` — `pricing.js` itself never looks
+up a rate by id:
 
 ```js
 computeWorkAndTotal(subtotal, area, rates, options, extraDimensions, extraLineItems)
-// extraLineItems: [{ rateId: 'EDGE-01', quantity: 3.2 }, ...]
+// extraLineItems: [{ rate: 4000 /* or null */, quantity: 3.2 }, ...]
+// -- rate is already resolved by the caller; pricing.js never imports rate-catalog.js.
 ```
 
 `extraLineItems` computes `catalogExtras = Σ max(0, quantity_i) ×
-(getAdditionalWorkRate(rateId_i) || 0)` and adds it into `work` and
-`total` the same way `extras` does today; the return value gains a new
-`catalogExtras` field (no existing test asserts the full shape of the
-returned object, so this is additive and non-breaking). Omitting
-`extraLineItems` defaults `catalogExtras` to 0, matching the
-backward-compatibility behavior already established for
-`extraDimensions`.
+(rate_i || 0)` and adds it into `work` and `total` the same way
+`extras` does today; the return value gains a new `catalogExtras`
+field (no existing test asserts the full shape of the returned object,
+so this is additive and non-breaking). Omitting `extraLineItems`
+defaults `catalogExtras` to 0, matching the backward-compatibility
+behavior already established for `extraDimensions`.
 
 The four new width+length "Дополнительно" items (wall panel,
 figured island, both bar-counter variants), plus edge/cuts/holes, all
@@ -229,6 +377,19 @@ shown to customers does not change.
 - UI (`sayanmramor-calculator.html`) has no automated test today
   (inline script); verified manually in-browser per product type,
   same as the existing countertop-extras block.
+- Manual verification must now walk the full **availability matrix**
+  above, not just "countertop vs. non-countertop": for every one of
+  the 9 product types, confirm exactly the ✅/❌ cells shown in the
+  matrix — in particular that `stoleshnitsa_vannaya` shows sink cutouts
+  but not the cooktop cutout, island, or bar counter, while
+  `stoleshnitsa_kuhnya` shows all of them; and that Полы/Стены/Фасады/
+  Панно show no additional-works UI at all (not even «Кромка»).
+- A new `product-types.test.js` case (or extension of the existing
+  `supportsCountertopExtras is true on exactly ...` test) should assert
+  `supportsEdgeWork` is `true` on exactly `lestnitsa`, `podokonnik`,
+  `stoleshnitsa_vannaya`, `stoleshnitsa_kuhnya`, `stupeni`, and that
+  `additionalWorks.island`/`.barCounter`/`.cooktopCutout` are `true`
+  only on `stoleshnitsa_kuhnya`.
 
 ## Explicitly out of scope (follow-up work)
 
