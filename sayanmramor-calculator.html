@@ -552,6 +552,15 @@
         <div class="error" id="dimError">Укажите ширину и длину больше нуля</div>
       </div>
 
+      <div class="field" id="edgeWork" style="display:none">
+        <label>Кромка</label>
+        <input type="number" id="edge-straight" placeholder="Прямая, мм (погонный размер)" min="0" step="1">
+        <input type="number" id="edge-figured" placeholder="Фигурная / сложная, мм (погонный размер)" min="0" step="1" style="margin-top:8px">
+        <input type="number" id="edge-round" placeholder="Скругление (R/профиль), мм (погонный размер)" min="0" step="1" style="margin-top:8px">
+        <input type="number" id="edge-chamfer" placeholder="Скос / фаска, мм (погонный размер)" min="0" step="1" style="margin-top:8px">
+        <input type="number" id="edge-stonefold" placeholder="Подгиб камнем, мм (погонный размер)" min="0" step="1" style="margin-top:8px">
+      </div>
+
       <div class="field" id="countertopExtras" style="display:none">
         <label>Дополнительные позиции</label>
         <input type="number" id="extra-bortik" placeholder="Бортик, мм (погонный размер)" min="0" step="1">
@@ -637,7 +646,7 @@
 <script src="rate-catalog.js"></script>
 <script>
   const { PRODUCTS } = ProductTypes;
-  const { getSubcategoriesForProduct } = RateCatalog;
+  const { getSubcategoriesForProduct, getAdditionalWorkRate } = RateCatalog;
 
   // Simple single-color line icons (24x24 viewBox) for the product-type
   // cards -- inner markup only, wrapped uniformly when the cards are built.
@@ -733,6 +742,14 @@
   const updatedAtOut = document.getElementById('updatedAtOut');
   const infoBlock = document.getElementById('infoBlock');
   const countertopExtrasField = document.getElementById('countertopExtras');
+  const edgeWorkField = document.getElementById('edgeWork');
+  const EDGE_LINE_ITEMS = [
+    { rateId: 'EDGE-01', elId: 'edge-straight', label: 'кромка прямая' },
+    { rateId: 'EDGE-03', elId: 'edge-figured', label: 'кромка фигурная/сложная' },
+    { rateId: 'EDGE-04', elId: 'edge-round', label: 'скругление' },
+    { rateId: 'EDGE-05', elId: 'edge-chamfer', label: 'скос/фаска' },
+    { rateId: 'EDGE-06', elId: 'edge-stonefold', label: 'подгиб камнем' },
+  ];
   const productSubcategoryField = document.getElementById('productSubcategoryField');
   const productSubcategorySelect = document.getElementById('productSubcategory');
   const subcategoryQtyInput = document.getElementById('subcategoryQty');
@@ -753,6 +770,7 @@
     input.addEventListener('change', () => {
       selectedProductKey = key;
       renderSubcategoryOptions(val);
+      edgeWorkField.style.display = '';
       calculate();
     });
 
@@ -821,6 +839,23 @@
   // field's raw mm value and convert here rather than each doing its own /1000.
   function mmToM(mmValue) {
     return mmValue / 1000;
+  }
+
+  // Reads a list of {rateId, elId, label} mm-length inputs into extraLineItems
+  // entries plus human-readable breakdown labels, skipping anything left at
+  // zero. Shared by the edge/cuts/holes/extras blocks so each doesn't hand-
+  // write its own near-identical read loop.
+  function readLengthLineItems(configs) {
+    const items = [];
+    const labels = [];
+    configs.forEach(({ rateId, elId, label }) => {
+      const lengthM = mmToM(parseFloat(document.getElementById(elId).value) || 0);
+      if (lengthM > 0) {
+        items.push({ rate: getAdditionalWorkRate(rateId), quantity: lengthM });
+        labels.push(`${label}: ${lengthM.toFixed(2)} м.п.`);
+      }
+    });
+    return { items, labels };
   }
 
   function currentSubcategoryRow() {
@@ -953,6 +988,10 @@
     if (polishEnabled) optionLabels.push('полировка');
     if (installEnabled) optionLabels.push('монтаж');
 
+    const edgeResult = readLengthLineItems(EDGE_LINE_ITEMS);
+    let extraLineItems = edgeResult.items;
+    optionLabels.push(...edgeResult.labels);
+
     // Defensive zeroing: a value left in these fields from a previously
     // selected product must never leak into a product type that doesn't
     // support these extras (e.g. switching from a countertop to "Полы").
@@ -994,6 +1033,7 @@
       polishEnabled,
       complexEnabled,
       extraDimensions,
+      extraLineItems,
       marginCm: SAW_MARGIN_CM,
       wasteFactor: AREA_WASTE_FACTOR,
       allowSeam: product.allowSeam !== false
@@ -1076,6 +1116,9 @@
   });
   [extraBortikInput, extraFartukWidthInput, extraFartukLengthInput, extraOstrovWidthInput, extraOstrovLengthInput].forEach(el => {
     el.addEventListener('input', calculate);
+  });
+  EDGE_LINE_ITEMS.forEach(({ elId }) => {
+    document.getElementById(elId).addEventListener('input', calculate);
   });
   productSubcategorySelect.addEventListener('change', () => { updateSubcategoryQtyVisibility(); calculate(); });
   subcategoryQtyInput.addEventListener('input', calculate);
