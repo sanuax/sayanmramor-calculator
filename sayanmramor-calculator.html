@@ -582,8 +582,24 @@
           <input type="number" id="extra-fartuk-length" placeholder="Фартук, длина мм" min="0" step="1">
         </div>
         <div class="dims" style="margin-top:12px">
-          <input type="number" id="extra-ostrov-width" placeholder="Остров, ширина мм" min="0" step="1">
-          <input type="number" id="extra-ostrov-length" placeholder="Остров, длина мм" min="0" step="1">
+          <input type="number" id="extra-ostrov-width" placeholder="Остров прямоугольный, ширина мм" min="0" step="1">
+          <input type="number" id="extra-ostrov-length" placeholder="Остров прямоугольный, длина мм" min="0" step="1">
+        </div>
+        <div class="dims" style="margin-top:12px">
+          <input type="number" id="extra-ostrov-figured-width" placeholder="Остров фигурный, ширина мм" min="0" step="1">
+          <input type="number" id="extra-ostrov-figured-length" placeholder="Остров фигурный, длина мм" min="0" step="1">
+        </div>
+        <div class="dims" style="margin-top:12px">
+          <input type="number" id="extra-wallpanel-width" placeholder="Стеновая панель, ширина мм" min="0" step="1">
+          <input type="number" id="extra-wallpanel-length" placeholder="Стеновая панель, длина мм" min="0" step="1">
+        </div>
+        <div class="dims" style="margin-top:12px">
+          <input type="number" id="extra-bar-standard-width" placeholder="Барная стойка стандартная, ширина мм" min="0" step="1">
+          <input type="number" id="extra-bar-standard-length" placeholder="Барная стойка стандартная, длина мм" min="0" step="1">
+        </div>
+        <div class="dims" style="margin-top:12px">
+          <input type="number" id="extra-bar-complex-width" placeholder="Барная стойка сложная, ширина мм" min="0" step="1">
+          <input type="number" id="extra-bar-complex-length" placeholder="Барная стойка сложная, длина мм" min="0" step="1">
         </div>
       </div>
 
@@ -772,6 +788,12 @@
     { rateId: 'CUT-06', elId: 'hole-socket', label: 'отверстие под розетку' },
     { rateId: 'CUT-07', elId: 'hole-dispenser', label: 'отверстие под дозатор' },
   ];
+  const AREA_LINE_ITEMS = [
+    { rateId: 'EXTRA-05', widthElId: 'extra-ostrov-figured-width', lengthElId: 'extra-ostrov-figured-length', label: 'остров фигурный' },
+    { rateId: 'EXTRA-03', widthElId: 'extra-wallpanel-width', lengthElId: 'extra-wallpanel-length', label: 'стеновая панель' },
+    { rateId: 'EXTRA-06', widthElId: 'extra-bar-standard-width', lengthElId: 'extra-bar-standard-length', label: 'барная стойка стандартная' },
+    { rateId: 'EXTRA-07', widthElId: 'extra-bar-complex-width', lengthElId: 'extra-bar-complex-length', label: 'барная стойка сложная' },
+  ];
   const productSubcategoryField = document.getElementById('productSubcategoryField');
   const productSubcategorySelect = document.getElementById('productSubcategory');
   const subcategoryQtyInput = document.getElementById('subcategoryQty');
@@ -892,6 +914,26 @@
       if (qty > 0) {
         items.push({ rate: getAdditionalWorkRate(rateId), quantity: qty });
         labels.push(`${label}: ${qty} шт.`);
+      }
+    });
+    return { items, labels };
+  }
+
+  // Reads a list of {rateId, widthElId, lengthElId, label} mm width+length
+  // pairs into extraLineItems entries plus human-readable breakdown labels,
+  // skipping anything left at zero. Sibling of readLengthLineItems/
+  // readQuantityLineItems for the wall panel / island / bar counter block,
+  // which measures an area (m²) rather than a length or a piece count.
+  function readAreaLineItems(configs) {
+    const items = [];
+    const labels = [];
+    configs.forEach(({ rateId, widthElId, lengthElId, label }) => {
+      const widthM = mmToM(parseFloat(document.getElementById(widthElId).value) || 0);
+      const lengthM = mmToM(parseFloat(document.getElementById(lengthElId).value) || 0);
+      const areaM2 = widthM * lengthM;
+      if (areaM2 > 0) {
+        items.push({ rate: getAdditionalWorkRate(rateId), quantity: areaM2 });
+        labels.push(`${label}: ${areaM2.toFixed(2)} м²`);
       }
     });
     return { items, labels };
@@ -1051,6 +1093,10 @@
       const quantityResult = readQuantityLineItems(QUANTITY_LINE_ITEMS);
       extraLineItems = extraLineItems.concat(quantityResult.items);
       optionLabels.push(...quantityResult.labels);
+
+      const areaResult = readAreaLineItems(AREA_LINE_ITEMS);
+      extraLineItems = extraLineItems.concat(areaResult.items);
+      optionLabels.push(...areaResult.labels);
     }
 
     const productRates = WORK_RATES[selectedProductKey];
@@ -1165,6 +1211,10 @@
   });
   QUANTITY_LINE_ITEMS.forEach(({ elId }) => {
     document.getElementById(elId).addEventListener('input', calculate);
+  });
+  AREA_LINE_ITEMS.forEach(({ widthElId, lengthElId }) => {
+    document.getElementById(widthElId).addEventListener('input', calculate);
+    document.getElementById(lengthElId).addEventListener('input', calculate);
   });
   productSubcategorySelect.addEventListener('change', () => { updateSubcategoryQtyVisibility(); calculate(); });
   subcategoryQtyInput.addEventListener('input', calculate);
