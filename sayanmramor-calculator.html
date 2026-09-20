@@ -563,6 +563,19 @@
 
       <div class="field" id="countertopExtras" style="display:none">
         <label>Дополнительные позиции</label>
+
+        <label style="margin-top:0">Вырезы</label>
+        <input type="number" id="cut-sink-overlay" placeholder="Раковина накладная, шт." min="0" step="1">
+        <input type="number" id="cut-sink-undermount" placeholder="Раковина подшивная снизу, шт." min="0" step="1" style="margin-top:8px">
+        <input type="number" id="cut-sink-integrated" placeholder="Раковина интегрированная, шт." min="0" step="1" style="margin-top:8px">
+        <input type="number" id="cut-cooktop" placeholder="Варочная панель, шт." min="0" step="1" style="margin-top:8px">
+
+        <label style="margin-top:16px">Отверстия</label>
+        <input type="number" id="hole-mixer" placeholder="Смеситель, шт." min="0" step="1">
+        <input type="number" id="hole-socket" placeholder="Розетка, шт." min="0" step="1" style="margin-top:8px">
+        <input type="number" id="hole-dispenser" placeholder="Дозатор, шт." min="0" step="1" style="margin-top:8px">
+
+        <label style="margin-top:16px">Дополнительно</label>
         <input type="number" id="extra-bortik" placeholder="Бортик, мм (погонный размер)" min="0" step="1">
         <div class="dims" style="margin-top:12px">
           <input type="number" id="extra-fartuk-width" placeholder="Фартук, ширина мм" min="0" step="1">
@@ -750,6 +763,15 @@
     { rateId: 'EDGE-05', elId: 'edge-chamfer', label: 'скос/фаска' },
     { rateId: 'EDGE-06', elId: 'edge-stonefold', label: 'подгиб камнем' },
   ];
+  const QUANTITY_LINE_ITEMS = [
+    { rateId: 'CUT-01', elId: 'cut-sink-overlay', label: 'вырез под накладную раковину' },
+    { rateId: 'CUT-02', elId: 'cut-sink-undermount', label: 'вырез под подшивную раковину' },
+    { rateId: 'CUT-03', elId: 'cut-sink-integrated', label: 'вырез под интегрированную раковину' },
+    { rateId: 'CUT-04', elId: 'cut-cooktop', label: 'вырез под варочную панель' },
+    { rateId: 'CUT-05', elId: 'hole-mixer', label: 'отверстие под смеситель' },
+    { rateId: 'CUT-06', elId: 'hole-socket', label: 'отверстие под розетку' },
+    { rateId: 'CUT-07', elId: 'hole-dispenser', label: 'отверстие под дозатор' },
+  ];
   const productSubcategoryField = document.getElementById('productSubcategoryField');
   const productSubcategorySelect = document.getElementById('productSubcategory');
   const subcategoryQtyInput = document.getElementById('subcategoryQty');
@@ -853,6 +875,23 @@
       if (lengthM > 0) {
         items.push({ rate: getAdditionalWorkRate(rateId), quantity: lengthM });
         labels.push(`${label}: ${lengthM.toFixed(2)} м.п.`);
+      }
+    });
+    return { items, labels };
+  }
+
+  // Reads a list of {rateId, elId, label} plain шт.-count inputs into
+  // extraLineItems entries plus human-readable breakdown labels, skipping
+  // anything left at zero. Sibling of readLengthLineItems for the cuts/holes
+  // block, which counts pieces rather than measuring mm-lengths (no mmToM).
+  function readQuantityLineItems(configs) {
+    const items = [];
+    const labels = [];
+    configs.forEach(({ rateId, elId, label }) => {
+      const qty = parseFloat(document.getElementById(elId).value) || 0;
+      if (qty > 0) {
+        items.push({ rate: getAdditionalWorkRate(rateId), quantity: qty });
+        labels.push(`${label}: ${qty} шт.`);
       }
     });
     return { items, labels };
@@ -1008,6 +1047,10 @@
       if (bortikLengthM > 0) optionLabels.push(`бортик: ${bortikLengthM} м.п.`);
       if (fartukAreaM2 > 0) optionLabels.push(`фартук: ${fartukAreaM2.toFixed(2)} м²`);
       if (ostrovAreaM2 > 0) optionLabels.push(`остров/полуостров: ${ostrovAreaM2.toFixed(2)} м²`);
+
+      const quantityResult = readQuantityLineItems(QUANTITY_LINE_ITEMS);
+      extraLineItems = extraLineItems.concat(quantityResult.items);
+      optionLabels.push(...quantityResult.labels);
     }
 
     const productRates = WORK_RATES[selectedProductKey];
@@ -1118,6 +1161,9 @@
     el.addEventListener('input', calculate);
   });
   EDGE_LINE_ITEMS.forEach(({ elId }) => {
+    document.getElementById(elId).addEventListener('input', calculate);
+  });
+  QUANTITY_LINE_ITEMS.forEach(({ elId }) => {
     document.getElementById(elId).addEventListener('input', calculate);
   });
   productSubcategorySelect.addEventListener('change', () => { updateSubcategoryQtyVisibility(); calculate(); });
