@@ -564,42 +564,68 @@
       <div class="field" id="countertopExtras" style="display:none">
         <label>Дополнительные позиции</label>
 
-        <label style="margin-top:0">Вырезы</label>
-        <input type="number" id="cut-sink-overlay" placeholder="Раковина накладная, шт." min="0" step="1">
-        <input type="number" id="cut-sink-undermount" placeholder="Раковина подшивная снизу, шт." min="0" step="1" style="margin-top:8px">
-        <input type="number" id="cut-sink-integrated" placeholder="Раковина интегрированная, шт." min="0" step="1" style="margin-top:8px">
-        <input type="number" id="cut-cooktop" placeholder="Варочная панель, шт." min="0" step="1" style="margin-top:8px">
+        <div id="group-sink-cutout" style="display:none">
+          <label style="margin-top:0">Вырезы под раковину</label>
+          <input type="number" id="cut-sink-overlay" placeholder="Раковина накладная, шт." min="0" step="1">
+          <input type="number" id="cut-sink-undermount" placeholder="Раковина подшивная снизу, шт." min="0" step="1" style="margin-top:8px">
+          <input type="number" id="cut-sink-integrated" placeholder="Раковина интегрированная, шт." min="0" step="1" style="margin-top:8px">
+        </div>
 
-        <label style="margin-top:16px">Отверстия</label>
-        <input type="number" id="hole-mixer" placeholder="Смеситель, шт." min="0" step="1">
-        <input type="number" id="hole-socket" placeholder="Розетка, шт." min="0" step="1" style="margin-top:8px">
-        <input type="number" id="hole-dispenser" placeholder="Дозатор, шт." min="0" step="1" style="margin-top:8px">
+        <div id="group-cooktop-cutout" style="margin-top:16px;display:none">
+          <label>Варочная панель</label>
+          <input type="number" id="cut-cooktop" placeholder="Варочная панель, шт." min="0" step="1">
+        </div>
 
-        <label style="margin-top:16px">Дополнительно</label>
-        <input type="number" id="extra-bortik" placeholder="Бортик, мм (погонный размер)" min="0" step="1">
-        <div class="dims" style="margin-top:12px">
-          <input type="number" id="extra-fartuk-width" placeholder="Фартук, ширина мм" min="0" step="1">
-          <input type="number" id="extra-fartuk-length" placeholder="Фартук, длина мм" min="0" step="1">
+        <div id="group-holes" style="margin-top:16px;display:none">
+          <label>Отверстия</label>
+          <input type="number" id="hole-mixer" placeholder="Смеситель, шт." min="0" step="1">
+          <input type="number" id="hole-socket" placeholder="Розетка, шт." min="0" step="1" style="margin-top:8px">
+          <input type="number" id="hole-dispenser" placeholder="Дозатор, шт." min="0" step="1" style="margin-top:8px">
         </div>
-        <div class="dims" style="margin-top:12px">
-          <input type="number" id="extra-ostrov-width" placeholder="Остров прямоугольный, ширина мм" min="0" step="1">
-          <input type="number" id="extra-ostrov-length" placeholder="Остров прямоугольный, длина мм" min="0" step="1">
+
+        <div id="group-curb" style="margin-top:16px;display:none">
+          <label>Бортик</label>
+          <input type="number" id="extra-bortik" placeholder="Бортик, мм (погонный размер)" min="0" step="1">
         </div>
-        <div class="dims" style="margin-top:12px">
-          <input type="number" id="extra-ostrov-figured-width" placeholder="Остров фигурный, ширина мм" min="0" step="1">
-          <input type="number" id="extra-ostrov-figured-length" placeholder="Остров фигурный, длина мм" min="0" step="1">
+
+        <div id="group-backsplash" style="margin-top:16px;display:none">
+          <label>Фартук</label>
+          <div class="dims">
+            <input type="number" id="extra-fartuk-width" placeholder="Фартук, ширина мм" min="0" step="1">
+            <input type="number" id="extra-fartuk-length" placeholder="Фартук, длина мм" min="0" step="1">
+          </div>
         </div>
-        <div class="dims" style="margin-top:12px">
-          <input type="number" id="extra-wallpanel-width" placeholder="Стеновая панель, ширина мм" min="0" step="1">
-          <input type="number" id="extra-wallpanel-length" placeholder="Стеновая панель, длина мм" min="0" step="1">
+
+        <div id="group-wallpanel" style="margin-top:16px;display:none">
+          <label>Стеновая панель</label>
+          <div class="dims">
+            <input type="number" id="extra-wallpanel-width" placeholder="Стеновая панель, ширина мм" min="0" step="1">
+            <input type="number" id="extra-wallpanel-length" placeholder="Стеновая панель, длина мм" min="0" step="1">
+          </div>
         </div>
-        <div class="dims" style="margin-top:12px">
-          <input type="number" id="extra-bar-standard-width" placeholder="Барная стойка стандартная, ширина мм" min="0" step="1">
-          <input type="number" id="extra-bar-standard-length" placeholder="Барная стойка стандартная, длина мм" min="0" step="1">
+
+        <div id="group-island" style="margin-top:16px;display:none">
+          <label>Остров</label>
+          <div class="dims">
+            <input type="number" id="extra-ostrov-width" placeholder="Остров прямоугольный, ширина мм" min="0" step="1">
+            <input type="number" id="extra-ostrov-length" placeholder="Остров прямоугольный, длина мм" min="0" step="1">
+          </div>
+          <div class="dims" style="margin-top:12px">
+            <input type="number" id="extra-ostrov-figured-width" placeholder="Остров фигурный, ширина мм" min="0" step="1">
+            <input type="number" id="extra-ostrov-figured-length" placeholder="Остров фигурный, длина мм" min="0" step="1">
+          </div>
         </div>
-        <div class="dims" style="margin-top:12px">
-          <input type="number" id="extra-bar-complex-width" placeholder="Барная стойка сложная, ширина мм" min="0" step="1">
-          <input type="number" id="extra-bar-complex-length" placeholder="Барная стойка сложная, длина мм" min="0" step="1">
+
+        <div id="group-barcounter" style="margin-top:16px;display:none">
+          <label>Барная стойка</label>
+          <div class="dims">
+            <input type="number" id="extra-bar-standard-width" placeholder="Барная стойка стандартная, ширина мм" min="0" step="1">
+            <input type="number" id="extra-bar-standard-length" placeholder="Барная стойка стандартная, длина мм" min="0" step="1">
+          </div>
+          <div class="dims" style="margin-top:12px">
+            <input type="number" id="extra-bar-complex-width" placeholder="Барная стойка сложная, ширина мм" min="0" step="1">
+            <input type="number" id="extra-bar-complex-length" placeholder="Барная стойка сложная, длина мм" min="0" step="1">
+          </div>
         </div>
       </div>
 
@@ -674,7 +700,7 @@
 <script src="product-types.js"></script>
 <script src="rate-catalog.js"></script>
 <script>
-  const { PRODUCTS } = ProductTypes;
+  const { PRODUCTS, hasAdditionalWork } = ProductTypes;
   const { getSubcategoriesForProduct, getAdditionalWorkRate } = RateCatalog;
 
   // Simple single-color line icons (24x24 viewBox) for the product-type
@@ -780,20 +806,39 @@
     { rateId: 'EDGE-06', elId: 'edge-stonefold', label: 'подгиб камнем' },
   ];
   const QUANTITY_LINE_ITEMS = [
-    { rateId: 'CUT-01', elId: 'cut-sink-overlay', label: 'вырез под накладную раковину' },
-    { rateId: 'CUT-02', elId: 'cut-sink-undermount', label: 'вырез под подшивную раковину' },
-    { rateId: 'CUT-03', elId: 'cut-sink-integrated', label: 'вырез под интегрированную раковину' },
-    { rateId: 'CUT-04', elId: 'cut-cooktop', label: 'вырез под варочную панель' },
-    { rateId: 'CUT-05', elId: 'hole-mixer', label: 'отверстие под смеситель' },
-    { rateId: 'CUT-06', elId: 'hole-socket', label: 'отверстие под розетку' },
-    { rateId: 'CUT-07', elId: 'hole-dispenser', label: 'отверстие под дозатор' },
+    { rateId: 'CUT-01', elId: 'cut-sink-overlay', label: 'вырез под накладную раковину', capability: 'sinkCutout' },
+    { rateId: 'CUT-02', elId: 'cut-sink-undermount', label: 'вырез под подшивную раковину', capability: 'sinkCutout' },
+    { rateId: 'CUT-03', elId: 'cut-sink-integrated', label: 'вырез под интегрированную раковину', capability: 'sinkCutout' },
+    { rateId: 'CUT-04', elId: 'cut-cooktop', label: 'вырез под варочную панель', capability: 'cooktopCutout' },
+    { rateId: 'CUT-05', elId: 'hole-mixer', label: 'отверстие под смеситель', capability: 'holes' },
+    { rateId: 'CUT-06', elId: 'hole-socket', label: 'отверстие под розетку', capability: 'holes' },
+    { rateId: 'CUT-07', elId: 'hole-dispenser', label: 'отверстие под дозатор', capability: 'holes' },
   ];
   const AREA_LINE_ITEMS = [
-    { rateId: 'EXTRA-05', widthElId: 'extra-ostrov-figured-width', lengthElId: 'extra-ostrov-figured-length', label: 'остров фигурный' },
-    { rateId: 'EXTRA-03', widthElId: 'extra-wallpanel-width', lengthElId: 'extra-wallpanel-length', label: 'стеновая панель' },
-    { rateId: 'EXTRA-06', widthElId: 'extra-bar-standard-width', lengthElId: 'extra-bar-standard-length', label: 'барная стойка стандартная' },
-    { rateId: 'EXTRA-07', widthElId: 'extra-bar-complex-width', lengthElId: 'extra-bar-complex-length', label: 'барная стойка сложная' },
+    { rateId: 'EXTRA-05', widthElId: 'extra-ostrov-figured-width', lengthElId: 'extra-ostrov-figured-length', label: 'остров фигурный', capability: 'island' },
+    { rateId: 'EXTRA-03', widthElId: 'extra-wallpanel-width', lengthElId: 'extra-wallpanel-length', label: 'стеновая панель', capability: 'wallPanel' },
+    { rateId: 'EXTRA-06', widthElId: 'extra-bar-standard-width', lengthElId: 'extra-bar-standard-length', label: 'барная стойка стандартная', capability: 'barCounter' },
+    { rateId: 'EXTRA-07', widthElId: 'extra-bar-complex-width', lengthElId: 'extra-bar-complex-length', label: 'барная стойка сложная', capability: 'barCounter' },
   ];
+  // Декларативный список групп внутри #countertopExtras -- одна точка
+  // соответствия "контейнер в разметке" -> "какая capability его открывает",
+  // вместо if-цепочки на каждое поле. hasAdditionalWork() уже безопасно
+  // трактует отсутствие product.additionalWorks/капабилити как false.
+  const ADDITIONAL_WORK_GROUPS = [
+    { elId: 'group-sink-cutout', capability: 'sinkCutout' },
+    { elId: 'group-cooktop-cutout', capability: 'cooktopCutout' },
+    { elId: 'group-holes', capability: 'holes' },
+    { elId: 'group-curb', capability: 'curb' },
+    { elId: 'group-backsplash', capability: 'backsplash' },
+    { elId: 'group-wallpanel', capability: 'wallPanel' },
+    { elId: 'group-island', capability: 'island' },
+    { elId: 'group-barcounter', capability: 'barCounter' },
+  ];
+  function updateAdditionalWorkGroupsVisibility(product) {
+    ADDITIONAL_WORK_GROUPS.forEach(({ elId, capability }) => {
+      document.getElementById(elId).style.display = hasAdditionalWork(product, capability) ? '' : 'none';
+    });
+  }
   const productSubcategoryField = document.getElementById('productSubcategoryField');
   const productSubcategorySelect = document.getElementById('productSubcategory');
   const subcategoryQtyInput = document.getElementById('subcategoryQty');
@@ -814,7 +859,6 @@
     input.addEventListener('change', () => {
       selectedProductKey = key;
       renderSubcategoryOptions(val);
-      edgeWorkField.style.display = '';
       calculate();
     });
 
@@ -902,14 +946,19 @@
     return { items, labels };
   }
 
-  // Reads a list of {rateId, elId, label} plain шт.-count inputs into
-  // extraLineItems entries plus human-readable breakdown labels, skipping
-  // anything left at zero. Sibling of readLengthLineItems for the cuts/holes
-  // block, which counts pieces rather than measuring mm-lengths (no mmToM).
-  function readQuantityLineItems(configs) {
+  // Reads a list of {rateId, elId, label, capability} plain шт.-count inputs
+  // into extraLineItems entries plus human-readable breakdown labels,
+  // skipping anything left at zero. Sibling of readLengthLineItems for the
+  // cuts/holes block, which counts pieces rather than measuring mm-lengths
+  // (no mmToM). A config entry whose capability the current product doesn't
+  // have is skipped entirely -- this is the defensive-zeroing guard: a value
+  // left in a hidden field from a previously selected product must never
+  // leak into a product that doesn't support that specific work item.
+  function readQuantityLineItems(configs, product) {
     const items = [];
     const labels = [];
-    configs.forEach(({ rateId, elId, label }) => {
+    configs.forEach(({ rateId, elId, label, capability }) => {
+      if (!hasAdditionalWork(product, capability)) return;
       const qty = parseFloat(document.getElementById(elId).value) || 0;
       if (qty > 0) {
         items.push({ rate: getAdditionalWorkRate(rateId), quantity: qty });
@@ -919,15 +968,17 @@
     return { items, labels };
   }
 
-  // Reads a list of {rateId, widthElId, lengthElId, label} mm width+length
-  // pairs into extraLineItems entries plus human-readable breakdown labels,
-  // skipping anything left at zero. Sibling of readLengthLineItems/
-  // readQuantityLineItems for the wall panel / island / bar counter block,
-  // which measures an area (m²) rather than a length or a piece count.
-  function readAreaLineItems(configs) {
+  // Reads a list of {rateId, widthElId, lengthElId, label, capability} mm
+  // width+length pairs into extraLineItems entries plus human-readable
+  // breakdown labels, skipping anything left at zero. Sibling of
+  // readLengthLineItems/readQuantityLineItems for the wall panel / island /
+  // bar counter block, which measures an area (m²) rather than a length or a
+  // piece count. Same capability guard as readQuantityLineItems.
+  function readAreaLineItems(configs, product) {
     const items = [];
     const labels = [];
-    configs.forEach(({ rateId, widthElId, lengthElId, label }) => {
+    configs.forEach(({ rateId, widthElId, lengthElId, label, capability }) => {
+      if (!hasAdditionalWork(product, capability)) return;
       const widthM = mmToM(parseFloat(document.getElementById(widthElId).value) || 0);
       const lengthM = mmToM(parseFloat(document.getElementById(lengthElId).value) || 0);
       const areaM2 = widthM * lengthM;
@@ -1014,6 +1065,8 @@
     // are filled in yet.
     const product = selectedProductKey ? PRODUCTS[selectedProductKey] : null;
     countertopExtrasField.style.display = product && product.supportsCountertopExtras ? '' : 'none';
+    edgeWorkField.style.display = product && product.supportsEdgeWork ? '' : 'none';
+    updateAdditionalWorkGroupsVisibility(product);
 
     const width = mmToM(parseFloat(widthInput.value) || 0);
     const length = mmToM(parseFloat(lengthInput.value) || 0);
@@ -1078,11 +1131,16 @@
     // support these extras (e.g. switching from a countertop to "Полы").
     let extraDimensions = { bortikLengthM: 0, fartukAreaM2: 0, ostrovAreaM2: 0 };
     if (product.supportsCountertopExtras) {
-      const bortikLengthM = mmToM(parseFloat(extraBortikInput.value) || 0);
-      const fartukWidthM = mmToM(parseFloat(extraFartukWidthInput.value) || 0);
-      const fartukLengthM = mmToM(parseFloat(extraFartukLengthInput.value) || 0);
-      const ostrovWidthM = mmToM(parseFloat(extraOstrovWidthInput.value) || 0);
-      const ostrovLengthM = mmToM(parseFloat(extraOstrovLengthInput.value) || 0);
+      // Каждое легаси-поле (бортик/фартук/остров-прямоугольный) читается,
+      // только если у изделия есть соответствующая additionalWorks-capability
+      // -- при текущей матрице у обеих столешниц она всегда true, но это не
+      // даёт значению из скрытого поля (оставшемуся от предыдущего изделия)
+      // просочиться в расчёт, если у будущего изделия capability окажется false.
+      const bortikLengthM = hasAdditionalWork(product, 'curb') ? mmToM(parseFloat(extraBortikInput.value) || 0) : 0;
+      const fartukWidthM = hasAdditionalWork(product, 'backsplash') ? mmToM(parseFloat(extraFartukWidthInput.value) || 0) : 0;
+      const fartukLengthM = hasAdditionalWork(product, 'backsplash') ? mmToM(parseFloat(extraFartukLengthInput.value) || 0) : 0;
+      const ostrovWidthM = hasAdditionalWork(product, 'island') ? mmToM(parseFloat(extraOstrovWidthInput.value) || 0) : 0;
+      const ostrovLengthM = hasAdditionalWork(product, 'island') ? mmToM(parseFloat(extraOstrovLengthInput.value) || 0) : 0;
       const fartukAreaM2 = fartukWidthM * fartukLengthM;
       const ostrovAreaM2 = ostrovWidthM * ostrovLengthM;
       extraDimensions = { bortikLengthM, fartukAreaM2, ostrovAreaM2 };
@@ -1090,11 +1148,11 @@
       if (fartukAreaM2 > 0) optionLabels.push(`фартук: ${fartukAreaM2.toFixed(2)} м²`);
       if (ostrovAreaM2 > 0) optionLabels.push(`остров/полуостров: ${ostrovAreaM2.toFixed(2)} м²`);
 
-      const quantityResult = readQuantityLineItems(QUANTITY_LINE_ITEMS);
+      const quantityResult = readQuantityLineItems(QUANTITY_LINE_ITEMS, product);
       extraLineItems = extraLineItems.concat(quantityResult.items);
       optionLabels.push(...quantityResult.labels);
 
-      const areaResult = readAreaLineItems(AREA_LINE_ITEMS);
+      const areaResult = readAreaLineItems(AREA_LINE_ITEMS, product);
       extraLineItems = extraLineItems.concat(areaResult.items);
       optionLabels.push(...areaResult.labels);
     }
