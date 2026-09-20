@@ -67,11 +67,39 @@
     { id: 'STEP-04', categoryLabel: 'Ступени', shape: 'Подступенок', variant: 'Стандартный', unit: 'шт.', rate: null, currency: null },
   ];
 
+  const ADDITIONAL_WORKS = [
+    { id: 'CUT-01', group: 'Вырезы', operation: 'Раковина', variant: 'Накладная', unit: 'шт.', rate: null, currency: null },
+    { id: 'CUT-02', group: 'Вырезы', operation: 'Раковина', variant: 'Подшивная снизу', unit: 'шт.', rate: null, currency: null },
+    { id: 'CUT-03', group: 'Вырезы', operation: 'Раковина', variant: 'Интегрированная', unit: 'шт.', rate: null, currency: null },
+    { id: 'CUT-04', group: 'Вырезы', operation: 'Варочная панель', variant: 'Стандартный вырез', unit: 'шт.', rate: null, currency: null },
+    { id: 'CUT-05', group: 'Отверстия', operation: 'Смеситель', variant: '1 отверстие', unit: 'шт.', rate: null, currency: null },
+    { id: 'CUT-06', group: 'Отверстия', operation: 'Розетка', variant: '1 отверстие', unit: 'шт.', rate: null, currency: null },
+    { id: 'CUT-07', group: 'Отверстия', operation: 'Дозатор', variant: '1 отверстие', unit: 'шт.', rate: null, currency: null },
+    { id: 'EDGE-01', group: 'Кромка', operation: 'Кромка', variant: 'Прямая', unit: 'м.п.', rate: null, currency: null },
+    { id: 'EDGE-03', group: 'Кромка', operation: 'Кромка', variant: 'Фигурная / сложная', unit: 'м.п.', rate: null, currency: null },
+    { id: 'EDGE-04', group: 'Кромка', operation: 'Скругление', variant: 'R / профиль', unit: 'м.п.', rate: null, currency: null },
+    { id: 'EDGE-05', group: 'Кромка', operation: 'Скос', variant: 'Фаска / скос', unit: 'м.п.', rate: null, currency: null },
+    { id: 'EDGE-06', group: 'Кромка', operation: 'Подгиб камнем', variant: 'Столешница / фасад', unit: 'м.п.', rate: null, currency: null },
+    { id: 'EXTRA-01', group: 'Дополнительно', operation: 'Бортик', variant: 'Стандартный', unit: 'м.п.', rate: null, currency: null },
+    { id: 'EXTRA-02', group: 'Дополнительно', operation: 'Фартук', variant: 'Стандартный', unit: 'м²', rate: null, currency: null },
+    { id: 'EXTRA-03', group: 'Дополнительно', operation: 'Стеновая панель', variant: 'Стандартная', unit: 'м²', rate: null, currency: null },
+    { id: 'EXTRA-04', group: 'Дополнительно', operation: 'Остров', variant: 'Прямоугольный', unit: 'м²', rate: null, currency: null },
+    { id: 'EXTRA-05', group: 'Дополнительно', operation: 'Остров', variant: 'Фигурный / радиусный', unit: 'м²', rate: null, currency: null },
+    { id: 'EXTRA-06', group: 'Дополнительно', operation: 'Барная стойка', variant: 'Стандартная', unit: 'м²', rate: null, currency: null },
+    { id: 'EXTRA-07', group: 'Дополнительно', operation: 'Барная стойка', variant: 'Сложная / радиусная', unit: 'м²', rate: null, currency: null },
+  ];
+
   function getSubcategoriesForProduct(categoryLabel) {
     return PRODUCT_SUBCATEGORIES.filter(row => row.categoryLabel === categoryLabel);
   }
 
+  function getAdditionalWorkRate(id) {
+    const row = ADDITIONAL_WORKS.find(r => r.id === id);
+    return row ? row.rate : null;
+  }
+
   return {
     PRODUCT_SUBCATEGORIES, getSubcategoriesForProduct,
+    ADDITIONAL_WORKS, getAdditionalWorkRate,
   };
 });

@@ -40,3 +40,35 @@ test('getSubcategoriesForProduct returns the right row count for every PRODUCTS 
 test('getSubcategoriesForProduct returns an empty array for an unknown category', () => {
   assert.deepEqual(RateCatalog.getSubcategoriesForProduct('Несуществующий тип'), []);
 });
+
+test('ADDITIONAL_WORKS has exactly 19 rows', () => {
+  assert.equal(RateCatalog.ADDITIONAL_WORKS.length, 19);
+});
+
+test('ADDITIONAL_WORKS ids are all unique', () => {
+  const ids = RateCatalog.ADDITIONAL_WORKS.map(r => r.id);
+  assert.equal(new Set(ids).size, ids.length);
+});
+
+test('ADDITIONAL_WORKS rows all start with rate/currency null', () => {
+  RateCatalog.ADDITIONAL_WORKS.forEach(row => {
+    assert.equal(row.rate, null);
+    assert.equal(row.currency, null);
+  });
+});
+
+test('ADDITIONAL_WORKS groups match the expected row counts', () => {
+  const counts = {};
+  RateCatalog.ADDITIONAL_WORKS.forEach(row => { counts[row.group] = (counts[row.group] || 0) + 1; });
+  assert.deepEqual(counts, { 'Вырезы': 4, 'Отверстия': 3, 'Кромка': 5, 'Дополнительно': 7 });
+});
+
+test('getAdditionalWorkRate returns null for every existing row (no real rates yet)', () => {
+  RateCatalog.ADDITIONAL_WORKS.forEach(row => {
+    assert.equal(RateCatalog.getAdditionalWorkRate(row.id), null);
+  });
+});
+
+test('getAdditionalWorkRate returns null for an unknown id', () => {
+  assert.equal(RateCatalog.getAdditionalWorkRate('NOPE-99'), null);
+});
