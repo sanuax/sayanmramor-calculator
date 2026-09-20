@@ -527,6 +527,12 @@
         <div class="product-grid" id="productGrid" role="radiogroup" aria-labelledby="productLabel"></div>
       </div>
 
+      <div class="field" id="productSubcategoryField" style="display:none">
+        <label for="productSubcategory">Вариант исполнения</label>
+        <select id="productSubcategory"></select>
+        <input type="number" id="subcategoryQty" placeholder="Количество, шт." min="0" step="1" style="margin-top:8px;display:none">
+      </div>
+
       <div class="field">
         <label id="materialLabel" for="materialField">Материал</label>
         <button type="button" class="material-field" id="materialField"
@@ -628,8 +634,10 @@
 <script src="pricing.js"></script>
 <script src="material-picker.js"></script>
 <script src="product-types.js"></script>
+<script src="rate-catalog.js"></script>
 <script>
   const { PRODUCTS } = ProductTypes;
+  const { getSubcategoriesForProduct } = RateCatalog;
 
   // Simple single-color line icons (24x24 viewBox) for the product-type
   // cards -- inner markup only, wrapped uniformly when the cards are built.
@@ -725,6 +733,9 @@
   const updatedAtOut = document.getElementById('updatedAtOut');
   const infoBlock = document.getElementById('infoBlock');
   const countertopExtrasField = document.getElementById('countertopExtras');
+  const productSubcategoryField = document.getElementById('productSubcategoryField');
+  const productSubcategorySelect = document.getElementById('productSubcategory');
+  const subcategoryQtyInput = document.getElementById('subcategoryQty');
   const extraBortikInput = document.getElementById('extra-bortik');
   const extraFartukWidthInput = document.getElementById('extra-fartuk-width');
   const extraFartukLengthInput = document.getElementById('extra-fartuk-length');
@@ -741,6 +752,7 @@
     input.value = key;
     input.addEventListener('change', () => {
       selectedProductKey = key;
+      renderSubcategoryOptions(val);
       calculate();
     });
 
@@ -809,6 +821,34 @@
   // field's raw mm value and convert here rather than each doing its own /1000.
   function mmToM(mmValue) {
     return mmValue / 1000;
+  }
+
+  function currentSubcategoryRow() {
+    const product = selectedProductKey ? PRODUCTS[selectedProductKey] : null;
+    if (!product) return null;
+    const rows = getSubcategoriesForProduct(product.label);
+    return rows.find(r => r.id === productSubcategorySelect.value) || null;
+  }
+
+  function subcategoryLabel(row) {
+    return row.shape === 'Любая' ? row.variant : `${row.shape} — ${row.variant}`;
+  }
+
+  function updateSubcategoryQtyVisibility() {
+    const row = currentSubcategoryRow();
+    subcategoryQtyInput.style.display = row && row.unit === 'шт.' ? '' : 'none';
+  }
+
+  function renderSubcategoryOptions(product) {
+    productSubcategorySelect.innerHTML = '';
+    getSubcategoriesForProduct(product.label).forEach(row => {
+      const opt = document.createElement('option');
+      opt.value = row.id;
+      opt.textContent = subcategoryLabel(row);
+      productSubcategorySelect.appendChild(opt);
+    });
+    productSubcategoryField.style.display = '';
+    updateSubcategoryQtyVisibility();
   }
 
   function formatRub(n) {
@@ -996,6 +1036,14 @@
     let html = `Площадь: <span>${(width * length).toFixed(2)} м²</span><br>`;
     html += `Материал: <span>${escapeHtml(stone.name)}</span><br>`;
     html += `Изделие: <span>${product.label}</span>`;
+    const subcategoryRow = currentSubcategoryRow();
+    if (subcategoryRow) {
+      html += `<br>Вариант: <span>${escapeHtml(subcategoryLabel(subcategoryRow))}</span>`;
+      if (subcategoryRow.unit === 'шт.') {
+        const subcategoryQty = parseFloat(subcategoryQtyInput.value) || 0;
+        html += ` (${subcategoryQty} шт.)`;
+      }
+    }
     if (optionLabels.length) {
       html += `<br>Опции: <span>${optionLabels.join(', ')}</span>`;
     }
@@ -1029,6 +1077,8 @@
   [extraBortikInput, extraFartukWidthInput, extraFartukLengthInput, extraOstrovWidthInput, extraOstrovLengthInput].forEach(el => {
     el.addEventListener('input', calculate);
   });
+  productSubcategorySelect.addEventListener('change', () => { updateSubcategoryQtyVisibility(); calculate(); });
+  subcategoryQtyInput.addEventListener('input', calculate);
 
   ctaBtn.addEventListener('click', () => {
     if (parseFloat(widthInput.value) > 0 && parseFloat(lengthInput.value) > 0) {
