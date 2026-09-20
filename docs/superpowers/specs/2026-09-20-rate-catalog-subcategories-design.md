@@ -32,7 +32,7 @@ customers.
   they don't drive pricing yet; they live in their own array,
   `INSTALLATION_RATES`, separate from `PRODUCT_SUBCATEGORIES` (see
   below).
-- **«Дополнительные работы»** — 21 rows: `ID, Группа, Операция,
+- **«Дополнительные работы»** — 19 rows: `ID, Группа, Операция,
   Вариант, Ед. расчёта, Ставка, Валюта, Примечание`. Groups: Вырезы
   (raковина ×3 variants, варочная панель), Отверстия (смеситель,
   розетка, дозатор), Кромка (5 variants), Дополнительно (бортик,
@@ -64,7 +64,7 @@ const PRODUCT_SUBCATEGORIES = [
 
 const ADDITIONAL_WORKS = [
   { id: 'CUT-01', group: 'Вырезы', operation: 'Раковина', variant: 'Накладная', unit: 'шт.', rate: null, currency: null },
-  // ... all 21 rows from «Дополнительные работы», in sheet order
+  // ... all 19 rows from «Дополнительные работы», in sheet order
 ];
 
 // The 9 INST-* rows from «Ставки изделий» -- kept as their own array, in the
@@ -213,7 +213,7 @@ shown to customers does not change.
 
 ## Testing
 
-- New `tests/rate-catalog.test.js`: row counts (50 + 21 + 9), unique
+- New `tests/rate-catalog.test.js`: row counts (50 + 19 + 9), unique
   `id`s across all three arrays, every `PRODUCTS` label has at least
   one matching row in `getSubcategoriesForProduct`, valid `unit`
   values, and every `PRODUCTS` label has exactly one row in
