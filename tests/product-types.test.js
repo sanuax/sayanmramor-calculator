@@ -53,3 +53,71 @@ test('supportsCountertopExtras is true on exactly stoleshnitsa_kuhnya and stoles
     .sort();
   assert.deepEqual(flagged, ['stoleshnitsa_kuhnya', 'stoleshnitsa_vannaya']);
 });
+
+test('supportsEdgeWork is true on exactly the 5 products where edge finishing is standard practice', () => {
+  const flagged = Object.entries(ProductTypes.PRODUCTS)
+    .filter(([, product]) => product.supportsEdgeWork === true)
+    .map(([key]) => key)
+    .sort();
+  assert.deepEqual(flagged, [
+    'lestnitsa', 'podokonnik', 'stoleshnitsa_kuhnya', 'stoleshnitsa_vannaya', 'stupeni'
+  ]);
+});
+
+test('supportsEdgeWork is absent (falsy) on panno/pol/stena/fasad', () => {
+  ['panno', 'pol', 'stena', 'fasad'].forEach(key => {
+    assert.equal(ProductTypes.PRODUCTS[key].supportsEdgeWork, undefined);
+  });
+});
+
+test('hasAdditionalWork returns false for a product with no additionalWorks object', () => {
+  assert.equal(ProductTypes.hasAdditionalWork(ProductTypes.PRODUCTS.pol, 'sinkCutout'), false);
+  assert.equal(ProductTypes.hasAdditionalWork(ProductTypes.PRODUCTS.lestnitsa, 'island'), false);
+});
+
+test('hasAdditionalWork returns false for an unknown capability key on a product that does have additionalWorks', () => {
+  assert.equal(ProductTypes.hasAdditionalWork(ProductTypes.PRODUCTS.stoleshnitsa_kuhnya, 'nonexistentCapability'), false);
+});
+
+test('hasAdditionalWork returns false when product itself is null or undefined', () => {
+  assert.equal(ProductTypes.hasAdditionalWork(null, 'island'), false);
+  assert.equal(ProductTypes.hasAdditionalWork(undefined, 'island'), false);
+});
+
+test('hasAdditionalWork matches the full 9-product x 8-capability availability matrix', () => {
+  const ALL_FALSE = {
+    sinkCutout: false, cooktopCutout: false, holes: false,
+    curb: false, backsplash: false, wallPanel: false,
+    island: false, barCounter: false
+  };
+  const expectedByProduct = {
+    lestnitsa: ALL_FALSE,
+    panno: ALL_FALSE,
+    podokonnik: ALL_FALSE,
+    pol: ALL_FALSE,
+    stena: ALL_FALSE,
+    fasad: ALL_FALSE,
+    stoleshnitsa_vannaya: {
+      sinkCutout: true, cooktopCutout: false, holes: true,
+      curb: true, backsplash: true, wallPanel: true,
+      island: false, barCounter: false
+    },
+    stoleshnitsa_kuhnya: {
+      sinkCutout: true, cooktopCutout: true, holes: true,
+      curb: true, backsplash: true, wallPanel: true,
+      island: true, barCounter: true
+    },
+    stupeni: ALL_FALSE
+  };
+
+  Object.entries(expectedByProduct).forEach(([productKey, expectedCapabilities]) => {
+    const product = ProductTypes.PRODUCTS[productKey];
+    Object.entries(expectedCapabilities).forEach(([capability, expected]) => {
+      assert.equal(
+        ProductTypes.hasAdditionalWork(product, capability),
+        expected,
+        `${productKey}.${capability} should be ${expected}`
+      );
+    });
+  });
+});

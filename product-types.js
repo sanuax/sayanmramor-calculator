@@ -7,20 +7,50 @@
 })(typeof window !== 'undefined' ? window : globalThis, function () {
 
   const PRODUCTS = {
-    lestnitsa:            { label: "Лестницы", type: 'B' },
+    lestnitsa:            { label: "Лестницы", type: 'B', supportsEdgeWork: true },
     panno:                { label: "Панно", type: 'B' },
-    podokonnik:           { label: "Подоконники", type: 'A' },
+    podokonnik:           { label: "Подоконники", type: 'A', supportsEdgeWork: true },
     pol:                  { label: "Полы", type: 'B' },
     stena:                { label: "Стены", type: 'B' },
     fasad:                { label: "Фасады", type: 'B' },
-    stoleshnitsa_vannaya: { label: "Столешницы в ванную", type: 'A', supportsCountertopExtras: true },
+    // additionalWorks: тонкая доступность конкретных доп. работ столешницы --
+    // отсутствие объекта (как у всех остальных изделий выше/ниже) через
+    // hasAdditionalWork() всегда безопасно читается как "всё false", так что
+    // ни одно изделие без него не может случайно получить доступную работу.
+    stoleshnitsa_vannaya: {
+      label: "Столешницы в ванную", type: 'A',
+      supportsEdgeWork: true,
+      supportsCountertopExtras: true,
+      additionalWorks: {
+        sinkCutout: true, cooktopCutout: false, holes: true,
+        curb: true, backsplash: true, wallPanel: true,
+        island: false, barCounter: false
+      }
+    },
     // TODO: кухонные столешницы нуждаются в отдельной фильтрации камня по
     // устойчивости к мех./хим. воздействиям (нож, вино и т.д.) — не весь
     // камень из общего каталога годится для кухни. Фильтрации пока нет,
     // добавим отдельным шагом, когда определим критерий классификации камня.
-    stoleshnitsa_kuhnya:  { label: "Столешницы на кухню", type: 'A', supportsCountertopExtras: true },
-    stupeni:              { label: "Ступени", type: 'A' }
+    stoleshnitsa_kuhnya:  {
+      label: "Столешницы на кухню", type: 'A',
+      supportsEdgeWork: true,
+      supportsCountertopExtras: true,
+      additionalWorks: {
+        sinkCutout: true, cooktopCutout: true, holes: true,
+        curb: true, backsplash: true, wallPanel: true,
+        island: true, barCounter: true
+      }
+    },
+    stupeni:              { label: "Ступени", type: 'A', supportsEdgeWork: true }
   };
+
+  // Единая точка чтения additionalWorks -- отсутствие объекта или неизвестный
+  // ключ всегда безопасно дают false, а не undefined/throw. Используется и
+  // тестами, и sayanmramor-calculator.html, чтобы это правило не могло
+  // разойтись между местами, где оно проверяется.
+  function hasAdditionalWork(product, capability) {
+    return !!(product && product.additionalWorks && product.additionalWorks[capability]);
+  }
 
   const SAW_MARGIN_CM = 4;       // запас на распил с каждого края
   const AREA_WASTE_FACTOR = 1.3; // на подрезку/подгонку швов и брак (тип B)
@@ -120,7 +150,7 @@
   };
 
   return {
-    PRODUCTS, SAW_MARGIN_CM, AREA_WASTE_FACTOR,
+    PRODUCTS, hasAdditionalWork, SAW_MARGIN_CM, AREA_WASTE_FACTOR,
     WORK_RATES, MISC_FLAT_SUM, MISC_RATE_PER_M2, COMPLEX_SHAPE_MULTIPLIER,
     COUNTERTOP_EXTRAS_RATES
   };
