@@ -6,6 +6,12 @@
   }
 })(typeof window !== 'undefined' ? window : globalThis, function () {
 
+  // The 50 rows below exist purely as UI/data structure for the subcategory
+  // selector (product -> shape/variant dropdown); this is deliberately
+  // display-only per the design spec, and no pricing code reads from this
+  // array yet. Filling in a `rate` here has no effect on the displayed
+  // price until a future task wires subcategory rates into
+  // computeWorkAndTotal/WORK_RATES.
   const PRODUCT_SUBCATEGORIES = [
     { id: 'STAIR-01', categoryLabel: 'Лестницы', shape: 'Прямая', variant: 'Ступени', unit: 'м²', rate: null, currency: null },
     { id: 'STAIR-02', categoryLabel: 'Лестницы', shape: 'Прямая', variant: 'Ступени + подступенки', unit: 'м²', rate: null, currency: null },
@@ -80,10 +86,27 @@
     { id: 'EDGE-04', group: 'Кромка', operation: 'Скругление', variant: 'R / профиль', unit: 'м.п.', rate: null, currency: null },
     { id: 'EDGE-05', group: 'Кромка', operation: 'Скос', variant: 'Фаска / скос', unit: 'м.п.', rate: null, currency: null },
     { id: 'EDGE-06', group: 'Кромка', operation: 'Подгиб камнем', variant: 'Столешница / фасад', unit: 'м.п.', rate: null, currency: null },
+    // NOTE: EXTRA-01's `.rate` is NOT read by any code. The «Бортик» UI
+    // input in sayanmramor-calculator.html is wired to the older, separate
+    // COUNTERTOP_EXTRAS_RATES.bortikRatePerM field in product-types.js
+    // instead. Setting a rate here has no effect on the displayed price.
     { id: 'EXTRA-01', group: 'Дополнительно', operation: 'Бортик', variant: 'Стандартный', unit: 'м.п.', rate: null, currency: null },
+    // NOTE: EXTRA-02's `.rate` is NOT read by any code. The «Фартук» UI
+    // input in sayanmramor-calculator.html is wired to the older, separate
+    // COUNTERTOP_EXTRAS_RATES.fartukRatePerM2 field in product-types.js
+    // instead. Setting a rate here has no effect on the displayed price.
     { id: 'EXTRA-02', group: 'Дополнительно', operation: 'Фартук', variant: 'Стандартный', unit: 'м²', rate: null, currency: null },
+    // EXTRA-03, unlike EXTRA-01/02/04 above/below, IS read via
+    // getAdditionalWorkRate() as part of the extraLineItems mechanism.
     { id: 'EXTRA-03', group: 'Дополнительно', operation: 'Стеновая панель', variant: 'Стандартная', unit: 'м²', rate: null, currency: null },
+    // NOTE: EXTRA-04's `.rate` is NOT read by any code. The «Остров
+    // прямоугольный» UI input in sayanmramor-calculator.html is wired to
+    // the older, separate COUNTERTOP_EXTRAS_RATES.ostrovRatePerM2 field in
+    // product-types.js instead. Setting a rate here has no effect on the
+    // displayed price.
     { id: 'EXTRA-04', group: 'Дополнительно', operation: 'Остров', variant: 'Прямоугольный', unit: 'м²', rate: null, currency: null },
+    // EXTRA-05, unlike EXTRA-04 above, IS read via getAdditionalWorkRate()
+    // as part of the extraLineItems mechanism.
     { id: 'EXTRA-05', group: 'Дополнительно', operation: 'Остров', variant: 'Фигурный / радиусный', unit: 'м²', rate: null, currency: null },
     { id: 'EXTRA-06', group: 'Дополнительно', operation: 'Барная стойка', variant: 'Стандартная', unit: 'м²', rate: null, currency: null },
     { id: 'EXTRA-07', group: 'Дополнительно', operation: 'Барная стойка', variant: 'Сложная / радиусная', unit: 'м²', rate: null, currency: null },
