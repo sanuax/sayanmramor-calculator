@@ -132,6 +132,7 @@ testable with `node:test` like the rest of the project's modules.
   shape: 'straight',            // only value implemented now; 'lshape' reserved
   widthM, lengthM,               // copied from state.dimensions
   visualThicknessM: 0.04,        // see "Thickness" below — NEVER state.dimensions.thicknessM
+  cameraPreset: 'top',           // see "Per-product-type default camera preset" below
   edge: { type, lengthMm },      // passed through from state.edge
   sink: null | { type, placement: { xMm, yMm, source: 'fallback' | 'real' } },
   cooktop: null | { placement: {...} },
@@ -228,6 +229,9 @@ later.
   `setView('top' | 'front' | 'side' | 'iso')`, `dispose()`. Owns
   renderer/camera/`OrbitControls`/scene graph; updates existing meshes
   in place where possible instead of rebuilding the scene on every call.
+- **`visualizer/camera-preset-tracker.js`** — `createCameraPresetTracker()`,
+  pure, no Three.js import, unit-testable. See "Per-product-type default
+  camera preset" below.
 - **`vendor/three/three.module.js`**, **`vendor/three/OrbitControls.js`** —
   Three.js vendored locally into the repo (confirmed: matches this
   project's existing convention of shipping all its own JS locally with no
@@ -264,6 +268,88 @@ for the four view presets (top/front/side/iso), which just animate the
 camera to a fixed position looking at the model's bounding-box center.
 Touch support comes from `OrbitControls` itself (it already handles
 touch gestures).
+
+## Per-product-type default camera preset (`cameraPreset`)
+
+The four manual view-preset buttons (top/front/side/iso) stay exactly as
+they are — this section is about what the camera shows **before** the
+client touches anything, and what "Сбросить вид" returns to. Different
+product types read best from different starting angles: a floor wants a
+near-top-down view to read its layout, a windowsill wants a frontal view,
+a staircase wants an angle that actually shows the steps. This must be
+**configuration on the product type, not a chain of `if`s inside
+`ThreeScene`** — the same declarative pattern already used for
+`supportsEdgeWork`/`additionalWorks`.
+
+**Where it lives:** a new, non-pricing field on each entry of
+`PRODUCTS` in `product-types.js` — `cameraPreset: '<name>'`, naming one of
+the entries in `visualizer/constants.js`'s `CAMERA_PRESETS` registry (the
+same registry the four manual buttons already read from). This is
+metadata about the product, exactly like `supportsEdgeWork`, so it belongs
+where the rest of that metadata lives — a separate "3D-only product table"
+would be exactly the kind of parallel product-definition system this
+design already rules out. It is not a pricing field, so it does not
+conflict with "pricing-relevant fields of `product-types.js` are
+untouched."
+
+`CAMERA_PRESETS` gains four new named directions alongside the existing
+`top`/`front`/`side`/`iso` (all first-pass approximations of the
+requested angles, expected to need visual tuning once seen rendered, not
+final numbers):
+
+| Name | Direction (first pass) | Used as default for |
+|---|---|---|
+| `top` (existing) | `[0, 1, 0.0001]` | Полы |
+| `front` (existing) | `[0, 0.3, 1]` | Стены, Фасады, Панно |
+| `iso-high` | `[1, 1.1, 1]` | Столешницы в ванную — isometric, a bit more top-down than plain `iso` |
+| `iso-eye-level` | `[1, 0.6, 1]` | Столешницы на кухню — isometric, closer to a standing person's eye line |
+| `front-high` | `[0, 0.6, 1]` | Подоконники — frontal, a bit more top-down than plain `front` |
+| `iso-side-high` | `[1.3, 0.7, 0.4]` | Лестницы, Ступени — angled from the side to read step geometry |
+
+**Data flow (declarative end to end):**
+```
+PRODUCTS[key].cameraPreset (product-types.js)
+  → ConstructorState.product.cameraPreset (constructor-state.js, passthrough)
+  → ProductGeometryModel.cameraPreset (geometry-model.js, defaults to 'iso' if the product defines none)
+  → ThreeScene.update() applies it as the initial view on the first mesh, and
+    records it as the "Reset View" default via camera-preset-tracker.js
+```
+
+**Reset View semantics — must be genuinely declarative, not "last viewed":**
+"Сбросить вид" always returns to the *current product's* default
+`cameraPreset`, never to whatever the user last manually navigated away
+from. Concretely: Полы defaults to `top`; the client manually clicks
+"Изометрия"; clicking "Сбросить вид" must go back to `top`, not stay on
+`iso`. If the client then switches to a different product type, that
+product's own `cameraPreset` immediately becomes the new Reset target.
+
+This is implemented with `visualizer/camera-preset-tracker.js`, a tiny
+module deliberately kept free of any Three.js import so it's unit-testable
+without a WebGL context — the actual property being guaranteed (manual
+view changes never affect what Reset returns to) is a pure state-machine
+question, independent of how the camera itself is drawn:
+
+```js
+const tracker = createCameraPresetTracker();     // defaultPreset = 'iso'
+tracker.setDefaultFromGeometryModel(geometryModel); // called ONLY from ThreeScene.update()
+tracker.getDefaultPreset();                       // called ONLY from ThreeScene.resetView()
+```
+
+`ThreeScene.setView(name)` (driven by the four manual buttons) never calls
+`setDefaultFromGeometryModel` — by construction, no code path lets a
+manual click change the stored default. `update()` calls
+`setDefaultFromGeometryModel(geometryModel)` on *every* call (not just the
+first), so switching products mid-session correctly updates the Reset
+target even without a page reload.
+
+**Explicitly deferred (not part of this addition):** geometry orientation
+per product type. Today `buildGeometryModel()` always produces the same
+flat, horizontal box shape regardless of product — a "Стена"/"Фасад"/
+"Панно" gets a front-facing camera, but the box itself isn't yet modeled
+as a vertical surface. Making the geometry itself orientation-aware (and
+eventually shape-aware, e.g. actual stair-step geometry for
+Лестницы/Ступени) is separate, larger follow-up work, tracked in
+"Explicitly out of scope" below.
 
 ## Resize / disposal / robustness
 
@@ -319,3 +405,7 @@ cooktop, edge rendering, backsplash, curb, island, bar counter, bookmatch.
 - Bookmatch UI and its actual UV/texture-mirroring implementation.
 - Real seamless stone textures (`textureUrl` wiring is ready; sourcing/
   producing the actual tileable images is separate work).
+- Geometry orientation/shape per product type (vertical-surface geometry
+  for Стены/Фасады/Панно, actual stair-step geometry for Лестницы/Ступени).
+  The per-product default camera angle is in place; the box shape itself
+  is still the same flat horizontal slab for every product.
