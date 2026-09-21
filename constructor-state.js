@@ -64,6 +64,11 @@
     const d = doc;
     const cap = (name) => !!(product && hasAdditionalWork(product, name));
 
+    // Every countertop-extras capability read below assumes
+    // product.supportsCountertopExtras is true whenever product.additionalWorks
+    // is defined -- enforced by a test in tests/product-types.test.js. If that
+    // ever stops holding, calculate()'s UI-visibility gate (supportsCountertopExtras)
+    // and this file's pricing gate (per-capability hasAdditionalWork) would disagree.
     const capabilities = product ? {
       supportsEdgeWork: !!product.supportsEdgeWork,
       supportsCountertopExtras: !!product.supportsCountertopExtras,

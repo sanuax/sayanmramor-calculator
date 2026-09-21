@@ -54,6 +54,15 @@ test('supportsCountertopExtras is true on exactly stoleshnitsa_kuhnya and stoles
   assert.deepEqual(flagged, ['stoleshnitsa_kuhnya', 'stoleshnitsa_vannaya']);
 });
 
+test('every product with additionalWorks also has supportsCountertopExtras (constructor-state.js relies on this)', () => {
+  Object.entries(ProductTypes.PRODUCTS).forEach(([key, product]) => {
+    if (product.additionalWorks) {
+      assert.equal(product.supportsCountertopExtras, true,
+        `${key} has additionalWorks but not supportsCountertopExtras -- constructor-state.js would price its extras while calculate() hides the UI block`);
+    }
+  });
+});
+
 test('supportsEdgeWork is true on exactly the 5 products where edge finishing is standard practice', () => {
   const flagged = Object.entries(ProductTypes.PRODUCTS)
     .filter(([, product]) => product.supportsEdgeWork === true)

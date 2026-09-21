@@ -63,6 +63,7 @@ function resize() {
 }
 
 function update(geometryModel, materialDescriptor) {
+  const isFirstModel = !countertopMesh;
   if (countertopMesh) {
     scene.remove(countertopMesh);
     countertopMesh.geometry.dispose();
@@ -71,10 +72,12 @@ function update(geometryModel, materialDescriptor) {
   countertopMesh = buildMesh(geometryModel, materialDescriptor);
   scene.add(countertopMesh);
 
-  const distance = frameCameraOnModel(geometryModel);
   controls.target.set(0, 0, 0);
-  if (camera.position.length() < 0.01) camera.position.set(distance, distance * 0.8, distance);
-  controls.update();
+  if (isFirstModel) {
+    resetView();
+  } else {
+    controls.update();
+  }
 }
 
 function setView(presetName) {
