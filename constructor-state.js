@@ -72,7 +72,12 @@
       island: cap('island'), barCounter: cap('barCounter'),
     } : null;
 
-    const edgeLineItems = product && product.supportsEdgeWork ? readEdgeLineItems(d) : [];
+    // Unconditional, matching sayanmramor-calculator.html's calculate(): the
+    // real app's `const edgeResult = readLengthLineItems(EDGE_LINE_ITEMS);`
+    // has no capability gate (unlike the countertop-extras block below it),
+    // so a stale edge value left over from a previously selected product is
+    // still priced today. See task-4-fix-report.md for the ruling on this.
+    const edgeLineItems = readEdgeLineItems(d);
     const sinkCounts = readSinkCounts(d, capabilities && capabilities.sinkCutout);
     const cooktopCount = capabilities && capabilities.cooktopCutout ? numFromField(d, 'cut-cooktop') : 0;
     const holeCounts = capabilities && capabilities.holes

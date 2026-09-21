@@ -70,6 +70,19 @@ test('readConstructorState.edgeLineItems keeps EVERY non-zero legacy field, not 
   ]);
 });
 
+test('readConstructorState reads edge-length fields unconditionally, even for a product without supportsEdgeWork (matches sayanmramor-calculator.html\'s current unconditional read)', () => {
+  const doc = createFakeDoc({
+    width: { value: '1000' }, length: { value: '600' },
+    'edge-straight': { value: '500' }, // stale value left over from a previously selected product
+  });
+  const state = ConstructorState.readConstructorState({
+    doc, selectedProductKey: 'pol', product: PRODUCTS.pol, stone: null, hasAdditionalWork,
+  });
+  assert.equal(PRODUCTS.pol.supportsEdgeWork, undefined); // sanity: pol genuinely lacks the capability
+  assert.deepEqual(state.edgeLineItems, [{ rateId: 'EDGE-01', type: 'straight', lengthMm: 500 }]);
+  assert.deepEqual(state.edge, { type: 'straight', lengthMm: 500 });
+});
+
 test('readConstructorState.additionalWorks.sink is derived by the same fixed-priority rule (overlay > undermount > integrated)', () => {
   const doc = createFakeDoc({
     width: { value: '1000' }, length: { value: '600' },

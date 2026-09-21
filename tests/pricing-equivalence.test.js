@@ -107,6 +107,11 @@ const SCENARIOS = [
     productKey: 'pol',
     values: { width: { value: '3000' }, length: { value: '2000' } },
   },
+  {
+    name: 'floor: no supportsEdgeWork capability, but a stale edge field is still priced (real app has no gate on edge fields)',
+    productKey: 'pol',
+    values: { width: { value: '3000' }, length: { value: '2000' }, 'edge-straight': { value: '500' } },
+  },
 ];
 
 SCENARIOS.forEach(({ name, productKey, values }) => {
