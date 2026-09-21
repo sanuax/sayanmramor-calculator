@@ -133,5 +133,50 @@
     };
   }
 
-  return { readConstructorState };
+  function buildPricingInputs(state, config) {
+    const { productRates, miscFlatSum, miscRatePerM2, complexShapeMultiplier, countertopExtrasRates, getAdditionalWorkRate } = config;
+
+    const rates = {
+      fabricationRatePerM2: productRates.fabricationRatePerM2,
+      installationRatePerM2: productRates.installationRatePerM2,
+      polishRatePerM2: productRates.polishRatePerM2,
+      miscFlatSum, miscRatePerM2, complexShapeMultiplier,
+      bortikRatePerM: countertopExtrasRates.bortikRatePerM,
+      fartukRatePerM2: countertopExtrasRates.fartukRatePerM2,
+      ostrovRatePerM2: countertopExtrasRates.ostrovRatePerM2,
+    };
+
+    let extraLineItems = state.edgeLineItems.map(item => ({
+      rate: getAdditionalWorkRate(item.rateId), quantity: mmToM(item.lengthMm),
+    }));
+
+    const QUANTITY_ITEMS = [
+      ['CUT-01', state.sinkCounts.overlay], ['CUT-02', state.sinkCounts.undermount], ['CUT-03', state.sinkCounts.integrated],
+      ['CUT-04', state.cooktopCount],
+      ['CUT-05', state.holeCounts.mixer], ['CUT-06', state.holeCounts.socket], ['CUT-07', state.holeCounts.dispenser],
+    ];
+    QUANTITY_ITEMS.forEach(([rateId, qty]) => {
+      if (qty > 0) extraLineItems.push({ rate: getAdditionalWorkRate(rateId), quantity: qty });
+    });
+
+    const AREA_ITEMS = [
+      ['EXTRA-05', state.island.figured.widthM * state.island.figured.lengthM],
+      ['EXTRA-03', state.wallPanel.widthM * state.wallPanel.lengthM],
+      ['EXTRA-06', state.barCounter.standard.widthM * state.barCounter.standard.lengthM],
+      ['EXTRA-07', state.barCounter.complex.widthM * state.barCounter.complex.lengthM],
+    ];
+    AREA_ITEMS.forEach(([rateId, areaM2]) => {
+      if (areaM2 > 0) extraLineItems.push({ rate: getAdditionalWorkRate(rateId), quantity: areaM2 });
+    });
+
+    const extraDimensions = {
+      bortikLengthM: state.curbLengthM,
+      fartukAreaM2: state.backsplash.widthM * state.backsplash.lengthM,
+      ostrovAreaM2: state.island.standard.widthM * state.island.standard.lengthM,
+    };
+
+    return { rates, extraLineItems, extraDimensions };
+  }
+
+  return { readConstructorState, buildPricingInputs };
 });

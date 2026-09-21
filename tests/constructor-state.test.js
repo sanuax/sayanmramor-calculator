@@ -115,3 +115,70 @@ test('readConstructorState.product is null when no product is selected', () => {
   });
   assert.equal(state.product, null);
 });
+
+const RateCatalog = require('../rate-catalog.js');
+
+function baseRatesConfig(productKey) {
+  return {
+    productRates: ProductTypes.WORK_RATES[productKey],
+    miscFlatSum: ProductTypes.MISC_FLAT_SUM,
+    miscRatePerM2: ProductTypes.MISC_RATE_PER_M2,
+    complexShapeMultiplier: ProductTypes.COMPLEX_SHAPE_MULTIPLIER,
+    countertopExtrasRates: ProductTypes.COUNTERTOP_EXTRAS_RATES,
+    getAdditionalWorkRate: RateCatalog.getAdditionalWorkRate,
+  };
+}
+
+test('buildPricingInputs assembles one extraLineItems entry per edge field, using rate-catalog rates', () => {
+  const doc = createFakeDoc({
+    width: { value: '1000' }, length: { value: '600' },
+    'edge-straight': { value: '100' }, 'edge-chamfer': { value: '50' },
+  });
+  const state = ConstructorState.readConstructorState({
+    doc, selectedProductKey: 'stoleshnitsa_kuhnya', product: PRODUCTS.stoleshnitsa_kuhnya, stone: null, hasAdditionalWork,
+  });
+  const { extraLineItems } = ConstructorState.buildPricingInputs(state, baseRatesConfig('stoleshnitsa_kuhnya'));
+  assert.equal(extraLineItems.length, 2);
+  assert.equal(extraLineItems[0].rate, RateCatalog.getAdditionalWorkRate('EDGE-01'));
+  assert.equal(extraLineItems[0].quantity, 0.1); // 100mm -> 0.1m
+  assert.equal(extraLineItems[1].rate, RateCatalog.getAdditionalWorkRate('EDGE-05'));
+  assert.equal(extraLineItems[1].quantity, 0.05);
+});
+
+test('buildPricingInputs sums BOTH sink counts as independent line items when more than one is non-zero (pricing must not collapse to one type)', () => {
+  const doc = createFakeDoc({
+    width: { value: '1000' }, length: { value: '600' },
+    'cut-sink-overlay': { value: '1' }, 'cut-sink-undermount': { value: '2' },
+  });
+  const state = ConstructorState.readConstructorState({
+    doc, selectedProductKey: 'stoleshnitsa_kuhnya', product: PRODUCTS.stoleshnitsa_kuhnya, stone: null, hasAdditionalWork,
+  });
+  const { extraLineItems } = ConstructorState.buildPricingInputs(state, baseRatesConfig('stoleshnitsa_kuhnya'));
+  const cutItems = extraLineItems.filter(i => i.rate === RateCatalog.getAdditionalWorkRate('CUT-01') || i.rate === RateCatalog.getAdditionalWorkRate('CUT-02'));
+  assert.equal(cutItems.length, 2);
+});
+
+test('buildPricingInputs.extraDimensions carries bortik/fartuk/ostrov, zero when capability absent', () => {
+  const doc = createFakeDoc({
+    width: { value: '1000' }, length: { value: '600' },
+    'extra-bortik': { value: '500' },
+    'extra-fartuk-width': { value: '600' }, 'extra-fartuk-length': { value: '2000' },
+  });
+  const state = ConstructorState.readConstructorState({
+    doc, selectedProductKey: 'stoleshnitsa_kuhnya', product: PRODUCTS.stoleshnitsa_kuhnya, stone: null, hasAdditionalWork,
+  });
+  const { extraDimensions } = ConstructorState.buildPricingInputs(state, baseRatesConfig('stoleshnitsa_kuhnya'));
+  assert.equal(extraDimensions.bortikLengthM, 0.5);
+  assert.ok(Math.abs(extraDimensions.fartukAreaM2 - 1.2) < 1e-9);
+  assert.equal(extraDimensions.ostrovAreaM2, 0);
+});
+
+test('buildPricingInputs.rates carries the product\'s own fabrication/installation/polish rates', () => {
+  const doc = createFakeDoc({ width: { value: '1000' }, length: { value: '600' } });
+  const state = ConstructorState.readConstructorState({
+    doc, selectedProductKey: 'pol', product: PRODUCTS.pol, stone: null, hasAdditionalWork,
+  });
+  const { rates } = ConstructorState.buildPricingInputs(state, baseRatesConfig('pol'));
+  assert.equal(rates.fabricationRatePerM2, ProductTypes.WORK_RATES.pol.fabricationRatePerM2);
+  assert.equal(rates.installationRatePerM2, ProductTypes.WORK_RATES.pol.installationRatePerM2);
+});
