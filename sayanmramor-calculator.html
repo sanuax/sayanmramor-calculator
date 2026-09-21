@@ -57,40 +57,61 @@
     max-width: 520px;
     line-height: 1.5;
   }
-  .card {
-    background: #fff;
-    border-radius: 4px;
+  /* Общая композиция V2: последовательный вертикальный конструктор
+     (.configurator -> .step), а не трёхколоночная форма. Перенесено как
+     принцип из согласованного V2-концепта
+     (https://claude.ai/artifact/8fkDjjV6vDdwZypMQwN7zK) -- сам V2 не имел
+     ни result-panel, ни 3D, поэтому .step/.step-head перенесены буквально,
+     а .summary-block (итоговый блок) спроектирован новый, в тех же токенах. */
+  .configurator { max-width: 640px; margin: 0 auto; }
+  .step { margin-bottom: 48px; }
+  .step:last-child { margin-bottom: 0; }
+  .step-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+  .step-num {
+    font-size: 12px; font-weight: 700; color: var(--muted);
+    border: 1px solid var(--line); border-radius: 999px;
+    width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; flex: none;
+  }
+  .step-title { font-size: 16px; font-weight: 700; margin: 0; color: var(--ink); }
+  .step-sub { color: var(--muted); font-size: 13px; margin: 0 0 18px; padding-left: 30px; line-height: 1.5; }
+  .field { margin-bottom: 20px; }
+  /* .step-title (h2) is now the visible heading for each section -- these
+     <label>s stay in the DOM purely for for=/aria-labelledby associations
+     (screen readers), so they must not visibly duplicate the step title. */
+  .visually-hidden-label {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+  }
+
+  /* Итоговый блок "Ваша столешница" -- тёмный акцентный блок внизу всей
+     композиции (не боковая колонка). Тот же оранжевый accent, что и везде
+     (#ff5a1f/#ff7a3d уже использовались в .cta-btn/.result-price). */
+  .summary-block {
+    background: #1a1a1a; color: #fff;
+    border-radius: 12px;
     padding: 32px;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 40px;
+    margin-top: 56px;
   }
-  @media (max-width: 700px) {
-    .card { grid-template-columns: 1fr; }
+  .summary-title {
+    font-size: 20px; font-weight: 700; margin: 0 0 24px;
+    text-align: center; letter-spacing: -0.2px;
   }
-  .viewer-panel { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 8px; }
+  .summary-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 32px; align-items: start; }
+  .summary-info { display: flex; flex-direction: column; justify-content: space-between; }
+  @media (max-width: 760px) {
+    .summary-grid { grid-template-columns: 1fr; }
+  }
+
+  .viewer-panel { display: flex; flex-direction: column; gap: 12px; }
   .viewer-panel[hidden] { display: none; }
-  .viewer-canvas-wrap { width: 100%; aspect-ratio: 4 / 3; background: #eee; border-radius: 4px; overflow: hidden; }
+  .viewer-canvas-wrap { width: 100%; aspect-ratio: 4 / 3; background: #2a2a2a; border-radius: 8px; overflow: hidden; }
   .viewer-canvas-wrap canvas { width: 100%; height: 100%; display: block; touch-action: none; }
   .viewer-controls { display: flex; gap: 6px; flex-wrap: wrap; }
   .viewer-controls button {
-    padding: 6px 12px; border: 1px solid #ddd; border-radius: 3px; background: #fafafa;
+    padding: 6px 12px; border: 1px solid #444; border-radius: 3px; background: #2a2a2a; color: #ddd;
     font-size: 12px; cursor: pointer;
   }
-  .viewer-controls button:hover { border-color: #bbb; }
-
-  /* Desktop: form / result / 3D side by side, 3D on the right. */
-  @media (min-width: 900px) {
-    .card { grid-template-columns: 1fr 1fr 1fr; }
-    .viewer-panel { grid-column: 3; grid-row: 1; order: 3; }
-  }
-  /* Mobile (existing single-column breakpoint at 700px): 3D goes near the
-     top, above the form, per spec. */
-  @media (max-width: 700px) {
-    .card { grid-template-columns: 1fr; }
-    .viewer-panel { order: -1; }
-  }
-  .field { margin-bottom: 20px; }
+  .viewer-controls button:hover { border-color: #ff5a1f; color: #fff; }
   label {
     display: block;
     font-size: 13px;
@@ -201,6 +222,13 @@
   .field-unit .unit-label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
   .field-row { display: flex; gap: 10px; flex-wrap: wrap; }
   .field-row .field-unit { flex: 1 1 140px; }
+
+  /* Диаграмма размеров: перенесено буквально из согласованного
+     V2-конструктора (https://claude.ai/artifact/8fkDjjV6vDdwZypMQwN7zK). */
+  .dim-wrap { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px 16px; }
+  .dim-diagram { display: flex; justify-content: center; margin-bottom: 16px; }
+  .dim-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; max-width: 320px; margin: 0 auto; }
+  .dim-note { font-size: 11.5px; color: var(--muted); text-align: center; margin-top: 12px; }
 
   /* The picker's trigger deliberately keeps the same silhouette as the <select>
      and number inputs beside it -- it is one more field in the same form, and
@@ -514,15 +542,6 @@
     .stone-card:active { transform: none; }
   }
 
-  .result-panel {
-    background: #1a1a1a;
-    color: #fff;
-    border-radius: 4px;
-    padding: 28px;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-  }
   .result-label {
     font-size: 12px;
     text-transform: uppercase;
@@ -610,21 +629,29 @@
   <h1>Рассчитайте стоимость изделия</h1>
   <p class="subtitle">Выберите тип изделия, материал и размеры — получите ориентировочную стоимость за несколько секунд. Точную цену рассчитает наш специалист после уточнения деталей проекта.</p>
 
-  <div class="card">
-    <div class="form-side">
+  <div class="configurator">
+    <section class="step">
+      <div class="step-head"><span class="step-num">1</span><h2 class="step-title">Тип изделия</h2></div>
       <div class="field">
-        <label id="productLabel">Тип изделия</label>
+        <label id="productLabel" class="visually-hidden-label">Тип изделия</label>
         <div class="product-grid" id="productGrid" role="radiogroup" aria-labelledby="productLabel"></div>
       </div>
+    </section>
 
-      <div class="field" id="productSubcategoryField" style="display:none">
-        <label for="productSubcategory">Вариант исполнения</label>
+    <section class="step" id="productSubcategoryField" style="display:none">
+      <div class="step-head"><span class="step-num">2</span><h2 class="step-title">Вариант исполнения</h2></div>
+      <div class="field">
+        <label for="productSubcategory" class="visually-hidden-label">Вариант исполнения</label>
         <select id="productSubcategory"></select>
         <input type="number" id="subcategoryQty" placeholder="Количество, шт." min="0" step="1" style="margin-top:8px;display:none">
       </div>
+    </section>
 
+    <section class="step">
+      <div class="step-head"><span class="step-num">3</span><h2 class="step-title">Материал</h2></div>
+      <p class="step-sub">Выберите камень из каталога компании.</p>
       <div class="field">
-        <label id="materialLabel" for="materialField">Материал</label>
+        <label id="materialLabel" for="materialField" class="visually-hidden-label">Материал</label>
         <button type="button" class="material-field" id="materialField"
                 aria-labelledby="materialLabel materialFieldText" aria-haspopup="dialog" disabled>
           <span class="material-field-thumb" id="materialFieldThumb" hidden><img alt=""></span>
@@ -632,18 +659,47 @@
           <span class="material-field-chevron" aria-hidden="true">▾</span>
         </button>
       </div>
+    </section>
 
+    <section class="step">
+      <div class="step-head"><span class="step-num">4</span><h2 class="step-title">Размеры</h2></div>
+      <p class="step-sub">Схема реагирует на введённые размеры.</p>
       <div class="field">
-        <label>Размеры, мм</label>
-        <div class="dims">
-          <input type="number" id="width" placeholder="Ширина, мм" min="0" step="1">
-          <input type="number" id="length" placeholder="Длина, мм" min="0" step="1">
+        <div class="dim-wrap">
+          <div class="dim-diagram">
+            <svg id="dimSvg" viewBox="0 0 260 190" width="260" height="190" role="img" aria-label="Схема изделия с размерами длины и ширины">
+              <rect id="dimRect" x="60" y="20" width="140" height="90" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5" rx="3"></rect>
+              <line x1="60" y1="128" x2="200" y2="128" stroke="var(--muted)" stroke-width="1.2" marker-start="url(#dimArrowStart)" marker-end="url(#dimArrowEnd)"></line>
+              <text id="dimLengthLabel" x="130" y="146" text-anchor="middle" font-size="12" fill="var(--ink)" font-weight="700">Длина</text>
+              <line x1="20" y1="20" x2="20" y2="110" stroke="var(--muted)" stroke-width="1.2" marker-start="url(#dimArrowStart)" marker-end="url(#dimArrowEnd)"></line>
+              <text id="dimWidthLabel" x="20" y="130" text-anchor="middle" font-size="12" fill="var(--ink)" font-weight="700">Ширина</text>
+              <defs>
+                <marker id="dimArrowStart" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto-start-reverse">
+                  <path d="M0,1 L7,4 L0,7" fill="none" stroke="var(--muted)" stroke-width="1.4"></path>
+                </marker>
+                <marker id="dimArrowEnd" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+                  <path d="M0,1 L7,4 L0,7" fill="none" stroke="var(--muted)" stroke-width="1.4"></path>
+                </marker>
+              </defs>
+            </svg>
+          </div>
+          <div class="dim-fields">
+            <div class="field-unit"><span class="unit-label">Длина</span><input type="number" id="length" min="0" step="1" placeholder="2000"><span class="unit">мм</span></div>
+            <div class="field-unit"><span class="unit-label">Ширина</span><input type="number" id="width" min="0" step="1" placeholder="600"><span class="unit">мм</span></div>
+          </div>
+          <!-- Показывается только для lshape -- диаграмма не рисует крыло
+               (не придумываем новую геометрию), только явно оговаривает,
+               что это схема главного сегмента. -->
+          <div class="dim-note" id="dimShapeNote" hidden>Показан основной сегмент. Крыло указывается отдельно, ниже.</div>
         </div>
         <div class="error" id="dimError">Укажите ширину и длину больше нуля</div>
       </div>
+    </section>
 
-      <div class="field" id="shapeField" style="display:none">
-        <label id="shapeLabel">Форма</label>
+    <section class="step" id="shapeField" style="display:none">
+      <div class="step-head"><span class="step-num">5</span><h2 class="step-title">Форма</h2></div>
+      <div class="field">
+        <label id="shapeLabel" class="visually-hidden-label">Форма</label>
         <div class="card-grid" id="shapeCardGrid" role="radiogroup" aria-labelledby="shapeLabel"></div>
         <!-- Real select constructor-state.js reads (`#productShape`) -- kept
              exactly as before, hidden; the visible cards above drive it. -->
@@ -668,9 +724,13 @@
           <option value="right">Угол справа</option>
         </select>
       </div>
+    </section>
 
-      <div class="field" id="edgeWork" style="display:none">
-        <label id="edgeLabel">Кромка</label>
+    <section class="step" id="edgeWork" style="display:none">
+      <div class="step-head"><span class="step-num">6</span><h2 class="step-title">Кромка</h2></div>
+      <p class="step-sub">Один тип на всё изделие.</p>
+      <div class="field">
+        <label id="edgeLabel" class="visually-hidden-label">Кромка</label>
         <div class="card-grid" id="edgeCardGrid" role="radiogroup" aria-labelledby="edgeLabel"></div>
         <div class="reveal-rows">
           <div class="reveal-row" id="edgeRevealRow" style="visibility:hidden">
@@ -690,9 +750,11 @@
         <input type="number" id="edge-chamfer" hidden>
         <input type="number" id="edge-stonefold" hidden>
       </div>
+    </section>
 
-      <div class="field" id="countertopExtras" style="display:none">
-        <label>Дополнительные позиции</label>
+    <section class="step" id="countertopExtras" style="display:none">
+      <div class="step-head"><span class="step-num">7</span><h2 class="step-title">Дополнительные позиции</h2></div>
+      <div class="field">
 
         <div id="group-sink-cutout" style="display:none">
           <label style="margin-top:0">Вырезы под раковину</label>
@@ -758,7 +820,10 @@
           </div>
         </div>
       </div>
+    </section>
 
+    <section class="step">
+      <div class="step-head"><span class="step-num">8</span><h2 class="step-title">Опции</h2></div>
       <div class="checkboxes">
         <label class="checkbox-row">
           <input type="checkbox" id="opt-complex"> Сложная форма / фигурный рез
@@ -770,34 +835,41 @@
           <input type="checkbox" id="opt-install"> Монтаж на объекте
         </label>
       </div>
-    </div>
+    </section>
+  </div>
 
-    <div class="result-panel">
-      <div>
-        <div class="result-label">Ориентировочная стоимость</div>
-        <div class="result-price placeholder" id="priceOut">Выберите тип изделия, материал и размеры, чтобы увидеть расчёт</div>
-        <div class="warning-box" id="warningOut" style="display:none"></div>
-        <div class="result-breakdown" id="breakdown"></div>
-        <div class="remainder-line" id="remainderOut"></div>
-        <div class="info-block" id="infoBlock">Стоимость указана за весь слэб — остаток после раскроя бесплатно хранится на складе компании, клиент может использовать его для другого проекта или забрать себе.</div>
+  <div class="summary-block">
+    <h2 class="summary-title">Ваша столешница</h2>
+    <div class="summary-grid">
+      <div class="summary-3d">
+        <div class="viewer-panel" id="viewerPanel" hidden>
+          <div class="viewer-canvas-wrap">
+            <canvas id="viewerCanvas"></canvas>
+          </div>
+          <div class="viewer-controls">
+            <button type="button" data-view="top">Сверху</button>
+            <button type="button" data-view="front">Спереди</button>
+            <button type="button" data-view="side">Сбоку</button>
+            <button type="button" data-view="iso">Изометрия</button>
+            <button type="button" id="viewerReset">Сбросить вид</button>
+          </div>
+        </div>
       </div>
-      <div>
-        <button class="cta-btn" id="ctaBtn">Получить точный расчёт</button>
-        <div class="disclaimer" id="updatedAtOut"></div>
-        <div class="disclaimer">Расчёт ориентировочный. Финальная цена зависит от партии камня, сложности рисунка и логистики.</div>
-      </div>
-    </div>
 
-    <div class="viewer-panel" id="viewerPanel" hidden>
-      <div class="viewer-canvas-wrap">
-        <canvas id="viewerCanvas"></canvas>
-      </div>
-      <div class="viewer-controls">
-        <button type="button" data-view="top">Сверху</button>
-        <button type="button" data-view="front">Спереди</button>
-        <button type="button" data-view="side">Сбоку</button>
-        <button type="button" data-view="iso">Изометрия</button>
-        <button type="button" id="viewerReset">Сбросить вид</button>
+      <div class="summary-info">
+        <div>
+          <div class="result-label">Ориентировочная стоимость</div>
+          <div class="result-price placeholder" id="priceOut">Выберите тип изделия, материал и размеры, чтобы увидеть расчёт</div>
+          <div class="warning-box" id="warningOut" style="display:none"></div>
+          <div class="result-breakdown" id="breakdown"></div>
+          <div class="remainder-line" id="remainderOut"></div>
+          <div class="info-block" id="infoBlock">Стоимость указана за весь слэб — остаток после раскроя бесплатно хранится на складе компании, клиент может использовать его для другого проекта или забрать себе.</div>
+        </div>
+        <div>
+          <button class="cta-btn" id="ctaBtn">Получить точный расчёт</button>
+          <div class="disclaimer" id="updatedAtOut"></div>
+          <div class="disclaimer">Расчёт ориентировочный. Финальная цена зависит от партии камня, сложности рисунка и логистики.</div>
+        </div>
       </div>
     </div>
   </div>
@@ -941,6 +1013,26 @@
   const widthInput = document.getElementById('width');
   const lengthInput = document.getElementById('length');
   const dimError = document.getElementById('dimError');
+  // Диаграмма размеров -- перенесена буквально из V2 (тот же расчёт
+  // соотношения сторон прямоугольника на схеме), реагирует на те же самые
+  // #width/#length поля, что уже читает calculate()/constructor-state.js.
+  const dimRect = document.getElementById('dimRect');
+  const dimLengthLabel = document.getElementById('dimLengthLabel');
+  const dimWidthLabel = document.getElementById('dimWidthLabel');
+  function updateDimDiagram() {
+    const l = parseFloat(lengthInput.value) || 0;
+    const w = parseFloat(widthInput.value) || 0;
+    const ratio = l > 0 && w > 0 ? Math.max(0.4, Math.min(2.6, l / w)) : 1.55;
+    const rectH = 90;
+    const rectW = Math.max(70, Math.min(140, Math.round(rectH * ratio)));
+    const x = 60 + (140 - rectW) / 2;
+    dimRect.setAttribute('x', x);
+    dimRect.setAttribute('width', rectW);
+    dimLengthLabel.setAttribute('x', x + rectW / 2);
+    dimLengthLabel.textContent = l > 0 ? l + ' мм' : 'Длина';
+    dimWidthLabel.textContent = w > 0 ? w + ' мм' : 'Ширина';
+  }
+  const dimShapeNote = document.getElementById('dimShapeNote');
   const priceOut = document.getElementById('priceOut');
   const breakdown = document.getElementById('breakdown');
   const ctaBtn = document.getElementById('ctaBtn');
@@ -958,6 +1050,9 @@
     const isLshape = productShapeSelect.value === 'lshape';
     wingField.style.display = isLshape ? '' : 'none';
     shapeCornerSelect.style.display = isLshape ? '' : 'none';
+    // Диаграмма размеров сама не рисует крыло (см. #dimShapeNote в разметке)
+    // -- только явно оговаривает при lshape, что показан главный сегмент.
+    dimShapeNote.hidden = !isLshape;
   }
 
   function svgIcon(inner, viewBox) {
@@ -1488,7 +1583,9 @@
   [widthInput, lengthInput].forEach(el => {
     el.addEventListener('input', () => { dimsTouched = true; calculate(); });
     el.addEventListener('change', () => { dimsTouched = true; calculate(); });
+    el.addEventListener('input', updateDimDiagram);
   });
+  updateDimDiagram();
   document.querySelectorAll('.checkbox-row input').forEach(el => {
     el.addEventListener('change', calculate);
   });
