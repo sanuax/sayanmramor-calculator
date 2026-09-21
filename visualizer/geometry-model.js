@@ -35,6 +35,11 @@
       shape: 'straight',
       widthM, lengthM,
       visualThicknessM: VISUAL_FALLBACK_THICKNESS_M,
+      // The product's own default camera angle -- see PRODUCTS[key].cameraPreset
+      // in product-types.js. Falls back to 'iso' whenever a product hasn't set
+      // one (or no product is selected yet), matching ThreeScene's own generic
+      // fallback for an unrecognized preset name.
+      cameraPreset: (state.product && state.product.cameraPreset) || 'iso',
       edge: { type: state.edge.type, lengthMm: state.edge.lengthMm },
       sink: sinkState.count > 0 ? {
         type: sinkState.type, count: sinkState.count,

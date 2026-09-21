@@ -109,7 +109,13 @@
       : { standard: { widthM: 0, lengthM: 0 }, complex: { widthM: 0, lengthM: 0 } };
 
     return {
-      product: product ? { key: selectedProductKey, label: product.label, type: product.type, capabilities } : null,
+      product: product ? {
+        key: selectedProductKey, label: product.label, type: product.type, capabilities,
+        // Non-pricing metadata for the 3D layer's default camera angle --
+        // see visualizer/geometry-model.js, which applies the ultimate
+        // 'iso' fallback if a product defines none.
+        cameraPreset: product.cameraPreset || null,
+      } : null,
       stone: stone || null,
       dimensions: {
         widthM: mmToM(numFromField(d, 'width')),

@@ -6,13 +6,19 @@
   }
 })(typeof window !== 'undefined' ? window : globalThis, function () {
 
+  // cameraPreset: НЕ ценообразующее поле -- имя стартового ракурса 3D-камеры
+  // для этого типа изделия (см. visualizer/constants.js: CAMERA_PRESETS и
+  // docs/superpowers/specs/2026-09-21-3d-visualizer-design.md, раздел
+  // "Per-product-type default camera preset"). Кнопки Сверху/Спереди/Сбоку/
+  // Изометрия остаются доступны всегда -- это только то, что показывается
+  // по умолчанию и куда возвращает "Сбросить вид".
   const PRODUCTS = {
-    lestnitsa:            { label: "Лестницы", type: 'B', supportsEdgeWork: true },
-    panno:                { label: "Панно", type: 'B' },
-    podokonnik:           { label: "Подоконники", type: 'A', supportsEdgeWork: true },
-    pol:                  { label: "Полы", type: 'B' },
-    stena:                { label: "Стены", type: 'B' },
-    fasad:                { label: "Фасады", type: 'B' },
+    lestnitsa:            { label: "Лестницы", type: 'B', supportsEdgeWork: true, cameraPreset: 'iso-side-high' },
+    panno:                { label: "Панно", type: 'B', cameraPreset: 'front' },
+    podokonnik:           { label: "Подоконники", type: 'A', supportsEdgeWork: true, cameraPreset: 'front-high' },
+    pol:                  { label: "Полы", type: 'B', cameraPreset: 'top' },
+    stena:                { label: "Стены", type: 'B', cameraPreset: 'front' },
+    fasad:                { label: "Фасады", type: 'B', cameraPreset: 'front' },
     // additionalWorks: тонкая доступность конкретных доп. работ столешницы --
     // отсутствие объекта (как у всех остальных изделий выше/ниже) через
     // hasAdditionalWork() всегда безопасно читается как "всё false", так что
@@ -21,6 +27,7 @@
       label: "Столешницы в ванную", type: 'A',
       supportsEdgeWork: true,
       supportsCountertopExtras: true,
+      cameraPreset: 'iso-high',
       additionalWorks: {
         sinkCutout: true, cooktopCutout: false, holes: true,
         curb: true, backsplash: true, wallPanel: true,
@@ -35,13 +42,14 @@
       label: "Столешницы на кухню", type: 'A',
       supportsEdgeWork: true,
       supportsCountertopExtras: true,
+      cameraPreset: 'iso-eye-level',
       additionalWorks: {
         sinkCutout: true, cooktopCutout: true, holes: true,
         curb: true, backsplash: true, wallPanel: true,
         island: true, barCounter: true
       }
     },
-    stupeni:              { label: "Ступени", type: 'A', supportsEdgeWork: true }
+    stupeni:              { label: "Ступени", type: 'A', supportsEdgeWork: true, cameraPreset: 'iso-side-high' }
   };
 
   // Единая точка чтения additionalWorks -- отсутствие объекта или неизвестный

@@ -4,6 +4,7 @@ import { OrbitControls } from '../vendor/three/OrbitControls.js';
 
 let renderer, scene, camera, controls, countertopMesh, currentCanvas, resizeObserver;
 let frameId = null;
+let cameraPresetTracker = null;
 
 function buildMesh(geometryModel, materialDescriptor) {
   const geometry = new THREE.BoxGeometry(geometryModel.widthM, geometryModel.visualThicknessM, geometryModel.lengthM);
@@ -22,6 +23,11 @@ function frameCameraOnModel(geometryModel) {
 
 function init(canvasEl) {
   currentCanvas = canvasEl;
+  // CameraPresetTracker lives in visualizer/camera-preset-tracker.js (a UMD
+  // script, not an ES module, so it can't be `import`ed here) -- read it off
+  // the global it already attaches to `window`, same pattern as
+  // VisualizerConstants below.
+  cameraPresetTracker = window.CameraPresetTracker.createCameraPresetTracker();
   renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 
@@ -72,6 +78,11 @@ function update(geometryModel, materialDescriptor) {
   countertopMesh = buildMesh(geometryModel, materialDescriptor);
   scene.add(countertopMesh);
 
+  // Every update() call (not just the first) adopts the current product's
+  // own default -- so switching products mid-session immediately changes
+  // what "Сбросить вид" returns to, without needing a page reload.
+  cameraPresetTracker.setDefaultFromGeometryModel(geometryModel);
+
   controls.target.set(0, 0, 0);
   if (isFirstModel) {
     resetView();
@@ -98,7 +109,10 @@ function setView(presetName) {
 }
 
 function resetView() {
-  setView('iso');
+  // Deliberately NOT "the last view the user manually picked" -- always the
+  // current product's own declared default, tracked separately from manual
+  // setView() calls. See visualizer/camera-preset-tracker.js.
+  setView(cameraPresetTracker.getDefaultPreset());
 }
 
 function dispose() {
@@ -111,6 +125,7 @@ function dispose() {
   if (controls) controls.dispose();
   if (renderer) renderer.dispose();
   renderer = scene = camera = controls = countertopMesh = currentCanvas = resizeObserver = null;
+  cameraPresetTracker = null;
 }
 
 const ThreeScene = { init, update, setView, resetView, dispose };

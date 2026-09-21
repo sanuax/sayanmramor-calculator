@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const ProductTypes = require('../product-types.js');
+const { CAMERA_PRESETS } = require('../visualizer/constants.js');
 
 test('WORK_RATES has an entry for every product type in PRODUCTS', () => {
   const productKeys = Object.keys(ProductTypes.PRODUCTS);
@@ -128,5 +129,32 @@ test('hasAdditionalWork matches the full 9-product x 8-capability availability m
         `${productKey}.${capability} should be ${expected}`
       );
     });
+  });
+});
+
+test('every product has a cameraPreset naming a real entry in visualizer/constants.js\'s CAMERA_PRESETS', () => {
+  Object.entries(ProductTypes.PRODUCTS).forEach(([key, product]) => {
+    assert.ok(product.cameraPreset, `${key} has no cameraPreset set`);
+    assert.ok(
+      Object.prototype.hasOwnProperty.call(CAMERA_PRESETS, product.cameraPreset),
+      `${key}.cameraPreset ("${product.cameraPreset}") is not a known CAMERA_PRESETS entry`
+    );
+  });
+});
+
+test('cameraPreset matches the per-product defaults from the design spec', () => {
+  const expected = {
+    lestnitsa: 'iso-side-high',
+    panno: 'front',
+    podokonnik: 'front-high',
+    pol: 'top',
+    stena: 'front',
+    fasad: 'front',
+    stoleshnitsa_vannaya: 'iso-high',
+    stoleshnitsa_kuhnya: 'iso-eye-level',
+    stupeni: 'iso-side-high',
+  };
+  Object.entries(expected).forEach(([key, cameraPreset]) => {
+    assert.equal(ProductTypes.PRODUCTS[key].cameraPreset, cameraPreset, `${key}.cameraPreset`);
   });
 });

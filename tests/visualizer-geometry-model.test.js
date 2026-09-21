@@ -9,6 +9,7 @@ function stateWith(overrides) {
     dimensions: { widthM: 2, lengthM: 0.6, thicknessM: null },
     edge: { type: null, lengthMm: null },
     additionalWorks: { sink: { type: null, count: 0, position: null }, cooktop: { count: 0, position: null } },
+    product: null,
   }, overrides);
 }
 
@@ -67,4 +68,23 @@ test('buildGeometryModel.cooktop is null when count is 0, fallback-placed otherw
   }));
   assert.equal(withCooktop.cooktop.count, 1);
   assert.equal(withCooktop.cooktop.placement.source, 'fallback');
+});
+
+test('buildGeometryModel.cameraPreset copies the product\'s cameraPreset when present', () => {
+  const model = buildGeometryModel(stateWith({
+    product: { key: 'pol', label: 'Полы', type: 'B', capabilities: null, cameraPreset: 'top' },
+  }));
+  assert.equal(model.cameraPreset, 'top');
+});
+
+test('buildGeometryModel.cameraPreset falls back to "iso" when the product has none set', () => {
+  const model = buildGeometryModel(stateWith({
+    product: { key: 'panno', label: 'Панно', type: 'B', capabilities: null, cameraPreset: null },
+  }));
+  assert.equal(model.cameraPreset, 'iso');
+});
+
+test('buildGeometryModel.cameraPreset falls back to "iso" when no product is selected', () => {
+  const model = buildGeometryModel(stateWith({ product: null }));
+  assert.equal(model.cameraPreset, 'iso');
 });

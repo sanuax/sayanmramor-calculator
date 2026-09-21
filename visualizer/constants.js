@@ -19,6 +19,16 @@
     front: { direction: [0, 0.3, 1] },
     side:  { direction: [1, 0.3, 0] },
     iso:   { direction: [1, 0.8, 1] },
+    // Per-product-type default camera angles (see PRODUCTS[key].cameraPreset
+    // in product-types.js and docs/superpowers/specs/2026-09-21-3d-visualizer-design.md,
+    // "Per-product-type default camera preset"). First-pass approximations of
+    // the requested angles -- expected to need visual tuning once seen
+    // rendered, not final numbers. These extend the registry the four manual
+    // view buttons already read from; they don't replace top/front/side/iso.
+    'iso-high':      { direction: [1, 1.1, 1] },   // vanity countertop: iso, a bit more top-down than plain iso
+    'iso-eye-level': { direction: [1, 0.6, 1] },   // kitchen countertop: iso, closer to a standing person's eye line
+    'front-high':    { direction: [0, 0.6, 1] },   // windowsill: front, a bit more top-down than plain front
+    'iso-side-high': { direction: [1.3, 0.7, 0.4] }, // stairs/steps: angled from the side to read step geometry
   };
 
   return { VISUAL_FALLBACK_THICKNESS_M, VISUAL_FALLBACK_SINK_INSET_M, CAMERA_PRESETS };
