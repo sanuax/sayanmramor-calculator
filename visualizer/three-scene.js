@@ -63,14 +63,34 @@ function buildMarkerMaterial() {
   return new THREE.MeshStandardMaterial({ color: MARKER_COLOR, roughness: 0.6 });
 }
 
+// Camera framing must cover the WHOLE composed model, not just the main
+// slab -- otherwise an L-shape's wing or an island (which can sit well
+// outside the main slab's own footprint) renders half out of frame or reads
+// as an unrelated, randomly-placed piece instead of one product. Still just
+// a bounding footprint for framing purposes, not a geometry change.
+function computeFootprintExtent(geometryModel) {
+  let extentX = geometryModel.widthM;
+  let extentZ = geometryModel.lengthM;
+  if (geometryModel.wing) {
+    extentX = Math.max(extentX, geometryModel.widthM + 2 * geometryModel.wing.lengthM);
+    extentZ = Math.max(extentZ, geometryModel.lengthM + 2 * geometryModel.wing.widthM);
+  }
+  if (geometryModel.island) {
+    const islandFarZ = Math.abs(geometryModel.island.offsetZM) + geometryModel.island.lengthM / 2;
+    extentZ = Math.max(extentZ, islandFarZ * 2);
+  }
+  return { widthM: extentX, lengthM: extentZ };
+}
+
 function buildProductGroup(geometryModel, materialDescriptor) {
   const group = new THREE.Group();
   const { widthM, lengthM, visualThicknessM: thicknessM, wing, edge, sink, cooktop, holes, backsplash, curb, island } = geometryModel;
   // frameCameraOnModel()/setView() read these back to size the camera to the
   // actual model -- a THREE.Group has no single .geometry.parameters the
   // way the old one-box countertopMesh did.
-  group.userData.widthM = widthM;
-  group.userData.lengthM = lengthM;
+  const footprint = computeFootprintExtent(geometryModel);
+  group.userData.widthM = footprint.widthM;
+  group.userData.lengthM = footprint.lengthM;
   const stoneMaterial = buildStoneMaterial(materialDescriptor);
   const markerMaterial = buildMarkerMaterial();
 
