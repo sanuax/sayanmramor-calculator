@@ -699,6 +699,7 @@
 <script src="material-picker.js"></script>
 <script src="product-types.js"></script>
 <script src="rate-catalog.js"></script>
+<script src="constructor-state.js"></script>
 <script>
   const { PRODUCTS, hasAdditionalWork } = ProductTypes;
   const { getSubcategoriesForProduct, getAdditionalWorkRate } = RateCatalog;
@@ -798,28 +799,6 @@
   const infoBlock = document.getElementById('infoBlock');
   const countertopExtrasField = document.getElementById('countertopExtras');
   const edgeWorkField = document.getElementById('edgeWork');
-  const EDGE_LINE_ITEMS = [
-    { rateId: 'EDGE-01', elId: 'edge-straight', label: 'кромка прямая' },
-    { rateId: 'EDGE-03', elId: 'edge-figured', label: 'кромка фигурная/сложная' },
-    { rateId: 'EDGE-04', elId: 'edge-round', label: 'скругление' },
-    { rateId: 'EDGE-05', elId: 'edge-chamfer', label: 'скос/фаска' },
-    { rateId: 'EDGE-06', elId: 'edge-stonefold', label: 'подгиб камнем' },
-  ];
-  const QUANTITY_LINE_ITEMS = [
-    { rateId: 'CUT-01', elId: 'cut-sink-overlay', label: 'вырез под накладную раковину', capability: 'sinkCutout' },
-    { rateId: 'CUT-02', elId: 'cut-sink-undermount', label: 'вырез под подшивную раковину', capability: 'sinkCutout' },
-    { rateId: 'CUT-03', elId: 'cut-sink-integrated', label: 'вырез под интегрированную раковину', capability: 'sinkCutout' },
-    { rateId: 'CUT-04', elId: 'cut-cooktop', label: 'вырез под варочную панель', capability: 'cooktopCutout' },
-    { rateId: 'CUT-05', elId: 'hole-mixer', label: 'отверстие под смеситель', capability: 'holes' },
-    { rateId: 'CUT-06', elId: 'hole-socket', label: 'отверстие под розетку', capability: 'holes' },
-    { rateId: 'CUT-07', elId: 'hole-dispenser', label: 'отверстие под дозатор', capability: 'holes' },
-  ];
-  const AREA_LINE_ITEMS = [
-    { rateId: 'EXTRA-05', widthElId: 'extra-ostrov-figured-width', lengthElId: 'extra-ostrov-figured-length', label: 'остров фигурный', capability: 'island' },
-    { rateId: 'EXTRA-03', widthElId: 'extra-wallpanel-width', lengthElId: 'extra-wallpanel-length', label: 'стеновая панель', capability: 'wallPanel' },
-    { rateId: 'EXTRA-06', widthElId: 'extra-bar-standard-width', lengthElId: 'extra-bar-standard-length', label: 'барная стойка стандартная', capability: 'barCounter' },
-    { rateId: 'EXTRA-07', widthElId: 'extra-bar-complex-width', lengthElId: 'extra-bar-complex-length', label: 'барная стойка сложная', capability: 'barCounter' },
-  ];
   // Декларативный список групп внутри #countertopExtras -- одна точка
   // соответствия "контейнер в разметке" -> "какая capability его открывает",
   // вместо if-цепочки на каждое поле. hasAdditionalWork() уже безопасно
@@ -927,67 +906,6 @@
   // field's raw mm value and convert here rather than each doing its own /1000.
   function mmToM(mmValue) {
     return mmValue / 1000;
-  }
-
-  // Reads a list of {rateId, elId, label} mm-length inputs into extraLineItems
-  // entries plus human-readable breakdown labels, skipping anything left at
-  // zero. Shared by the edge/cuts/holes/extras blocks so each doesn't hand-
-  // write its own near-identical read loop.
-  function readLengthLineItems(configs) {
-    const items = [];
-    const labels = [];
-    configs.forEach(({ rateId, elId, label }) => {
-      const lengthM = mmToM(parseFloat(document.getElementById(elId).value) || 0);
-      if (lengthM > 0) {
-        items.push({ rate: getAdditionalWorkRate(rateId), quantity: lengthM });
-        labels.push(`${label}: ${lengthM.toFixed(2)} м.п.`);
-      }
-    });
-    return { items, labels };
-  }
-
-  // Reads a list of {rateId, elId, label, capability} plain шт.-count inputs
-  // into extraLineItems entries plus human-readable breakdown labels,
-  // skipping anything left at zero. Sibling of readLengthLineItems for the
-  // cuts/holes block, which counts pieces rather than measuring mm-lengths
-  // (no mmToM). A config entry whose capability the current product doesn't
-  // have is skipped entirely -- this is the defensive-zeroing guard: a value
-  // left in a hidden field from a previously selected product must never
-  // leak into a product that doesn't support that specific work item.
-  function readQuantityLineItems(configs, product) {
-    const items = [];
-    const labels = [];
-    configs.forEach(({ rateId, elId, label, capability }) => {
-      if (!hasAdditionalWork(product, capability)) return;
-      const qty = parseFloat(document.getElementById(elId).value) || 0;
-      if (qty > 0) {
-        items.push({ rate: getAdditionalWorkRate(rateId), quantity: qty });
-        labels.push(`${label}: ${qty} шт.`);
-      }
-    });
-    return { items, labels };
-  }
-
-  // Reads a list of {rateId, widthElId, lengthElId, label, capability} mm
-  // width+length pairs into extraLineItems entries plus human-readable
-  // breakdown labels, skipping anything left at zero. Sibling of
-  // readLengthLineItems/readQuantityLineItems for the wall panel / island /
-  // bar counter block, which measures an area (m²) rather than a length or a
-  // piece count. Same capability guard as readQuantityLineItems.
-  function readAreaLineItems(configs, product) {
-    const items = [];
-    const labels = [];
-    configs.forEach(({ rateId, widthElId, lengthElId, label, capability }) => {
-      if (!hasAdditionalWork(product, capability)) return;
-      const widthM = mmToM(parseFloat(document.getElementById(widthElId).value) || 0);
-      const lengthM = mmToM(parseFloat(document.getElementById(lengthElId).value) || 0);
-      const areaM2 = widthM * lengthM;
-      if (areaM2 > 0) {
-        items.push({ rate: getAdditionalWorkRate(rateId), quantity: areaM2 });
-        labels.push(`${label}: ${areaM2.toFixed(2)} м²`);
-      }
-    });
-    return { items, labels };
   }
 
   function currentSubcategoryRow() {
@@ -1122,53 +1040,47 @@
     if (polishEnabled) optionLabels.push('полировка');
     if (installEnabled) optionLabels.push('монтаж');
 
-    const edgeResult = readLengthLineItems(EDGE_LINE_ITEMS);
-    let extraLineItems = edgeResult.items;
-    optionLabels.push(...edgeResult.labels);
+    const constructorState = ConstructorState.readConstructorState({
+      doc: document, selectedProductKey, product, stone, hasAdditionalWork,
+    });
 
-    // Defensive zeroing: a value left in these fields from a previously
-    // selected product must never leak into a product type that doesn't
-    // support these extras (e.g. switching from a countertop to "Полы").
-    let extraDimensions = { bortikLengthM: 0, fartukAreaM2: 0, ostrovAreaM2: 0 };
-    if (product.supportsCountertopExtras) {
-      // Каждое легаси-поле (бортик/фартук/остров-прямоугольный) читается,
-      // только если у изделия есть соответствующая additionalWorks-capability
-      // -- при текущей матрице у обеих столешниц она всегда true, но это не
-      // даёт значению из скрытого поля (оставшемуся от предыдущего изделия)
-      // просочиться в расчёт, если у будущего изделия capability окажется false.
-      const bortikLengthM = hasAdditionalWork(product, 'curb') ? mmToM(parseFloat(extraBortikInput.value) || 0) : 0;
-      const fartukWidthM = hasAdditionalWork(product, 'backsplash') ? mmToM(parseFloat(extraFartukWidthInput.value) || 0) : 0;
-      const fartukLengthM = hasAdditionalWork(product, 'backsplash') ? mmToM(parseFloat(extraFartukLengthInput.value) || 0) : 0;
-      const ostrovWidthM = hasAdditionalWork(product, 'island') ? mmToM(parseFloat(extraOstrovWidthInput.value) || 0) : 0;
-      const ostrovLengthM = hasAdditionalWork(product, 'island') ? mmToM(parseFloat(extraOstrovLengthInput.value) || 0) : 0;
-      const fartukAreaM2 = fartukWidthM * fartukLengthM;
-      const ostrovAreaM2 = ostrovWidthM * ostrovLengthM;
-      extraDimensions = { bortikLengthM, fartukAreaM2, ostrovAreaM2 };
-      if (bortikLengthM > 0) optionLabels.push(`бортик: ${bortikLengthM} м.п.`);
-      if (fartukAreaM2 > 0) optionLabels.push(`фартук: ${fartukAreaM2.toFixed(2)} м²`);
-      if (ostrovAreaM2 > 0) optionLabels.push(`остров/полуостров: ${ostrovAreaM2.toFixed(2)} м²`);
-
-      const quantityResult = readQuantityLineItems(QUANTITY_LINE_ITEMS, product);
-      extraLineItems = extraLineItems.concat(quantityResult.items);
-      optionLabels.push(...quantityResult.labels);
-
-      const areaResult = readAreaLineItems(AREA_LINE_ITEMS, product);
-      extraLineItems = extraLineItems.concat(areaResult.items);
-      optionLabels.push(...areaResult.labels);
-    }
-
-    const productRates = WORK_RATES[selectedProductKey];
-    const rates = {
-      fabricationRatePerM2: productRates.fabricationRatePerM2,
-      installationRatePerM2: productRates.installationRatePerM2,
-      polishRatePerM2: productRates.polishRatePerM2,
-      miscFlatSum: MISC_FLAT_SUM,
-      miscRatePerM2: MISC_RATE_PER_M2,
+    const { rates, extraLineItems, extraDimensions } = ConstructorState.buildPricingInputs(constructorState, {
+      productRates: WORK_RATES[selectedProductKey],
+      miscFlatSum: MISC_FLAT_SUM, miscRatePerM2: MISC_RATE_PER_M2,
       complexShapeMultiplier: COMPLEX_SHAPE_MULTIPLIER,
-      bortikRatePerM: COUNTERTOP_EXTRAS_RATES.bortikRatePerM,
-      fartukRatePerM2: COUNTERTOP_EXTRAS_RATES.fartukRatePerM2,
-      ostrovRatePerM2: COUNTERTOP_EXTRAS_RATES.ostrovRatePerM2
-    };
+      countertopExtrasRates: COUNTERTOP_EXTRAS_RATES,
+      getAdditionalWorkRate,
+    });
+
+    // Breakdown labels are UI text, not pricing -- built from the same
+    // constructorState so the displayed text and the priced quantities can
+    // never drift apart.
+    constructorState.edgeLineItems.forEach(item => {
+      const labels = { straight: 'кромка прямая', figured: 'кромка фигурная/сложная', rounding: 'скругление', bevel: 'скос/фаска', 'stone-wrap': 'подгиб камнем' };
+      optionLabels.push(`${labels[item.type]}: ${mmToM(item.lengthMm).toFixed(2)} м.п.`);
+    });
+    if (constructorState.curbLengthM > 0) optionLabels.push(`бортик: ${constructorState.curbLengthM} м.п.`);
+    const fartukAreaM2 = constructorState.backsplash.widthM * constructorState.backsplash.lengthM;
+    if (fartukAreaM2 > 0) optionLabels.push(`фартук: ${fartukAreaM2.toFixed(2)} м²`);
+    const ostrovAreaM2 = constructorState.island.standard.widthM * constructorState.island.standard.lengthM;
+    if (ostrovAreaM2 > 0) optionLabels.push(`остров/полуостров: ${ostrovAreaM2.toFixed(2)} м²`);
+    const QUANTITY_LABELS = [
+      [constructorState.sinkCounts.overlay, 'вырез под накладную раковину'],
+      [constructorState.sinkCounts.undermount, 'вырез под подшивную раковину'],
+      [constructorState.sinkCounts.integrated, 'вырез под интегрированную раковину'],
+      [constructorState.cooktopCount, 'вырез под варочную панель'],
+      [constructorState.holeCounts.mixer, 'отверстие под смеситель'],
+      [constructorState.holeCounts.socket, 'отверстие под розетку'],
+      [constructorState.holeCounts.dispenser, 'отверстие под дозатор'],
+    ];
+    QUANTITY_LABELS.forEach(([qty, label]) => { if (qty > 0) optionLabels.push(`${label}: ${qty} шт.`); });
+    const AREA_LABELS = [
+      [constructorState.island.figured.widthM * constructorState.island.figured.lengthM, 'остров фигурный'],
+      [constructorState.wallPanel.widthM * constructorState.wallPanel.lengthM, 'стеновая панель'],
+      [constructorState.barCounter.standard.widthM * constructorState.barCounter.standard.lengthM, 'барная стойка стандартная'],
+      [constructorState.barCounter.complex.widthM * constructorState.barCounter.complex.lengthM, 'барная стойка сложная'],
+    ];
+    AREA_LABELS.forEach(([areaM2, label]) => { if (areaM2 > 0) optionLabels.push(`${label}: ${areaM2.toFixed(2)} м²`); });
 
     const result = Pricing.calculatePrice({
       stone,
@@ -1264,16 +1176,15 @@
   [extraBortikInput, extraFartukWidthInput, extraFartukLengthInput, extraOstrovWidthInput, extraOstrovLengthInput].forEach(el => {
     el.addEventListener('input', calculate);
   });
-  EDGE_LINE_ITEMS.forEach(({ elId }) => {
-    document.getElementById(elId).addEventListener('input', calculate);
-  });
-  QUANTITY_LINE_ITEMS.forEach(({ elId }) => {
-    document.getElementById(elId).addEventListener('input', calculate);
-  });
-  AREA_LINE_ITEMS.forEach(({ widthElId, lengthElId }) => {
-    document.getElementById(widthElId).addEventListener('input', calculate);
-    document.getElementById(lengthElId).addEventListener('input', calculate);
-  });
+  [
+    'edge-straight', 'edge-figured', 'edge-round', 'edge-chamfer', 'edge-stonefold',
+    'cut-sink-overlay', 'cut-sink-undermount', 'cut-sink-integrated', 'cut-cooktop',
+    'hole-mixer', 'hole-socket', 'hole-dispenser',
+    'extra-ostrov-figured-width', 'extra-ostrov-figured-length',
+    'extra-wallpanel-width', 'extra-wallpanel-length',
+    'extra-bar-standard-width', 'extra-bar-standard-length',
+    'extra-bar-complex-width', 'extra-bar-complex-length',
+  ].forEach(id => document.getElementById(id).addEventListener('input', calculate));
   productSubcategorySelect.addEventListener('change', () => { updateSubcategoryQtyVisibility(); calculate(); });
   subcategoryQtyInput.addEventListener('input', calculate);
 
