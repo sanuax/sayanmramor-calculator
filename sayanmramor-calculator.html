@@ -63,9 +63,10 @@
      (https://claude.ai/artifact/8fkDjjV6vDdwZypMQwN7zK) -- сам V2 не имел
      ни result-panel, ни 3D, поэтому .step/.step-head перенесены буквально,
      а .summary-block (итоговый блок) спроектирован новый, в тех же токенах. */
-  .configurator { max-width: 640px; margin: 0 auto; }
+  .configurator { max-width: 760px; margin: 0 auto; }
   .step { margin-bottom: 48px; }
   .step:last-child { margin-bottom: 0; }
+  .step .field:last-child { margin-bottom: 0; }
   .step-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
   .step-num {
     font-size: 12px; font-weight: 700; color: var(--muted);
@@ -90,7 +91,8 @@
     background: #1a1a1a; color: #fff;
     border-radius: 12px;
     padding: 32px;
-    margin-top: 56px;
+    margin: 56px auto 0;
+    max-width: 760px;
   }
   .summary-title {
     font-size: 20px; font-weight: 700; margin: 0 0 24px;
@@ -148,27 +150,31 @@
   }
   .checkbox-row input { width: 16px; height: 16px; accent-color: #ff5a1f; cursor: pointer; }
 
-  .product-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  /* Тип изделия: та же визуальная масса/размер/стиль заливки, что у
+     .pick-card (иконки var(--stone)/var(--stone-line), область 44px) --
+     сама карточка остаётся на radio+:has() (менять логику выбора не нужно),
+     меняется только визуальный вес. Иконка НЕ перекрашивается при выборе --
+     тот же принцип, что и у .pick-card (только рамка/фон/подпись меняются). */
+  .product-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
   .product-card {
     position: relative;
     display: flex; flex-direction: column; align-items: center; gap: 6px;
-    padding: 10px 4px;
-    border: 1px solid #ddd; border-radius: 6px;
-    background: #fafafa;
+    padding: 12px 10px 10px;
+    border: 1.5px solid var(--line); border-radius: 12px;
+    background: var(--card);
     text-align: center;
     cursor: pointer;
-    transition: border-color 0.15s, background 0.15s;
+    transition: border-color 0.15s, background-color 0.15s;
   }
-  .product-card:hover { border-color: #bbb; }
+  .product-card:hover { background: var(--card-hover); border-color: var(--stone-line); }
   .product-card input {
     position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none;
   }
-  .product-card svg { width: 24px; height: 24px; color: #555; }
-  .product-card-label { font-size: 11px; line-height: 1.25; color: #333; }
-  .product-card:has(input:checked) { border-color: #ff5a1f; background: #fff5ef; }
-  .product-card:has(input:checked) svg { color: #ff5a1f; }
-  .product-card:has(input:checked) .product-card-label { color: #ff5a1f; font-weight: 700; }
-  .product-card:has(input:focus-visible) { outline: 2px solid #ff5a1f; outline-offset: 2px; }
+  .product-card svg { width: 100%; height: 44px; }
+  .product-card-label { font-size: 12.5px; font-weight: 700; line-height: 1.25; color: var(--ink); }
+  .product-card:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+  .product-card:has(input:checked) .product-card-label { color: var(--accent-ink); }
+  .product-card:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   /* Кромка/форма: перенесено буквально из согласованного V2-конструктора
      (https://claude.ai/artifact/8fkDjjV6vDdwZypMQwN7zK) -- .card-grid/
@@ -927,73 +933,38 @@
   const { PRODUCTS, hasAdditionalWork } = ProductTypes;
   const { getSubcategoriesForProduct, getAdditionalWorkRate } = RateCatalog;
 
-  // Simple single-color line icons (24x24 viewBox) for the product-type
-  // cards -- inner markup only, wrapped uniformly when the cards are built.
+  // Мини-иллюстрации типов изделий -- тот же визуальный язык, что и у
+  // остальных карточек V2 (var(--stone)/var(--stone-line) заливка, viewBox
+  // 0 0 60 60, 2-4 простые формы на иконку), а не системные пиктограммы.
   const PRODUCT_ICONS = {
-    // Straight staircase, side view, solid flat-icon style (matches the
-    // reference photo): 4 equal steps (tread run = riser rise = 4.5, a true
-    // diagonal offset per step), closed by ONE diagonal from the top-left
-    // corner to the bottom-right corner of an extended final riser. The
-    // final riser is deliberately taller than the other 3 (7 vs 4.5) --
-    // with all 4 risers equal, the closing diagonal would run exactly
-    // through every inner step corner (same slope) and collapse the fill
-    // into a near-zero-width zigzag, which is what "just a thin line with
-    // bends" was. Stretching only the last riser tilts the diagonal's slope
-    // just enough to clear all 3 inner corners with growing margin, so the
-    // shape reads as one solid mass, not a sliver. Fill AND a matching
-    // round-joined stroke (this is the one PRODUCT_ICONS entry that sets
-    // its own paint -- all others stay outline-only via the shared svg
-    // fill="none") so the sharp path corners render softened, like the
-    // reference's rounded outline. Distinct from "Ступени" below, which is
-    // the same stepped idea left unfilled and open.
-    lestnitsa: '<path d="M2 2h4.5v4.5h4.5v4.5h4.5v4.5h4.5v7Z" fill="currentColor" ' +
-      'stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>',
-    // "Seed of life" rosette (6 circles of equal radius, each centered on
-    // the ring at that same radius, so every circle passes through the
-    // frame's center) in a square frame -- a genuinely decorative floral
-    // motif built from nothing but circles, no risky curve math.
-    panno: '<rect x="3.5" y="3.5" width="17" height="17" rx="1"/>' +
-      '<circle cx="15.2" cy="12" r="3.2"/><circle cx="13.6" cy="9.23" r="3.2"/>' +
-      '<circle cx="10.4" cy="9.23" r="3.2"/><circle cx="8.8" cy="12" r="3.2"/>' +
-      '<circle cx="10.4" cy="14.77" r="3.2"/><circle cx="13.6" cy="14.77" r="3.2"/>',
-    podokonnik: '<rect x="5" y="3" width="14" height="11"/><path d="M5 8.5h14M12 3v11"/><path d="M3 15h18v2H3z"/>',
-    // Square split into 4 quadrants, each filled with parallel "plank"
-    // lines; direction alternates diagonally (vertical/horizontal) to
-    // read as a parquet floor pattern rather than a plain grid.
-    pol: '<rect x="3" y="3" width="18" height="18"/><path d="M12 3v18M3 12h18"/>' +
-      '<path d="M6 3v9M9 3v9M12 6h9M12 9h9M3 15h9M3 18h9M15 12v9M18 12v9"/>',
-    // Running-bond brick cladding: 3 even rows, offset middle row, equal
-    // gaps and symmetric top/bottom margins for a tidier grid than a plain,
-    // unevenly-spaced brick layout.
-    stena: '<rect x="3" y="3" width="8.5" height="5" rx="0.4"/><rect x="12.5" y="3" width="8.5" height="5" rx="0.4"/>' +
-      '<rect x="3" y="9.5" width="4" height="5" rx="0.4"/><rect x="8" y="9.5" width="8" height="5" rx="0.4"/><rect x="17" y="9.5" width="4" height="5" rx="0.4"/>' +
-      '<rect x="3" y="16" width="8.5" height="5" rx="0.4"/><rect x="12.5" y="16" width="8.5" height="5" rx="0.4"/>',
-    fasad: '<path d="M4 21V9l8-5 8 5v12"/><path d="M4 21h16"/><rect x="10" y="14" width="4" height="7"/>' +
-      '<rect x="6" y="11" width="3" height="3"/><rect x="15" y="11" width="3" height="3"/>',
-    // A basin (rim ellipse + bowl curve) sitting on a slab, with a
-    // gooseneck faucet -- reads as a vanity countertop rather than a
-    // generic rectangle. The two short strokes by the faucet base are the
-    // aerator/handle buttons visible in the reference photo.
-    stoleshnitsa_vannaya: '<rect x="2" y="15.4" width="20" height="4.4" rx="0.8"/>' +
-      '<ellipse cx="12" cy="11.6" rx="5.6" ry="2"/>' +
-      '<path d="M6.4 11.6c0 2.6 1.6 3.8 5.6 3.8s5.6-1.2 5.6-3.8"/>' +
-      '<path d="M13.6 11.2V7.6C13.6 5.8 16.6 5.8 16.6 7.6V10.4"/>' +
-      '<path d="M12.1 10.6v1.1M15.1 10.6v1.1"/>',
-    // Kitchen counter, front view: a base cabinet (box + one center seam for
-    // its two doors) with a countertop slab overhanging on top, an inset
-    // sink basin recessed into the slab, and a gooseneck faucet behind it --
-    // reads as "kitchen table/cabinet with a sink" rather than the earlier
-    // bar-counter-and-stool silhouette. The cabinet body is what
-    // distinguishes it from "Столешницы в ванную" below, which has no base.
-    stoleshnitsa_kuhnya: '<rect x="3" y="13.4" width="18" height="7.2" rx="0.5"/>' +
-      '<path d="M12 13.4v7.2"/>' +
-      '<rect x="2" y="11.2" width="20" height="2.6" rx="0.6"/>' +
-      '<ellipse cx="8" cy="10.4" rx="3.6" ry="1.2"/>' +
-      '<path d="M14.8 11V7.4C14.8 5.6 17.8 5.6 17.8 7.4V10.2"/>' +
-      '<path d="M13.3 10.4v1.1M16.3 10.4v1.1" stroke-width="1"/>',
-    // "Ступени" reuses the staircase motif but as two broad steps rather
-    // than a full flight, to read as distinct from "Лестницы" above.
-    stupeni: '<path d="M4 20h6v-6h6v-6h6"/>',
+    // Лестница: профиль сбоку, восходящие ступени одним замкнутым контуром.
+    lestnitsa: '<path d="M8 46 L8 36 H20 V26 H32 V16 H44 V46 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="2"/>',
+    // Панно: рамка + декоративный медальон внутри.
+    panno: '<rect x="8" y="8" width="44" height="44" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="2"/>' +
+      '<circle cx="30" cy="30" r="13" fill="none" stroke="var(--stone-line)" stroke-width="2"/>',
+    // Подоконник: оконный проём + выступающая плита подоконника снизу.
+    podokonnik: '<rect x="14" y="6" width="32" height="26" fill="none" stroke="var(--stone-line)" stroke-width="2"/>' +
+      '<rect x="6" y="32" width="48" height="10" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="2"/>',
+    // Пол: плита сверху + линии раскладки плит/досок.
+    pol: '<rect x="6" y="14" width="48" height="32" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="2"/>' +
+      '<path d="M6 30 H54 M22 14 V46 M38 14 V46" stroke="var(--stone-line)" stroke-width="1.4"/>',
+    // Стена: облицовка со швами вразбежку.
+    stena: '<rect x="6" y="10" width="48" height="40" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="2"/>' +
+      '<path d="M6 26 H54 M6 38 H54 M20 10 V26 M38 26 V38 M30 38 V50" stroke="var(--stone-line)" stroke-width="1.4"/>',
+    // Фасад: силуэт здания с двускатной крышей и окнами.
+    fasad: '<path d="M8 50 V22 L30 8 L52 22 V50 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="2"/>' +
+      '<rect x="18" y="30" width="10" height="10" fill="none" stroke="var(--stone-line)" stroke-width="1.6"/>' +
+      '<rect x="34" y="30" width="10" height="10" fill="none" stroke="var(--stone-line)" stroke-width="1.6"/>',
+    // Столешница в ванную: плита с врезной раковиной (без тумбы).
+    stoleshnitsa_vannaya: '<rect x="6" y="30" width="48" height="12" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="2"/>' +
+      '<ellipse cx="30" cy="24" rx="14" ry="6" fill="none" stroke="var(--stone-line)" stroke-width="2"/>',
+    // Столешница на кухню: то же самое + тумба снизу -- отличает её от
+    // столешницы в ванную выше.
+    stoleshnitsa_kuhnya: '<rect x="6" y="26" width="48" height="12" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="2"/>' +
+      '<rect x="6" y="38" width="48" height="12" fill="none" stroke="var(--stone-line)" stroke-width="1.6"/>' +
+      '<ellipse cx="20" cy="20" rx="10" ry="5" fill="none" stroke="var(--stone-line)" stroke-width="2"/>',
+    // Ступени: два широких марша, короче и проще полной лестницы выше.
+    stupeni: '<path d="M8 46 V34 H26 V22 H44 V46 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="2"/>',
   };
 
   const { SAW_MARGIN_CM, AREA_WASTE_FACTOR, WORK_RATES, MISC_FLAT_SUM, MISC_RATE_PER_M2, COMPLEX_SHAPE_MULTIPLIER, COUNTERTOP_EXTRAS_RATES } = ProductTypes;
@@ -1247,12 +1218,11 @@
     });
 
     const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    icon.setAttribute('viewBox', '0 0 24 24');
-    icon.setAttribute('fill', 'none');
-    icon.setAttribute('stroke', 'currentColor');
-    icon.setAttribute('stroke-width', '1.6');
-    icon.setAttribute('stroke-linecap', 'round');
-    icon.setAttribute('stroke-linejoin', 'round');
+    // viewBox 0 0 60 60 + var(--stone)/var(--stone-line) fill, same
+    // convention as svgIcon() below (edge/shape cards) -- each shape in
+    // PRODUCT_ICONS specifies its own fill/stroke, so the outer <svg> itself
+    // stays paint-free (unlike the old currentColor line-icon version).
+    icon.setAttribute('viewBox', '0 0 60 60');
     icon.setAttribute('aria-hidden', 'true');
     icon.innerHTML = PRODUCT_ICONS[key] || '';
 
