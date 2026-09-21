@@ -53,6 +53,28 @@
   @media (max-width: 700px) {
     .card { grid-template-columns: 1fr; }
   }
+  .card { grid-template-columns: 1fr 1fr 1fr; }
+  .viewer-panel { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 8px; }
+  .viewer-canvas-wrap { width: 100%; aspect-ratio: 4 / 3; background: #eee; border-radius: 4px; overflow: hidden; }
+  .viewer-canvas-wrap canvas { width: 100%; height: 100%; display: block; touch-action: none; }
+  .viewer-controls { display: flex; gap: 6px; flex-wrap: wrap; }
+  .viewer-controls button {
+    padding: 6px 12px; border: 1px solid #ddd; border-radius: 3px; background: #fafafa;
+    font-size: 12px; cursor: pointer;
+  }
+  .viewer-controls button:hover { border-color: #bbb; }
+
+  /* Desktop: form / result / 3D side by side, 3D on the right. */
+  @media (min-width: 900px) {
+    .card { grid-template-columns: 1fr 1fr 1fr; }
+    .viewer-panel { grid-column: 3; grid-row: 1; order: 3; }
+  }
+  /* Mobile (existing single-column breakpoint at 700px): 3D goes near the
+     top, above the form, per spec. */
+  @media (max-width: 700px) {
+    .card { grid-template-columns: 1fr; }
+    .viewer-panel { order: -1; }
+  }
   .field { margin-bottom: 20px; }
   label {
     display: block;
@@ -657,6 +679,19 @@
         <div class="disclaimer">Расчёт ориентировочный. Финальная цена зависит от партии камня, сложности рисунка и логистики.</div>
       </div>
     </div>
+
+    <div class="viewer-panel" id="viewerPanel" hidden>
+      <div class="viewer-canvas-wrap">
+        <canvas id="viewerCanvas"></canvas>
+      </div>
+      <div class="viewer-controls">
+        <button type="button" data-view="top">Сверху</button>
+        <button type="button" data-view="front">Спереди</button>
+        <button type="button" data-view="side">Сбоку</button>
+        <button type="button" data-view="iso">Изометрия</button>
+        <button type="button" id="viewerReset">Сбросить вид</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -700,6 +735,11 @@
 <script src="product-types.js"></script>
 <script src="rate-catalog.js"></script>
 <script src="constructor-state.js"></script>
+<script src="visualizer/constants.js"></script>
+<script src="visualizer/geometry-model.js"></script>
+<script src="visualizer/material-adapter.js"></script>
+<script src="visualizer/webgl-support.js"></script>
+<script type="module" src="visualizer/three-scene.js"></script>
 <script>
   const { PRODUCTS, hasAdditionalWork } = ProductTypes;
   const { getSubcategoriesForProduct, getAdditionalWorkRate } = RateCatalog;
@@ -826,6 +866,35 @@
   const extraFartukLengthInput = document.getElementById('extra-fartuk-length');
   const extraOstrovWidthInput = document.getElementById('extra-ostrov-width');
   const extraOstrovLengthInput = document.getElementById('extra-ostrov-length');
+
+  const viewerPanel = document.getElementById('viewerPanel');
+  const viewerCanvas = document.getElementById('viewerCanvas');
+  let viewerReady = false;
+
+  function mountViewerIfSupported() {
+    if (!WebglSupport.isWebglAvailable()) return;
+    if (!window.ThreeScene) return; // see DOMContentLoaded note below
+    viewerPanel.hidden = false;
+    window.ThreeScene.init(viewerCanvas);
+    viewerReady = true;
+    document.querySelectorAll('.viewer-controls [data-view]').forEach(btn => {
+      btn.addEventListener('click', () => window.ThreeScene.setView(btn.dataset.view));
+    });
+    document.getElementById('viewerReset').addEventListener('click', () => window.ThreeScene.resetView());
+  }
+  // A `<script type="module">` (visualizer/three-scene.js) is always deferred
+  // by the HTML spec -- it executes after the document finishes parsing but
+  // BEFORE `DOMContentLoaded` fires, even though it's declared before this
+  // classic, non-deferred inline script (which runs immediately, at parse
+  // time, before the module has had a chance to run). Do NOT call
+  // mountViewerIfSupported() directly here, and do NOT poll for
+  // window.ThreeScene with a recursive Promise.resolve().then() -- a
+  // microtask that re-schedules itself every time it finds ThreeScene
+  // missing never yields to the task queue the module's own execution is
+  // waiting on, so it hangs the page instead of just being slow. Waiting for
+  // DOMContentLoaded is both correct (module execution is spec-guaranteed to
+  // finish before it fires) and simple:
+  document.addEventListener('DOMContentLoaded', mountViewerIfSupported);
 
   Object.entries(PRODUCTS).forEach(([key, val]) => {
     const card = document.createElement('label');
@@ -1003,6 +1072,17 @@
     }
     dimError.style.display = 'none';
 
+    const constructorState = ConstructorState.readConstructorState({
+      doc: document, selectedProductKey, product,
+      stone: selectedStoneId ? STONES_BY_ID[selectedStoneId] : null,
+      hasAdditionalWork,
+    });
+    if (viewerReady) {
+      const geometryModel = GeometryModel.buildGeometryModel(constructorState);
+      const materialDescriptor = MaterialAdapter.resolveMaterial(constructorState.stone, constructorState.bookmatchMode);
+      window.ThreeScene.update(geometryModel, materialDescriptor);
+    }
+
     if (!selectedProductKey) {
       setPriceHint(INCOMPLETE_HINT);
       breakdown.innerHTML = '';
@@ -1039,10 +1119,6 @@
     if (complexEnabled) optionLabels.push('сложная форма');
     if (polishEnabled) optionLabels.push('полировка');
     if (installEnabled) optionLabels.push('монтаж');
-
-    const constructorState = ConstructorState.readConstructorState({
-      doc: document, selectedProductKey, product, stone, hasAdditionalWork,
-    });
 
     const { rates, extraLineItems, extraDimensions } = ConstructorState.buildPricingInputs(constructorState, {
       productRates: WORK_RATES[selectedProductKey],
