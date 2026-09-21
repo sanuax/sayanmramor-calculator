@@ -674,11 +674,11 @@
         <div class="dim-wrap">
           <div class="dim-diagram">
             <svg id="dimSvg" viewBox="0 0 260 190" width="260" height="190" role="img" aria-label="Схема изделия с размерами длины и ширины">
-              <rect id="dimRect" x="60" y="20" width="140" height="90" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5" rx="3"></rect>
-              <line x1="60" y1="128" x2="200" y2="128" stroke="var(--muted)" stroke-width="1.2" marker-start="url(#dimArrowStart)" marker-end="url(#dimArrowEnd)"></line>
-              <text id="dimLengthLabel" x="130" y="146" text-anchor="middle" font-size="12" fill="var(--ink)" font-weight="700">Длина</text>
-              <line x1="20" y1="20" x2="20" y2="110" stroke="var(--muted)" stroke-width="1.2" marker-start="url(#dimArrowStart)" marker-end="url(#dimArrowEnd)"></line>
-              <text id="dimWidthLabel" x="20" y="130" text-anchor="middle" font-size="12" fill="var(--ink)" font-weight="700">Ширина</text>
+              <rect id="dimRect" x="117" y="27" width="36" height="126" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5" rx="3"></rect>
+              <line id="dimLengthLine" x1="117" y1="162" x2="153" y2="162" stroke="var(--muted)" stroke-width="1.2" marker-start="url(#dimArrowStart)" marker-end="url(#dimArrowEnd)"></line>
+              <text id="dimLengthLabel" x="135" y="180" text-anchor="middle" font-size="12" fill="var(--ink)" font-weight="700">Длина</text>
+              <line id="dimWidthLine" x1="50" y1="27" x2="50" y2="153" stroke="var(--muted)" stroke-width="1.2" marker-start="url(#dimArrowStart)" marker-end="url(#dimArrowEnd)"></line>
+              <text id="dimWidthLabel" x="40" y="90" text-anchor="middle" font-size="12" fill="var(--ink)" font-weight="700">Ширина</text>
               <defs>
                 <marker id="dimArrowStart" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto-start-reverse">
                   <path d="M0,1 L7,4 L0,7" fill="none" stroke="var(--muted)" stroke-width="1.4"></path>
@@ -988,19 +988,57 @@
   // соотношения сторон прямоугольника на схеме), реагирует на те же самые
   // #width/#length поля, что уже читает calculate()/constructor-state.js.
   const dimRect = document.getElementById('dimRect');
+  const dimLengthLine = document.getElementById('dimLengthLine');
   const dimLengthLabel = document.getElementById('dimLengthLabel');
+  const dimWidthLine = document.getElementById('dimWidthLine');
   const dimWidthLabel = document.getElementById('dimWidthLabel');
+  // Горизонтальная ось диаграммы всегда = Длина, вертикальная = Ширина.
+  // Прямоугольник вписывается в квадратную область AREA_SIZE x AREA_SIZE:
+  // большая из двух реальных величин растягивается ровно до AREA_SIZE, а
+  // вторая масштабируется тем же коэффициентом -- т.е. реальное соотношение
+  // сторон (l/w) сохраняется один в один, а не подгоняется под фиксированную
+  // высоту, как раньше. MIN_RECT -- это ТОЛЬКО визуальный пол для очень
+  // маленькой стороны (чтобы фигура не схлопывалась в невидимую линию),
+  // применяется исключительно к меньшей стороне и не влияет на то, какая
+  // сторона больше -- направление (портрет/альбом) от него не зависит.
+  const DIM_AREA_X = 70, DIM_AREA_Y = 20, DIM_AREA_SIZE = 130, DIM_MIN_RECT = 36;
   function updateDimDiagram() {
     const l = parseFloat(lengthInput.value) || 0;
     const w = parseFloat(widthInput.value) || 0;
-    const ratio = l > 0 && w > 0 ? Math.max(0.4, Math.min(2.6, l / w)) : 1.55;
-    const rectH = 90;
-    const rectW = Math.max(70, Math.min(140, Math.round(rectH * ratio)));
-    const x = 60 + (140 - rectW) / 2;
-    dimRect.setAttribute('x', x);
+    // Без реальных значений показываем условную альбомную заготовку (тот же
+    // расчёт, просто с плейсхолдер-величинами вместо l/w).
+    const effL = l > 0 ? l : 1.55;
+    const effW = w > 0 ? w : 1;
+    const scale = DIM_AREA_SIZE / Math.max(effL, effW);
+    const rectW = Math.max(DIM_MIN_RECT, effL * scale);
+    const rectH = Math.max(DIM_MIN_RECT, effW * scale);
+    const rectX = DIM_AREA_X + (DIM_AREA_SIZE - rectW) / 2;
+    const rectY = DIM_AREA_Y + (DIM_AREA_SIZE - rectH) / 2;
+
+    dimRect.setAttribute('x', rectX);
+    dimRect.setAttribute('y', rectY);
     dimRect.setAttribute('width', rectW);
-    dimLengthLabel.setAttribute('x', x + rectW / 2);
+    dimRect.setAttribute('height', rectH);
+
+    const lengthLineY = DIM_AREA_Y + DIM_AREA_SIZE + 12;
+    dimLengthLine.setAttribute('x1', rectX);
+    dimLengthLine.setAttribute('x2', rectX + rectW);
+    dimLengthLine.setAttribute('y1', lengthLineY);
+    dimLengthLine.setAttribute('y2', lengthLineY);
+    dimLengthLabel.setAttribute('x', rectX + rectW / 2);
+    dimLengthLabel.setAttribute('y', lengthLineY + 18);
     dimLengthLabel.textContent = l > 0 ? l + ' мм' : 'Длина';
+
+    const widthLineX = DIM_AREA_X - 20;
+    dimWidthLine.setAttribute('y1', rectY);
+    dimWidthLine.setAttribute('y2', rectY + rectH);
+    dimWidthLine.setAttribute('x1', widthLineX);
+    dimWidthLine.setAttribute('x2', widthLineX);
+    const widthLabelX = widthLineX - 10;
+    const widthLabelY = rectY + rectH / 2;
+    dimWidthLabel.setAttribute('x', widthLabelX);
+    dimWidthLabel.setAttribute('y', widthLabelY);
+    dimWidthLabel.setAttribute('transform', 'rotate(-90 ' + widthLabelX + ' ' + widthLabelY + ')');
     dimWidthLabel.textContent = w > 0 ? w + ' мм' : 'Ширина';
   }
   const dimShapeNote = document.getElementById('dimShapeNote');
