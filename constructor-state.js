@@ -72,10 +72,24 @@
     const capabilities = product ? {
       supportsEdgeWork: !!product.supportsEdgeWork,
       supportsCountertopExtras: !!product.supportsCountertopExtras,
+      supportsShapeSelection: !!product.supportsShapeSelection,
       sinkCutout: cap('sinkCutout'), cooktopCutout: cap('cooktopCutout'), holes: cap('holes'),
       curb: cap('curb'), backsplash: cap('backsplash'), wallPanel: cap('wallPanel'),
       island: cap('island'), barCounter: cap('barCounter'),
     } : null;
+
+    // shape/wing/corner: real user-entered geometry (Прямая/Г-образная).
+    // Zeroed/forced to 'straight' for a product without supportsShapeSelection,
+    // same defensive-zeroing pattern as the countertop-extras fields below --
+    // wing.widthM/lengthM are only promoted to a real ProductGeometryModel.wing
+    // by buildGeometryModel() once both are > 0 (see visualizer/geometry-model.js).
+    const supportsShapeSelection = !!(capabilities && capabilities.supportsShapeSelection);
+    const shape = supportsShapeSelection && d.getElementById('productShape').value === 'lshape' ? 'lshape' : 'straight';
+    const wing = {
+      widthM: supportsShapeSelection ? mmToM(numFromField(d, 'wing-width')) : 0,
+      lengthM: supportsShapeSelection ? mmToM(numFromField(d, 'wing-length')) : 0,
+    };
+    const corner = supportsShapeSelection ? (d.getElementById('shape-corner').value || 'left') : 'left';
 
     // Unconditional, matching sayanmramor-calculator.html's calculate(): the
     // real app's `const edgeResult = readLengthLineItems(EDGE_LINE_ITEMS);`
@@ -122,6 +136,9 @@
         lengthM: mmToM(numFromField(d, 'length')),
         thicknessM: null,
       },
+      shape,
+      wing,
+      corner,
       edgeLineItems,
       sinkCounts,
       cooktopCount,

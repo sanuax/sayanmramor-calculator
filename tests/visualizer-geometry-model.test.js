@@ -7,15 +7,23 @@ const { VISUAL_FALLBACK_THICKNESS_M } = require('../visualizer/constants.js');
 function stateWith(overrides) {
   return Object.assign({
     dimensions: { widthM: 2, lengthM: 0.6, thicknessM: null },
+    shape: 'straight',
+    wing: { widthM: 0, lengthM: 0 },
+    corner: 'left',
     edge: { type: null, lengthMm: null },
     additionalWorks: { sink: { type: null, count: 0, position: null }, cooktop: { count: 0, position: null } },
+    holeCounts: { mixer: 0, socket: 0, dispenser: 0 },
+    backsplash: { widthM: 0, lengthM: 0 },
+    curbLengthM: 0,
+    island: { standard: { widthM: 0, lengthM: 0 } },
     product: null,
   }, overrides);
 }
 
-test('buildGeometryModel always reports shape "straight" for the vertical slice', () => {
-  const model = buildGeometryModel(stateWith({}));
-  assert.equal(model.shape, 'straight');
+test('buildGeometryModel reports shape "straight" when state.shape is "straight" or wing is unfilled', () => {
+  assert.equal(buildGeometryModel(stateWith({})).shape, 'straight');
+  // shape:'lshape' selected in the UI, but wing dimensions still 0 -- degrades to straight.
+  assert.equal(buildGeometryModel(stateWith({ shape: 'lshape', wing: { widthM: 0, lengthM: 1.2 } })).shape, 'straight');
 });
 
 test('buildGeometryModel copies widthM/lengthM from state.dimensions', () => {
@@ -30,44 +38,54 @@ test('buildGeometryModel.visualThicknessM is the constant fallback, never state.
   assert.notEqual(model.visualThicknessM, 0.02);
 });
 
+test('buildGeometryModel.wing is null when shape is "straight", populated when "lshape" with both wing dimensions > 0', () => {
+  assert.equal(buildGeometryModel(stateWith({})).wing, null);
+  const model = buildGeometryModel(stateWith({ shape: 'lshape', wing: { widthM: 0.6, lengthM: 1.2 }, corner: 'right' }));
+  assert.equal(model.shape, 'lshape');
+  assert.deepEqual(model.wing, { widthM: 0.6, lengthM: 1.2, corner: 'right' });
+});
+
 test('buildGeometryModel.edge passes state.edge through unchanged', () => {
   const model = buildGeometryModel(stateWith({ edge: { type: 'bevel', lengthMm: 500 } }));
   assert.deepEqual(model.edge, { type: 'bevel', lengthMm: 500 });
 });
 
-test('buildGeometryModel.sink is null when count is 0', () => {
-  const model = buildGeometryModel(stateWith({}));
-  assert.equal(model.sink, null);
-});
-
-test('buildGeometryModel.sink has a fallback placement, tagged as such, when position is null and count > 0', () => {
+test('buildGeometryModel.sink/cooktop delegate to cutout-geometry (null when count is 0, populated cut otherwise)', () => {
+  assert.equal(buildGeometryModel(stateWith({})).sink, null);
+  assert.equal(buildGeometryModel(stateWith({})).cooktop, null);
   const model = buildGeometryModel(stateWith({
-    additionalWorks: { sink: { type: 'undermount', count: 1, position: null }, cooktop: { count: 0, position: null } },
+    additionalWorks: { sink: { type: 'undermount', count: 1, position: null }, cooktop: { count: 1, position: null } },
   }));
   assert.equal(model.sink.type, 'undermount');
-  assert.equal(model.sink.count, 1);
-  assert.equal(model.sink.placement.source, 'fallback');
-  assert.equal(typeof model.sink.placement.xM, 'number');
-  assert.equal(typeof model.sink.placement.yM, 'number');
+  assert.equal(model.sink.cut.source, 'fallback');
+  assert.equal(model.cooktop.count, 1);
+  assert.equal(model.cooktop.cut.source, 'fallback');
 });
 
-test('buildGeometryModel.sink uses the real position (tagged "real") when one is provided', () => {
-  const model = buildGeometryModel(stateWith({
-    additionalWorks: { sink: { type: 'undermount', count: 1, position: { xMm: 300, yMm: 150 } }, cooktop: { count: 0, position: null } },
-  }));
-  assert.equal(model.sink.placement.source, 'real');
-  assert.equal(model.sink.placement.xM, 0.3);
-  assert.equal(model.sink.placement.yM, 0.15);
-});
-
-test('buildGeometryModel.cooktop is null when count is 0, fallback-placed otherwise', () => {
+test('buildGeometryModel.holes delegates to cutout-geometry for mixer/socket/dispenser', () => {
   const empty = buildGeometryModel(stateWith({}));
-  assert.equal(empty.cooktop, null);
-  const withCooktop = buildGeometryModel(stateWith({
-    additionalWorks: { sink: { type: null, count: 0, position: null }, cooktop: { count: 1, position: null } },
+  assert.deepEqual(empty.holes, { mixer: null, socket: null, dispenser: null });
+  const model = buildGeometryModel(stateWith({ holeCounts: { mixer: 1, socket: 0, dispenser: 0 } }));
+  assert.equal(model.holes.mixer.count, 1);
+  assert.equal(model.holes.socket, null);
+});
+
+test('buildGeometryModel.backsplash/curb/island delegate to attachment-geometry', () => {
+  const empty = buildGeometryModel(stateWith({}));
+  assert.equal(empty.backsplash, null);
+  assert.equal(empty.curb, null);
+  assert.equal(empty.island, null);
+
+  const model = buildGeometryModel(stateWith({
+    backsplash: { widthM: 0.6, lengthM: 2 },
+    curbLengthM: 0.5,
+    island: { standard: { widthM: 1.2, lengthM: 0.8 } },
   }));
-  assert.equal(withCooktop.cooktop.count, 1);
-  assert.equal(withCooktop.cooktop.placement.source, 'fallback');
+  assert.equal(model.backsplash.heightM, 0.6);
+  assert.equal(model.curb.lengthM, 0.5);
+  assert.equal(model.island.widthM, 1.2);
+  // island offset is relative to the MAIN segment's lengthM (0.6 in stateWith's default dimensions).
+  assert.ok(model.island.offsetZM > 0.6);
 });
 
 test('buildGeometryModel.cameraPreset copies the product\'s cameraPreset when present', () => {

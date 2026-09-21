@@ -14,6 +14,20 @@
   const VISUAL_FALLBACK_THICKNESS_M = 0.04;
   const VISUAL_FALLBACK_SINK_INSET_M = 0.15;
 
+  // Cutout sizes: no real width/length input exists for a sink/cooktop
+  // cutout anywhere in the calculator (only a count) -- typical real-world
+  // sizes, purely for a convincing visual, never priced.
+  const VISUAL_FALLBACK_SINK_CUTOUT_SIZE_M = { widthM: 0.5, lengthM: 0.4 };
+  const VISUAL_FALLBACK_COOKTOP_CUTOUT_SIZE_M = { widthM: 0.56, lengthM: 0.49 };
+  const VISUAL_FALLBACK_HOLE_RADIUS_M = 0.01;
+
+  // Attachment sizes/placement with no real input: curb has only a real
+  // length (no height/cross-section anywhere); island has no real position
+  // relative to the main countertop. Backsplash needs no fallback here --
+  // both its dimensions are real (see attachment-geometry.js).
+  const VISUAL_FALLBACK_CURB_HEIGHT_M = 0.03;
+  const VISUAL_FALLBACK_ISLAND_GAP_M = 0.9;
+
   const CAMERA_PRESETS = {
     top:   { direction: [0, 1, 0.0001] }, // near-vertical avoids a degenerate up-vector
     front: { direction: [0, 0.3, 1] },
@@ -31,5 +45,9 @@
     'iso-side-high': { direction: [1.3, 0.7, 0.4] }, // stairs/steps: angled from the side to read step geometry
   };
 
-  return { VISUAL_FALLBACK_THICKNESS_M, VISUAL_FALLBACK_SINK_INSET_M, CAMERA_PRESETS };
+  return {
+    VISUAL_FALLBACK_THICKNESS_M, VISUAL_FALLBACK_SINK_INSET_M, CAMERA_PRESETS,
+    VISUAL_FALLBACK_SINK_CUTOUT_SIZE_M, VISUAL_FALLBACK_COOKTOP_CUTOUT_SIZE_M, VISUAL_FALLBACK_HOLE_RADIUS_M,
+    VISUAL_FALLBACK_CURB_HEIGHT_M, VISUAL_FALLBACK_ISLAND_GAP_M,
+  };
 });

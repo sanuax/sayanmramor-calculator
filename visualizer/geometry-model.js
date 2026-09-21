@@ -12,28 +12,26 @@
   // inside that function's body, so it does not close over `root`. Re-derive
   // the same global directly instead.
   const globalRoot = typeof window !== 'undefined' ? window : globalThis;
-  const { VISUAL_FALLBACK_THICKNESS_M, VISUAL_FALLBACK_SINK_INSET_M } =
-    (typeof module !== 'undefined' && module.exports) ? require('./constants.js') : globalRoot.VisualizerConstants;
-
-  function resolvePlacement(position, widthM) {
-    if (position) {
-      return { xM: position.xMm / 1000, yM: position.yMm / 1000, source: 'real' };
-    }
-    // No real coordinate data exists anywhere in the calculator yet -- this
-    // is a demonstration-only point, tagged so the renderer can draw it
-    // differently from a confirmed position (see spec: "Sink/cooktop:
-    // fallback placement is visually disclosed, not just undocumented").
-    return { xM: widthM / 2, yM: VISUAL_FALLBACK_SINK_INSET_M, source: 'fallback' };
-  }
+  const isNode = typeof module !== 'undefined' && module.exports;
+  const { VISUAL_FALLBACK_THICKNESS_M } = isNode ? require('./constants.js') : globalRoot.VisualizerConstants;
+  const { resolveSinkCutout, resolveCooktopCutout, resolveHoles } = isNode ? require('./cutout-geometry.js') : globalRoot.CutoutGeometry;
+  const { resolveBacksplash, resolveCurb, resolveIsland } = isNode ? require('./attachment-geometry.js') : globalRoot.AttachmentGeometry;
 
   function buildGeometryModel(state) {
     const { widthM, lengthM } = state.dimensions;
-    const sinkState = state.additionalWorks.sink;
-    const cooktopState = state.additionalWorks.cooktop;
+
+    // wing is only promoted from ConstructorState's raw {widthM,lengthM}
+    // (always present, possibly zero) to a real geometry element once both
+    // dimensions are actually filled in -- see
+    // docs/superpowers/specs/2026-09-21-3d-visualizer-design.md.
+    const wing = state.shape === 'lshape' && state.wing.widthM > 0 && state.wing.lengthM > 0
+      ? { widthM: state.wing.widthM, lengthM: state.wing.lengthM, corner: state.corner }
+      : null;
 
     return {
-      shape: 'straight',
+      shape: wing ? 'lshape' : 'straight',
       widthM, lengthM,
+      wing,
       visualThicknessM: VISUAL_FALLBACK_THICKNESS_M,
       // The product's own default camera angle -- see PRODUCTS[key].cameraPreset
       // in product-types.js. Falls back to 'iso' whenever a product hasn't set
@@ -41,14 +39,12 @@
       // fallback for an unrecognized preset name.
       cameraPreset: (state.product && state.product.cameraPreset) || 'iso',
       edge: { type: state.edge.type, lengthMm: state.edge.lengthMm },
-      sink: sinkState.count > 0 ? {
-        type: sinkState.type, count: sinkState.count,
-        placement: resolvePlacement(sinkState.position, widthM),
-      } : null,
-      cooktop: cooktopState.count > 0 ? {
-        count: cooktopState.count,
-        placement: resolvePlacement(cooktopState.position, widthM),
-      } : null,
+      sink: resolveSinkCutout(state.additionalWorks.sink, widthM),
+      cooktop: resolveCooktopCutout(state.additionalWorks.cooktop, widthM),
+      holes: resolveHoles(state.holeCounts, widthM),
+      backsplash: resolveBacksplash(state.backsplash),
+      curb: resolveCurb(state.curbLengthM),
+      island: resolveIsland(state.island.standard, lengthM),
     };
   }
 

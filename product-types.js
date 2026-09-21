@@ -27,6 +27,11 @@
       label: "Столешницы в ванную", type: 'A',
       supportsEdgeWork: true,
       supportsCountertopExtras: true,
+      // supportsShapeSelection: НЕ ценообразующее поле -- разрешает выбор
+      // формы (прямая/Г-образная) в 3D-конструкторе. wing (второе крыло)
+      // сегодня НЕ учитывается в pricing.js -- см.
+      // docs/superpowers/specs/2026-09-21-3d-visualizer-design.md.
+      supportsShapeSelection: true,
       cameraPreset: 'iso-high',
       additionalWorks: {
         sinkCutout: true, cooktopCutout: false, holes: true,
@@ -42,6 +47,7 @@
       label: "Столешницы на кухню", type: 'A',
       supportsEdgeWork: true,
       supportsCountertopExtras: true,
+      supportsShapeSelection: true,
       cameraPreset: 'iso-eye-level',
       additionalWorks: {
         sinkCutout: true, cooktopCutout: true, holes: true,

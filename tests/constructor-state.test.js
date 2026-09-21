@@ -115,7 +115,7 @@ test('readConstructorState.product.capabilities matches ProductTypes.hasAddition
     stone: null, hasAdditionalWork,
   });
   assert.deepEqual(state.product.capabilities, {
-    supportsEdgeWork: true, supportsCountertopExtras: true,
+    supportsEdgeWork: true, supportsCountertopExtras: true, supportsShapeSelection: true,
     sinkCutout: true, cooktopCutout: false, holes: true,
     curb: true, backsplash: true, wallPanel: true, island: false, barCounter: false,
   });
@@ -194,4 +194,43 @@ test('buildPricingInputs.rates carries the product\'s own fabrication/installati
   const { rates } = ConstructorState.buildPricingInputs(state, baseRatesConfig('pol'));
   assert.equal(rates.fabricationRatePerM2, ProductTypes.WORK_RATES.pol.fabricationRatePerM2);
   assert.equal(rates.installationRatePerM2, ProductTypes.WORK_RATES.pol.installationRatePerM2);
+});
+
+test('readConstructorState.shape defaults to "straight" with a zeroed wing when the shape select is untouched', () => {
+  const doc = createFakeDoc({ width: { value: '2000' }, length: { value: '600' } });
+  const state = ConstructorState.readConstructorState({
+    doc, selectedProductKey: 'stoleshnitsa_kuhnya', product: PRODUCTS.stoleshnitsa_kuhnya, stone: null, hasAdditionalWork,
+  });
+  assert.equal(state.shape, 'straight');
+  assert.deepEqual(state.wing, { widthM: 0, lengthM: 0 });
+  assert.equal(state.corner, 'left');
+});
+
+test('readConstructorState.shape/wing/corner read real values for a product with supportsShapeSelection', () => {
+  const doc = createFakeDoc({
+    width: { value: '2000' }, length: { value: '600' },
+    productShape: { value: 'lshape' },
+    'wing-width': { value: '600' }, 'wing-length': { value: '1200' },
+    'shape-corner': { value: 'right' },
+  });
+  const state = ConstructorState.readConstructorState({
+    doc, selectedProductKey: 'stoleshnitsa_kuhnya', product: PRODUCTS.stoleshnitsa_kuhnya, stone: null, hasAdditionalWork,
+  });
+  assert.equal(state.shape, 'lshape');
+  assert.deepEqual(state.wing, { widthM: 0.6, lengthM: 1.2 });
+  assert.equal(state.corner, 'right');
+});
+
+test('readConstructorState forces shape to "straight" and zeroes wing for a product without supportsShapeSelection, even if the shared fields have leftover values', () => {
+  const doc = createFakeDoc({
+    width: { value: '1000' }, length: { value: '600' },
+    productShape: { value: 'lshape' }, // leftover from a previously selected countertop
+    'wing-width': { value: '600' }, 'wing-length': { value: '1200' },
+  });
+  const state = ConstructorState.readConstructorState({
+    doc, selectedProductKey: 'pol', product: PRODUCTS.pol, stone: null, hasAdditionalWork,
+  });
+  assert.equal(state.shape, 'straight');
+  assert.deepEqual(state.wing, { widthM: 0, lengthM: 0 });
+  assert.equal(state.corner, 'left');
 });

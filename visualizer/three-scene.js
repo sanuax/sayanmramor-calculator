@@ -2,18 +2,163 @@
 import * as THREE from '../vendor/three/three.module.js';
 import { OrbitControls } from '../vendor/three/OrbitControls.js';
 
-let renderer, scene, camera, controls, countertopMesh, currentCanvas, resizeObserver;
+let renderer, scene, camera, controls, productGroup, currentCanvas, resizeObserver;
 let frameId = null;
 let cameraPresetTracker = null;
 
-function buildMesh(geometryModel, materialDescriptor) {
-  const geometry = new THREE.BoxGeometry(geometryModel.widthM, geometryModel.visualThicknessM, geometryModel.lengthM);
-  const material = new THREE.MeshStandardMaterial({
+// Rendering-only proportions with no data significance -- not shared via
+// visualizer/constants.js because nothing outside this file needs them and
+// they're verified visually, not by assertion.
+const CUTOUT_MARKER_DEPTH_M = 0.02;
+const BACKSPLASH_PANEL_DEPTH_M = 0.02;
+const MARKER_COLOR = '#2b2b2b'; // sink/cooktop/hole markers: symbolic voids/fixtures, not stone
+
+// Coordinate convention for the whole group: origin is the MAIN segment's
+// center (matching the single-box convention this file used before L-shape/
+// attachments existed). X = width (left is -X), Z = length ("front", facing
+// the 'front' camera preset, is +Z; "back" is -Z). Y = thickness, centered.
+// Cut/hole positions from geometry-model.js are "distance from the left/front
+// edge" (0..widthM / 0..lengthM) and are converted to this local frame here.
+
+function buildSlabGeometry(xExtentM, zExtentM, thicknessM, edgeType) {
+  const shape = new THREE.Shape();
+  const hx = xExtentM / 2, hz = zExtentM / 2;
+  shape.moveTo(-hx, -hz);
+  shape.lineTo(hx, -hz);
+  shape.lineTo(hx, hz);
+  shape.lineTo(-hx, hz);
+  shape.closePath();
+
+  // Кромка (edge.type) как параметр геометрии: одна обобщённая фаска на весь
+  // периметр, когда выбран любой тип кромки -- не 5 разных реалистичных
+  // профилей (см. docs/superpowers/specs/2026-09-21-3d-visualizer-design.md).
+  const hasBevel = !!edgeType;
+  const bevel = hasBevel ? Math.min(thicknessM * 0.25, 0.01) : 0;
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth: thicknessM,
+    bevelEnabled: hasBevel,
+    bevelThickness: bevel,
+    bevelSize: bevel,
+    bevelSegments: hasBevel ? 2 : 0,
+    curveSegments: 1,
+  });
+  // ExtrudeGeometry extrudes the shape's local (x,y) along +Z by `depth`.
+  // Rotating -90 deg around X maps shape-x -> world X (unchanged), the
+  // extrude direction -> world Y (thickness), and shape-y -> world -Z (still
+  // centered, since the shape itself is symmetric around the origin).
+  geometry.rotateX(-Math.PI / 2);
+  geometry.translate(0, -thicknessM / 2, 0); // only Y (0..depth) needs centering
+  return geometry;
+}
+
+function buildStoneMaterial(materialDescriptor) {
+  return new THREE.MeshStandardMaterial({
     color: materialDescriptor.fallbackColor,
     roughness: materialDescriptor.roughness,
     metalness: materialDescriptor.metalness,
   });
-  return new THREE.Mesh(geometry, material);
+}
+
+function buildMarkerMaterial() {
+  return new THREE.MeshStandardMaterial({ color: MARKER_COLOR, roughness: 0.6 });
+}
+
+function buildProductGroup(geometryModel, materialDescriptor) {
+  const group = new THREE.Group();
+  const { widthM, lengthM, visualThicknessM: thicknessM, wing, edge, sink, cooktop, holes, backsplash, curb, island } = geometryModel;
+  // frameCameraOnModel()/setView() read these back to size the camera to the
+  // actual model -- a THREE.Group has no single .geometry.parameters the
+  // way the old one-box countertopMesh did.
+  group.userData.widthM = widthM;
+  group.userData.lengthM = lengthM;
+  const stoneMaterial = buildStoneMaterial(materialDescriptor);
+  const markerMaterial = buildMarkerMaterial();
+
+  group.add(new THREE.Mesh(buildSlabGeometry(widthM, lengthM, thicknessM, edge.type), stoneMaterial));
+
+  // Г-образная столешница: без CSG, второй прямоугольник визуально
+  // состыкован в углу главного (см. спека, "L-shape wing placement").
+  // wing.lengthM (его собственный "пробег", вдоль X) и wing.widthM (его
+  // "глубина", вдоль Z, заподлицо с задним краем главного сегмента, Z<0)
+  // -- поэтому extent-аргументы переставлены местами.
+  if (wing) {
+    const wingMesh = new THREE.Mesh(buildSlabGeometry(wing.lengthM, wing.widthM, thicknessM, edge.type), stoneMaterial);
+    const xSign = wing.corner === 'right' ? 1 : -1;
+    wingMesh.position.set(
+      xSign * (widthM / 2 + wing.lengthM / 2),
+      0,
+      -(lengthM / 2 + wing.widthM / 2),
+    );
+    group.add(wingMesh);
+  }
+
+  function toLocalX(xM) { return xM - widthM / 2; }
+  function toLocalZ(zM) { return lengthM / 2 - zM; }
+
+  // Мойка/варочная панель: без CSG нельзя вырезать дыру из box, поэтому
+  // врезной вид (undermount/integrated, и варочная -- всегда врез) имитирует
+  // тёмная утопленная плашка, а накладная мойка (overlay) -- приподнятая.
+  function addCutoutMarker(cutout, isRaised) {
+    const geometry = new THREE.BoxGeometry(cutout.cut.widthM, CUTOUT_MARKER_DEPTH_M, cutout.cut.lengthM);
+    const mesh = new THREE.Mesh(geometry, markerMaterial);
+    const yCenter = isRaised
+      ? thicknessM / 2 + CUTOUT_MARKER_DEPTH_M / 2
+      : thicknessM / 2 - CUTOUT_MARKER_DEPTH_M / 2;
+    mesh.position.set(toLocalX(cutout.cut.xM), yCenter, toLocalZ(cutout.cut.zM));
+    group.add(mesh);
+  }
+  if (sink) addCutoutMarker(sink, sink.type === 'overlay');
+  if (cooktop) addCutoutMarker(cooktop, false);
+
+  // Отверстия: маленькие символические цилиндры, пронизывающие толщину.
+  function addHoleMarker(hole) {
+    if (!hole) return;
+    const geometry = new THREE.CylinderGeometry(hole.radiusM, hole.radiusM, thicknessM * 1.4, 12);
+    const mesh = new THREE.Mesh(geometry, markerMaterial);
+    mesh.position.set(toLocalX(hole.position.xM), 0, toLocalZ(hole.position.zM));
+    group.add(mesh);
+  }
+  if (holes) {
+    addHoleMarker(holes.mixer);
+    addHoleMarker(holes.socket);
+    addHoleMarker(holes.dispenser);
+  }
+
+  // Фартук: тонкая вертикальная панель вдоль заднего края (Z < 0), из того
+  // же материала, что и столешница -- это реальный камень, а не маркер.
+  if (backsplash) {
+    const geometry = new THREE.BoxGeometry(backsplash.lengthM, backsplash.heightM, BACKSPLASH_PANEL_DEPTH_M);
+    const mesh = new THREE.Mesh(geometry, stoneMaterial);
+    mesh.position.set(0, thicknessM / 2 + backsplash.heightM / 2, -(lengthM / 2 + BACKSPLASH_PANEL_DEPTH_M / 2));
+    group.add(mesh);
+  }
+
+  // Бортик: невысокая приподнятая полоса вдоль переднего края (Z > 0),
+  // квадратное сечение (высота = глубина) -- нет реальных данных для формы
+  // сечения, только длина.
+  if (curb) {
+    const geometry = new THREE.BoxGeometry(curb.lengthM, curb.heightM, curb.heightM);
+    const mesh = new THREE.Mesh(geometry, stoneMaterial);
+    mesh.position.set(0, thicknessM / 2 + curb.heightM / 2, lengthM / 2 - curb.heightM / 2);
+    group.add(mesh);
+  }
+
+  // Остров: отдельная самостоятельная плита, тот же материал, со смещением
+  // от главной столешницы (offsetXM/offsetZM уже готовые локальные координаты).
+  if (island) {
+    const mesh = new THREE.Mesh(buildSlabGeometry(island.widthM, island.lengthM, thicknessM, edge.type), stoneMaterial);
+    mesh.position.set(island.offsetXM, 0, island.offsetZM);
+    group.add(mesh);
+  }
+
+  return group;
+}
+
+function disposeGroup(group) {
+  group.traverse(obj => {
+    if (obj.geometry) obj.geometry.dispose();
+    if (obj.material) obj.material.dispose();
+  });
 }
 
 function frameCameraOnModel(geometryModel) {
@@ -69,14 +214,13 @@ function resize() {
 }
 
 function update(geometryModel, materialDescriptor) {
-  const isFirstModel = !countertopMesh;
-  if (countertopMesh) {
-    scene.remove(countertopMesh);
-    countertopMesh.geometry.dispose();
-    countertopMesh.material.dispose();
+  const isFirstModel = !productGroup;
+  if (productGroup) {
+    scene.remove(productGroup);
+    disposeGroup(productGroup);
   }
-  countertopMesh = buildMesh(geometryModel, materialDescriptor);
-  scene.add(countertopMesh);
+  productGroup = buildProductGroup(geometryModel, materialDescriptor);
+  scene.add(productGroup);
 
   // Every update() call (not just the first) adopts the current product's
   // own default -- so switching products mid-session immediately changes
@@ -92,9 +236,9 @@ function update(geometryModel, materialDescriptor) {
 }
 
 function setView(presetName) {
-  const distance = countertopMesh ? frameCameraOnModel({
-    widthM: countertopMesh.geometry.parameters.width,
-    lengthM: countertopMesh.geometry.parameters.depth,
+  const distance = productGroup ? frameCameraOnModel({
+    widthM: productGroup.userData.widthM || 2,
+    lengthM: productGroup.userData.lengthM || 2,
   }) : 2;
   // CAMERA_PRESETS lives in visualizer/constants.js (a UMD script, not an ES
   // module, so it can't be `import`ed here) -- read it off the global it
@@ -118,13 +262,10 @@ function resetView() {
 function dispose() {
   if (frameId !== null) cancelAnimationFrame(frameId);
   if (resizeObserver) resizeObserver.disconnect();
-  if (countertopMesh) {
-    countertopMesh.geometry.dispose();
-    countertopMesh.material.dispose();
-  }
+  if (productGroup) disposeGroup(productGroup);
   if (controls) controls.dispose();
   if (renderer) renderer.dispose();
-  renderer = scene = camera = controls = countertopMesh = currentCanvas = resizeObserver = null;
+  renderer = scene = camera = controls = productGroup = currentCanvas = resizeObserver = null;
   cameraPresetTracker = null;
 }
 

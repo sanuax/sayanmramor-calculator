@@ -574,6 +574,22 @@
         <div class="error" id="dimError">Укажите ширину и длину больше нуля</div>
       </div>
 
+      <div class="field" id="shapeField" style="display:none">
+        <label>Форма</label>
+        <select id="productShape">
+          <option value="straight">Прямая</option>
+          <option value="lshape">Г-образная</option>
+        </select>
+        <div class="dims" id="wingField" style="margin-top:8px;display:none">
+          <input type="number" id="wing-width" placeholder="Крыло, ширина мм" min="0" step="1">
+          <input type="number" id="wing-length" placeholder="Крыло, длина мм" min="0" step="1">
+        </div>
+        <select id="shape-corner" style="margin-top:8px;display:none">
+          <option value="left">Угол слева</option>
+          <option value="right">Угол справа</option>
+        </select>
+      </div>
+
       <div class="field" id="edgeWork" style="display:none">
         <label>Кромка</label>
         <input type="number" id="edge-straight" placeholder="Прямая, мм (погонный размер)" min="0" step="1">
@@ -736,6 +752,8 @@
 <script src="rate-catalog.js"></script>
 <script src="constructor-state.js"></script>
 <script src="visualizer/constants.js"></script>
+<script src="visualizer/cutout-geometry.js"></script>
+<script src="visualizer/attachment-geometry.js"></script>
 <script src="visualizer/geometry-model.js"></script>
 <script src="visualizer/material-adapter.js"></script>
 <script src="visualizer/webgl-support.js"></script>
@@ -840,6 +858,15 @@
   const infoBlock = document.getElementById('infoBlock');
   const countertopExtrasField = document.getElementById('countertopExtras');
   const edgeWorkField = document.getElementById('edgeWork');
+  const shapeField = document.getElementById('shapeField');
+  const productShapeSelect = document.getElementById('productShape');
+  const wingField = document.getElementById('wingField');
+  const shapeCornerSelect = document.getElementById('shape-corner');
+  function updateWingVisibility() {
+    const isLshape = productShapeSelect.value === 'lshape';
+    wingField.style.display = isLshape ? '' : 'none';
+    shapeCornerSelect.style.display = isLshape ? '' : 'none';
+  }
   // Декларативный список групп внутри #countertopExtras -- одна точка
   // соответствия "контейнер в разметке" -> "какая capability его открывает",
   // вместо if-цепочки на каждое поле. hasAdditionalWork() уже безопасно
@@ -1060,6 +1087,8 @@
     const product = selectedProductKey ? PRODUCTS[selectedProductKey] : null;
     countertopExtrasField.style.display = product && product.supportsCountertopExtras ? '' : 'none';
     edgeWorkField.style.display = product && product.supportsEdgeWork ? '' : 'none';
+    shapeField.style.display = product && product.supportsShapeSelection ? '' : 'none';
+    updateWingVisibility();
     updateAdditionalWorkGroupsVisibility(product);
 
     const width = mmToM(parseFloat(widthInput.value) || 0);
@@ -1270,6 +1299,9 @@
   ].forEach(id => document.getElementById(id).addEventListener('input', calculate));
   productSubcategorySelect.addEventListener('change', () => { updateSubcategoryQtyVisibility(); calculate(); });
   subcategoryQtyInput.addEventListener('input', calculate);
+  productShapeSelect.addEventListener('change', () => { updateWingVisibility(); calculate(); });
+  ['wing-width', 'wing-length'].forEach(id => document.getElementById(id).addEventListener('input', calculate));
+  shapeCornerSelect.addEventListener('change', calculate);
 
   ctaBtn.addEventListener('click', () => {
     if (parseFloat(widthInput.value) > 0 && parseFloat(lengthInput.value) > 0) {
