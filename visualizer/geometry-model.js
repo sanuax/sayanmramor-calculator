@@ -7,8 +7,13 @@
   }
 })(typeof window !== 'undefined' ? window : globalThis, function () {
 
+  // NOTE: can't reference the outer IIFE's `root` param here -- this factory
+  // function is a separate literal passed in as an argument, not nested
+  // inside that function's body, so it does not close over `root`. Re-derive
+  // the same global directly instead.
+  const globalRoot = typeof window !== 'undefined' ? window : globalThis;
   const { VISUAL_FALLBACK_THICKNESS_M, VISUAL_FALLBACK_SINK_INSET_M } =
-    (typeof module !== 'undefined' && module.exports) ? require('./constants.js') : root.VisualizerConstants;
+    (typeof module !== 'undefined' && module.exports) ? require('./constants.js') : globalRoot.VisualizerConstants;
 
   function resolvePlacement(position, widthM) {
     if (position) {
