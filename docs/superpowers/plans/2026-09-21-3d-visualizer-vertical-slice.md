@@ -1547,14 +1547,14 @@ function setView(presetName) {
     widthM: countertopMesh.geometry.parameters.width,
     lengthM: countertopMesh.geometry.parameters.depth,
   }) : 2;
-  const presets = {
-    top:   [0, distance * 1.4, 0.0001],
-    front: [0, distance * 0.3, distance],
-    side:  [distance, distance * 0.3, 0],
-    iso:   [distance * 0.8, distance * 0.7, distance * 0.8],
-  };
-  const [x, y, z] = presets[presetName] || presets.iso;
-  camera.position.set(x, y, z);
+  // CAMERA_PRESETS lives in visualizer/constants.js (a UMD script, not an ES
+  // module, so it can't be `import`ed here) -- read it off the global it
+  // already attaches to `window`, so there's one source of truth for the 4
+  // view directions instead of a second copy hardcoded in this file.
+  const presetsByName = window.VisualizerConstants.CAMERA_PRESETS;
+  const preset = presetsByName[presetName] || presetsByName.iso;
+  const [dx, dy, dz] = preset.direction;
+  camera.position.set(dx * distance, dy * distance, dz * distance);
   controls.target.set(0, 0, 0);
   controls.update();
 }
@@ -1582,7 +1582,7 @@ export default ThreeScene;
 
 - [ ] **Step 2: Manual verification (no automated test — WebGL requires a real browser)**
 
-Using the project's dev server and the Browser tool (or a real browser), with a minimal test page that calls `ThreeScene.init(canvas)` then `ThreeScene.update({ widthM: 2, lengthM: 0.6, visualThicknessM: 0.04, edge: {type:null,lengthMm:null}, sink:null, cooktop:null }, { fallbackColor: '#e8ddc7', roughness: 0.25, metalness: 0.02 })`:
+Using the project's dev server and the Browser tool (or a real browser), build a throwaway test page (e.g. `visualizer/manual-test.html`, not committed — delete it before Step 3's commit) that loads `<script src="constants.js"></script>` (classic, so `window.VisualizerConstants` exists — `setView` reads `CAMERA_PRESETS` from it) followed by `<script type="module">` importing `./three-scene.js` as its default export, with a `<canvas>` in the page. Call `ThreeScene.init(canvas)` then `ThreeScene.update({ widthM: 2, lengthM: 0.6, visualThicknessM: 0.04, edge: {type:null,lengthMm:null}, sink:null, cooktop:null }, { fallbackColor: '#e8ddc7', roughness: 0.25, metalness: 0.02 })`:
 
 1. A beige box roughly 2×0.6 renders, proportioned like a countertop (wide/shallow, not a cube).
 2. Left-drag rotates the view; scroll/pinch zooms; right-drag (or two-finger drag) pans.
@@ -1684,15 +1684,7 @@ In the inline `<script>`, near the other top-level `const`s, add:
 
   function mountViewerIfSupported() {
     if (!WebglSupport.isWebglAvailable()) return;
-    // window.ThreeScene is set by the ES module script -- it may not have
-    // executed yet on the very first tick, so retry once via a microtask;
-    // ES module scripts run after all classic scripts but their relative
-    // order with this inline classic script isn't guaranteed by the
-    // `<script type="module">` spec the way classic-script order is.
-    if (!window.ThreeScene) {
-      Promise.resolve().then(mountViewerIfSupported);
-      return;
-    }
+    if (!window.ThreeScene) return; // see DOMContentLoaded note below
     viewerPanel.hidden = false;
     window.ThreeScene.init(viewerCanvas);
     viewerReady = true;
@@ -1701,7 +1693,19 @@ In the inline `<script>`, near the other top-level `const`s, add:
     });
     document.getElementById('viewerReset').addEventListener('click', () => window.ThreeScene.resetView());
   }
-  mountViewerIfSupported();
+  // A `<script type="module">` (visualizer/three-scene.js) is always deferred
+  // by the HTML spec -- it executes after the document finishes parsing but
+  // BEFORE `DOMContentLoaded` fires, even though it's declared before this
+  // classic, non-deferred inline script (which runs immediately, at parse
+  // time, before the module has had a chance to run). Do NOT call
+  // mountViewerIfSupported() directly here, and do NOT poll for
+  // window.ThreeScene with a recursive Promise.resolve().then() -- a
+  // microtask that re-schedules itself every time it finds ThreeScene
+  // missing never yields to the task queue the module's own execution is
+  // waiting on, so it hangs the page instead of just being slow. Waiting for
+  // DOMContentLoaded is both correct (module execution is spec-guaranteed to
+  // finish before it fires) and simple:
+  document.addEventListener('DOMContentLoaded', mountViewerIfSupported);
 ```
 
 At the end of `calculate()`, right before its final closing `}` (after `updatedAtOut.textContent = ...`), add:
