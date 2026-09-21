@@ -19,6 +19,21 @@
     --pick-fill: #f2f0ed;
     --pick-tile: #edeae6;
     --pick-ease: cubic-bezier(0.22, 0.68, 0.24, 1);
+
+    /* Токены согласованного V2-конструктора (visual reference:
+       https://claude.ai/artifact/8fkDjjV6vDdwZypMQwN7zK) -- переносятся как
+       есть, --accent совпадает с уже использовавшимся в калькуляторе #ff5a1f. */
+    --ink: #1a1a1a;
+    --muted: #6e6a65;
+    --line: #e7e4e0;
+    --page: #f4f4f4;
+    --card: #ffffff;
+    --card-hover: #fafafa;
+    --accent: #ff5a1f;
+    --accent-ink: #7a2a0e;
+    --accent-soft: #fff1ea;
+    --stone: #d9d3c8;
+    --stone-line: #b3aa9a;
   }
 
   body {
@@ -134,43 +149,58 @@
   .product-card:has(input:checked) .product-card-label { color: #ff5a1f; font-weight: 700; }
   .product-card:has(input:focus-visible) { outline: 2px solid #ff5a1f; outline-offset: 2px; }
 
-  /* Same card-is-the-selection pattern as .product-card above (native radio
-     hidden inside the label, :has(input:checked) drives the visual state) --
-     reused here for кромка/форма so the whole constructor speaks one visual
-     language. The one addition is an explicit checkmark badge: unlike
-     .product-card (border+background alone was enough there), edge/shape
-     cards must show a checkmark, and it must reserve its layout space at all
-     times via `visibility` rather than `display` -- toggling `display`
-     removes/re-adds the badge from flow, which stretches the whole card row
-     (flex-column card + CSS Grid's default align-items:stretch) and produces
-     a layout jump on selection change. */
-  .edge-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
-  .shape-card-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; max-width: 240px; }
-  .edge-card, .shape-card {
+  /* Кромка/форма: перенесено буквально из согласованного V2-конструктора
+     (https://claude.ai/artifact/8fkDjjV6vDdwZypMQwN7zK) -- .card-grid/
+     .pick-card/.pc-check/.pc-title/.pc-desc, плюс .reveal-row/.field-unit
+     для полей длины. Чекмарк -- обычный элемент в потоке (не
+     position:absolute), сдвинутый в угол отрицательным margin, и скрыт через
+     `visibility`, а не `display`: он должен резервировать своё место в
+     карточке всегда, иначе появление display:flex при выборе добавляет
+     карточке реальную высоту, CSS Grid растягивает на неё весь ряд карточек,
+     и всё, что ниже, сдвигается -- та же причина "прыжка", что уже
+     диагностировалась и чинилась в самом V2-концепте. */
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 10px; }
+  .pick-card {
     position: relative;
-    display: flex; flex-direction: column; align-items: center; gap: 4px;
-    padding: 10px 6px 8px;
-    border: 1px solid #ddd; border-radius: 6px;
-    background: #fafafa;
-    text-align: center;
-    cursor: pointer;
-    transition: border-color 0.15s, background 0.15s;
+    background: var(--card); border: 1.5px solid var(--line); border-radius: 12px;
+    padding: 12px 10px 10px; cursor: pointer; text-align: center;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    transition: border-color 0.15s, background-color 0.15s;
   }
-  .edge-card:hover, .shape-card:hover { border-color: #bbb; }
-  .edge-card input, .shape-card input {
-    position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none;
+  .pick-card:hover { background: var(--card-hover); border-color: var(--stone-line); }
+  .pick-card svg { width: 100%; height: 44px; }
+  .pick-card .pc-title { font-size: 12.5px; font-weight: 700; line-height: 1.25; color: var(--ink); }
+  .pick-card .pc-desc { font-size: 11px; color: var(--muted); line-height: 1.3; }
+  .pick-card.selected { border-color: var(--accent); background: var(--accent-soft); }
+  .pick-card.selected .pc-title { color: var(--accent-ink); }
+  .pick-card .pc-check {
+    position: relative; align-self: flex-end; margin: -6px -4px -2px 0;
+    width: 18px; height: 18px; border-radius: 50%;
+    border: 1.5px solid var(--line); background: var(--card);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; color: #fff; visibility: hidden;
   }
-  .edge-card svg, .shape-card svg { width: 30px; height: 22px; color: #555; }
-  .edge-card-label, .shape-card-label { font-size: 11px; line-height: 1.2; color: #333; }
-  .card-check {
-    position: absolute; top: 4px; right: 4px; width: 14px; height: 14px;
-    color: #ff5a1f; visibility: hidden;
+  .pick-card.selected .pc-check { visibility: visible; background: var(--accent); border-color: var(--accent); }
+  .pick-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .reveal-rows { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+  .reveal-row {
+    display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
   }
-  .edge-card:has(input:checked), .shape-card:has(input:checked) { border-color: #ff5a1f; background: #fff5ef; }
-  .edge-card:has(input:checked) svg, .shape-card:has(input:checked) svg { color: #ff5a1f; }
-  .edge-card:has(input:checked) .edge-card-label, .shape-card:has(input:checked) .shape-card-label { color: #ff5a1f; font-weight: 700; }
-  .edge-card:has(input:checked) .card-check, .shape-card:has(input:checked) .card-check { visibility: visible; }
-  .edge-card:has(input:focus-visible), .shape-card:has(input:focus-visible) { outline: 2px solid #ff5a1f; outline-offset: 2px; }
+  .reveal-row .rr-title { font-size: 13px; font-weight: 700; flex: 1 1 auto; min-width: 0; color: var(--ink); }
+  .reveal-row .field-unit { flex: 0 0 140px; }
+
+  .field-unit { position: relative; min-width: 0; }
+  .field-unit input {
+    width: 100%; padding: 10px 40px 10px 12px; border: 1px solid var(--line);
+    border-radius: 8px; font-size: 14px; background: var(--page); color: var(--ink);
+  }
+  .field-unit input:focus { outline: none; border-color: var(--accent); }
+  .field-unit .unit { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 12px; color: var(--muted); pointer-events: none; }
+  .field-unit .unit-label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .field-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .field-row .field-unit { flex: 1 1 140px; }
 
   /* The picker's trigger deliberately keeps the same silhouette as the <select>
      and number inputs beside it -- it is one more field in the same form, and
@@ -614,16 +644,24 @@
 
       <div class="field" id="shapeField" style="display:none">
         <label id="shapeLabel">Форма</label>
-        <div class="shape-card-grid" id="shapeCardGrid" role="radiogroup" aria-labelledby="shapeLabel"></div>
+        <div class="card-grid" id="shapeCardGrid" role="radiogroup" aria-labelledby="shapeLabel"></div>
         <!-- Real select constructor-state.js reads (`#productShape`) -- kept
              exactly as before, hidden; the visible cards above drive it. -->
         <select id="productShape" hidden>
           <option value="straight">Прямая</option>
           <option value="lshape">Г-образная</option>
         </select>
-        <div class="dims" id="wingField" style="margin-top:8px;display:none">
-          <input type="number" id="wing-width" placeholder="Крыло, ширина мм" min="0" step="1">
-          <input type="number" id="wing-length" placeholder="Крыло, длина мм" min="0" step="1">
+        <div class="field-row" id="wingField" style="margin-top:14px;display:none">
+          <div class="field-unit">
+            <span class="unit-label">Крыло, ширина</span>
+            <input type="number" id="wing-width" min="0" step="1" placeholder="600">
+            <span class="unit">мм</span>
+          </div>
+          <div class="field-unit">
+            <span class="unit-label">Крыло, длина</span>
+            <input type="number" id="wing-length" min="0" step="1" placeholder="1000">
+            <span class="unit">мм</span>
+          </div>
         </div>
         <select id="shape-corner" style="margin-top:8px;display:none">
           <option value="left">Угол слева</option>
@@ -633,8 +671,16 @@
 
       <div class="field" id="edgeWork" style="display:none">
         <label id="edgeLabel">Кромка</label>
-        <div class="edge-card-grid" id="edgeCardGrid" role="radiogroup" aria-labelledby="edgeLabel"></div>
-        <input type="number" id="edge-length-shared" placeholder="Длина кромки, мм (погонный размер)" min="0" step="1" style="margin-top:8px">
+        <div class="card-grid" id="edgeCardGrid" role="radiogroup" aria-labelledby="edgeLabel"></div>
+        <div class="reveal-rows">
+          <div class="reveal-row" id="edgeRevealRow" style="visibility:hidden">
+            <span class="rr-title" id="edgeRevealTitle">Длина кромки</span>
+            <div class="field-unit">
+              <input type="number" id="edge-length-shared" min="0" step="1" placeholder="0">
+              <span class="unit">мм</span>
+            </div>
+          </div>
+        </div>
         <!-- Real fields constructor-state.js reads, one per edge type -- kept
              exactly as before, hidden; at most one is ever non-zero, kept in
              sync with the card selection + shared length field above. -->
@@ -914,113 +960,119 @@
     shapeCornerSelect.style.display = isLshape ? '' : 'none';
   }
 
-  // Общий строитель карточки "иконка + подпись + чекмарк", тот же паттерн,
-  // что и product-card (radio скрыт внутри label, :has(input:checked) в CSS
-  // делает всё визуальное состояние) -- один визуальный язык на весь
-  // конструктор вместо технических select/чисел.
-  function buildChoiceCard({ container, name, value, label, iconPath, cardClass, checked, onChange }) {
-    const cardLabel = document.createElement('label');
-    cardLabel.className = cardClass;
-    const input = document.createElement('input');
-    input.type = 'radio';
-    input.name = name;
-    input.value = value;
-    input.checked = checked;
-    input.addEventListener('change', () => onChange(value));
-    const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    icon.setAttribute('viewBox', '0 0 24 24');
-    icon.setAttribute('fill', 'none');
-    icon.setAttribute('stroke', 'currentColor');
-    icon.setAttribute('stroke-width', '1.6');
-    icon.setAttribute('stroke-linecap', 'round');
-    icon.setAttribute('stroke-linejoin', 'round');
-    icon.setAttribute('aria-hidden', 'true');
-    icon.innerHTML = iconPath;
-    const text = document.createElement('span');
-    text.className = cardClass + '-label';
-    text.textContent = label;
-    const check = document.createElement('span');
-    check.className = 'card-check';
-    check.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg>';
-    cardLabel.appendChild(input);
-    cardLabel.appendChild(icon);
-    cardLabel.appendChild(text);
-    cardLabel.appendChild(check);
-    container.appendChild(cardLabel);
+  function svgIcon(inner, viewBox) {
+    return '<svg viewBox="' + (viewBox || '0 0 60 60') + '" aria-hidden="true">' + inner + '</svg>';
   }
 
-  // Мини-иллюстрации профиля кромки (вид сбоку: верхняя грань + обработка
-  // угла) -- те же 24x24 line-icon соглашения, что и PRODUCT_ICONS выше.
-  const EDGE_ICONS = {
-    straight:     '<path d="M3 6h12M15 6v14"/>',
-    rounding:     '<path d="M3 6h8a4 4 0 0 1 4 4v10"/>',
-    bevel:        '<path d="M3 6h9l4 4v10"/>',
-    figured:      '<path d="M3 6h6c1.5 0 1.5 3 3 3s1.5-3 3-3v14"/>',
-    'stone-wrap': '<path d="M3 6h12v18"/>',
-  };
-  const SHAPE_ICONS = {
-    straight: '<rect x="4" y="9" width="16" height="7" rx="1"/>',
-    lshape:   '<path d="M4 4h9v9h7v9H4z"/>',
-  };
-
-  // Порядок отображения карточек -- по требованию UX, отличается от
-  // приоритетного порядка EDGE_FIELDS внутри constructor-state.js (там
-  // порядок влияет на выбор типа при нескольких одновременно ненулевых полях;
-  // здесь ненулевым может быть только одно поле сразу, так что порядок
-  // отображения ни на что не влияет функционально).
-  const EDGE_CARDS = [
-    { type: 'straight', elId: 'edge-straight', label: 'Прямая' },
-    { type: 'rounding', elId: 'edge-round', label: 'Скругление' },
-    { type: 'bevel', elId: 'edge-chamfer', label: 'Скос (фаска)' },
-    { type: 'figured', elId: 'edge-figured', label: 'Фигурная' },
-    { type: 'stone-wrap', elId: 'edge-stonefold', label: 'Подгиб камнем' },
+  // Кромка: карточки, иконки (var(--stone)/var(--stone-line) заливка, вид
+  // сбоку на профиль торца) и текст перенесены буквально из согласованного
+  // V2-конструктора (https://claude.ai/artifact/8fkDjjV6vDdwZypMQwN7zK).
+  // Порядок отображения -- по требованию UX, отличается от приоритетного
+  // порядка EDGE_FIELDS внутри constructor-state.js (там порядок влияет на
+  // выбор типа при нескольких одновременно ненулевых полях; здесь ненулевым
+  // может быть только одно поле сразу, так что порядок отображения ни на что
+  // не влияет функционально).
+  const EDGE_TYPES = [
+    { type: 'straight', elId: 'edge-straight', title: 'Прямая', desc: 'Ровный срез без обработки',
+      icon: svgIcon('<rect x="14" y="12" width="24" height="36" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="2"/>') },
+    { type: 'rounding', elId: 'edge-round', title: 'Скругление', desc: 'Мягкий край без острых углов',
+      icon: svgIcon('<path d="M14 12 H26 A12 12 0 0 1 38 24 V48 H14 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="2"/>') },
+    { type: 'bevel', elId: 'edge-chamfer', title: 'Скос (фаска)', desc: 'Край срезан под углом',
+      icon: svgIcon('<path d="M14 12 H32 L38 18 V48 H14 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="2"/>') },
+    { type: 'figured', elId: 'edge-figured', title: 'Фигурная', desc: 'Волнообразный резной профиль',
+      icon: svgIcon('<path d="M14 12 H26 C36 12 36 20 30 22 C24 24 24 30 32 30 C38 30 38 36 38 40 V48 H14 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="2"/>') },
+    { type: 'stone-wrap', elId: 'edge-stonefold', title: 'Подгиб камнем', desc: 'Торец выглядит толще — камень подвёрнут вниз',
+      icon: svgIcon('<rect x="10" y="12" width="28" height="10" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="2"/><path d="M28 22 L38 22 L38 48 L30 48 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="2"/>') },
   ];
 
   const edgeCardGrid = document.getElementById('edgeCardGrid');
+  const edgeRevealRow = document.getElementById('edgeRevealRow');
+  const edgeRevealTitle = document.getElementById('edgeRevealTitle');
   const edgeLengthSharedInput = document.getElementById('edge-length-shared');
   // Длина кромки хранится отдельно по каждому типу только в памяти JS (не в
   // DOM) -- при переключении карточки предыдущее значение восстанавливается,
   // но в реальных (скрытых) полях ненулевым остаётся только текущий тип,
   // поэтому в pricing.js по-прежнему попадает ровно одна позиция кромки.
+  // selectedEdgeType изначально null (как и в V2) -- ни одна карточка не
+  // выбрана по умолчанию, повторный клик по уже выбранной снимает выбор.
   const edgeLengthsByType = {};
-  let selectedEdgeType = 'straight';
+  let selectedEdgeType = null;
 
   function syncHiddenEdgeFields() {
-    EDGE_CARDS.forEach(c => {
+    EDGE_TYPES.forEach(c => {
       document.getElementById(c.elId).value = (c.type === selectedEdgeType) ? edgeLengthSharedInput.value : '';
     });
   }
 
-  function selectEdgeType(type) {
-    edgeLengthsByType[selectedEdgeType] = edgeLengthSharedInput.value;
-    selectedEdgeType = type;
-    edgeLengthSharedInput.value = edgeLengthsByType[type] || '';
+  edgeLengthSharedInput.addEventListener('input', () => {
+    if (selectedEdgeType) edgeLengthsByType[selectedEdgeType] = edgeLengthSharedInput.value;
     syncHiddenEdgeFields();
-  }
-
-  EDGE_CARDS.forEach(({ type, label }) => {
-    buildChoiceCard({
-      container: edgeCardGrid, name: 'edgeCardChoice', value: type, label,
-      iconPath: EDGE_ICONS[type], cardClass: 'edge-card', checked: type === selectedEdgeType,
-      onChange: (value) => { selectEdgeType(value); calculate(); },
-    });
+    calculate();
   });
-  edgeLengthSharedInput.addEventListener('input', () => { syncHiddenEdgeFields(); calculate(); });
 
-  const shapeCardGrid = document.getElementById('shapeCardGrid');
-  const SHAPE_CARDS = [
-    { value: 'straight', label: 'Прямая' },
-    { value: 'lshape', label: 'Г-образная' },
+  EDGE_TYPES.forEach(edgeDef => {
+    const card = document.createElement('div');
+    card.className = 'pick-card';
+    card.setAttribute('role', 'button');
+    card.setAttribute('tabindex', '0');
+    card.innerHTML = '<span class="pc-check">✓</span>' + edgeDef.icon +
+      '<div class="pc-title">' + edgeDef.title + '</div><div class="pc-desc">' + edgeDef.desc + '</div>';
+    function selectEdge() {
+      if (selectedEdgeType === edgeDef.type) {
+        // Повторный клик по уже выбранной карточке -- снять выбор совсем.
+        // reveal-row не удаляется из разметки, просто становится невидимой
+        // (visibility, не display) -- она и так резервирует своё место.
+        selectedEdgeType = null;
+        card.classList.remove('selected');
+        edgeRevealRow.style.visibility = 'hidden';
+        syncHiddenEdgeFields();
+        calculate();
+        return;
+      }
+      selectedEdgeType = edgeDef.type;
+      Array.prototype.forEach.call(edgeCardGrid.children, c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      edgeRevealTitle.textContent = 'Длина кромки — ' + edgeDef.title.toLowerCase();
+      edgeLengthSharedInput.value = edgeLengthsByType[edgeDef.type] || '';
+      edgeRevealRow.style.visibility = 'visible';
+      syncHiddenEdgeFields();
+      calculate();
+    }
+    card.addEventListener('click', selectEdge);
+    card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectEdge(); } });
+    edgeCardGrid.appendChild(card);
+  });
+
+  // Форма: та же карточная система, что и кромка (эту часть V2-концепт не
+  // покрывал -- иконки/описания новые, но в том же визуальном языке: заливка
+  // var(--stone), вид сбоку/сверху на профиль). В отличие от кромки, здесь
+  // всегда выбран ровно один вариант, без снятия по повторному клику -- у
+  // shape в ConstructorState нет валидного состояния "форма не выбрана".
+  const SHAPE_TYPES = [
+    { value: 'straight', title: 'Прямая', desc: 'Стандартная прямоугольная столешница',
+      icon: svgIcon('<rect x="10" y="20" width="40" height="20" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="2" rx="2"/>') },
+    { value: 'lshape', title: 'Г-образная', desc: 'Угловая столешница из двух сегментов',
+      icon: svgIcon('<path d="M10 10 H30 V30 H50 V50 H10 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="2"/>') },
   ];
-  SHAPE_CARDS.forEach(({ value, label }) => {
-    buildChoiceCard({
-      container: shapeCardGrid, name: 'shapeCardChoice', value, label,
-      iconPath: SHAPE_ICONS[value], cardClass: 'shape-card', checked: value === productShapeSelect.value,
-      onChange: (val) => {
-        productShapeSelect.value = val;
-        productShapeSelect.dispatchEvent(new Event('change', { bubbles: true }));
-      },
-    });
+  const shapeCardGrid = document.getElementById('shapeCardGrid');
+
+  function selectShapeCard(value) {
+    Array.prototype.forEach.call(shapeCardGrid.children, c => c.classList.toggle('selected', c.dataset.shapeValue === value));
+    productShapeSelect.value = value;
+    productShapeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  SHAPE_TYPES.forEach(shapeDef => {
+    const card = document.createElement('div');
+    card.className = 'pick-card';
+    card.dataset.shapeValue = shapeDef.value;
+    card.setAttribute('role', 'button');
+    card.setAttribute('tabindex', '0');
+    if (shapeDef.value === productShapeSelect.value) card.classList.add('selected');
+    card.innerHTML = '<span class="pc-check">✓</span>' + shapeDef.icon +
+      '<div class="pc-title">' + shapeDef.title + '</div><div class="pc-desc">' + shapeDef.desc + '</div>';
+    card.addEventListener('click', () => selectShapeCard(shapeDef.value));
+    card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectShapeCard(shapeDef.value); } });
+    shapeCardGrid.appendChild(card);
   });
   // Декларативный список групп внутри #countertopExtras -- одна точка
   // соответствия "контейнер в разметке" -> "какая capability его открывает",
