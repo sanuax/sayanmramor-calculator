@@ -84,6 +84,38 @@
     overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
   }
 
+  /* Adaptive Step Engine (step-engine.js): compact progress strip + Back/Next
+     nav, added on top of the existing .configurator/.step language above --
+     same tokens, no redesign. Exactly one .step[data-step-id] is visible at
+     a time; see updateStepUI() further down in the page script. */
+  .step-progress { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 32px; }
+  .step-progress-item {
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 10px 4px 4px; border-radius: 999px;
+    font-size: 12px; color: var(--muted); background: #f4f2ef;
+    border: 1px solid transparent;
+  }
+  .step-progress-num {
+    width: 18px; height: 18px; border-radius: 999px; flex: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; background: #fff; border: 1px solid var(--line); color: var(--muted);
+  }
+  .step-progress-item.done .step-progress-num { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); }
+  .step-progress-item.active { background: var(--accent-soft); color: var(--accent-ink); border-color: var(--accent); }
+  .step-progress-item.active .step-progress-num { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  .step-nav { display: flex; align-items: center; max-width: 760px; margin: 32px auto 0; }
+  .step-nav-btn {
+    padding: 12px 22px; border-radius: 4px; font-size: 14px; font-weight: 700;
+    cursor: pointer; border: 1px solid var(--line); background: #fff; color: var(--ink);
+  }
+  .step-nav-back { background: transparent; border-color: transparent; color: var(--muted); padding-left: 4px; }
+  .step-nav-back:hover { color: var(--ink); }
+  .step-nav-back.is-hidden { visibility: hidden; }
+  .step-nav-next { background: var(--accent); border-color: var(--accent); color: #fff; margin-left: auto; }
+  .step-nav-next:hover { background: #e64f16; }
+  .step-nav-next:disabled { background: #ddd; border-color: #ddd; color: #999; cursor: not-allowed; }
+
   /* Итоговый блок "Ваша столешница" -- тёмный акцентный блок внизу всей
      композиции (не боковая колонка). Тот же оранжевый accent, что и везде
      (#ff5a1f/#ff7a3d уже использовались в .cta-btn/.result-price). */
@@ -691,7 +723,16 @@
       </div>
     </section>
 
-    <section class="step">
+    <!-- Adaptive Step Engine: with a product selected, exactly ONE of the
+         [data-step-id] sections below is visible at a time (see
+         updateStepUI() further down) -- the order they render in is decided
+         by StepEngine.getSteps(selectedProductKey)/step-engine.js, not by
+         their position in this markup. "Тип изделия" above and
+         "Вариант исполнения" stay outside this mechanism entirely, exactly
+         as before. -->
+    <div class="step-progress" id="stepProgress" style="display:none"></div>
+
+    <section class="step" data-step-id="material" style="display:none">
       <div class="step-head"><span class="step-num">3</span><h2 class="step-title">Материал</h2></div>
       <p class="step-sub">Выберите камень из каталога компании.</p>
       <div class="field">
@@ -705,7 +746,7 @@
       </div>
     </section>
 
-    <section class="step">
+    <section class="step" data-step-id="dimensions" style="display:none">
       <div class="step-head"><span class="step-num">4</span><h2 class="step-title">Размеры</h2></div>
       <p class="step-sub">Схема реагирует на введённые размеры.</p>
       <div class="field">
@@ -740,7 +781,7 @@
       </div>
     </section>
 
-    <section class="step" id="shapeField" style="display:none">
+    <section class="step" id="shapeField" data-step-id="shape" style="display:none">
       <div class="step-head"><span class="step-num">5</span><h2 class="step-title">Форма</h2></div>
       <div class="field">
         <label id="shapeLabel" class="visually-hidden-label">Форма</label>
@@ -770,7 +811,7 @@
       </div>
     </section>
 
-    <section class="step" id="edgeWork" style="display:none">
+    <section class="step" id="edgeWork" data-step-id="edge" style="display:none">
       <div class="step-head"><span class="step-num">6</span><h2 class="step-title">Кромка</h2></div>
       <p class="step-sub">Один тип на всё изделие.</p>
       <div class="field">
@@ -796,7 +837,7 @@
       </div>
     </section>
 
-    <section class="step" id="countertopExtras" style="display:none">
+    <section class="step" id="countertopExtras" data-step-id="additionalWorks" style="display:none">
       <div class="step-head"><span class="step-num">7</span><h2 class="step-title">Дополнительные позиции</h2></div>
       <p class="step-sub">Раскройте нужную позицию, чтобы указать вариант и количество.</p>
       <div class="field">
@@ -965,7 +1006,7 @@
       </div>
     </section>
 
-    <section class="step">
+    <section class="step" data-step-id="options" style="display:none">
       <div class="step-head"><span class="step-num">8</span><h2 class="step-title">Опции</h2></div>
       <div class="checkboxes">
         <label class="checkbox-row">
@@ -979,6 +1020,24 @@
         </label>
       </div>
     </section>
+
+    <!-- review: the final step, same for every product (see step-engine.js
+         -- PRODUCT_STEPS always ends in 'review'). It does NOT duplicate the
+         summary block below (price/3D/breakdown) -- that already stays
+         visible the whole time; this is just the last stop that points at
+         it before "Готово". -->
+    <section class="step" data-step-id="review" style="display:none">
+      <div class="step-head"><span class="step-num">9</span><h2 class="step-title">Проверка</h2></div>
+      <p class="step-sub">Все выбранные параметры уже учтены в расчёте справа.</p>
+      <div class="field">
+        <p>Проверьте материал, размеры и состав работ в блоке «Ваша столешница» ниже, затем нажмите «Получить точный расчёт».</p>
+      </div>
+    </section>
+
+    <div class="step-nav" id="stepNav" style="display:none">
+      <button type="button" class="step-nav-btn step-nav-back" id="stepBackBtn">← Назад</button>
+      <button type="button" class="step-nav-btn step-nav-next" id="stepNextBtn">Далее →</button>
+    </div>
   </div>
 
   <div class="summary-block">
@@ -1057,6 +1116,7 @@
 <script src="material-picker.js"></script>
 <script src="product-types.js"></script>
 <script src="rate-catalog.js"></script>
+<script src="step-engine.js"></script>
 <script src="constructor-state.js"></script>
 <script src="visualizer/constants.js"></script>
 <script src="visualizer/cutout-geometry.js"></script>
@@ -1109,6 +1169,13 @@
 
   const productGrid = document.getElementById('productGrid');
   let selectedProductKey = null;
+  // Declared here (not next to the rest of the Step Engine wiring further
+  // down) because the URL-bootstrap block below can synchronously dispatch
+  // a 'change' event on a product radio, which sets this to null -- same
+  // temporal-dead-zone hazard as DATA_LOADED had before (see url-bootstrap
+  // usage further down): the assignment must run after this declaration,
+  // not after wherever the rest of the Step Engine glue happens to sit.
+  let currentStepId = null;
   const materialField = document.getElementById('materialField');
   const materialFieldThumb = document.getElementById('materialFieldThumb');
   const materialFieldThumbImg = materialFieldThumb.querySelector('img');
@@ -1187,9 +1254,6 @@
   const remainderOut = document.getElementById('remainderOut');
   const updatedAtOut = document.getElementById('updatedAtOut');
   const infoBlock = document.getElementById('infoBlock');
-  const countertopExtrasField = document.getElementById('countertopExtras');
-  const edgeWorkField = document.getElementById('edgeWork');
-  const shapeField = document.getElementById('shapeField');
   const productShapeSelect = document.getElementById('productShape');
   const wingField = document.getElementById('wingField');
   const shapeCornerSelect = document.getElementById('shape-corner');
@@ -1389,6 +1453,12 @@
     input.value = key;
     input.addEventListener('change', () => {
       selectedProductKey = key;
+      // Reset to the new product's FIRST step (§6 of the task) -- reuses
+      // this same existing product-change handler/calculate() pipeline
+      // rather than a second reset mechanism. updateStepUI() (called from
+      // calculate()) resolves null -> StepEngine.firstStep(key) on its own;
+      // it does NOT touch any other state (dimensions/stone/etc. survive).
+      currentStepId = null;
       renderSubcategoryOptions(val);
       calculate();
     });
@@ -1500,19 +1570,131 @@
     subcategoryQtyInput.style.display = row && row.unit === 'шт.' ? '' : 'none';
   }
 
-  // Номера шагов в разметке статичны (1..8) -- когда capability-логика
-  // прячет шаг целиком (кромка/форма/доп.позиции/вариант исполнения), это
-  // оставляет разрыв вида "1, 3, 4...". Пересчитывает подписи только у тех
-  // .step, что сейчас видимы, не трогая порядок/логику самих шагов.
+  // Номера шагов у "Тип изделия"/"Вариант исполнения" в разметке статичны
+  // (1..2) -- когда "Вариант исполнения" скрыт (hideVariantStep или пустой
+  // каталог подкатегорий), это оставляет разрыв вида "1, 3". Пересчитывает
+  // подписи только у ЭТИХ двух секций, не трогая [data-step-id] -- те
+  // получают свой номер от Step Engine (см. updateStepUI() ниже), т.к. их
+  // "видимость" теперь означает "текущий активный шаг", а не "показывать
+  // этот шаг вообще" -- getComputedStyle тут дал бы всегда ровно один
+  // видимый элемент независимо от того, сколько шагов в PRODUCT_STEPS.
   function renumberVisibleSteps() {
     let visibleIndex = 0;
-    document.querySelectorAll('.configurator > .step').forEach(step => {
+    document.querySelectorAll('.configurator > .step:not([data-step-id])').forEach(step => {
       if (getComputedStyle(step).display === 'none') return;
       visibleIndex += 1;
       const numEl = step.querySelector('.step-num');
       if (numEl) numEl.textContent = String(visibleIndex);
     });
   }
+
+  // ===== Adaptive Step Engine wiring =====
+  // step-engine.js decides ONLY the order/availability of steps for the
+  // selected product; this block is the thin glue that (a) asks it which
+  // step is current, (b) shows that one [data-step-id] section and hides
+  // the rest, (c) renders the progress strip, and (d) gates Далее on the
+  // CURRENT step's own validity -- reusing the exact same signals calculate()
+  // already uses below (width/length > 0, a stone selected), not a new
+  // validation system.
+  const stepProgressEl = document.getElementById('stepProgress');
+  const stepNavEl = document.getElementById('stepNav');
+  const stepBackBtn = document.getElementById('stepBackBtn');
+  const stepNextBtn = document.getElementById('stepNextBtn');
+  // currentStepId itself is declared earlier, next to selectedProductKey --
+  // see the comment there for why (URL-bootstrap TDZ hazard).
+
+  function isCurrentStepDataValid(stepId) {
+    if (stepId === 'dimensions') {
+      return mmToM(parseFloat(widthInput.value) || 0) > 0 && mmToM(parseFloat(lengthInput.value) || 0) > 0;
+    }
+    if (stepId === 'material') {
+      return !!selectedStoneId;
+    }
+    // shape/edge/additionalWorks/options/review have no required data today
+    // (calculate() never blocks on them) -- see step-engine.js's own note on
+    // 'options' always being real/non-empty. Nothing to validate here.
+    return true;
+  }
+
+  function renderStepProgress(progress) {
+    stepProgressEl.innerHTML = '';
+    progress.forEach(step => {
+      const item = document.createElement('div');
+      item.className = 'step-progress-item' + (step.active ? ' active' : '') + (step.done ? ' done' : '');
+      const num = document.createElement('span');
+      num.className = 'step-progress-num';
+      num.textContent = String(step.position);
+      const label = document.createElement('span');
+      label.textContent = step.label;
+      item.appendChild(num);
+      item.appendChild(label);
+      stepProgressEl.appendChild(item);
+    });
+  }
+
+  // Called from calculate() on every recalculation (input change, product
+  // change, etc.) -- resolveCurrentStep() with the EXISTING currentStepId as
+  // "desired" is a no-op when the product hasn't changed (state/step is
+  // preserved, see §5 of the task), and only actually moves to the first
+  // step when the product change handler below explicitly clears
+  // currentStepId first.
+  function updateStepUI(productKey) {
+    const steps = StepEngine.getSteps(productKey);
+    const stepSections = document.querySelectorAll('.configurator .step[data-step-id]');
+
+    if (!steps.length) {
+      stepSections.forEach(el => { el.style.display = 'none'; });
+      stepNavEl.style.display = 'none';
+      stepProgressEl.innerHTML = '';
+      stepProgressEl.style.display = 'none';
+      currentStepId = null;
+      return;
+    }
+
+    currentStepId = StepEngine.resolveCurrentStep(productKey, currentStepId);
+
+    stepSections.forEach(el => {
+      el.style.display = (el.dataset.stepId === currentStepId) ? '' : 'none';
+    });
+
+    const progress = StepEngine.buildProgress(productKey, currentStepId);
+    stepProgressEl.style.display = '';
+    renderStepProgress(progress);
+
+    const activePosition = progress.find(p => p.active);
+    const activeSection = document.querySelector('.configurator .step[data-step-id="' + currentStepId + '"]');
+    if (activeSection && activePosition) {
+      const numEl = activeSection.querySelector('.step-num');
+      if (numEl) numEl.textContent = String(activePosition.position);
+    }
+
+    const isFirst = StepEngine.isFirstStep(productKey, currentStepId);
+    const isLast = StepEngine.isLastStep(productKey, currentStepId);
+    stepBackBtn.classList.toggle('is-hidden', isFirst);
+    stepNextBtn.textContent = isLast ? 'Готово' : 'Далее →';
+    stepNextBtn.disabled = !isLast && !StepEngine.canAdvance(productKey, currentStepId, isCurrentStepDataValid(currentStepId));
+    stepNavEl.style.display = '';
+  }
+
+  stepBackBtn.addEventListener('click', () => {
+    const prev = StepEngine.previousStep(selectedProductKey, currentStepId);
+    if (!prev) return;
+    currentStepId = prev;
+    updateStepUI(selectedProductKey);
+  });
+
+  stepNextBtn.addEventListener('click', () => {
+    if (StepEngine.isLastStep(selectedProductKey, currentStepId)) {
+      // 'review' is the finishing action -- point at the existing, always-
+      // visible summary block (price/3D/CTA) instead of building a second
+      // result screen.
+      document.querySelector('.summary-block').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    if (!StepEngine.canAdvance(selectedProductKey, currentStepId, isCurrentStepDataValid(currentStepId))) return;
+    currentStepId = StepEngine.nextStep(selectedProductKey, currentStepId);
+    updateStepUI(selectedProductKey);
+  });
 
   function renderSubcategoryOptions(product) {
     productSubcategorySelect.innerHTML = '';
@@ -1576,12 +1758,17 @@
     // on product selection alone, independent of whether dimensions/stone
     // are filled in yet.
     const product = selectedProductKey ? PRODUCTS[selectedProductKey] : null;
-    countertopExtrasField.style.display = product && product.supportsCountertopExtras ? '' : 'none';
-    edgeWorkField.style.display = product && product.supportsEdgeWork ? '' : 'none';
-    shapeField.style.display = product && product.supportsShapeSelection ? '' : 'none';
+    // Whole-step visibility (shape/edge/additionalWorks/options/review
+    // sections) is now decided by the Adaptive Step Engine below, not by
+    // capability flags directly -- a step whose id isn't in
+    // StepEngine.getSteps(selectedProductKey) simply never becomes the
+    // current step, so it's never shown. updateWingVisibility()/
+    // updateAdditionalWorkGroupsVisibility() are a finer grain (which FIELDS
+    // inside the shape/additionalWorks steps show) and are untouched.
     updateWingVisibility();
     updateAdditionalWorkGroupsVisibility(product);
     renumberVisibleSteps();
+    updateStepUI(selectedProductKey);
 
     const width = mmToM(parseFloat(widthInput.value) || 0);
     const length = mmToM(parseFloat(lengthInput.value) || 0);
