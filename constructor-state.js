@@ -163,6 +163,21 @@
         id: d.getElementById('productSubcategory').value || null,
         qty: numFromField(d, 'subcategoryQty'),
       },
+      // Product-specific state that doesn't fit the shared fields above --
+      // same "always the same shape, capability-zeroed when not this
+      // product" convention as island/barCounter/etc. above, so the state
+      // contract never changes shape between products. Currently just
+      // stupeni's "с подступенками" toggle (see the 'riser' step in
+      // sayanmramor-calculator.html); a real, working control -- it is
+      // simply not consumed by pricing/geometry yet (see WORK_RATES/
+      // buildPricingInputs -- no per-tread-type rate exists today). Future
+      // product-specific fields (e.g. lestnitsa cladding, panno composition)
+      // belong here too, once a real UI/data source exists for them -- see
+      // docs comment on PRODUCT_SUBCATEGORIES in rate-catalog.js for why
+      // none exists yet.
+      productConfig: {
+        stupeni: { riser: selectedProductKey === 'stupeni' && !!d.getElementById('stupeni-riser').checked },
+      },
     };
   }
 

@@ -890,8 +890,8 @@
             </svg>
           </div>
           <div class="dim-fields">
-            <div class="field-unit"><span class="unit-label">Длина</span><input type="number" id="length" min="0" step="1" placeholder="2000"><span class="unit">мм</span></div>
-            <div class="field-unit"><span class="unit-label">Ширина</span><input type="number" id="width" min="0" step="1" placeholder="600"><span class="unit">мм</span></div>
+            <div class="field-unit"><span class="unit-label" id="dimLengthUnitLabel">Длина</span><input type="number" id="length" min="0" step="1" placeholder="2000"><span class="unit">мм</span></div>
+            <div class="field-unit"><span class="unit-label" id="dimWidthUnitLabel">Ширина</span><input type="number" id="width" min="0" step="1" placeholder="600"><span class="unit">мм</span></div>
           </div>
           <!-- Показывается только для lshape -- диаграмма не рисует крыло
                (не придумываем новую геометрию), только явно оговаривает,
@@ -929,6 +929,21 @@
           <option value="left">Угол слева</option>
           <option value="right">Угол справа</option>
         </select>
+      </div>
+    </section>
+
+    <!-- 'riser' -- stupeni-only. A real checkbox writing to
+         state.productConfig.stupeni.riser (constructor-state.js); not yet
+         consumed by pricing/geometry (no per-riser rate exists today -- see
+         WORK_RATES.stupeni), which is a documented, honest gap, not a fake
+         control: the choice IS captured, just not priced yet. -->
+    <section class="step" data-step-id="riser" style="display:none">
+      <div class="step-head"><span class="step-num">4</span><h2 class="step-title">Подступенок</h2></div>
+      <p class="step-sub">Отдельный параметр от формы ступени -- см. шаг «Тип».</p>
+      <div class="field">
+        <label class="checkbox-row">
+          <input type="checkbox" id="stupeni-riser"> С подступенками
+        </label>
       </div>
     </section>
 
@@ -1349,6 +1364,19 @@
     stoleshnitsa_kuhnya: 'Ваша столешница',
     stupeni: 'Ваши ступени',
   };
+  // "Длина"/"Ширина" read as the wrong words for a floor (a room isn't
+  // "длина 4000мм") or a wall (its two dimensions are a run and a height,
+  // not a length and a width) -- same numeric fields/state either way
+  // (state.dimensions.widthM/lengthM, unchanged), just product-appropriate
+  // wording. Every other product keeps the generic pair.
+  const DIMENSION_LABELS = {
+    pol: { length: 'Длина помещения', width: 'Ширина помещения' },
+    stena: { length: 'Высота стены', width: 'Ширина стены' },
+  };
+  const DEFAULT_DIMENSION_LABELS = { length: 'Длина', width: 'Ширина' };
+  // Read by updateDimDiagram() (defined further down) for its own fallback
+  // label text -- same TDZ reasoning as the other module-scope state above.
+  let currentDimLabels = DEFAULT_DIMENSION_LABELS;
   const materialField = document.getElementById('materialField');
   const materialFieldThumb = document.getElementById('materialFieldThumb');
   const materialFieldThumbImg = materialFieldThumb.querySelector('img');
@@ -1405,7 +1433,7 @@
     dimLengthLine.setAttribute('y2', lengthLineY);
     dimLengthLabel.setAttribute('x', rectX + rectW / 2);
     dimLengthLabel.setAttribute('y', lengthLineY + 18);
-    dimLengthLabel.textContent = l > 0 ? l + ' мм' : 'Длина';
+    dimLengthLabel.textContent = l > 0 ? l + ' мм' : currentDimLabels.length;
 
     const widthLineX = DIM_AREA_X - 20;
     dimWidthLine.setAttribute('y1', rectY);
@@ -1417,7 +1445,7 @@
     dimWidthLabel.setAttribute('x', widthLabelX);
     dimWidthLabel.setAttribute('y', widthLabelY);
     dimWidthLabel.setAttribute('transform', 'rotate(-90 ' + widthLabelX + ' ' + widthLabelY + ')');
-    dimWidthLabel.textContent = w > 0 ? w + ' мм' : 'Ширина';
+    dimWidthLabel.textContent = w > 0 ? w + ' мм' : currentDimLabels.width;
   }
   const dimShapeNote = document.getElementById('dimShapeNote');
   const priceOut = document.getElementById('priceOut');
@@ -1576,6 +1604,8 @@
   const subcategoryQtyInput = document.getElementById('subcategoryQty');
   const typeStepTitleEl = document.getElementById('typeStepTitle');
   const summaryTitleEl = document.getElementById('summaryTitle');
+  const dimLengthUnitLabelEl = document.getElementById('dimLengthUnitLabel');
+  const dimWidthUnitLabelEl = document.getElementById('dimWidthUnitLabel');
   const extraBortikInput = document.getElementById('extra-bortik');
   const extraFartukWidthInput = document.getElementById('extra-fartuk-width');
   const extraFartukLengthInput = document.getElementById('extra-fartuk-length');
@@ -1633,9 +1663,10 @@
       // calculate()) resolves null -> StepEngine.firstStep(key) on its own;
       // it does NOT touch any other state (dimensions/stone/etc. survive).
       currentStepId = null;
-      renderSubcategoryOptions(val);
+      renderSubcategoryOptions(val, key);
       updateTypeStepTitle(key);
       updateSummaryTitle(key);
+      updateDimensionLabels(key);
       calculate();
     });
 
@@ -1915,10 +1946,19 @@
   // decided by applyStep()/StepEngine.getSteps(), not by this function.
   // PRODUCT_SUBCATEGORIES/rate-catalog and constructor-state.js's
   // #productSubcategory/#subcategoryQty read are all unchanged.
-  function renderSubcategoryOptions(product) {
+  function renderSubcategoryOptions(product, productKey) {
     productSubcategorySelect.innerHTML = '';
     if (product.hideVariantStep) return;
-    getSubcategoriesForProduct(product.label).forEach(row => {
+    let rows = getSubcategoriesForProduct(product.label);
+    // STEP-04 ("Подступенок — Стандартный") is a riser YES/NO, not a tread
+    // shape -- mixing it into the SAME select as STEP-01..03 (Прямая/
+    // Забежная/Радиусная) would make 'type' answer two different questions
+    // at once. It now has its own real control -- see the 'riser' step
+    // (#stupeni-riser) -- so it is excluded here, not silently dropped.
+    if (productKey === 'stupeni') {
+      rows = rows.filter(row => row.shape !== 'Подступенок');
+    }
+    rows.forEach(row => {
       const opt = document.createElement('option');
       opt.value = row.id;
       opt.textContent = subcategoryLabel(row);
@@ -1933,6 +1973,13 @@
 
   function updateSummaryTitle(productKey) {
     summaryTitleEl.textContent = RESULT_TITLES[productKey] || 'Ваша столешница';
+  }
+
+  function updateDimensionLabels(productKey) {
+    currentDimLabels = DIMENSION_LABELS[productKey] || DEFAULT_DIMENSION_LABELS;
+    dimLengthUnitLabelEl.textContent = currentDimLabels.length;
+    dimWidthUnitLabelEl.textContent = currentDimLabels.width;
+    updateDimDiagram();
   }
 
   function formatRub(n) {

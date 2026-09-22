@@ -67,7 +67,14 @@
     // 'type' -- существующий (SILL-*/STEP-*/STAIR-*) subcategory-каталог,
     // ранее скрытый legacy-шагом "Вариант исполнения".
     podokonnik: ['type', 'dimensions', 'material', 'edge', 'options', 'review'],
-    stupeni:    ['type', 'dimensions', 'material', 'edge', 'options', 'review'],
+    // stupeni: 'riser' ("с подступенками") is its own step, not folded into
+    // 'type' -- STEP-04 in PRODUCT_SUBCATEGORIES used to mix a tread-SHAPE
+    // choice (Прямая/Забежная/Радиусная) and a riser YES/NO into the same
+    // select, which is two different questions. 'type' now only lists the
+    // tread-shape rows (see renderSubcategoryOptions()'s stupeni filter in
+    // sayanmramor-calculator.html); 'riser' is a real checkbox writing to
+    // state.productConfig.stupeni.riser (see constructor-state.js).
+    stupeni:    ['type', 'dimensions', 'material', 'riser', 'edge', 'options', 'review'],
     lestnitsa:  ['type', 'dimensions', 'material', 'edge', 'options', 'review'],
     // Панно/пол/стена/фасад: ни кромки, ни доп.позиций сегодня не
     // поддерживают -- 'type' из PANEL-*/FLOOR-*/WALL-*/FACADE-* каталога.
@@ -88,6 +95,7 @@
     shape: 'Форма',
     dimensions: 'Размеры',
     material: 'Материал',
+    riser: 'Подступенок',
     edge: 'Кромка',
     additionalWorks: 'Доп. работы',
     options: 'Опции',

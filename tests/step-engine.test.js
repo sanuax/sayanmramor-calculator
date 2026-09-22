@@ -8,7 +8,7 @@ const ALL_PRODUCT_KEYS = [
   'stoleshnitsa_vannaya', 'stoleshnitsa_kuhnya', 'stupeni',
 ];
 
-const KNOWN_STEP_IDS = ['type', 'shape', 'dimensions', 'material', 'edge', 'additionalWorks', 'options', 'review'];
+const KNOWN_STEP_IDS = ['type', 'shape', 'dimensions', 'material', 'riser', 'edge', 'additionalWorks', 'options', 'review'];
 
 test('getSteps returns [] for an unknown or missing product key', () => {
   assert.deepEqual(StepEngine.getSteps('does-not-exist'), []);
