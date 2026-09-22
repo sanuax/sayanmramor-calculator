@@ -1466,7 +1466,8 @@
   }
 
   function subcategoryLabel(row) {
-    return row.shape === 'Любая' ? row.variant : `${row.shape} — ${row.variant}`;
+    if (row.shape === 'Любая') return row.variant;
+    return row.variant ? `${row.shape} — ${row.variant}` : row.shape;
   }
 
   function updateSubcategoryQtyVisibility() {

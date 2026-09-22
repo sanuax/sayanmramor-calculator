@@ -56,10 +56,10 @@
     { id: 'FACADE-04', categoryLabel: 'Фасады', shape: 'Цоколь', variant: 'Облицовка', unit: 'м²', rate: null, currency: null },
     { id: 'FACADE-05', categoryLabel: 'Фасады', shape: 'Декоративные элементы', variant: 'Изделие', unit: 'шт.', rate: null, currency: null },
 
-    { id: 'BATH-01', categoryLabel: 'Столешницы в ванную', shape: 'Прямая', variant: 'Без раковины', unit: 'м²', rate: null, currency: null },
-    { id: 'BATH-02', categoryLabel: 'Столешницы в ванную', shape: 'Угловая', variant: 'Без раковины', unit: 'м²', rate: null, currency: null },
-    { id: 'BATH-03', categoryLabel: 'Столешницы в ванную', shape: 'П-образная', variant: 'Без раковины', unit: 'м²', rate: null, currency: null },
-    { id: 'BATH-04', categoryLabel: 'Столешницы в ванную', shape: 'Фигурная', variant: 'Без раковины', unit: 'м²', rate: null, currency: null },
+    { id: 'BATH-01', categoryLabel: 'Столешницы в ванную', shape: 'Прямая', variant: '', unit: 'м²', rate: null, currency: null },
+    { id: 'BATH-02', categoryLabel: 'Столешницы в ванную', shape: 'Угловая', variant: '', unit: 'м²', rate: null, currency: null },
+    { id: 'BATH-03', categoryLabel: 'Столешницы в ванную', shape: 'П-образная', variant: '', unit: 'м²', rate: null, currency: null },
+    { id: 'BATH-04', categoryLabel: 'Столешницы в ванную', shape: 'Фигурная', variant: '', unit: 'м²', rate: null, currency: null },
 
     { id: 'KITCHEN-01', categoryLabel: 'Столешницы на кухню', shape: 'Основная столешница', variant: 'Стандартная', unit: 'м²', rate: null, currency: null },
     { id: 'KITCHEN-02', categoryLabel: 'Столешницы на кухню', shape: 'Остров', variant: 'Прямоугольный', unit: 'м²', rate: null, currency: null },
