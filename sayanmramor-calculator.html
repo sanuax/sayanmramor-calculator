@@ -1065,6 +1065,7 @@
 <script src="visualizer/material-adapter.js"></script>
 <script src="visualizer/webgl-support.js"></script>
 <script src="visualizer/camera-preset-tracker.js"></script>
+<script src="url-bootstrap.js"></script>
 <script type="module" src="visualizer/three-scene.js"></script>
 <script>
   const { PRODUCTS, hasAdditionalWork } = ProductTypes;
@@ -1415,6 +1416,24 @@
   let UPDATED_AT = null;
   let DATA_LOADED = false;
 
+  // SITE -> CONFIGURATOR URL bootstrap (?product=&stone=), read exactly
+  // once here at initial load -- never written back to the URL, never
+  // synced on later state changes. Reuses the exact same <input>+change
+  // event the user's own click fires, so it goes through the one real
+  // selection mechanism (line ~1390) instead of a second, parallel one.
+  // Must run after DATA_LOADED/etc. above are declared: the dispatched
+  // change event synchronously calls calculate(), which reads DATA_LOADED
+  // -- doing this any earlier hits the `let` temporal dead zone.
+  const bootstrapParams = new URLSearchParams(window.location.search);
+  const initialProductKey = UrlBootstrap.resolveInitialProductKey(bootstrapParams.get('product'), PRODUCTS);
+  if (initialProductKey) {
+    const initialProductInput = productGrid.querySelector('input[value="' + initialProductKey + '"]');
+    if (initialProductInput) {
+      initialProductInput.checked = true;
+      initialProductInput.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  }
+
   fetch('data/slabs.json')
     .then(r => r.json())
     .then(data => {
@@ -1424,6 +1443,12 @@
       materialField.disabled = false;
       materialFieldText.textContent = 'Выберите камень';
       DATA_LOADED = true;
+      // Stone ids only become checkable once STONES_BY_ID exists, so this
+      // half of the URL bootstrap runs here rather than next to the
+      // product one above. Reuses the real selection function -- same as
+      // what MaterialPicker's onSelect callback calls on a manual click.
+      const initialStoneId = UrlBootstrap.resolveInitialStoneId(bootstrapParams.get('stone'), STONES_BY_ID);
+      if (initialStoneId) handleMaterialSelected(initialStoneId);
       calculate();
     })
     .catch(() => {
