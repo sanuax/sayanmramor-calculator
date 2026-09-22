@@ -41,29 +41,50 @@
   // "универсальный шаг по умолчанию": если бы calculate() гейтил эти поля
   // capability-флагом для какого-то продукта, для него 'options' сюда бы не
   // попал.
+  //
+  // 'type' vs 'shape' -- two DIFFERENT step ids, deliberately not merged:
+  //   - 'shape' is real, geometry-connected form selection (straight/
+  //     lshape) -- only stoleshnitsa_kuhnya/stoleshnitsa_vannaya have it,
+  //     because only they have supportsShapeSelection + a real wing/corner
+  //     model in geometry-model.js/three-scene.js.
+  //   - 'type' reuses the existing (until now hidden) subcategory select --
+  //     the same PRODUCT_SUBCATEGORIES/getSubcategoriesForProduct() data and
+  //     the same #productSubcategory/#subcategoryQty fields constructor-
+  //     state.js already reads -- for the 7 products that have a
+  //     subcategory catalog but NO real geometry/pricing connection to it
+  //     yet (rate-catalog.js documents PRODUCT_SUBCATEGORIES as
+  //     display-only; buildPricingInputs() never reads state.subcategory).
+  //     It is a real, working control (picks and stores a real value), just
+  //     not yet wired to geometry/price -- that gap is intentionally NOT
+  //     papered over with a fake shape/geometry step.
   const PRODUCT_STEPS = {
     // Столешницы: форма (прямая/Г-образная) -- самостоятельный шаг с
     // реальной геометрией (supportsShapeSelection), плюс кромка и
     // дополнительные позиции (вырезы/отверстия/бортик/фартук/остров/...).
     stoleshnitsa_kuhnya:  ['shape', 'dimensions', 'material', 'edge', 'additionalWorks', 'options', 'review'],
     stoleshnitsa_vannaya: ['shape', 'dimensions', 'material', 'edge', 'additionalWorks', 'options', 'review'],
-    // Подоконник/ступени/лестница: сегодня поддерживают только кромку
-    // (supportsEdgeWork) -- ни выбора формы, ни доп.позиций у них в
-    // constructor-state/geometry нет, поэтому эти шаги для них не заявлены.
-    podokonnik: ['dimensions', 'material', 'edge', 'options', 'review'],
-    stupeni:    ['dimensions', 'material', 'edge', 'options', 'review'],
-    lestnitsa:  ['dimensions', 'material', 'edge', 'options', 'review'],
-    // Панно/пол/стена/фасад: ни формы, ни кромки, ни доп.позиций сегодня не
-    // поддерживают -- только размеры, материал и опции.
-    panno: ['dimensions', 'material', 'options', 'review'],
-    pol:   ['dimensions', 'material', 'options', 'review'],
-    stena: ['dimensions', 'material', 'options', 'review'],
-    fasad: ['dimensions', 'material', 'options', 'review'],
+    // Подоконник/ступени/лестница: supportsEdgeWork -- реальная кромка.
+    // 'type' -- существующий (SILL-*/STEP-*/STAIR-*) subcategory-каталог,
+    // ранее скрытый legacy-шагом "Вариант исполнения".
+    podokonnik: ['type', 'dimensions', 'material', 'edge', 'options', 'review'],
+    stupeni:    ['type', 'dimensions', 'material', 'edge', 'options', 'review'],
+    lestnitsa:  ['type', 'dimensions', 'material', 'edge', 'options', 'review'],
+    // Панно/пол/стена/фасад: ни кромки, ни доп.позиций сегодня не
+    // поддерживают -- 'type' из PANEL-*/FLOOR-*/WALL-*/FACADE-* каталога.
+    panno: ['type', 'dimensions', 'material', 'options', 'review'],
+    pol:   ['type', 'dimensions', 'material', 'options', 'review'],
+    stena: ['type', 'dimensions', 'material', 'options', 'review'],
+    fasad: ['type', 'dimensions', 'material', 'options', 'review'],
   };
 
   // Человекочитаемые подписи для прогресса -- UI не должен сам решать, как
-  // назвать шаг по его id.
+  // назвать шаг по его id. 'type' здесь -- только компактная подпись для
+  // прогресс-бара; заголовок самого шага (h2) переключается по продукту
+  // отдельно (updateTypeStepTitle() в sayanmramor-calculator.html), потому
+  // что одно название не подходит одинаково для "Тип лестницы" и "Укладка
+  // пола".
   const STEP_LABELS = {
+    type: 'Тип',
     shape: 'Форма',
     dimensions: 'Размеры',
     material: 'Материал',
