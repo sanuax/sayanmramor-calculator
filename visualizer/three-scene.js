@@ -11,7 +11,14 @@ let cameraPresetTracker = null;
 // they're verified visually, not by assertion.
 const CUTOUT_MARKER_DEPTH_M = 0.02;
 const BACKSPLASH_PANEL_DEPTH_M = 0.02;
+const WALL_PANEL_DEPTH_M = 0.02;
 const MARKER_COLOR = '#2b2b2b'; // sink/cooktop/hole markers: symbolic voids/fixtures, not stone
+// Ступени: минимальный, не идеальный визуальный профиль лестницы -- N
+// одинаковых по толщине проступей, каждая на свою высоту выше предыдущей,
+// без подступенков/косоура. Числа ниже -- чисто визуальные, не реальные
+// параметры конкретной лестницы (их сейчас неоткуда взять).
+const STEPS_COUNT = 4;
+const STEPS_RISE_M = 0.17;
 
 // Coordinate convention for the whole group: origin is the MAIN segment's
 // center (matching the single-box convention this file used before L-shape/
@@ -19,8 +26,17 @@ const MARKER_COLOR = '#2b2b2b'; // sink/cooktop/hole markers: symbolic voids/fix
 // the 'front' camera preset, is +Z; "back" is -Z). Y = thickness, centered.
 // Cut/hole positions from geometry-model.js are "distance from the left/front
 // edge" (0..widthM / 0..lengthM) and are converted to this local frame here.
+//
+// "Стеновая" сторона для бортика/фартука/стеновой панели -- КОНСТАНТНЫЙ X
+// (X = -widthM/2, левый по ширине край), а не константный Z. Причина: X
+// (width) -- короткая "глубина от стены до переднего края" столешницы,
+// Z (length) -- длинный "пробег вдоль стены". Панель на стену должна тянуться
+// вдоль ДЛИННОГО пробега (Z), примыкая к КОРОТКОМУ краю (константный X) --
+// раньше было наоборот (панель тянулась вдоль width, торчала с торца по
+// length), из-за чего фартук/бортик/стеновая панель выглядели растянутыми
+// не в ту сторону.
 
-function buildSlabGeometry(xExtentM, zExtentM, thicknessM, edgeType) {
+function buildSlabGeometry(xExtentM, zExtentM, thicknessM, edgeType, holes) {
   const shape = new THREE.Shape();
   const hx = xExtentM / 2, hz = zExtentM / 2;
   shape.moveTo(-hx, -hz);
@@ -28,6 +44,24 @@ function buildSlabGeometry(xExtentM, zExtentM, thicknessM, edgeType) {
   shape.lineTo(hx, hz);
   shape.lineTo(-hx, hz);
   shape.closePath();
+
+  // Настоящий сквозной вырез (не отдельный меш поверх плиты): дырка в
+  // самой THREE.Shape, которую ExtrudeGeometry честно протягивает через
+  // всю толщину, включая внутренние стенки отверстия. `holes` -- в тех же
+  // мировых X/Z координатах, что и внешний контур; shape-y -> world -Z
+  // (см. комментарий у geometry.rotateX ниже), поэтому центр по Z уходит
+  // в shape с обратным знаком.
+  (holes || []).forEach(hole => {
+    const hw = hole.widthM / 2, hl = hole.lengthM / 2;
+    const cx = hole.xM, cy = -hole.zM;
+    const path = new THREE.Path();
+    path.moveTo(cx - hw, cy - hl);
+    path.lineTo(cx + hw, cy - hl);
+    path.lineTo(cx + hw, cy + hl);
+    path.lineTo(cx - hw, cy + hl);
+    path.closePath();
+    shape.holes.push(path);
+  });
 
   // Кромка (edge.type) как параметр геометрии: одна обобщённая фаска на весь
   // периметр, когда выбран любой тип кромки -- не 5 разных реалистичных
@@ -73,18 +107,45 @@ function computeFootprintExtent(geometryModel) {
   let extentZ = geometryModel.lengthM;
   if (geometryModel.wing) {
     extentX = Math.max(extentX, geometryModel.widthM + 2 * geometryModel.wing.lengthM);
-    extentZ = Math.max(extentZ, geometryModel.lengthM + 2 * geometryModel.wing.widthM);
+    // wing.widthM no longer extends the Z footprint: after the corner-join
+    // fix the wing's Z-range sits inside the main slab's own [-lengthM/2,
+    // lengthM/2] range (flush with its back edge, not past it), so lengthM
+    // alone already covers it -- extentZ needs no contribution from wing.
   }
+  // Island now offsets along WIDTH (X), bar counter along LENGTH (Z) --
+  // see attachment-geometry.js -- so each only ever grows its own axis.
   if (geometryModel.island) {
-    const islandFarZ = Math.abs(geometryModel.island.offsetZM) + geometryModel.island.lengthM / 2;
-    extentZ = Math.max(extentZ, islandFarZ * 2);
+    const islandFarX = Math.abs(geometryModel.island.offsetXM) + geometryModel.island.widthM / 2;
+    extentX = Math.max(extentX, islandFarX * 2);
+  }
+  if (geometryModel.barCounter) {
+    const barFarZ = Math.abs(geometryModel.barCounter.offsetZM) + geometryModel.barCounter.lengthM / 2;
+    extentZ = Math.max(extentZ, barFarZ * 2);
   }
   return { widthM: extentX, lengthM: extentZ };
 }
 
+// Ступени: N ascending slabs of the product's own tread thickness, each a
+// fixed rise higher than the last, together spanning the full entered
+// lengthM/widthM -- reads as "a flight of steps", not the single flat
+// countertop-style slab every other product uses. Deliberately no risers/
+// stringer -- minimal correct shape, not a finished visualization.
+function buildStepsGroup(widthM, lengthM, thicknessM, edgeType, stoneMaterial) {
+  const group = new THREE.Group();
+  const runM = lengthM / STEPS_COUNT;
+  for (let i = 0; i < STEPS_COUNT; i++) {
+    const mesh = new THREE.Mesh(buildSlabGeometry(widthM, runM, thicknessM, edgeType), stoneMaterial);
+    const stepTopY = (i + 1) * STEPS_RISE_M;
+    const stepCenterZ = -lengthM / 2 + runM * (i + 0.5);
+    mesh.position.set(0, stepTopY - thicknessM / 2, stepCenterZ);
+    group.add(mesh);
+  }
+  return group;
+}
+
 function buildProductGroup(geometryModel, materialDescriptor) {
   const group = new THREE.Group();
-  const { widthM, lengthM, visualThicknessM: thicknessM, wing, edge, sink, cooktop, holes, backsplash, curb, island } = geometryModel;
+  const { widthM, lengthM, visualThicknessM: thicknessM, wing, edge, sink, cooktop, holes, backsplash, curb, wallPanel, island, barCounter, productKey } = geometryModel;
   // frameCameraOnModel()/setView() read these back to size the camera to the
   // actual model -- a THREE.Group has no single .geometry.parameters the
   // way the old one-box countertopMesh did.
@@ -94,7 +155,29 @@ function buildProductGroup(geometryModel, materialDescriptor) {
   const stoneMaterial = buildStoneMaterial(materialDescriptor);
   const markerMaterial = buildMarkerMaterial();
 
-  group.add(new THREE.Mesh(buildSlabGeometry(widthM, lengthM, thicknessM, edge.type), stoneMaterial));
+  function toLocalX(xM) { return xM - widthM / 2; }
+  function toLocalZ(zM) { return lengthM / 2 - zM; }
+
+  if (productKey === 'stupeni') {
+    // Ступени get their own dedicated shape (see buildStepsGroup) instead
+    // of the single flat slab every other product uses below -- this
+    // product has no shape/sink/cooktop/attachments capability anyway (see
+    // product-types.js), so nothing past this block applies to it.
+    group.add(buildStepsGroup(widthM, lengthM, thicknessM, edge.type, stoneMaterial));
+    return group;
+  }
+
+  // Врезная/интегрированная мойка (не накладная) режет насквозь саму плиту
+  // столешницы -- настоящая дыра в geometry, а не отдельный меш поверх/внутри
+  // неё. Накладная мойка ставится СВЕРХУ готовой плиты (сквозного выреза не
+  // требует по этой же модели), поэтому для неё дырка не добавляется --
+  // см. addCutoutMarker(sink, true) ниже, где она остаётся приподнятой
+  // плашкой-посадочным местом. Варочная панель (cooktop) этой правкой не
+  // затронута -- остаётся тем же маркером, что и раньше.
+  const sinkHoles = (sink && sink.type !== 'overlay')
+    ? [{ xM: toLocalX(sink.cut.xM), zM: toLocalZ(sink.cut.zM), widthM: sink.cut.widthM, lengthM: sink.cut.lengthM }]
+    : [];
+  group.add(new THREE.Mesh(buildSlabGeometry(widthM, lengthM, thicknessM, edge.type, sinkHoles), stoneMaterial));
 
   // Г-образная столешница: без CSG, второй прямоугольник визуально
   // состыкован в углу главного (см. спека, "L-shape wing placement").
@@ -107,17 +190,17 @@ function buildProductGroup(geometryModel, materialDescriptor) {
     wingMesh.position.set(
       xSign * (widthM / 2 + wing.lengthM / 2),
       0,
-      -(lengthM / 2 + wing.widthM / 2),
+      -(lengthM / 2 - wing.widthM / 2),
     );
     group.add(wingMesh);
   }
 
-  function toLocalX(xM) { return xM - widthM / 2; }
-  function toLocalZ(zM) { return lengthM / 2 - zM; }
-
-  // Мойка/варочная панель: без CSG нельзя вырезать дыру из box, поэтому
-  // врезной вид (undermount/integrated, и варочная -- всегда врез) имитирует
-  // тёмная утопленная плашка, а накладная мойка (overlay) -- приподнятая.
+  // Варочная панель (всегда врезная) и накладная мойка (всегда сверху, без
+  // сквозного выреза) по-прежнему рисуются этой тёмной плашкой-маркером, а
+  // не настоящим отверстием -- варочную панель эта задача не трогает, а
+  // накладной мойке сквозной вырез и не нужен по модели (ставится поверх
+  // цельной плиты). Врезная/интегрированная мойка теперь режет саму плиту
+  // (см. sinkHoles выше) и через этот маркер уже не рисуется.
   function addCutoutMarker(cutout, isRaised) {
     const geometry = new THREE.BoxGeometry(cutout.cut.widthM, CUTOUT_MARKER_DEPTH_M, cutout.cut.lengthM);
     const mesh = new THREE.Mesh(geometry, markerMaterial);
@@ -127,7 +210,10 @@ function buildProductGroup(geometryModel, materialDescriptor) {
     mesh.position.set(toLocalX(cutout.cut.xM), yCenter, toLocalZ(cutout.cut.zM));
     group.add(mesh);
   }
-  if (sink) addCutoutMarker(sink, sink.type === 'overlay');
+  // Undermount/integrated already got a real hole in the main slab above --
+  // only overlay still needs the raised seating-mark, since it sits on top
+  // of a solid (uncut) countertop rather than through it.
+  if (sink && sink.type === 'overlay') addCutoutMarker(sink, true);
   if (cooktop) addCutoutMarker(cooktop, false);
 
   // Отверстия: маленькие символические цилиндры, пронизывающие толщину.
@@ -144,30 +230,56 @@ function buildProductGroup(geometryModel, materialDescriptor) {
     addHoleMarker(holes.dispenser);
   }
 
-  // Фартук: тонкая вертикальная панель вдоль заднего края (Z < 0), из того
-  // же материала, что и столешница -- это реальный камень, а не маркер.
+  // Фартук: тонкая вертикальная панель вдоль стенового края -- КОНСТАНТНЫЙ
+  // X (widthM -- короткая сторона, глубина от стены), тянется вдоль ВСЕЙ
+  // длины Z (lengthM -- длинный пробег вдоль стены). backsplash.lengthM
+  // (реальный пользовательский ввод) поэтому идёт в Z-протяжённость бокса,
+  // а не в X, как было раньше. Тот же материал, что и столешница -- это
+  // реальный камень, а не маркер.
   if (backsplash) {
-    const geometry = new THREE.BoxGeometry(backsplash.lengthM, backsplash.heightM, BACKSPLASH_PANEL_DEPTH_M);
+    const geometry = new THREE.BoxGeometry(BACKSPLASH_PANEL_DEPTH_M, backsplash.heightM, backsplash.lengthM);
     const mesh = new THREE.Mesh(geometry, stoneMaterial);
-    mesh.position.set(0, thicknessM / 2 + backsplash.heightM / 2, -(lengthM / 2 + BACKSPLASH_PANEL_DEPTH_M / 2));
+    mesh.position.set(-(widthM / 2 + BACKSPLASH_PANEL_DEPTH_M / 2), thicknessM / 2 + backsplash.heightM / 2, 0);
     group.add(mesh);
   }
 
-  // Бортик: невысокая приподнятая полоса вдоль переднего края (Z > 0),
-  // квадратное сечение (высота = глубина) -- нет реальных данных для формы
+  // Стеновая панель: та же ориентация и та же стеновая сторона, что и
+  // фартук выше -- просто более крупная панель со своими размерами.
+  if (wallPanel) {
+    const geometry = new THREE.BoxGeometry(WALL_PANEL_DEPTH_M, wallPanel.heightM, wallPanel.lengthM);
+    const mesh = new THREE.Mesh(geometry, stoneMaterial);
+    mesh.position.set(-(widthM / 2 + WALL_PANEL_DEPTH_M / 2), thicknessM / 2 + wallPanel.heightM / 2, 0);
+    group.add(mesh);
+  }
+
+  // Бортик: невысокая приподнятая полоса вдоль ТОЙ ЖЕ стеновой стороны
+  // (константный X), что и фартук/стеновая панель выше -- все три примыкают
+  // к одной и той же стене, а не к разным краям столешницы. Тянется вдоль
+  // Z на всю свою длину (curb.lengthM), а не вдоль X, как было раньше.
+  // Квадратное сечение (высота = глубина) -- нет реальных данных для формы
   // сечения, только длина.
   if (curb) {
-    const geometry = new THREE.BoxGeometry(curb.lengthM, curb.heightM, curb.heightM);
+    const geometry = new THREE.BoxGeometry(curb.heightM, curb.heightM, curb.lengthM);
     const mesh = new THREE.Mesh(geometry, stoneMaterial);
-    mesh.position.set(0, thicknessM / 2 + curb.heightM / 2, lengthM / 2 - curb.heightM / 2);
+    mesh.position.set(-(widthM / 2 + curb.heightM / 2), thicknessM / 2 + curb.heightM / 2, 0);
     group.add(mesh);
   }
 
-  // Остров: отдельная самостоятельная плита, тот же материал, со смещением
-  // от главной столешницы (offsetXM/offsetZM уже готовые локальные координаты).
+  // Остров: отдельная самостоятельная плита лицом к длинному пробегу
+  // столешницы, со смещением по WIDTH (offsetXM/offsetZM -- уже готовые
+  // локальные координаты, см. attachment-geometry.js).
   if (island) {
     const mesh = new THREE.Mesh(buildSlabGeometry(island.widthM, island.lengthM, thicknessM, edge.type), stoneMaterial);
     mesh.position.set(island.offsetXM, 0, island.offsetZM);
+    group.add(mesh);
+  }
+
+  // Барная стойка: продолжение столешницы за одним из LENGTH-концов (Z),
+  // а не по WIDTH -- поэтому не может занять то же место, что и остров
+  // выше, даже если оба выбраны одновременно.
+  if (barCounter) {
+    const mesh = new THREE.Mesh(buildSlabGeometry(barCounter.widthM, barCounter.lengthM, thicknessM, edge.type), stoneMaterial);
+    mesh.position.set(barCounter.offsetXM, 0, barCounter.offsetZM);
     group.add(mesh);
   }
 

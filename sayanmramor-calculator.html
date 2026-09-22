@@ -878,8 +878,8 @@
               <div class="reveal-row">
                 <span class="rr-title">Фартук</span>
                 <div class="rr-fields">
-                  <div class="field-unit"><span class="unit-label">Ширина</span><input type="number" id="extra-fartuk-width" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
                   <div class="field-unit"><span class="unit-label">Длина</span><input type="number" id="extra-fartuk-length" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
+                  <div class="field-unit"><span class="unit-label">Ширина</span><input type="number" id="extra-fartuk-width" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
                 </div>
               </div>
             </div>
@@ -899,8 +899,8 @@
               <div class="reveal-row">
                 <span class="rr-title">Стеновая панель</span>
                 <div class="rr-fields">
-                  <div class="field-unit"><span class="unit-label">Ширина</span><input type="number" id="extra-wallpanel-width" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
                   <div class="field-unit"><span class="unit-label">Длина</span><input type="number" id="extra-wallpanel-length" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
+                  <div class="field-unit"><span class="unit-label">Ширина</span><input type="number" id="extra-wallpanel-width" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
                 </div>
               </div>
             </div>
@@ -1500,8 +1500,26 @@
     subcategoryQtyInput.style.display = row && row.unit === 'шт.' ? '' : 'none';
   }
 
+  // Номера шагов в разметке статичны (1..8) -- когда capability-логика
+  // прячет шаг целиком (кромка/форма/доп.позиции/вариант исполнения), это
+  // оставляет разрыв вида "1, 3, 4...". Пересчитывает подписи только у тех
+  // .step, что сейчас видимы, не трогая порядок/логику самих шагов.
+  function renumberVisibleSteps() {
+    let visibleIndex = 0;
+    document.querySelectorAll('.configurator > .step').forEach(step => {
+      if (getComputedStyle(step).display === 'none') return;
+      visibleIndex += 1;
+      const numEl = step.querySelector('.step-num');
+      if (numEl) numEl.textContent = String(visibleIndex);
+    });
+  }
+
   function renderSubcategoryOptions(product) {
     productSubcategorySelect.innerHTML = '';
+    if (product.hideVariantStep) {
+      productSubcategoryField.style.display = 'none';
+      return;
+    }
     getSubcategoriesForProduct(product.label).forEach(row => {
       const opt = document.createElement('option');
       opt.value = row.id;
@@ -1563,6 +1581,7 @@
     shapeField.style.display = product && product.supportsShapeSelection ? '' : 'none';
     updateWingVisibility();
     updateAdditionalWorkGroupsVisibility(product);
+    renumberVisibleSteps();
 
     const width = mmToM(parseFloat(widthInput.value) || 0);
     const length = mmToM(parseFloat(lengthInput.value) || 0);
@@ -1772,6 +1791,40 @@
     'extra-bar-standard-width', 'extra-bar-standard-length',
     'extra-bar-complex-width', 'extra-bar-complex-length',
   ].forEach(id => document.getElementById(id).addEventListener('input', calculate));
+
+  // Остров (Прямоугольный/Фигурный) и барная стойка (Стандартная/Сложная) --
+  // взаимоисключающие варианты одной и той же дополнительной работы. Ввод
+  // значения в один вариант очищает поля другого -- не просто визуально
+  // прячет карточку, а реально обнуляет её input'ы (с синтетическим
+  // 'input', чтобы calculate()/geometry сразу увидели обнулённое
+  // состояние). Это гарантирует, что state никогда не содержит два
+  // одновременно заполненных варианта, без новой абстракции -- переиспользует
+  // уже существующие поля и их же 'input'-обработчики выше.
+  function makeVariantExclusive(fieldIds, otherFieldIds) {
+    const fields = fieldIds.map(id => document.getElementById(id));
+    const otherFields = otherFieldIds.map(id => document.getElementById(id));
+    fields.forEach(el => el.addEventListener('input', () => {
+      const anyFilled = fields.some(f => parseFloat(f.value) > 0);
+      if (!anyFilled) return;
+      // Clear every sibling field's VALUE first, then dispatch 'input' on
+      // them afterwards. Dispatching immediately inside this same loop would
+      // let the sibling group's own exclusivity listener re-check itself
+      // mid-clear -- while its OTHER field is still non-empty -- and wipe out
+      // the very group we are in the middle of filling in.
+      const toClear = otherFields.filter(other => other.value !== '');
+      if (toClear.length === 0) return;
+      toClear.forEach(other => { other.value = ''; });
+      toClear.forEach(other => other.dispatchEvent(new Event('input', { bubbles: true })));
+    }));
+  }
+  const OSTROV_STANDARD_FIELDS = ['extra-ostrov-width', 'extra-ostrov-length'];
+  const OSTROV_FIGURED_FIELDS = ['extra-ostrov-figured-width', 'extra-ostrov-figured-length'];
+  makeVariantExclusive(OSTROV_STANDARD_FIELDS, OSTROV_FIGURED_FIELDS);
+  makeVariantExclusive(OSTROV_FIGURED_FIELDS, OSTROV_STANDARD_FIELDS);
+  const BAR_STANDARD_FIELDS = ['extra-bar-standard-width', 'extra-bar-standard-length'];
+  const BAR_COMPLEX_FIELDS = ['extra-bar-complex-width', 'extra-bar-complex-length'];
+  makeVariantExclusive(BAR_STANDARD_FIELDS, BAR_COMPLEX_FIELDS);
+  makeVariantExclusive(BAR_COMPLEX_FIELDS, BAR_STANDARD_FIELDS);
 
   // «Дополнительные позиции»: раскрытие/закрытие accordion и подсветка
   // заполненного варианта -- чисто визуальные обработчики, не влияют на

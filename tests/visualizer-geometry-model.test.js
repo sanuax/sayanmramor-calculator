@@ -15,7 +15,9 @@ function stateWith(overrides) {
     holeCounts: { mixer: 0, socket: 0, dispenser: 0 },
     backsplash: { widthM: 0, lengthM: 0 },
     curbLengthM: 0,
-    island: { standard: { widthM: 0, lengthM: 0 } },
+    wallPanel: { widthM: 0, lengthM: 0 },
+    island: { standard: { widthM: 0, lengthM: 0 }, figured: { widthM: 0, lengthM: 0 } },
+    barCounter: { standard: { widthM: 0, lengthM: 0 }, complex: { widthM: 0, lengthM: 0 } },
     product: null,
   }, overrides);
 }
@@ -79,13 +81,68 @@ test('buildGeometryModel.backsplash/curb/island delegate to attachment-geometry'
   const model = buildGeometryModel(stateWith({
     backsplash: { widthM: 0.6, lengthM: 2 },
     curbLengthM: 0.5,
-    island: { standard: { widthM: 1.2, lengthM: 0.8 } },
+    island: { standard: { widthM: 1.2, lengthM: 0.8 }, figured: { widthM: 0, lengthM: 0 } },
   }));
   assert.equal(model.backsplash.heightM, 0.6);
   assert.equal(model.curb.lengthM, 0.5);
   assert.equal(model.island.widthM, 1.2);
-  // island offset is relative to the MAIN segment's lengthM (0.6 in stateWith's default dimensions).
-  assert.ok(model.island.offsetZM > 0.6);
+  // island offset is relative to the MAIN segment's widthM (2 in stateWith's default dimensions) --
+  // it now faces the main segment's LENGTH run, offset along WIDTH.
+  assert.ok(model.island.offsetXM > 2);
+  assert.equal(model.island.offsetZM, 0);
+});
+
+test('buildGeometryModel.wallPanel/barCounter delegate to attachment-geometry', () => {
+  const empty = buildGeometryModel(stateWith({}));
+  assert.equal(empty.wallPanel, null);
+  assert.equal(empty.barCounter, null);
+
+  const model = buildGeometryModel(stateWith({
+    wallPanel: { widthM: 0.9, lengthM: 2.4 },
+    barCounter: { standard: { widthM: 0.6, lengthM: 1.5 }, complex: { widthM: 0, lengthM: 0 } },
+  }));
+  assert.equal(model.wallPanel.heightM, 0.9);
+  assert.equal(model.barCounter.widthM, 0.6);
+  // bar counter offset is relative to the MAIN segment's own lengthM (0.6),
+  // extending past one LENGTH-end -- independent of the island's WIDTH axis.
+  assert.ok(model.barCounter.offsetZM > 0.6);
+  assert.equal(model.barCounter.offsetXM, 0);
+});
+
+test('buildGeometryModel.island/barCounter only ever build ONE variant, even if both are filled in at once', () => {
+  const model = buildGeometryModel(stateWith({
+    island: { standard: { widthM: 1.2, lengthM: 0.8 }, figured: { widthM: 2, lengthM: 2 } },
+    barCounter: {
+      standard: { widthM: 0.6, lengthM: 1.5 },
+      complex: { widthM: 0.9, lengthM: 3 },
+    },
+  }));
+  // standard wins over figured/complex when both are present -- fixed
+  // priority, same pattern as sink type priority in constructor-state.js.
+  assert.equal(model.island.widthM, 1.2);
+  assert.equal(model.barCounter.widthM, 0.6);
+});
+
+test('buildGeometryModel.island falls back to the figured variant when only it is filled in', () => {
+  const model = buildGeometryModel(stateWith({
+    island: { standard: { widthM: 0, lengthM: 0 }, figured: { widthM: 2, lengthM: 2 } },
+  }));
+  assert.equal(model.island.widthM, 2);
+});
+
+test('buildGeometryModel.productKey is null with no product, otherwise the product\'s key', () => {
+  assert.equal(buildGeometryModel(stateWith({})).productKey, null);
+  const model = buildGeometryModel(stateWith({
+    product: { key: 'pol', label: 'Полы', type: 'B', capabilities: null, cameraPreset: null },
+  }));
+  assert.equal(model.productKey, 'pol');
+});
+
+test('buildGeometryModel.visualThicknessM is thinner for "pol" (floors) than the regular fallback', () => {
+  const model = buildGeometryModel(stateWith({
+    product: { key: 'pol', label: 'Полы', type: 'B', capabilities: null, cameraPreset: null },
+  }));
+  assert.ok(model.visualThicknessM < VISUAL_FALLBACK_THICKNESS_M);
 });
 
 test('buildGeometryModel.cameraPreset copies the product\'s cameraPreset when present', () => {

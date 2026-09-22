@@ -16,7 +16,7 @@
   // function does not close over the outer IIFE's `root` parameter.
   const globalRoot = typeof window !== 'undefined' ? window : globalThis;
   const {
-    VISUAL_FALLBACK_CURB_HEIGHT_M, VISUAL_FALLBACK_ISLAND_GAP_M,
+    VISUAL_FALLBACK_CURB_HEIGHT_M, VISUAL_FALLBACK_ISLAND_GAP_M, VISUAL_FALLBACK_BAR_COUNTER_GAP_M,
   } = (typeof module !== 'undefined' && module.exports) ? require('./constants.js') : globalRoot.VisualizerConstants;
 
   function resolveBacksplash(backsplash) {
@@ -26,7 +26,8 @@
       // (the shorter of the two, by the same width<length convention as the
       // main countertop) is the panel's own dimension that becomes its
       // mounted HEIGHT once stood up against the wall; lengthM is the
-      // horizontal run along the wall.
+      // horizontal run along the wall -- see three-scene.js for why that
+      // run has to align with the main slab's own LENGTH axis, not WIDTH.
       heightM: backsplash.widthM,
       lengthM: backsplash.lengthM,
       edge: 'back',
@@ -39,26 +40,60 @@
     return {
       lengthM: curbLengthM,
       heightM: VISUAL_FALLBACK_CURB_HEIGHT_M,
-      edge: 'front',
+      // Same wall-facing edge as the backsplash -- бортик and фартук mount
+      // on the same physical wall, not opposite edges of the countertop.
+      edge: 'back',
       source: 'fallback-height', // length is real; height is a guess
+    };
+  }
+
+  // Стеновая панель: same shape as the backsplash (width becomes the mounted
+  // height, length is the run along the wall) -- a bigger wall-mounted
+  // panel, not a new concept.
+  function resolveWallPanel(wallPanel) {
+    if (!wallPanel || wallPanel.widthM <= 0 || wallPanel.lengthM <= 0) return null;
+    return {
+      heightM: wallPanel.widthM,
+      lengthM: wallPanel.lengthM,
+      edge: 'back',
+      source: 'real',
     };
   }
 
   // offsetXM/offsetZM are the island's own center, in the SAME local frame as
   // the main segment's center (0,0) -- directly usable as a mesh position,
   // not a distance-from-an-edge that still needs half-length math downstream.
-  // mainLengthM/2 reaches the main segment's edge; + the gap; + the island's
-  // own half-length so the island's NEAR edge, not its center, sits the gap
-  // away from the main segment.
-  function resolveIsland(island, mainLengthM) {
+  // The island sits OFFSET ALONG WIDTH (X), facing the main segment's own
+  // LENGTH-oriented run, like a real kitchen island parallel to the main
+  // counter across a walkway -- not tacked onto one end of it (that was the
+  // bug: offsetting along Z made it read as a random extra segment rather
+  // than a separate, related piece of furniture facing the counter).
+  // mainWidthM/2 reaches the main segment's own edge; + the gap; + the
+  // island's own half-width so the island's NEAR edge, not its center, sits
+  // the gap away from the main segment.
+  function resolveIsland(island, mainWidthM) {
     if (!island || island.widthM <= 0 || island.lengthM <= 0) return null;
     return {
       widthM: island.widthM, lengthM: island.lengthM,
-      offsetXM: 0,
-      offsetZM: mainLengthM / 2 + VISUAL_FALLBACK_ISLAND_GAP_M + island.lengthM / 2,
+      offsetXM: mainWidthM / 2 + VISUAL_FALLBACK_ISLAND_GAP_M + island.widthM / 2,
+      offsetZM: 0,
       source: 'fallback-offset', // width/length are real; the gap from the main countertop is a guess
     };
   }
 
-  return { resolveBacksplash, resolveCurb, resolveIsland };
+  // Барная стойка: a peninsula-style continuation past one LENGTH-end of the
+  // main segment (the axis the island no longer uses, so the two attachments
+  // can never collide even if both are present at once). Same offset math as
+  // the island, just extending mainLengthM instead of mainWidthM.
+  function resolveBarCounter(barCounter, mainLengthM) {
+    if (!barCounter || barCounter.widthM <= 0 || barCounter.lengthM <= 0) return null;
+    return {
+      widthM: barCounter.widthM, lengthM: barCounter.lengthM,
+      offsetXM: 0,
+      offsetZM: mainLengthM / 2 + VISUAL_FALLBACK_BAR_COUNTER_GAP_M + barCounter.lengthM / 2,
+      source: 'fallback-offset',
+    };
+  }
+
+  return { resolveBacksplash, resolveCurb, resolveWallPanel, resolveIsland, resolveBarCounter };
 });

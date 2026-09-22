@@ -32,6 +32,14 @@
       // сегодня НЕ учитывается в pricing.js -- см.
       // docs/superpowers/specs/2026-09-21-3d-visualizer-design.md.
       supportsShapeSelection: true,
+      // UX-аудит: "Вариант исполнения" (BATH-01..04) дублирует реальный шаг
+      // "Форма" (Прямая/Г-образная) и дополнительно предлагает
+      // "П-образная"/"Фигурная", которых не существует ни в state, ни в
+      // geometry. См. product-types.js:stoleshnitsa_kuhnya для того же
+      // фикса. PRODUCT_SUBCATEGORIES/BATH-01..04 не трогаются -- это
+      // заготовка будущей ценовой модели, просто больше не показывается
+      // клиенту как шаг выбора для этого продукта.
+      hideVariantStep: true,
       cameraPreset: 'iso-high',
       additionalWorks: {
         sinkCutout: true, cooktopCutout: false, holes: true,
@@ -48,6 +56,15 @@
       supportsEdgeWork: true,
       supportsCountertopExtras: true,
       supportsShapeSelection: true,
+      // UX-аудит показал: этот шаг для кухонных столешниц не влияет ни на
+      // geometry, ни на pricing, ни на состав доп.работ -- реальную форму
+      // задаёт шаг "Форма" (straight/lshape), а "Остров"/"Барная стойка"
+      // здесь дублируют одноимённые объекты, уже настраиваемые отдельно в
+      // "Дополнительных позициях". KITCHEN-01..05 в PRODUCT_SUBCATEGORIES
+      // остаются как есть -- это заготовка будущей ценовой модели компании,
+      // просто больше не показывается клиенту как шаг выбора для этого
+      // продукта.
+      hideVariantStep: true,
       cameraPreset: 'iso-eye-level',
       additionalWorks: {
         sinkCutout: true, cooktopCutout: true, holes: true,
