@@ -217,6 +217,14 @@
   }
   .reveal-row .rr-title { font-size: 13px; font-weight: 700; flex: 1 1 auto; min-width: 0; color: var(--ink); }
   .reveal-row .field-unit { flex: 0 0 140px; }
+  .reveal-row .rr-fields { display: flex; gap: 12px; flex: 0 0 auto; }
+  @media (max-width: 480px) {
+    /* Строка "заголовок + два поля" (ширина/длина) не помещается в один ряд
+       на узком экране -- переносим пару полей на вторую строку целиком,
+       вместо того чтобы схлопывать заголовок до нечитаемой ширины. */
+    .reveal-row:has(.rr-fields) { flex-wrap: wrap; }
+    .reveal-row .rr-fields { flex: 1 1 100%; }
+  }
 
   .field-unit { position: relative; min-width: 0; }
   .field-unit input {
@@ -228,6 +236,36 @@
   .field-unit .unit-label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
   .field-row { display: flex; gap: 10px; flex-wrap: wrap; }
   .field-row .field-unit { flex: 1 1 140px; }
+
+  /* «Дополнительные работы»: компактный accordion в языке V2. Сам
+     .work-item -- это тот же элемент, что раньше был голым div#group-*
+     (id и capability-переключение через ADDITIONAL_WORK_GROUPS не тронуты),
+     меняется только то, как он выглядит и раскрывается. Раскрытие -- чистый
+     CSS-трюк grid-template-rows 0fr/1fr (без JS-анимации и без измерения
+     scrollHeight), :has() для .product-card уже задаёт минимальную планку
+     поддержки браузеров, так что этот приём в том же допущении. */
+  .work-item { background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+  .work-item + .work-item { margin-top: 10px; }
+  .work-item-head {
+    width: 100%; display: flex; align-items: center; gap: 12px;
+    padding: 14px 16px; background: none; border: none; cursor: pointer; text-align: left;
+    font: inherit; color: inherit;
+  }
+  .work-item-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .work-item-title { font-size: 14px; font-weight: 700; color: var(--ink); }
+  .work-item-hint { font-size: 12px; color: var(--muted); }
+  .work-item-chevron {
+    flex: none; width: 22px; height: 22px; border-radius: 50%;
+    border: 1.5px solid var(--line); display: flex; align-items: center; justify-content: center;
+    transition: transform 0.2s ease, border-color 0.2s ease;
+  }
+  .work-item-chevron svg { width: 10px; height: 10px; }
+  .work-item.open .work-item-chevron { transform: rotate(180deg); border-color: var(--accent); }
+  .work-item-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.2s ease; }
+  .work-item.open .work-item-body { grid-template-rows: 1fr; }
+  .work-item-body-inner { overflow: hidden; }
+  .work-item-body-pad { padding: 0 16px 16px; }
+  .reveal-row.filled { border-color: var(--accent); background: var(--accent-soft); }
 
   /* Диаграмма размеров: перенесено буквально из согласованного
      V2-конструктора (https://claude.ai/artifact/8fkDjjV6vDdwZypMQwN7zK). */
@@ -760,70 +798,169 @@
 
     <section class="step" id="countertopExtras" style="display:none">
       <div class="step-head"><span class="step-num">7</span><h2 class="step-title">Дополнительные позиции</h2></div>
+      <p class="step-sub">Раскройте нужную позицию, чтобы указать вариант и количество.</p>
       <div class="field">
 
-        <div id="group-sink-cutout" style="display:none">
-          <label style="margin-top:0">Вырезы под раковину</label>
-          <input type="number" id="cut-sink-overlay" placeholder="Раковина накладная, шт." min="0" step="1">
-          <input type="number" id="cut-sink-undermount" placeholder="Раковина подшивная снизу, шт." min="0" step="1" style="margin-top:8px">
-          <input type="number" id="cut-sink-integrated" placeholder="Раковина интегрированная, шт." min="0" step="1" style="margin-top:8px">
+        <div id="group-sink-cutout" class="work-item" style="display:none">
+          <button type="button" class="work-item-head" aria-expanded="false">
+            <span class="work-item-text">
+              <span class="work-item-title">Вырезы под раковину</span>
+              <span class="work-item-hint">Отверстие под мойку в столешнице</span>
+            </span>
+            <span class="work-item-chevron" aria-hidden="true"><svg viewBox="0 0 12 12" fill="none"><path d="M3 4.5 L6 7.5 L9 4.5" stroke="var(--muted)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          </button>
+          <div class="work-item-body"><div class="work-item-body-inner"><div class="work-item-body-pad">
+            <div class="reveal-rows">
+              <div class="reveal-row"><span class="rr-title">Накладная</span><div class="field-unit"><input type="number" id="cut-sink-overlay" min="0" step="1" placeholder="0"><span class="unit">шт.</span></div></div>
+              <div class="reveal-row"><span class="rr-title">Подшивная снизу</span><div class="field-unit"><input type="number" id="cut-sink-undermount" min="0" step="1" placeholder="0"><span class="unit">шт.</span></div></div>
+              <div class="reveal-row"><span class="rr-title">Интегрированная</span><div class="field-unit"><input type="number" id="cut-sink-integrated" min="0" step="1" placeholder="0"><span class="unit">шт.</span></div></div>
+            </div>
+          </div></div></div>
         </div>
 
-        <div id="group-cooktop-cutout" style="margin-top:16px;display:none">
-          <label>Варочная панель</label>
-          <input type="number" id="cut-cooktop" placeholder="Варочная панель, шт." min="0" step="1">
+        <div id="group-cooktop-cutout" class="work-item" style="display:none">
+          <button type="button" class="work-item-head" aria-expanded="false">
+            <span class="work-item-text">
+              <span class="work-item-title">Варочная панель</span>
+              <span class="work-item-hint">Вырез под варочную поверхность</span>
+            </span>
+            <span class="work-item-chevron" aria-hidden="true"><svg viewBox="0 0 12 12" fill="none"><path d="M3 4.5 L6 7.5 L9 4.5" stroke="var(--muted)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          </button>
+          <div class="work-item-body"><div class="work-item-body-inner"><div class="work-item-body-pad">
+            <div class="reveal-rows">
+              <div class="reveal-row"><span class="rr-title">Количество</span><div class="field-unit"><input type="number" id="cut-cooktop" min="0" step="1" placeholder="0"><span class="unit">шт.</span></div></div>
+            </div>
+          </div></div></div>
         </div>
 
-        <div id="group-holes" style="margin-top:16px;display:none">
-          <label>Отверстия</label>
-          <input type="number" id="hole-mixer" placeholder="Смеситель, шт." min="0" step="1">
-          <input type="number" id="hole-socket" placeholder="Розетка, шт." min="0" step="1" style="margin-top:8px">
-          <input type="number" id="hole-dispenser" placeholder="Дозатор, шт." min="0" step="1" style="margin-top:8px">
+        <div id="group-holes" class="work-item" style="display:none">
+          <button type="button" class="work-item-head" aria-expanded="false">
+            <span class="work-item-text">
+              <span class="work-item-title">Отверстия</span>
+              <span class="work-item-hint">Под смеситель, розетку или дозатор</span>
+            </span>
+            <span class="work-item-chevron" aria-hidden="true"><svg viewBox="0 0 12 12" fill="none"><path d="M3 4.5 L6 7.5 L9 4.5" stroke="var(--muted)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          </button>
+          <div class="work-item-body"><div class="work-item-body-inner"><div class="work-item-body-pad">
+            <div class="reveal-rows">
+              <div class="reveal-row"><span class="rr-title">Смеситель</span><div class="field-unit"><input type="number" id="hole-mixer" min="0" step="1" placeholder="0"><span class="unit">шт.</span></div></div>
+              <div class="reveal-row"><span class="rr-title">Розетка</span><div class="field-unit"><input type="number" id="hole-socket" min="0" step="1" placeholder="0"><span class="unit">шт.</span></div></div>
+              <div class="reveal-row"><span class="rr-title">Дозатор</span><div class="field-unit"><input type="number" id="hole-dispenser" min="0" step="1" placeholder="0"><span class="unit">шт.</span></div></div>
+            </div>
+          </div></div></div>
         </div>
 
-        <div id="group-curb" style="margin-top:16px;display:none">
-          <label>Бортик</label>
-          <input type="number" id="extra-bortik" placeholder="Бортик, мм (погонный размер)" min="0" step="1">
+        <div id="group-curb" class="work-item" style="display:none">
+          <button type="button" class="work-item-head" aria-expanded="false">
+            <span class="work-item-text">
+              <span class="work-item-title">Бортик</span>
+              <span class="work-item-hint">Погонный размер бортика</span>
+            </span>
+            <span class="work-item-chevron" aria-hidden="true"><svg viewBox="0 0 12 12" fill="none"><path d="M3 4.5 L6 7.5 L9 4.5" stroke="var(--muted)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          </button>
+          <div class="work-item-body"><div class="work-item-body-inner"><div class="work-item-body-pad">
+            <div class="reveal-rows">
+              <div class="reveal-row"><span class="rr-title">Длина</span><div class="field-unit"><input type="number" id="extra-bortik" min="0" step="1" placeholder="0"><span class="unit">мм</span></div></div>
+            </div>
+          </div></div></div>
         </div>
 
-        <div id="group-backsplash" style="margin-top:16px;display:none">
-          <label>Фартук</label>
-          <div class="dims">
-            <input type="number" id="extra-fartuk-width" placeholder="Фартук, ширина мм" min="0" step="1">
-            <input type="number" id="extra-fartuk-length" placeholder="Фартук, длина мм" min="0" step="1">
-          </div>
+        <div id="group-backsplash" class="work-item" style="display:none">
+          <button type="button" class="work-item-head" aria-expanded="false">
+            <span class="work-item-text">
+              <span class="work-item-title">Фартук</span>
+              <span class="work-item-hint">Панель на стену за столешницей</span>
+            </span>
+            <span class="work-item-chevron" aria-hidden="true"><svg viewBox="0 0 12 12" fill="none"><path d="M3 4.5 L6 7.5 L9 4.5" stroke="var(--muted)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          </button>
+          <div class="work-item-body"><div class="work-item-body-inner"><div class="work-item-body-pad">
+            <div class="reveal-rows">
+              <div class="reveal-row">
+                <span class="rr-title">Фартук</span>
+                <div class="rr-fields">
+                  <div class="field-unit"><span class="unit-label">Ширина</span><input type="number" id="extra-fartuk-width" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
+                  <div class="field-unit"><span class="unit-label">Длина</span><input type="number" id="extra-fartuk-length" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
+                </div>
+              </div>
+            </div>
+          </div></div></div>
         </div>
 
-        <div id="group-wallpanel" style="margin-top:16px;display:none">
-          <label>Стеновая панель</label>
-          <div class="dims">
-            <input type="number" id="extra-wallpanel-width" placeholder="Стеновая панель, ширина мм" min="0" step="1">
-            <input type="number" id="extra-wallpanel-length" placeholder="Стеновая панель, длина мм" min="0" step="1">
-          </div>
+        <div id="group-wallpanel" class="work-item" style="display:none">
+          <button type="button" class="work-item-head" aria-expanded="false">
+            <span class="work-item-text">
+              <span class="work-item-title">Стеновая панель</span>
+              <span class="work-item-hint">Панель большой площади на стену</span>
+            </span>
+            <span class="work-item-chevron" aria-hidden="true"><svg viewBox="0 0 12 12" fill="none"><path d="M3 4.5 L6 7.5 L9 4.5" stroke="var(--muted)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          </button>
+          <div class="work-item-body"><div class="work-item-body-inner"><div class="work-item-body-pad">
+            <div class="reveal-rows">
+              <div class="reveal-row">
+                <span class="rr-title">Стеновая панель</span>
+                <div class="rr-fields">
+                  <div class="field-unit"><span class="unit-label">Ширина</span><input type="number" id="extra-wallpanel-width" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
+                  <div class="field-unit"><span class="unit-label">Длина</span><input type="number" id="extra-wallpanel-length" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
+                </div>
+              </div>
+            </div>
+          </div></div></div>
         </div>
 
-        <div id="group-island" style="margin-top:16px;display:none">
-          <label>Остров</label>
-          <div class="dims">
-            <input type="number" id="extra-ostrov-width" placeholder="Остров прямоугольный, ширина мм" min="0" step="1">
-            <input type="number" id="extra-ostrov-length" placeholder="Остров прямоугольный, длина мм" min="0" step="1">
-          </div>
-          <div class="dims" style="margin-top:12px">
-            <input type="number" id="extra-ostrov-figured-width" placeholder="Остров фигурный, ширина мм" min="0" step="1">
-            <input type="number" id="extra-ostrov-figured-length" placeholder="Остров фигурный, длина мм" min="0" step="1">
-          </div>
+        <div id="group-island" class="work-item" style="display:none">
+          <button type="button" class="work-item-head" aria-expanded="false">
+            <span class="work-item-text">
+              <span class="work-item-title">Остров</span>
+              <span class="work-item-hint">Отдельно стоящий элемент столешницы</span>
+            </span>
+            <span class="work-item-chevron" aria-hidden="true"><svg viewBox="0 0 12 12" fill="none"><path d="M3 4.5 L6 7.5 L9 4.5" stroke="var(--muted)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          </button>
+          <div class="work-item-body"><div class="work-item-body-inner"><div class="work-item-body-pad">
+            <div class="reveal-rows">
+              <div class="reveal-row">
+                <span class="rr-title">Прямоугольный</span>
+                <div class="rr-fields">
+                  <div class="field-unit"><span class="unit-label">Ширина</span><input type="number" id="extra-ostrov-width" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
+                  <div class="field-unit"><span class="unit-label">Длина</span><input type="number" id="extra-ostrov-length" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
+                </div>
+              </div>
+              <div class="reveal-row">
+                <span class="rr-title">Фигурный</span>
+                <div class="rr-fields">
+                  <div class="field-unit"><span class="unit-label">Ширина</span><input type="number" id="extra-ostrov-figured-width" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
+                  <div class="field-unit"><span class="unit-label">Длина</span><input type="number" id="extra-ostrov-figured-length" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
+                </div>
+              </div>
+            </div>
+          </div></div></div>
         </div>
 
-        <div id="group-barcounter" style="margin-top:16px;display:none">
-          <label>Барная стойка</label>
-          <div class="dims">
-            <input type="number" id="extra-bar-standard-width" placeholder="Барная стойка стандартная, ширина мм" min="0" step="1">
-            <input type="number" id="extra-bar-standard-length" placeholder="Барная стойка стандартная, длина мм" min="0" step="1">
-          </div>
-          <div class="dims" style="margin-top:12px">
-            <input type="number" id="extra-bar-complex-width" placeholder="Барная стойка сложная, ширина мм" min="0" step="1">
-            <input type="number" id="extra-bar-complex-length" placeholder="Барная стойка сложная, длина мм" min="0" step="1">
-          </div>
+        <div id="group-barcounter" class="work-item" style="display:none">
+          <button type="button" class="work-item-head" aria-expanded="false">
+            <span class="work-item-text">
+              <span class="work-item-title">Барная стойка</span>
+              <span class="work-item-hint">Продолжение столешницы для сидения</span>
+            </span>
+            <span class="work-item-chevron" aria-hidden="true"><svg viewBox="0 0 12 12" fill="none"><path d="M3 4.5 L6 7.5 L9 4.5" stroke="var(--muted)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          </button>
+          <div class="work-item-body"><div class="work-item-body-inner"><div class="work-item-body-pad">
+            <div class="reveal-rows">
+              <div class="reveal-row">
+                <span class="rr-title">Стандартная</span>
+                <div class="rr-fields">
+                  <div class="field-unit"><span class="unit-label">Ширина</span><input type="number" id="extra-bar-standard-width" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
+                  <div class="field-unit"><span class="unit-label">Длина</span><input type="number" id="extra-bar-standard-length" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
+                </div>
+              </div>
+              <div class="reveal-row">
+                <span class="rr-title">Сложная</span>
+                <div class="rr-fields">
+                  <div class="field-unit"><span class="unit-label">Ширина</span><input type="number" id="extra-bar-complex-width" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
+                  <div class="field-unit"><span class="unit-label">Длина</span><input type="number" id="extra-bar-complex-length" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
+                </div>
+              </div>
+            </div>
+          </div></div></div>
         </div>
       </div>
     </section>
@@ -1609,6 +1746,27 @@
     'extra-bar-standard-width', 'extra-bar-standard-length',
     'extra-bar-complex-width', 'extra-bar-complex-length',
   ].forEach(id => document.getElementById(id).addEventListener('input', calculate));
+
+  // «Дополнительные позиции»: раскрытие/закрытие accordion и подсветка
+  // заполненного варианта -- чисто визуальные обработчики, не влияют на
+  // calculate()/state (те продолжают слушать те же самые input-события,
+  // что и раньше, см. блок выше).
+  document.querySelectorAll('#countertopExtras .work-item-head').forEach(head => {
+    head.addEventListener('click', () => {
+      const item = head.closest('.work-item');
+      const isOpen = item.classList.toggle('open');
+      head.setAttribute('aria-expanded', String(isOpen));
+    });
+  });
+  document.querySelectorAll('#countertopExtras .reveal-row').forEach(row => {
+    const rowInputs = row.querySelectorAll('input');
+    const syncFilled = () => {
+      row.classList.toggle('filled', Array.from(rowInputs).some(el => parseFloat(el.value) > 0));
+    };
+    rowInputs.forEach(el => el.addEventListener('input', syncFilled));
+    syncFilled();
+  });
+
   productSubcategorySelect.addEventListener('change', () => { updateSubcategoryQtyVisibility(); calculate(); });
   subcategoryQtyInput.addEventListener('input', calculate);
   productShapeSelect.addEventListener('change', () => { updateWingVisibility(); calculate(); });
