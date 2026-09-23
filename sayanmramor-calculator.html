@@ -988,10 +988,39 @@
             <span class="work-item-chevron" aria-hidden="true"><svg viewBox="0 0 12 12" fill="none"><path d="M3 4.5 L6 7.5 L9 4.5" stroke="var(--muted)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
           </button>
           <div class="work-item-body"><div class="work-item-body-inner"><div class="work-item-body-pad">
+            <!-- Утверждённые sub-card иконки варианта мойки (V2-концепт) --
+                 форма/пропорции/линии перенесены 1:1, заливка через
+                 var(--stone)/var(--stone-line) подхватывает текущий цветокор.
+                 Явный single-select картой (как edge/shape выше), а не три
+                 независимых числовых поля: клик по карточке обнуляет два
+                 других #cut-sink-* поля НАПРЯМУЮ, так что pricing физически
+                 не может получить два одновременно ненулевых типа мойки --
+                 это не "визуальное снятие галочки" поверх произвольного
+                 state, single-select теперь гарантирован на уровне данных. -->
+            <div class="card-grid" id="sinkVariantGrid">
+              <div class="pick-card" data-sink-variant="overlay" role="button" tabindex="0">
+                <span class="pc-check">✓</span>
+                <svg viewBox="0 0 60 34" aria-hidden="true"><rect x="4" y="20" width="52" height="8" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M18 20 V16 A12 4 0 0 1 42 16 V20 Z" fill="none" stroke="var(--stone-line)" stroke-width="2"/></svg>
+                <div class="pc-title">Накладная</div>
+                <div class="pc-desc">Мойка стоит поверх столешницы</div>
+              </div>
+              <div class="pick-card" data-sink-variant="undermount" role="button" tabindex="0">
+                <span class="pc-check">✓</span>
+                <svg viewBox="0 0 60 34" aria-hidden="true"><rect x="4" y="10" width="52" height="8" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M18 18 V24 A12 4 0 0 0 42 24 V18" fill="none" stroke="var(--stone-line)" stroke-width="2"/></svg>
+                <div class="pc-title">Снизу</div>
+                <div class="pc-desc">Мойка закреплена под камнем</div>
+              </div>
+              <div class="pick-card" data-sink-variant="integrated" role="button" tabindex="0">
+                <span class="pc-check">✓</span>
+                <svg viewBox="0 0 60 34" aria-hidden="true"><rect x="4" y="10" width="52" height="16" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5" rx="2"/><ellipse cx="30" cy="18" rx="10" ry="5" fill="none" stroke="var(--stone-line)" stroke-width="2"/></svg>
+                <div class="pc-title">Интегрированная</div>
+                <div class="pc-desc">Единое целое с камнем, без шва</div>
+              </div>
+            </div>
             <div class="reveal-rows">
-              <div class="reveal-row"><span class="rr-title">Накладная</span><div class="field-unit"><input type="number" id="cut-sink-overlay" min="0" step="1" placeholder="0"><span class="unit">шт.</span></div></div>
-              <div class="reveal-row"><span class="rr-title">Подшивная снизу</span><div class="field-unit"><input type="number" id="cut-sink-undermount" min="0" step="1" placeholder="0"><span class="unit">шт.</span></div></div>
-              <div class="reveal-row"><span class="rr-title">Интегрированная</span><div class="field-unit"><input type="number" id="cut-sink-integrated" min="0" step="1" placeholder="0"><span class="unit">шт.</span></div></div>
+              <div class="reveal-row" data-sink-qty-row="overlay" style="display:none"><span class="rr-title">Количество — накладная</span><div class="field-unit"><input type="number" id="cut-sink-overlay" min="0" step="1" placeholder="0"><span class="unit">шт.</span></div></div>
+              <div class="reveal-row" data-sink-qty-row="undermount" style="display:none"><span class="rr-title">Количество — снизу</span><div class="field-unit"><input type="number" id="cut-sink-undermount" min="0" step="1" placeholder="0"><span class="unit">шт.</span></div></div>
+              <div class="reveal-row" data-sink-qty-row="integrated" style="display:none"><span class="rr-title">Количество — интегрированная</span><div class="field-unit"><input type="number" id="cut-sink-integrated" min="0" step="1" placeholder="0"><span class="unit">шт.</span></div></div>
             </div>
           </div></div></div>
         </div>
@@ -2248,6 +2277,38 @@
     'extra-bar-standard-width', 'extra-bar-standard-length',
     'extra-bar-complex-width', 'extra-bar-complex-length',
   ].forEach(id => document.getElementById(id).addEventListener('input', calculate));
+
+  // Мойка: три карточки (Накладная/Снизу/Интегрированная), явный
+  // single-select. Клик по невыбранной карточке выбирает её вариант
+  // (реально заполняет соответствующее #cut-sink-* поле значением 1,
+  // обнуляя два других), клик по уже выбранной -- снимает выбор совсем
+  // (все три поля обнуляются). Количество можно скорректировать в
+  // раскрывшемся под карточками поле -- тот же самый input, что уже читает
+  // constructor-state.js, просто скрыт/показан по выбору, а не всегда
+  // виден как раньше.
+  const SINK_VARIANTS = ['overlay', 'undermount', 'integrated'];
+  const sinkVariantGrid = document.getElementById('sinkVariantGrid');
+  function sinkFieldFor(variant) { return document.getElementById('cut-sink-' + variant); }
+  function sinkQtyRowFor(variant) { return sinkVariantGrid.parentElement.querySelector('[data-sink-qty-row="' + variant + '"]'); }
+  function sinkCardFor(variant) { return sinkVariantGrid.querySelector('[data-sink-variant="' + variant + '"]'); }
+  function selectSinkVariant(variant) {
+    const wasSelected = parseFloat(sinkFieldFor(variant).value) > 0;
+    SINK_VARIANTS.forEach(v => {
+      const input = sinkFieldFor(v);
+      const select = v === variant && !wasSelected;
+      input.value = select ? '1' : '';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      sinkQtyRowFor(v).style.display = select ? '' : 'none';
+      sinkCardFor(v).classList.toggle('selected', select);
+    });
+  }
+  SINK_VARIANTS.forEach(variant => {
+    const card = sinkCardFor(variant);
+    card.addEventListener('click', () => selectSinkVariant(variant));
+    card.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectSinkVariant(variant); }
+    });
+  });
 
   // Остров (Прямоугольный/Фигурный) и барная стойка (Стандартная/Сложная) --
   // взаимоисключающие варианты одной и той же дополнительной работы. Ввод
