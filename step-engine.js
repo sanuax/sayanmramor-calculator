@@ -99,7 +99,9 @@
     edge: 'Кромка',
     additionalWorks: 'Доп. работы',
     options: 'Опции',
-    review: 'Проверка',
+    // 'review' is the Result screen (the configurator's finish), not an
+    // intermediate check page.
+    review: 'Итог',
   };
 
   // Продукт без записи в PRODUCT_STEPS (или ключ null/undefined -- ничего

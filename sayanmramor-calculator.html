@@ -826,6 +826,119 @@
     line-height: 1.5;
     margin-bottom: 20px;
   }
+
+  /* ---- Result (the 'review' step) ----------------------------------------
+     Result mode reuses the SAME dark 3D block (one renderer, see
+     three-scene.js's ResizeObserver) -- it just becomes the large left
+     column, while the review section is the information column. The block's
+     own price/breakdown/CTA hide here because the Result column shows them.
+     Type sizes are the existing --configurator-* scale; the only big size is
+     the price token, reused for the product title and the total. */
+  @media (min-width: 981px) {
+    .configurator-columns.is-result { grid-template-columns: minmax(0, 1fr) minmax(360px, 440px); gap: 48px; }
+    /* Desktop only: with aspect-ratio, a min-height also becomes a minimum
+       WIDTH (280px * 16/10), which on a phone pushes the page past the
+       viewport -- phones keep the default 4/3 box. */
+    .configurator-columns.is-result .viewer-canvas-wrap { aspect-ratio: 16 / 10; max-height: 68vh; min-height: 280px; }
+  }
+  .configurator-columns.is-result .configurator-side { order: -1; }
+  .configurator-columns.is-result .summary-info { display: none; }
+  .configurator-columns.is-result .summary-grid { gap: 0; }
+  .configurator-columns.is-result .summary-title {
+    font-size: var(--configurator-price); font-weight: 800; text-align: left; letter-spacing: -0.5px; margin-bottom: 20px;
+  }
+  .step-nav-next.is-hidden { display: none; }
+
+  .result-panel { display: flex; flex-direction: column; gap: 28px; }
+  .result-eyebrow, .result-block-title {
+    font-size: var(--configurator-muted); font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1px; color: var(--muted); line-height: 1.5;
+  }
+  .result-block-title { margin-bottom: 10px; }
+  .result-eyebrow { margin-bottom: -16px; }
+  .result-specs { margin: 0; border-top: 1px solid var(--line); }
+  .result-spec {
+    display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px;
+    padding: 12px 0; border-bottom: 1px solid var(--line);
+  }
+  .result-spec dt { font-size: var(--configurator-muted); color: var(--muted); line-height: 1.5; padding-top: 1px; }
+  .result-spec dd { margin: 0; font-size: var(--configurator-text); font-weight: 700; color: var(--ink); line-height: 1.4; overflow-wrap: anywhere; }
+  .result-spec-detail { display: block; margin-top: 2px; font-size: var(--configurator-muted); font-weight: 400; color: var(--muted); line-height: 1.5; }
+
+  .result-works[hidden] { display: none; }
+  .result-works-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+  .result-works-list li {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 16px;
+    padding: 10px 0; border-bottom: 1px solid var(--line);
+    font-size: var(--configurator-text); color: var(--ink); line-height: 1.4;
+  }
+  .result-works-list .result-work-detail { flex: none; font-size: var(--configurator-muted); color: var(--muted); }
+  .result-works-empty { margin: 0; font-size: var(--configurator-text); color: var(--muted); line-height: 1.5; }
+  .result-works-empty[hidden] { display: none; }
+
+  .result-pricing {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px;
+  }
+  .result-pricing .result-block-title { margin-bottom: 4px; }
+  .result-total {
+    font-size: var(--configurator-price); font-weight: 900; color: var(--ink);
+    line-height: 1.15; letter-spacing: -0.5px;
+  }
+  .result-total:empty { display: none; }
+  .result-manual { margin: 6px 0 0; font-size: var(--configurator-text); color: var(--accent-ink); line-height: 1.5; }
+  .result-manual[hidden] { display: none; }
+  .result-lines { margin: 14px 0 0; padding-top: 10px; border-top: 1px solid var(--line); }
+  .result-lines:empty { display: none; }
+  .result-line { display: flex; justify-content: space-between; gap: 16px; padding: 3px 0; font-size: var(--configurator-muted); line-height: 1.5; }
+  .result-line dt { color: var(--muted); }
+  .result-line dd { margin: 0; color: var(--ink); white-space: nowrap; }
+  .result-note { margin: 12px 0 0; font-size: var(--configurator-muted); color: var(--muted); line-height: 1.5; }
+
+  .lead-form, .lead-success {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 22px;
+  }
+  .lead-form { display: flex; flex-direction: column; gap: 16px; }
+  .lead-form[hidden], .lead-success[hidden], #resultCtaBtn[hidden] { display: none; }
+  .lead-form-title { margin: 0 0 4px; font-size: var(--configurator-heading); font-weight: 700; color: var(--ink); }
+  .lead-form-sub { margin: 0; font-size: var(--configurator-muted); color: var(--muted); line-height: 1.5; }
+  .lead-field label {
+    text-transform: none; letter-spacing: 0; font-size: var(--configurator-muted);
+    color: var(--muted); margin-bottom: 6px;
+  }
+  .lead-optional { font-weight: 400; }
+  .lead-field input, .lead-field textarea {
+    width: 100%; padding: 12px 14px; border: 1px solid var(--line); border-radius: 3px;
+    font-family: inherit; font-size: var(--configurator-text); line-height: 1.4;
+    background: var(--card-hover); color: var(--ink);
+  }
+  .lead-field textarea { resize: vertical; min-height: 84px; }
+  .lead-field textarea:focus { outline: none; border-color: var(--accent); background: var(--card); }
+  .lead-field.has-error input, .lead-field.has-error textarea { border-color: var(--accent-ink); }
+  .lead-error { margin-top: 4px; font-size: var(--configurator-muted); color: var(--accent-ink); line-height: 1.5; }
+  .lead-error:empty { display: none; }
+  .lead-actions { display: flex; gap: 10px; align-items: stretch; }
+  .lead-actions .cta-btn { flex: 1; }
+  .lead-secondary-btn {
+    padding: 12px 18px; border: 1px solid var(--line); border-radius: 4px; background: transparent;
+    font-family: inherit; font-size: var(--configurator-text); font-weight: 700; color: var(--muted); cursor: pointer;
+  }
+  .lead-secondary-btn:hover { color: var(--ink); border-color: var(--stone-line); }
+  .lead-success { border-left: 3px solid var(--sage); outline: none; }
+  .lead-success-title { font-size: var(--configurator-heading); font-weight: 700; color: var(--ink); margin-bottom: 6px; }
+  .lead-success p { margin: 0 0 16px; font-size: var(--configurator-text); color: var(--muted); line-height: 1.5; }
+
+  .result-edit-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .result-edit-btn {
+    padding: 8px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--card);
+    font-family: inherit; font-size: var(--configurator-muted); color: var(--ink); cursor: pointer;
+    transition: border-color 0.15s, background-color 0.15s;
+  }
+  .result-edit-btn:hover { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); }
+  .result-edit-btn:focus-visible, .lead-secondary-btn:focus-visible, .cta-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (max-width: 480px) {
+    .result-spec { grid-template-columns: 1fr; gap: 2px; }
+    .lead-actions { flex-direction: column; }
+  }
 </style>
 </head>
 <body>
@@ -1244,16 +1357,72 @@
       </div>
     </section>
 
-    <!-- review: the final step, same for every product (see step-engine.js
-         -- PRODUCT_STEPS always ends in 'review'). It does NOT duplicate the
-         summary block below (price/3D/breakdown) -- that already stays
-         visible the whole time; this is just the last stop that points at
-         it before "Готово". -->
+    <!-- review: the final step for every product (PRODUCT_STEPS always
+         ends in 'review') -- the Result. While it is active the layout
+         switches to result mode (.configurator-columns.is-result): the
+         existing dark 3D block becomes the large left column and this
+         section is the information column. Everything below is filled by
+         renderResult() from ResultModel -- no values are written here by
+         hand, and there is no second renderer/state. -->
     <section class="step" data-step-id="review" style="display:none">
-      <div class="step-head"><span class="step-num">9</span><h2 class="step-title">Проверка</h2></div>
-      <p class="step-sub">Все выбранные параметры уже учтены в расчёте справа.</p>
-      <div class="field">
-        <p>Проверьте материал, размеры и состав работ в блоке результата ниже, затем нажмите «Получить точный расчёт».</p>
+      <div class="result-panel">
+        <div class="result-eyebrow">Конфигурация готова</div>
+        <dl class="result-specs" id="resultSpecs"></dl>
+
+        <div class="result-pricing">
+          <div class="result-block-title">Предварительная стоимость</div>
+          <div class="result-total" id="resultTotal"></div>
+          <p class="result-manual" id="resultManual" hidden></p>
+          <dl class="result-lines" id="resultLines"></dl>
+          <p class="result-note">Стоимость предварительная и уточняется после проверки проекта.</p>
+        </div>
+
+        <div class="lead" id="leadArea">
+          <button type="button" class="cta-btn" id="resultCtaBtn">Получить расчёт</button>
+
+          <form class="lead-form" id="leadForm" novalidate hidden>
+            <div class="lead-form-head">
+              <h3 class="lead-form-title">Получить расчёт</h3>
+              <p class="lead-form-sub">Оставьте контакты — параметры изделия уже собраны в запрос, повторно их вводить не нужно.</p>
+            </div>
+            <div class="lead-field">
+              <label for="leadName">Имя</label>
+              <input type="text" id="leadName" name="name" autocomplete="name" maxlength="100" aria-describedby="leadNameError">
+              <div class="lead-error" id="leadNameError"></div>
+            </div>
+            <div class="lead-field">
+              <label for="leadPhone">Телефон</label>
+              <input type="tel" id="leadPhone" name="phone" autocomplete="tel" inputmode="tel" placeholder="+7 900 000-00-00" maxlength="30" aria-describedby="leadPhoneError">
+              <div class="lead-error" id="leadPhoneError"></div>
+            </div>
+            <div class="lead-field">
+              <label for="leadComment">Комментарий <span class="lead-optional">— необязательно</span></label>
+              <textarea id="leadComment" name="comment" rows="3" maxlength="1000" aria-describedby="leadCommentError"></textarea>
+              <div class="lead-error" id="leadCommentError"></div>
+            </div>
+            <div class="lead-actions">
+              <button type="submit" class="cta-btn">Подготовить запрос</button>
+              <button type="button" class="lead-secondary-btn" id="leadCancelBtn">Отмена</button>
+            </div>
+          </form>
+
+          <div class="lead-success" id="leadSuccess" hidden tabindex="-1">
+            <div class="lead-success-title">Запрос подготовлен</div>
+            <p>Конфигурация и ваши контакты собраны в один запрос. Онлайн-отправка менеджеру пока не подключена — запрос сохранён только на этой странице.</p>
+            <button type="button" class="lead-secondary-btn" id="leadEditBtn">Изменить контакты</button>
+          </div>
+        </div>
+
+        <div class="result-works" id="resultWorksBlock" hidden>
+          <div class="result-block-title">Дополнительные работы</div>
+          <ul class="result-works-list" id="resultWorksList"></ul>
+          <p class="result-works-empty" id="resultWorksEmpty" hidden>Без дополнительных работ</p>
+        </div>
+
+        <div class="result-edit">
+          <div class="result-block-title">Изменить конфигурацию</div>
+          <div class="result-edit-actions" id="resultEditActions"></div>
+        </div>
       </div>
     </section>
     </div><!-- /#stepViewport -->
@@ -1293,7 +1462,7 @@
                 <div class="info-block" id="infoBlock">Стоимость указана за весь слэб — остаток после раскроя бесплатно хранится на складе компании, клиент может использовать его для другого проекта или забрать себе.</div>
               </div>
               <div>
-                <button class="cta-btn" id="ctaBtn">Получить точный расчёт</button>
+                <button class="cta-btn" id="ctaBtn">Получить расчёт</button>
                 <div class="disclaimer" id="updatedAtOut"></div>
                 <div class="disclaimer">Расчёт ориентировочный. Финальная цена зависит от партии камня, сложности рисунка и логистики.</div>
               </div>
@@ -1350,6 +1519,8 @@
 <script src="product-types.js"></script>
 <script src="rate-catalog.js"></script>
 <script src="step-engine.js"></script>
+<script src="result-model.js"></script>
+<script src="lead-payload.js"></script>
 <script src="transition-layer.js"></script>
 <script src="constructor-state.js"></script>
 <script src="visualizer/constants.js"></script>
@@ -1432,22 +1603,22 @@
     stupeni: 'Тип ступеней',
     panno: 'Тип панно',
   };
-  // Summary panel heading: grammatically correct "Ваш/Ваша/Ваше <изделие>"
-  // per product -- was hardcoded to "Ваша столешница" even for a staircase
-  // or a floor, which read as a genuine content bug once the Step Engine
-  // started serving all 9 products, not just the two countertops it was
-  // originally written for.
-  const RESULT_TITLES = {
-    lestnitsa: 'Ваша лестница',
-    panno: 'Ваше панно',
-    podokonnik: 'Ваш подоконник',
-    pol: 'Ваш пол',
-    stena: 'Ваша стена',
-    fasad: 'Ваш фасад',
-    stoleshnitsa_vannaya: 'Ваша столешница',
-    stoleshnitsa_kuhnya: 'Ваша столешница',
-    stupeni: 'Ваши ступени',
-  };
+  // Result/summary heading ("Ваш/Ваша/Ваше <изделие>") lives in
+  // result-model.js (ResultModel.resultTitle) -- one helper for the summary
+  // panel, the Result screen and the lead payload.
+  //
+  // What calculate() last produced (constructor state + pricing outcome) --
+  // the Result screen and the lead payload are built from this, never from
+  // a second read of the form. Declared up here for the same URL-bootstrap
+  // TDZ reason as currentStepId above.
+  let lastCalcSnapshot = null;
+  // Lead UI mode: 'cta' | 'form' | 'success'. leadPreparedKey is the
+  // configuration+pricing the prepared request was built from; if the
+  // configuration changes afterwards, the success state is no longer true
+  // and the Result falls back to the CTA.
+  let leadMode = 'cta';
+  let leadPreparedKey = null;
+  let lastLeadPayload = null;
   // "Длина"/"Ширина" read as the wrong words for a floor (a room isn't
   // "длина 4000мм") or a wall (its two dimensions are a run and a height,
   // not a length and a width) -- same numeric fields/state either way
@@ -1918,6 +2089,7 @@
   const stepNavEl = document.getElementById('stepNav');
   const stepBackBtn = document.getElementById('stepBackBtn');
   const stepNextBtn = document.getElementById('stepNextBtn');
+  const configuratorColumnsEl = document.querySelector('.configurator-columns');
   // currentStepId itself is declared earlier, next to selectedProductKey --
   // see the comment there for why (URL-bootstrap TDZ hazard).
 
@@ -1969,6 +2141,7 @@
 
     if (!steps.length) {
       stepSections.forEach(el => { el.style.display = 'none'; });
+      configuratorColumnsEl.classList.remove('is-result');
       stepNavEl.style.display = 'none';
       stepProgressEl.innerHTML = '';
       stepProgressEl.style.display = 'none';
@@ -1993,9 +2166,23 @@
     const isFirst = StepEngine.isFirstStep(productKey, currentStepId);
     const isLast = StepEngine.isLastStep(productKey, currentStepId);
     stepBackBtn.classList.toggle('is-hidden', isFirst);
-    stepNextBtn.textContent = isLast ? 'Готово' : 'Далее →';
+    // The last step is the Result itself -- its own CTA ("Получить расчёт")
+    // is the next action, so a "Готово" button there would be a dead end.
+    stepNextBtn.classList.toggle('is-hidden', isLast);
     stepNextBtn.disabled = !isLast && !StepEngine.canAdvance(productKey, currentStepId, isCurrentStepDataValid(currentStepId));
     stepNavEl.style.display = '';
+
+    const enteringResult = currentStepId === 'review' && previousStepId !== 'review';
+    configuratorColumnsEl.classList.toggle('is-result', currentStepId === 'review');
+    if (currentStepId === 'review') renderResult();
+    // three-scene.js frames the camera only on the first model and then
+    // keeps the user's orbit -- so after size/product changes the final
+    // model can sit far away. Entering the Result re-frames it on what was
+    // actually configured (the same call as "Сбросить вид").
+    if (enteringResult && viewerReady) window.ThreeScene.resetView();
+    if (enteringResult && transitionDirection) {
+      configuratorColumnsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
 
     const fromEl = (previousStepId && previousStepId !== currentStepId)
       ? document.querySelector('.configurator .step[data-step-id="' + previousStepId + '"]')
@@ -2035,13 +2222,6 @@
 
   stepNextBtn.addEventListener('click', () => {
     if (stepTransitionInFlight) return;
-    if (StepEngine.isLastStep(selectedProductKey, currentStepId)) {
-      // 'review' is the finishing action -- point at the existing, always-
-      // visible summary block (price/3D/CTA) instead of building a second
-      // result screen.
-      document.querySelector('.summary-block').scrollIntoView({ behavior: 'smooth', block: 'start' });
-      return;
-    }
     if (!StepEngine.canAdvance(selectedProductKey, currentStepId, isCurrentStepDataValid(currentStepId))) return;
     const next = StepEngine.nextStep(selectedProductKey, currentStepId);
     applyStep(selectedProductKey, next, 'forward');
@@ -2082,7 +2262,7 @@
   }
 
   function updateSummaryTitle(productKey) {
-    summaryTitleEl.textContent = RESULT_TITLES[productKey] || 'Ваша столешница';
+    summaryTitleEl.textContent = ResultModel.resultTitle(productKey);
   }
 
   function updateDimensionLabels(productKey) {
@@ -2131,9 +2311,18 @@
     priceOut.classList.remove('placeholder');
   }
 
+  // The one recalculation entry point every input calls. It renders the
+  // persistent summary exactly as before and keeps the resulting snapshot
+  // (constructor state + pricing outcome) for the Result screen.
   function calculate() {
     if (!DATA_LOADED) return;
+    lastCalcSnapshot = computeAndRenderSummary();
+    if (currentStepId === 'review') renderResult();
+  }
 
+  // Returns { state, outcome } -- outcome.kind is 'incomplete' | 'manual' |
+  // 'ok' (see ResultModel.summarizePricing) -- from every exit point.
+  function computeAndRenderSummary() {
     // Must run before any early return below -- the extras block toggles
     // on product selection alone, independent of whether dimensions/stone
     // are filled in yet.
@@ -2163,7 +2352,7 @@
       breakdown.innerHTML = '';
       updatedAtOut.textContent = '';
       infoBlock.style.display = 'none';
-      return;
+      return { state: null, outcome: { kind: 'incomplete' } };
     }
     dimError.style.display = 'none';
 
@@ -2184,7 +2373,7 @@
       warningOut.style.display = 'none';
       updatedAtOut.textContent = '';
       infoBlock.style.display = 'none';
-      return;
+      return { state: constructorState, outcome: { kind: 'incomplete' } };
     }
     if (!selectedStoneId) {
       setPriceHint(INCOMPLETE_HINT);
@@ -2192,7 +2381,7 @@
       warningOut.style.display = 'none';
       updatedAtOut.textContent = '';
       infoBlock.style.display = 'none';
-      return;
+      return { state: constructorState, outcome: { kind: 'incomplete' } };
     }
     const stone = STONES_BY_ID[selectedStoneId];
 
@@ -2204,7 +2393,7 @@
       remainderOut.textContent = '';
       updatedAtOut.textContent = '';
       infoBlock.style.display = 'none';
-      return;
+      return { state: constructorState, outcome: { kind: 'manual', reason: 'stone_unavailable', message: warningOut.textContent } };
     }
 
     const complexEnabled = document.getElementById('opt-complex').checked;
@@ -2296,7 +2485,7 @@
       breakdown.innerHTML = '';
       updatedAtOut.textContent = '';
       infoBlock.style.display = 'none';
-      return;
+      return { state: constructorState, outcome: { kind: 'manual', reason: result.reason, message: msg } };
     }
 
     infoBlock.style.display = '';
@@ -2344,6 +2533,7 @@
     }
 
     updatedAtOut.textContent = 'Расчёт по ценам на ' + formatDate(UPDATED_AT) + ', точная цена подтверждается менеджером.';
+    return { state: constructorState, outcome: { kind: 'ok', result, message: warningOut.textContent || null } };
   }
 
   [widthInput, lengthInput].forEach(el => {
@@ -2460,13 +2650,202 @@
   ['wing-width', 'wing-length'].forEach(id => document.getElementById(id).addEventListener('input', calculate));
   shapeCornerSelect.addEventListener('change', calculate);
 
+  // ===== Result + lead =====
+  const resultSpecsEl = document.getElementById('resultSpecs');
+  const resultWorksBlockEl = document.getElementById('resultWorksBlock');
+  const resultWorksListEl = document.getElementById('resultWorksList');
+  const resultWorksEmptyEl = document.getElementById('resultWorksEmpty');
+  const resultTotalEl = document.getElementById('resultTotal');
+  const resultManualEl = document.getElementById('resultManual');
+  const resultLinesEl = document.getElementById('resultLines');
+  const resultEditActionsEl = document.getElementById('resultEditActions');
+  const resultCtaBtn = document.getElementById('resultCtaBtn');
+  const leadForm = document.getElementById('leadForm');
+  const leadSuccessEl = document.getElementById('leadSuccess');
+  const leadFields = {
+    name: { input: document.getElementById('leadName'), error: document.getElementById('leadNameError') },
+    phone: { input: document.getElementById('leadPhone'), error: document.getElementById('leadPhoneError') },
+    comment: { input: document.getElementById('leadComment'), error: document.getElementById('leadCommentError') },
+  };
+  const EDGE_TITLES = {};
+  EDGE_TYPES.forEach(e => { EDGE_TITLES[e.type] = e.title; });
+  const DEBUG_LEAD = bootstrapParams.get('debug') === '1';
+
+  // Configuration + pricing for the Result and the lead payload, built only
+  // from the last calculate() snapshot (never a second read of the form).
+  function currentResultData() {
+    const snap = lastCalcSnapshot;
+    if (!snap || !snap.state || !snap.state.product) return null;
+    const product = PRODUCTS[snap.state.product.key];
+    const subcategoryId = snap.state.subcategory.id;
+    const row = subcategoryId ? getSubcategoriesForProduct(product.label).find(r => r.id === subcategoryId) : null;
+    const configuration = ResultModel.buildConfiguration({
+      state: snap.state,
+      productLabel: product.label,
+      subcategory: row ? { id: row.id, label: subcategoryLabel(row), unit: row.unit } : null,
+      edgeTitles: EDGE_TITLES,
+      dimensionLabels: currentDimLabels,
+    });
+    return { configuration, pricing: ResultModel.summarizePricing(snap.outcome, UPDATED_AT) };
+  }
+
+  function el(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  function goToStep(stepId) {
+    if (stepTransitionInFlight || !selectedProductKey || stepId === currentStepId) return;
+    const forward = StepEngine.stepIndex(selectedProductKey, stepId) > StepEngine.stepIndex(selectedProductKey, currentStepId);
+    applyStep(selectedProductKey, stepId, forward ? 'forward' : 'backward');
+  }
+
+  function renderResult() {
+    const data = currentResultData();
+    if (!data) return;
+    const view = ResultModel.buildResultView(data.configuration);
+
+    resultSpecsEl.replaceChildren(...view.specs.map(spec => {
+      const row = el('div', 'result-spec');
+      const dd = el('dd', null, spec.value);
+      if (spec.detail) dd.appendChild(el('span', 'result-spec-detail', spec.detail));
+      row.append(el('dt', null, spec.label), dd);
+      return row;
+    }));
+
+    resultWorksBlockEl.hidden = view.works === null;
+    if (view.works) {
+      resultWorksListEl.replaceChildren(...view.works.map(work => {
+        const li = el('li', null, work.label);
+        if (work.detail) li.appendChild(el('span', 'result-work-detail', work.detail));
+        return li;
+      }));
+      resultWorksListEl.hidden = view.works.length === 0;
+      resultWorksEmptyEl.hidden = view.works.length > 0;
+    }
+
+    const pricing = data.pricing;
+    resultTotalEl.textContent = pricing.status === 'ok' ? '≈ ' + ResultModel.formatRub(pricing.total) : '';
+    const manualText = pricing.status === 'ok' ? pricing.message
+      : pricing.status === 'manual' ? (pricing.message || 'Стоимость уточнит менеджер.')
+      : INCOMPLETE_HINT;
+    resultManualEl.textContent = manualText || '';
+    resultManualEl.hidden = !manualText;
+    resultLinesEl.replaceChildren(...pricing.lines.map(line => {
+      const row = el('div', 'result-line');
+      row.append(el('dt', null, line.label), el('dd', null, ResultModel.formatRub(line.amountRub)));
+      return row;
+    }));
+
+    const stepLabels = Object.assign({}, StepEngine.STEP_LABELS, { type: TYPE_STEP_TITLES[selectedProductKey] || StepEngine.STEP_LABELS.type });
+    resultEditActionsEl.replaceChildren(...ResultModel.buildEditTargets(StepEngine.getSteps(selectedProductKey), stepLabels).map(target => {
+      const btn = el('button', 'result-edit-btn', target.label);
+      btn.type = 'button';
+      btn.addEventListener('click', () => goToStep(target.stepId));
+      return btn;
+    }));
+
+    // A prepared request describes one exact configuration -- once that
+    // changes, "Запрос подготовлен" would no longer be true.
+    if (leadMode === 'success' && JSON.stringify(data) !== leadPreparedKey) leadMode = 'cta';
+    applyLeadMode(false);
+  }
+
+  function applyLeadMode(moveFocus) {
+    resultCtaBtn.hidden = leadMode !== 'cta';
+    leadForm.hidden = leadMode !== 'form';
+    leadSuccessEl.hidden = leadMode !== 'success';
+    if (!moveFocus) return;
+    const target = leadMode === 'form' ? leadFields.name.input : leadMode === 'success' ? leadSuccessEl : resultCtaBtn;
+    target.focus({ preventScroll: true });
+    target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function showLeadErrors(errors) {
+    Object.keys(leadFields).forEach(key => {
+      const field = leadFields[key];
+      const message = errors[key] || '';
+      field.error.textContent = message;
+      field.input.parentElement.classList.toggle('has-error', !!message);
+      field.input.setAttribute('aria-invalid', message ? 'true' : 'false');
+    });
+  }
+
+  function readLeadInput() {
+    return { name: leadFields.name.input.value, phone: leadFields.phone.input.value, comment: leadFields.comment.input.value };
+  }
+
+  // The single integration point for a future backend/CRM request. No
+  // endpoint exists yet, so nothing leaves the page: the payload is only
+  // kept in memory (and logged with ?debug=1). Replace the body with the
+  // real request once an API exists; callers already wait on a Promise.
+  function submitLead(payload) {
+    lastLeadPayload = payload;
+    if (DEBUG_LEAD) console.info('[lead payload]', payload);
+    return Promise.resolve({ delivered: false });
+  }
+  window.SayanCalculator = { getLastLeadPayload: () => lastLeadPayload };
+
+  resultCtaBtn.addEventListener('click', () => { leadMode = 'form'; applyLeadMode(true); });
+  document.getElementById('leadCancelBtn').addEventListener('click', () => { leadMode = 'cta'; showLeadErrors({}); applyLeadMode(true); });
+  document.getElementById('leadEditBtn').addEventListener('click', () => { leadMode = 'form'; applyLeadMode(true); });
+  leadForm.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { leadMode = 'cta'; showLeadErrors({}); applyLeadMode(true); }
+  });
+  // Errors appear on submit; after that, each field clears its own error as
+  // soon as it becomes valid (no aggressive validation while typing).
+  Object.keys(leadFields).forEach(key => {
+    leadFields[key].input.addEventListener('input', () => {
+      if (!leadFields[key].error.textContent) return;
+      const errors = LeadPayload.validateContact(readLeadInput()).errors;
+      const current = {};
+      Object.keys(leadFields).forEach(k => { if (leadFields[k].error.textContent) current[k] = errors[k]; });
+      showLeadErrors(current);
+    });
+  });
+  leadForm.addEventListener('submit', e => {
+    e.preventDefault();
+    const contact = LeadPayload.validateContact(readLeadInput());
+    showLeadErrors(contact.errors);
+    if (!contact.ok) {
+      const firstInvalid = Object.keys(leadFields).find(k => contact.errors[k]);
+      leadFields[firstInvalid].input.focus();
+      return;
+    }
+    const data = currentResultData();
+    if (!data) return;
+    const payload = LeadPayload.buildLeadPayload({
+      configuration: data.configuration, pricing: data.pricing, contact: contact.value, createdAt: new Date().toISOString(),
+    });
+    submitLead(payload).then(() => {
+      leadPreparedKey = JSON.stringify(data);
+      leadMode = 'success';
+      applyLeadMode(true);
+    });
+  });
+
+  // Summary CTA (visible while configuring): leads to the Result with the
+  // form open, or to the first step still missing required data.
   ctaBtn.addEventListener('click', () => {
-    if (parseFloat(widthInput.value) > 0 && parseFloat(lengthInput.value) > 0) {
-      alert('Здесь будет открываться форма заявки с уже заполненными данными расчёта (тип, материал, размеры).');
-    } else {
+    if (!selectedProductKey) {
+      productGrid.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    if (!isCurrentStepDataValid('dimensions')) {
       dimsTouched = true;
       dimError.style.display = 'block';
+      goToStep('dimensions');
+      return;
     }
+    if (!isCurrentStepDataValid('material')) {
+      goToStep('material');
+      return;
+    }
+    goToStep('review');
+    if (leadMode !== 'success') leadMode = 'form';
+    applyLeadMode(true);
   });
 </script>
 </body>

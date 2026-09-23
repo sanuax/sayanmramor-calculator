@@ -172,7 +172,7 @@ test('buildProgress lists every step of the product with 1-based position and co
 test('buildProgress carries human-readable labels from STEP_LABELS', () => {
   const progress = StepEngine.buildProgress('podokonnik', 'dimensions');
   assert.equal(progress.find(p => p.id === 'dimensions').label, 'Размеры');
-  assert.equal(progress.find(p => p.id === 'review').label, 'Проверка');
+  assert.equal(progress.find(p => p.id === 'review').label, 'Итог');
   assert.equal(progress.find(p => p.id === 'type').label, 'Тип');
 });
 
