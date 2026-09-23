@@ -23,7 +23,9 @@ function legacyBuildPricingInputs(doc, product) {
     { rateId: 'EDGE-06', elId: 'edge-stonefold' },
   ];
   let extraLineItems = [];
-  EDGE_LINE_ITEMS.forEach(({ rateId, elId }) => {
+  // Edge is charged only where the product supports edge work (Block 7
+  // capability-safety fix); a leftover edge field on e.g. a floor is not priced.
+  if (product.supportsEdgeWork) EDGE_LINE_ITEMS.forEach(({ rateId, elId }) => {
     const lengthM = mmToM(num(doc, elId));
     if (lengthM > 0) extraLineItems.push({ rate: getAdditionalWorkRate(rateId), quantity: lengthM });
   });
@@ -108,7 +110,7 @@ const SCENARIOS = [
     values: { width: { value: '3000' }, length: { value: '2000' } },
   },
   {
-    name: 'floor: no supportsEdgeWork capability, but a stale edge field is still priced (real app has no gate on edge fields)',
+    name: 'floor: no supportsEdgeWork capability -- a stale edge field is NOT priced',
     productKey: 'pol',
     values: { width: { value: '3000' }, length: { value: '2000' }, 'edge-straight': { value: '500' } },
   },

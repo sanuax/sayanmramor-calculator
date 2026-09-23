@@ -194,9 +194,15 @@
       ostrovRatePerM2: countertopExtrasRates.ostrovRatePerM2,
     };
 
-    let extraLineItems = state.edgeLineItems.map(item => ({
-      rate: getAdditionalWorkRate(item.rateId), quantity: mmToM(item.lengthMm),
-    }));
+    // Edge fields are read for every product (a leftover value survives a
+    // product switch -- see readConstructorState), but edge work is only
+    // charged on a product that actually supports it. Today every edge rate
+    // is null, so this changes no price; it keeps a hidden edge from ever
+    // adding to the quote once real rates are filled in.
+    const edgeSupported = !!(state.product && state.product.capabilities && state.product.capabilities.supportsEdgeWork);
+    let extraLineItems = edgeSupported
+      ? state.edgeLineItems.map(item => ({ rate: getAdditionalWorkRate(item.rateId), quantity: mmToM(item.lengthMm) }))
+      : [];
 
     const QUANTITY_ITEMS = [
       ['CUT-01', state.sinkCounts.overlay], ['CUT-02', state.sinkCounts.undermount], ['CUT-03', state.sinkCounts.integrated],

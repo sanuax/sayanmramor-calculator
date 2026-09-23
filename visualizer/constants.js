@@ -12,30 +12,27 @@
   // ("Thickness: real data vs. visual fallback"). Never display these
   // numbers to the client as if they were a real spec.
   const VISUAL_FALLBACK_THICKNESS_M = 0.04;
-  // Distance from the FRONT edge for the sink/cooktop/holes fallback row.
-  // Was 0.15 -- smaller than half the sink cutout's own length (0.4/2=0.2),
-  // so clampCutoutToSlab() pushed every normal-sized countertop's sink to
-  // sit with zero clearance flush against the front edge instead of the
-  // clamp only ever engaging for a genuinely undersized slab. 0.3 leaves a
-  // believable ~0.1m/~0.055m clearance for the sink/cooktop's own length.
-  const VISUAL_FALLBACK_SINK_INSET_M = 0.3;
-  // Гap behind the sink cutout (further from the front edge) where the
-  // faucet/mixer hole sits -- a real faucet mounts behind the bowl, not on
-  // top of its exact center.
-  const VISUAL_FALLBACK_FAUCET_GAP_M = 0.05;
-  // Sideways offset from the faucet for the soap dispenser -- same row
-  // (behind the sink) as the faucet, not the identical point.
-  const VISUAL_FALLBACK_DISPENSER_OFFSET_M = 0.08;
-  // Minimum clearance kept between any hole marker's center and the slab's
-  // own edge, purely so a clamped point never sits exactly on the boundary.
-  const VISUAL_FALLBACK_HOLE_EDGE_MARGIN_M = 0.02;
 
-  // Cutout sizes: no real width/length input exists for a sink/cooktop
-  // cutout anywhere in the calculator (only a count) -- typical real-world
-  // sizes, purely for a convincing visual, never priced.
-  const VISUAL_FALLBACK_SINK_CUTOUT_SIZE_M = { widthM: 0.5, lengthM: 0.4 };
-  const VISUAL_FALLBACK_COOKTOP_CUTOUT_SIZE_M = { widthM: 0.56, lengthM: 0.49 };
-  const VISUAL_FALLBACK_HOLE_RADIUS_M = 0.01;
+  // Plan frame used by every countertop cutout/attachment: widthM is the
+  // DEPTH (wall edge -> room edge), lengthM is the RUN along the wall.
+  // Cutout sizes below follow that frame: widthM across the depth, lengthM
+  // along the run. No real size/position input exists for a sink, cooktop
+  // or hole anywhere in the calculator (only counts) -- typical real-world
+  // values, purely for a readable visual, never priced or shown as a spec.
+  const VISUAL_FALLBACK_SINK_CUTOUT_SIZE_M = { widthM: 0.4, lengthM: 0.5 };
+  const VISUAL_FALLBACK_COOKTOP_CUTOUT_SIZE_M = { widthM: 0.49, lengthM: 0.56 };
+  // Real mixer/socket holes are ~35 mm across.
+  const VISUAL_FALLBACK_HOLE_RADIUS_M = 0.0175;
+  // Minimum run-wise gap kept between the sink and the cooktop.
+  const VISUAL_FALLBACK_CUTOUT_GAP_M = 0.15;
+  // Clearance between the sink's wall-side edge and the faucet hole.
+  const VISUAL_FALLBACK_FAUCET_GAP_M = 0.035;
+  // Run-wise offset of the soap dispenser from the faucet.
+  const VISUAL_FALLBACK_DISPENSER_OFFSET_M = 0.1;
+  // Minimum clearance between any hole's edge and the slab's edge.
+  const VISUAL_FALLBACK_HOLE_EDGE_MARGIN_M = 0.02;
+  // Minimum stone left in front of a cutout (room-side edge).
+  const VISUAL_FALLBACK_CUTOUT_FRONT_MARGIN_M = 0.03;
 
   // Attachment sizes/placement with no real input: curb has only a real
   // length (no height/cross-section anywhere); island/bar counter have no
@@ -43,34 +40,52 @@
   // fallback here -- both its dimensions are real (see attachment-geometry.js).
   const VISUAL_FALLBACK_CURB_HEIGHT_M = 0.03;
   const VISUAL_FALLBACK_ISLAND_GAP_M = 0.9;
-  const VISUAL_FALLBACK_BAR_COUNTER_GAP_M = 0.9;
+  // The bar counter continues the main run -- only a visible joint, not a
+  // walkway, separates them.
+  const VISUAL_FALLBACK_BAR_COUNTER_GAP_M = 0.01;
   // Floors render as a thin flat surface, not a full-thickness slab like a
   // countertop -- purely visual, same "no real thickness input" caveat as
   // VISUAL_FALLBACK_THICKNESS_M above.
   const VISUAL_FALLBACK_FLOOR_THICKNESS_M = 0.02;
 
+  // Stairs/steps: the calculator has no step count, rise or tread-depth
+  // input, so these are standard proportions used only to draw a readable
+  // flight. Never shown as a spec.
+  const VISUAL_STEPS_ILLUSTRATION_COUNT = 4;
+  const VISUAL_STAIR_RISE_M = 0.17;
+  const VISUAL_STAIR_TREAD_DEPTH_M = 0.3;
+  const VISUAL_STAIR_MIN_STEPS = 3;
+  const VISUAL_STAIR_MAX_STEPS = 16;
+  const VISUAL_RISER_THICKNESS_M = 0.02;
+  // Joint module for floor/wall/facade layouts that name a pattern but not a
+  // tile size -- illustrates the chosen layout, not a real tile size.
+  const VISUAL_LAYOUT_MODULE_M = 0.6;
+  const VISUAL_LARGE_FORMAT_MODULE_M = 1.2;
+
+  // View directions in the shared frame: X+ is the room/viewer side (the wall
+  // a countertop, sill or panel is mounted on is at X-), Z runs along the
+  // product's length, Y is up.
   const CAMERA_PRESETS = {
-    top:   { direction: [0, 1, 0.0001] }, // near-vertical avoids a degenerate up-vector
-    front: { direction: [0, 0.3, 1] },
-    side:  { direction: [1, 0.3, 0] },
+    top:   { direction: [0.0001, 1, 0] }, // near-vertical; wall side at the top of the screen
+    front: { direction: [1, 0.22, 0.32] }, // slightly off-axis so a panel's thickness reads
+    side:  { direction: [0, 0.3, 1] },
     iso:   { direction: [1, 0.8, 1] },
-    // Per-product-type default camera angles (see PRODUCTS[key].cameraPreset
-    // in product-types.js and docs/superpowers/specs/2026-09-21-3d-visualizer-design.md,
-    // "Per-product-type default camera preset"). First-pass approximations of
-    // the requested angles -- expected to need visual tuning once seen
-    // rendered, not final numbers. These extend the registry the four manual
-    // view buttons already read from; they don't replace top/front/side/iso.
-    'iso-high':      { direction: [1, 1.1, 1] },   // vanity countertop: iso, a bit more top-down than plain iso
-    'iso-eye-level': { direction: [1, 0.6, 1] },   // kitchen countertop: iso, closer to a standing person's eye line
-    'front-high':    { direction: [0, 0.6, 1] },   // windowsill: front, a bit more top-down than plain front
-    'iso-side-high': { direction: [1.3, 0.7, 0.4] }, // stairs/steps: angled from the side to read step geometry
+    // Per-product defaults (PRODUCTS[key].cameraPreset in product-types.js).
+    'iso-high':      { direction: [1, 1.1, 0.75] }, // vanity countertop
+    'iso-eye-level': { direction: [1, 0.65, 0.75] }, // kitchen countertop, standing eye line
+    'front-high':    { direction: [1, 0.55, 0.25] }, // windowsill
+    'iso-side-high': { direction: [1, 1.05, 1.25] }, // stairs/steps: profile of the flight, treads visible from above
   };
 
   return {
-    VISUAL_FALLBACK_THICKNESS_M, VISUAL_FALLBACK_SINK_INSET_M, CAMERA_PRESETS,
+    VISUAL_FALLBACK_THICKNESS_M, CAMERA_PRESETS,
     VISUAL_FALLBACK_FAUCET_GAP_M, VISUAL_FALLBACK_DISPENSER_OFFSET_M, VISUAL_FALLBACK_HOLE_EDGE_MARGIN_M,
     VISUAL_FALLBACK_SINK_CUTOUT_SIZE_M, VISUAL_FALLBACK_COOKTOP_CUTOUT_SIZE_M, VISUAL_FALLBACK_HOLE_RADIUS_M,
+    VISUAL_FALLBACK_CUTOUT_GAP_M, VISUAL_FALLBACK_CUTOUT_FRONT_MARGIN_M,
     VISUAL_FALLBACK_CURB_HEIGHT_M, VISUAL_FALLBACK_ISLAND_GAP_M, VISUAL_FALLBACK_BAR_COUNTER_GAP_M,
     VISUAL_FALLBACK_FLOOR_THICKNESS_M,
+    VISUAL_STEPS_ILLUSTRATION_COUNT, VISUAL_STAIR_RISE_M, VISUAL_STAIR_TREAD_DEPTH_M,
+    VISUAL_STAIR_MIN_STEPS, VISUAL_STAIR_MAX_STEPS, VISUAL_RISER_THICKNESS_M,
+    VISUAL_LAYOUT_MODULE_M, VISUAL_LARGE_FORMAT_MODULE_M,
   };
 });

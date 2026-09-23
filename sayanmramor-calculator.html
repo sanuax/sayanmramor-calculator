@@ -939,6 +939,14 @@
     .result-spec { grid-template-columns: 1fr; gap: 2px; }
     .lead-actions { flex-direction: column; }
   }
+  /* Phones: the 3D gets the width (less panel padding) and a square canvas
+     in the Result; the title drops to the regular summary size instead of
+     wrapping onto two lines above the model. */
+  @media (max-width: 600px) {
+    .summary-block { padding: 16px; }
+    .configurator-columns.is-result .summary-title { font-size: var(--configurator-title); margin-bottom: 14px; }
+    .configurator-columns.is-result .viewer-canvas-wrap { aspect-ratio: 1 / 1; }
+  }
 </style>
 </head>
 <body>
@@ -1528,6 +1536,8 @@
 <script src="visualizer/attachment-geometry.js"></script>
 <script src="visualizer/geometry-model.js"></script>
 <script src="visualizer/material-adapter.js"></script>
+<script src="visualizer/scene-layout.js"></script>
+<script src="visualizer/camera-framing.js"></script>
 <script src="visualizer/webgl-support.js"></script>
 <script src="visualizer/camera-preset-tracker.js"></script>
 <script src="url-bootstrap.js"></script>
@@ -2415,7 +2425,7 @@
     // Breakdown labels are UI text, not pricing -- built from the same
     // constructorState so the displayed text and the priced quantities can
     // never drift apart.
-    constructorState.edgeLineItems.forEach(item => {
+    if (product.supportsEdgeWork) constructorState.edgeLineItems.forEach(item => {
       const labels = { straight: 'кромка прямая', figured: 'кромка фигурная/сложная', rounding: 'скругление', bevel: 'скос/фаска', 'stone-wrap': 'подгиб камнем' };
       optionLabels.push(`${labels[item.type]}: ${mmToM(item.lengthMm).toFixed(2)} м.п.`);
     });

@@ -71,12 +71,27 @@
   // mainWidthM/2 reaches the main segment's own edge; + the gap; + the
   // island's own half-width so the island's NEAR edge, not its center, sits
   // the gap away from the main segment.
-  function resolveIsland(island, mainWidthM) {
+  //
+  // With an L-shape the wing reaches into the same room-side area from one
+  // end of the run. If the wing is longer than the walkway gap, the island
+  // slides along the run so it starts one walkway gap past the wing -- same
+  // kitchen, no two pieces of stone occupying the same floor.
+  // Local Z (same frame as offsetZM): a 'right' wing sits at the -Z end of
+  // the run, a 'left' wing at the +Z end.
+  function islandRunCenter(islandLengthM, mainLengthM, wing) {
+    if (!wing || !mainLengthM || wing.lengthM <= VISUAL_FALLBACK_ISLAND_GAP_M) return 0;
+    const clearFromWing = mainLengthM / 2 - wing.widthM - VISUAL_FALLBACK_ISLAND_GAP_M;
+    if (wing.corner === 'left') return Math.min(0, clearFromWing - islandLengthM / 2);
+    return Math.max(0, islandLengthM / 2 - clearFromWing);
+  }
+
+  function resolveIsland(island, mainWidthM, mainLengthM, wing) {
     if (!island || island.widthM <= 0 || island.lengthM <= 0) return null;
     return {
       widthM: island.widthM, lengthM: island.lengthM,
+      variant: island.variant || 'standard',
       offsetXM: mainWidthM / 2 + VISUAL_FALLBACK_ISLAND_GAP_M + island.widthM / 2,
-      offsetZM: 0,
+      offsetZM: islandRunCenter(island.lengthM, mainLengthM, wing),
       source: 'fallback-offset', // width/length are real; the gap from the main countertop is a guess
     };
   }
@@ -85,12 +100,17 @@
   // main segment (the axis the island no longer uses, so the two attachments
   // can never collide even if both are present at once). Same offset math as
   // the island, just extending mainLengthM instead of mainWidthM.
-  function resolveBarCounter(barCounter, mainLengthM) {
+  // It continues the run from the FREE end: with an L-shape whose wing sits
+  // at the +Z end ('left' corner), the bar goes to the -Z end instead of
+  // crowding the corner.
+  function resolveBarCounter(barCounter, mainLengthM, wing) {
     if (!barCounter || barCounter.widthM <= 0 || barCounter.lengthM <= 0) return null;
+    const side = wing && wing.corner === 'left' ? -1 : 1;
     return {
       widthM: barCounter.widthM, lengthM: barCounter.lengthM,
+      variant: barCounter.variant || 'standard',
       offsetXM: 0,
-      offsetZM: mainLengthM / 2 + VISUAL_FALLBACK_BAR_COUNTER_GAP_M + barCounter.lengthM / 2,
+      offsetZM: side * (mainLengthM / 2 + VISUAL_FALLBACK_BAR_COUNTER_GAP_M + barCounter.lengthM / 2),
       source: 'fallback-offset',
     };
   }

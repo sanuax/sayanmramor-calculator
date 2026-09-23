@@ -73,7 +73,7 @@ test('resolveHoles returns null per hole type when its count is 0', () => {
 });
 
 test('resolveHoles populates each present hole type with a fallback position and shared radius', () => {
-  const holes = resolveHoles({ mixer: 1, socket: 2, dispenser: 0 }, 2);
+  const holes = resolveHoles({ mixer: 1, socket: 2, dispenser: 0 }, 2, 2);
   assert.equal(holes.mixer.count, 1);
   assert.equal(holes.mixer.radiusM, VISUAL_FALLBACK_HOLE_RADIUS_M);
   assert.equal(holes.mixer.position.source, 'fallback');
@@ -82,24 +82,26 @@ test('resolveHoles populates each present hole type with a fallback position and
 });
 
 test('resolveHoles gives mixer/socket/dispenser distinct fallback positions so they do not overlap', () => {
-  const holes = resolveHoles({ mixer: 1, socket: 1, dispenser: 1 }, 2);
+  const holes = resolveHoles({ mixer: 1, socket: 1, dispenser: 1 }, 2, 2);
   const points = [holes.mixer.position, holes.socket.position, holes.dispenser.position];
   const unique = new Set(points.map(p => `${p.xM},${p.zM}`));
   assert.equal(unique.size, 3);
 });
 
-test('resolveHoles anchors mixer directly behind the sink (same xM, larger zM) when a sink is present', () => {
+// Plan frame: xM runs from the wall edge (0) across the depth, zM along the run.
+test('resolveHoles puts the faucet between the sink and the wall (smaller xM), level with the sink along the run', () => {
   const sink = resolveSinkCutout({ type: 'undermount', count: 1, position: null }, 0.6, 2);
   const holes = resolveHoles({ mixer: 1, socket: 0, dispenser: 0 }, 0.6, 2, sink);
-  assert.equal(holes.mixer.position.xM, sink.cut.xM);
-  assert.ok(holes.mixer.position.zM > sink.cut.zM + sink.cut.lengthM / 2);
+  assert.equal(holes.mixer.position.zM, sink.cut.zM);
+  assert.ok(holes.mixer.position.xM < sink.cut.xM - sink.cut.widthM / 2, 'faucet sits on the wall side of the sink');
+  assert.ok(holes.mixer.position.xM - holes.mixer.radiusM > 0, 'and still inside the stone');
 });
 
-test('resolveHoles offsets dispenser sideways from the faucet, not onto the exact same point', () => {
+test('resolveHoles puts the dispenser on the faucet\'s row, offset along the run -- not on the same point', () => {
   const sink = resolveSinkCutout({ type: 'undermount', count: 1, position: null }, 0.6, 2);
   const holes = resolveHoles({ mixer: 1, socket: 0, dispenser: 1 }, 0.6, 2, sink);
-  assert.notEqual(holes.dispenser.position.xM, holes.mixer.position.xM);
-  assert.equal(holes.dispenser.position.zM, holes.mixer.position.zM);
+  assert.equal(holes.dispenser.position.xM, holes.mixer.position.xM);
+  assert.notEqual(holes.dispenser.position.zM, holes.mixer.position.zM);
 });
 
 test('resolveHoles keeps socket on its own row, unrelated to the sink, even when a sink is present', () => {

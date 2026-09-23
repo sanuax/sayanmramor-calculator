@@ -1,328 +1,375 @@
 // visualizer/three-scene.js
+//
+// Renderer only. What to draw and where comes from SceneLayout
+// (visualizer/scene-layout.js); how to frame it from CameraFraming
+// (visualizer/camera-framing.js) -- both pure, both unit-tested. This file
+// turns layout parts into meshes and owns the look: studio environment,
+// lighting, soft shadows, a display floor and the stone material.
 import * as THREE from '../vendor/three/three.module.js';
 import { OrbitControls } from '../vendor/three/OrbitControls.js';
 
 let renderer, scene, camera, controls, productGroup, currentCanvas, resizeObserver;
+let keyLight, fillLight, rimLight;
 let frameId = null;
 let cameraPresetTracker = null;
+let lastBounds = null;
+let lastProductKey = null;
+let hasModel = false;
+// True once the client orbits/zooms by hand -- until then, a canvas resize
+// (e.g. entering the Result layout) reframes the model automatically.
+let userAdjusted = false;
+let textures = null;
 
-// Rendering-only proportions with no data significance -- not shared via
-// visualizer/constants.js because nothing outside this file needs them and
-// they're verified visually, not by assertion.
-const CUTOUT_MARKER_DEPTH_M = 0.02;
-const BACKSPLASH_PANEL_DEPTH_M = 0.02;
-const WALL_PANEL_DEPTH_M = 0.02;
-const MARKER_COLOR = '#2b2b2b'; // sink/cooktop/hole markers: symbolic voids/fixtures, not stone
-// Ступени: минимальный, не идеальный визуальный профиль лестницы -- N
-// одинаковых по толщине проступей, каждая на свою высоту выше предыдущей,
-// без подступенков/косоура. Числа ниже -- чисто визуальные, не реальные
-// параметры конкретной лестницы (их сейчас неоткуда взять).
-const STEPS_COUNT = 4;
-const STEPS_RISE_M = 0.17;
+const FOV_DEG = 32;
+let framePadding = 0.1;
+const BACKGROUND_TOP = '#3a332b';
+const BACKGROUND_BOTTOM = '#1c1814';
+// Lighter than the studio behind it, so even a near-black stone has a
+// silhouette against the floor it stands on.
+const FLOOR_COLOR = '#4a4138';
 
-// Coordinate convention for the whole group: origin is the MAIN segment's
-// center (matching the single-box convention this file used before L-shape/
-// attachments existed). X = width (left is -X), Z = length ("front", facing
-// the 'front' camera preset, is +Z; "back" is -Z). Y = thickness, centered.
-// Cut/hole positions from geometry-model.js are "distance from the left/front
-// edge" (0..widthM / 0..lengthM) and are converted to this local frame here.
-//
-// "Стеновая" сторона для бортика/фартука/стеновой панели -- КОНСТАНТНЫЙ X
-// (X = -widthM/2, левый по ширине край), а не константный Z. Причина: X
-// (width) -- короткая "глубина от стены до переднего края" столешницы,
-// Z (length) -- длинный "пробег вдоль стены". Панель на стену должна тянуться
-// вдоль ДЛИННОГО пробега (Z), примыкая к КОРОТКОМУ краю (константный X) --
-// раньше было наоборот (панель тянулась вдоль width, торчала с торца по
-// length), из-за чего фартук/бортик/стеновая панель выглядели растянутыми
-// не в ту сторону.
+// ---- procedural textures (no external assets) ----------------------------
 
-function buildSlabGeometry(xExtentM, zExtentM, thicknessM, edgeType, holes) {
+// Deterministic, tileable value noise -- same seed, same texture, every run.
+function noiseCanvas(size, cells, octaves, lo, hi) {
+  let seed = 1234567;
+  const rand = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  const layers = [];
+  for (let o = 0; o < octaves; o++) {
+    const n = cells << o;
+    const grid = new Float32Array(n * n);
+    for (let i = 0; i < grid.length; i++) grid[i] = rand();
+    layers.push({ n, grid, weight: 1 / (1 << o) });
+  }
+  const totalWeight = layers.reduce((s, l) => s + l.weight, 0);
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const smooth = t => t * t * (3 - 2 * t);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      let v = 0;
+      layers.forEach(({ n, grid, weight }) => {
+        const fx = (x / size) * n, fy = (y / size) * n;
+        const x0 = Math.floor(fx), y0 = Math.floor(fy);
+        const tx = smooth(fx - x0), ty = smooth(fy - y0);
+        const g = (i, j) => grid[((j % n + n) % n) * n + ((i % n + n) % n)];
+        const a = g(x0, y0) + (g(x0 + 1, y0) - g(x0, y0)) * tx;
+        const b = g(x0, y0 + 1) + (g(x0 + 1, y0 + 1) - g(x0, y0 + 1)) * tx;
+        v += (a + (b - a) * ty) * weight;
+      });
+      const c = Math.round(lo + (hi - lo) * (v / totalWeight));
+      const k = (y * size + x) * 4;
+      img.data[k] = img.data[k + 1] = img.data[k + 2] = c;
+      img.data[k + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return canvas;
+}
+
+function repeatTexture(canvas, repeat, colorSpace) {
+  const t = new THREE.CanvasTexture(canvas);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(repeat, repeat);
+  if (colorSpace) t.colorSpace = colorSpace;
+  return t;
+}
+
+function buildTextures() {
+  // Fine grain: micro-roughness/bump so light breaks up like on real stone.
+  const grain = noiseCanvas(256, 48, 2, 150, 255);
+  // Broad, very low-contrast mottling -- depth in the colour, not a pattern.
+  const cloud = noiseCanvas(256, 3, 4, 226, 255);
+  const bg = document.createElement('canvas');
+  bg.width = 2; bg.height = 256;
+  const g = bg.getContext('2d');
+  const grad = g.createLinearGradient(0, 0, 0, 256);
+  grad.addColorStop(0, BACKGROUND_TOP);
+  grad.addColorStop(1, BACKGROUND_BOTTOM);
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 2, 256);
+  const fade = document.createElement('canvas');
+  fade.width = fade.height = 128;
+  const f = fade.getContext('2d');
+  const radial = f.createRadialGradient(64, 64, 0, 64, 64, 64);
+  radial.addColorStop(0, '#ffffff');
+  radial.addColorStop(0.55, '#b0b0b0');
+  radial.addColorStop(1, '#000000');
+  f.fillStyle = radial;
+  f.fillRect(0, 0, 128, 128);
+  const background = new THREE.CanvasTexture(bg);
+  background.colorSpace = THREE.SRGBColorSpace;
+  return {
+    grain: repeatTexture(grain, 1.5),
+    cloud: repeatTexture(cloud, 0.6, THREE.SRGBColorSpace),
+    background,
+    floorFade: new THREE.CanvasTexture(fade),
+  };
+}
+
+// A soft photo-studio environment for reflections (clear coat, steel,
+// glass): a dark warm room with a large overhead softbox and a warm key
+// panel on the room side. Built from plain meshes -- no HDR file.
+function buildEnvironment() {
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const env = new THREE.Scene();
+  const room = new THREE.Mesh(new THREE.BoxGeometry(20, 10, 20), new THREE.MeshBasicMaterial({ color: '#2a241e', side: THREE.BackSide }));
+  env.add(room);
+  const panel = (w, h, color, position, lookAt) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide }));
+    m.position.set(...position);
+    m.lookAt(...lookAt);
+    env.add(m);
+  };
+  panel(8, 8, new THREE.Color(1.3, 1.22, 1.1), [0, 4.8, 0], [0, 0, 0]);
+  panel(5, 3.5, new THREE.Color(1.1, 1.0, 0.86), [9.8, 2.5, 3], [0, 1, 0]);
+  panel(4, 3, new THREE.Color(0.35, 0.38, 0.42), [-9.8, 2, -2], [0, 1, 0]);
+  const texture = pmrem.fromScene(env, 0.03).texture;
+  env.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+  pmrem.dispose();
+  return texture;
+}
+
+// ---- materials -----------------------------------------------------------
+
+function buildMaterials(desc) {
+  const stone = new THREE.MeshPhysicalMaterial({
+    color: desc.fallbackColor,
+    map: textures.cloud,
+    roughness: desc.roughness,
+    roughnessMap: textures.grain,
+    metalness: desc.metalness || 0,
+    clearcoat: desc.clearcoat || 0,
+    clearcoatRoughness: 0.14,
+    bumpMap: textures.grain,
+    bumpScale: 0.35,
+    envMapIntensity: 0.7,
+  });
+  const seamColor = new THREE.Color(desc.fallbackColor).multiplyScalar(0.62);
+  return {
+    stone,
+    metal: new THREE.MeshStandardMaterial({ color: '#9a9ea2', metalness: 0.85, roughness: 0.32, envMapIntensity: 1.1, side: THREE.DoubleSide }),
+    glass: new THREE.MeshPhysicalMaterial({ color: '#0d0d0e', roughness: 0.08, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.05, envMapIntensity: 1.2 }),
+    // Stair structure (concrete) -- visibly not stone, so stone risers read.
+    body: new THREE.MeshStandardMaterial({ color: '#66686a', roughness: 0.95, metalness: 0, envMapIntensity: 0.35 }),
+    // Warm plaster: lighter than the studio so a wall reads as a wall, darker
+    // than any stone so the product stays the brightest thing in view.
+    context: new THREE.MeshStandardMaterial({ color: '#6f675d', roughness: 0.95, metalness: 0, envMapIntensity: 0.4 }),
+    'context-glass': new THREE.MeshPhysicalMaterial({ color: '#5f676c', roughness: 0.05, metalness: 0, transparent: true, opacity: 0.45, envMapIntensity: 1.3 }),
+    seam: new THREE.LineBasicMaterial({ color: seamColor, transparent: true, opacity: 0.7 }),
+    burner: new THREE.MeshBasicMaterial({ color: '#4d4a47' }),
+  };
+}
+
+// ---- geometry ------------------------------------------------------------
+
+// Edge profile as a geometry parameter: a generic, honest approximation of
+// the chosen edge (soft round, sharp chamfer, ...), not a CNC profile. Every
+// stone edge gets at least a hairline arris so it catches the light.
+function bevelFor(part) {
+  const depth = part.y1 - part.y0;
+  if (part.role !== 'stone' || depth < 0.015) return { size: 0, segments: 0 };
+  const cap = depth * 0.35;
+  switch (part.edge) {
+    case 'rounding': return { size: Math.min(cap, 0.012), segments: 5 };
+    case 'bevel': return { size: Math.min(cap, 0.008), segments: 1 };
+    case 'figured': return { size: Math.min(cap, 0.01), segments: 3 };
+    default: return { size: 0.0015, segments: 1 };
+  }
+}
+
+function buildPrismGeometry(part) {
+  // Shape lives in (x, -z); rotating -90deg about X maps shape-y to world -Z
+  // and the extrusion to world +Y.
   const shape = new THREE.Shape();
-  const hx = xExtentM / 2, hz = zExtentM / 2;
-  shape.moveTo(-hx, -hz);
-  shape.lineTo(hx, -hz);
-  shape.lineTo(hx, hz);
-  shape.lineTo(-hx, hz);
+  part.outline.forEach(([x, z], i) => (i === 0 ? shape.moveTo(x, -z) : shape.lineTo(x, -z)));
   shape.closePath();
-
-  // Настоящий сквозной вырез (не отдельный меш поверх плиты): дырка в
-  // самой THREE.Shape, которую ExtrudeGeometry честно протягивает через
-  // всю толщину, включая внутренние стенки отверстия. `holes` -- в тех же
-  // мировых X/Z координатах, что и внешний контур; shape-y -> world -Z
-  // (см. комментарий у geometry.rotateX ниже), поэтому центр по Z уходит
-  // в shape с обратным знаком.
-  (holes || []).forEach(hole => {
-    const hw = hole.widthM / 2, hl = hole.lengthM / 2;
-    const cx = hole.xM, cy = -hole.zM;
+  (part.holes || []).forEach(h => {
     const path = new THREE.Path();
-    path.moveTo(cx - hw, cy - hl);
-    path.lineTo(cx + hw, cy - hl);
-    path.lineTo(cx + hw, cy + hl);
-    path.lineTo(cx - hw, cy + hl);
-    path.closePath();
+    if (h.rect) {
+      const { x, z, w, l } = h.rect;
+      path.moveTo(x - w / 2, -(z - l / 2));
+      path.lineTo(x - w / 2, -(z + l / 2));
+      path.lineTo(x + w / 2, -(z + l / 2));
+      path.lineTo(x + w / 2, -(z - l / 2));
+      path.closePath();
+    } else {
+      path.absarc(h.circle.x, -h.circle.z, h.circle.r, 0, Math.PI * 2, true);
+    }
     shape.holes.push(path);
   });
-
-  // Кромка (edge.type) как параметр геометрии: одна обобщённая фаска на весь
-  // периметр, когда выбран любой тип кромки -- не 5 разных реалистичных
-  // профилей (см. docs/superpowers/specs/2026-09-21-3d-visualizer-design.md).
-  const hasBevel = !!edgeType;
-  const bevel = hasBevel ? Math.min(thicknessM * 0.25, 0.01) : 0;
+  const bevel = bevelFor(part);
+  const depth = Math.max(0.001, part.y1 - part.y0 - 2 * bevel.size);
   const geometry = new THREE.ExtrudeGeometry(shape, {
-    depth: thicknessM,
-    bevelEnabled: hasBevel,
-    bevelThickness: bevel,
-    bevelSize: bevel,
-    bevelSegments: hasBevel ? 2 : 0,
-    curveSegments: 1,
+    depth,
+    bevelEnabled: bevel.size > 0,
+    bevelThickness: bevel.size,
+    bevelSize: bevel.size,
+    bevelSegments: bevel.segments,
+    curveSegments: 20,
   });
-  // ExtrudeGeometry extrudes the shape's local (x,y) along +Z by `depth`.
-  // Rotating -90 deg around X maps shape-x -> world X (unchanged), the
-  // extrude direction -> world Y (thickness), and shape-y -> world -Z (still
-  // centered, since the shape itself is symmetric around the origin).
   geometry.rotateX(-Math.PI / 2);
-  geometry.translate(0, -thicknessM / 2, 0); // only Y (0..depth) needs centering
+  geometry.translate(0, part.y0 + bevel.size, 0);
   return geometry;
 }
 
-function buildStoneMaterial(materialDescriptor) {
-  return new THREE.MeshStandardMaterial({
-    color: materialDescriptor.fallbackColor,
-    roughness: materialDescriptor.roughness,
-    metalness: materialDescriptor.metalness,
+function addMesh(group, geometry, material, position, cast) {
+  const mesh = new THREE.Mesh(geometry, material);
+  if (position) mesh.position.set(...position);
+  mesh.castShadow = cast !== false;
+  mesh.receiveShadow = true;
+  group.add(mesh);
+  return mesh;
+}
+
+function buildBasin(group, part, material) {
+  const [cx, top, cz] = part.center;
+  const [sx, depth, sz] = part.size;
+  const bottom = new THREE.PlaneGeometry(sx, sz);
+  bottom.rotateX(-Math.PI / 2);
+  addMesh(group, bottom, material, [cx, top - depth, cz]);
+  [[sx, 0, sz / 2, 0], [sx, 0, -sz / 2, Math.PI], [sz, sx / 2, 0, Math.PI / 2], [sz, -sx / 2, 0, -Math.PI / 2]].forEach(([w, dx, dz, rot]) => {
+    const wall = new THREE.PlaneGeometry(w, depth);
+    const mesh = addMesh(group, wall, material, [cx + dx, top - depth / 2, cz + dz]);
+    mesh.rotation.y = rot;
   });
 }
 
-function buildMarkerMaterial() {
-  return new THREE.MeshStandardMaterial({ color: MARKER_COLOR, roughness: 0.6 });
+function buildCooktop(group, part, materials) {
+  const [cx, top, cz] = part.center;
+  const [sx, sy, sz] = part.size;
+  addMesh(group, new THREE.BoxGeometry(sx, sy, sz), materials.glass, [cx, top + sy / 2, cz]);
+  const r = Math.min(sx, sz) * 0.17;
+  [[-1, -1, 1], [1, -1, 0.78], [-1, 1, 0.78], [1, 1, 1]].forEach(([ix, iz, scale]) => {
+    const ring = new THREE.RingGeometry(r * scale * 0.82, r * scale, 48);
+    ring.rotateX(-Math.PI / 2);
+    addMesh(group, ring, materials.burner, [cx + ix * sx / 4, top + sy + 0.0006, cz + iz * sz / 4], false);
+  });
 }
 
-// Camera framing must cover the WHOLE composed model, not just the main
-// slab -- otherwise an L-shape's wing or an island (which can sit well
-// outside the main slab's own footprint) renders half out of frame or reads
-// as an unrelated, randomly-placed piece instead of one product. Still just
-// a bounding footprint for framing purposes, not a geometry change.
-function computeFootprintExtent(geometryModel) {
-  let extentX = geometryModel.widthM;
-  let extentZ = geometryModel.lengthM;
-  if (geometryModel.wing) {
-    extentX = Math.max(extentX, geometryModel.widthM + 2 * geometryModel.wing.lengthM);
-    // wing.widthM no longer extends the Z footprint: after the corner-join
-    // fix the wing's Z-range sits inside the main slab's own [-lengthM/2,
-    // lengthM/2] range (flush with its back edge, not past it), so lengthM
-    // alone already covers it -- extentZ needs no contribution from wing.
-  }
-  // Island now offsets along WIDTH (X), bar counter along LENGTH (Z) --
-  // see attachment-geometry.js -- so each only ever grows its own axis.
-  if (geometryModel.island) {
-    const islandFarX = Math.abs(geometryModel.island.offsetXM) + geometryModel.island.widthM / 2;
-    extentX = Math.max(extentX, islandFarX * 2);
-  }
-  if (geometryModel.barCounter) {
-    const barFarZ = Math.abs(geometryModel.barCounter.offsetZM) + geometryModel.barCounter.lengthM / 2;
-    extentZ = Math.max(extentZ, barFarZ * 2);
-  }
-  return { widthM: extentX, lengthM: extentZ };
+function buildFloor(group, layout, materials) {
+  const { min, max } = layout.bounds;
+  const radius = Math.max(max[0] - min[0], max[2] - min[2]) * 0.9 + 1.2;
+  const floorMaterial = new THREE.MeshStandardMaterial({
+    color: FLOOR_COLOR, roughness: 0.92, metalness: 0, alphaMap: textures.floorFade, transparent: true, envMapIntensity: 0.3,
+  });
+  materials.floor = floorMaterial;
+  const disc = new THREE.CircleGeometry(radius, 72);
+  disc.rotateX(-Math.PI / 2);
+  const mesh = addMesh(group, disc, floorMaterial, [(min[0] + max[0]) / 2, layout.floorY - 0.0005, (min[2] + max[2]) / 2], false);
+  mesh.receiveShadow = true;
 }
 
-// Ступени: N ascending slabs of the product's own tread thickness, each a
-// fixed rise higher than the last, together spanning the full entered
-// lengthM/widthM -- reads as "a flight of steps", not the single flat
-// countertop-style slab every other product uses. Deliberately no risers/
-// stringer -- minimal correct shape, not a finished visualization.
-function buildStepsGroup(widthM, lengthM, thicknessM, edgeType, stoneMaterial) {
+function buildProductGroup(layout, materialDescriptor) {
   const group = new THREE.Group();
-  const runM = lengthM / STEPS_COUNT;
-  for (let i = 0; i < STEPS_COUNT; i++) {
-    const mesh = new THREE.Mesh(buildSlabGeometry(widthM, runM, thicknessM, edgeType), stoneMaterial);
-    const stepTopY = (i + 1) * STEPS_RISE_M;
-    const stepCenterZ = -lengthM / 2 + runM * (i + 0.5);
-    mesh.position.set(0, stepTopY - thicknessM / 2, stepCenterZ);
-    group.add(mesh);
-  }
-  return group;
-}
-
-function buildProductGroup(geometryModel, materialDescriptor) {
-  const group = new THREE.Group();
-  const { widthM, lengthM, visualThicknessM: thicknessM, wing, edge, sink, cooktop, holes, backsplash, curb, wallPanel, island, barCounter, productKey } = geometryModel;
-  // frameCameraOnModel()/setView() read these back to size the camera to the
-  // actual model -- a THREE.Group has no single .geometry.parameters the
-  // way the old one-box countertopMesh did.
-  const footprint = computeFootprintExtent(geometryModel);
-  group.userData.widthM = footprint.widthM;
-  group.userData.lengthM = footprint.lengthM;
-  const stoneMaterial = buildStoneMaterial(materialDescriptor);
-  const markerMaterial = buildMarkerMaterial();
-
-  function toLocalX(xM) { return xM - widthM / 2; }
-  function toLocalZ(zM) { return lengthM / 2 - zM; }
-
-  if (productKey === 'stupeni') {
-    // Ступени get their own dedicated shape (see buildStepsGroup) instead
-    // of the single flat slab every other product uses below -- this
-    // product has no shape/sink/cooktop/attachments capability anyway (see
-    // product-types.js), so nothing past this block applies to it.
-    group.add(buildStepsGroup(widthM, lengthM, thicknessM, edge.type, stoneMaterial));
-    return group;
-  }
-
-  // Врезная/интегрированная мойка (не накладная) режет насквозь саму плиту
-  // столешницы -- настоящая дыра в geometry, а не отдельный меш поверх/внутри
-  // неё. Накладная мойка ставится СВЕРХУ готовой плиты (сквозного выреза не
-  // требует по этой же модели), поэтому для неё дырка не добавляется --
-  // см. addCutoutMarker(sink, true) ниже, где она остаётся приподнятой
-  // плашкой-посадочным местом. Варочная панель (cooktop) этой правкой не
-  // затронута -- остаётся тем же маркером, что и раньше.
-  const sinkHoles = (sink && sink.type !== 'overlay')
-    ? [{ xM: toLocalX(sink.cut.xM), zM: toLocalZ(sink.cut.zM), widthM: sink.cut.widthM, lengthM: sink.cut.lengthM }]
-    : [];
-  group.add(new THREE.Mesh(buildSlabGeometry(widthM, lengthM, thicknessM, edge.type, sinkHoles), stoneMaterial));
-
-  // Г-образная столешница: без CSG, второй прямоугольник визуально
-  // состыкован в углу главного (см. спека, "L-shape wing placement").
-  // wing.lengthM (его собственный "пробег", вдоль X) и wing.widthM (его
-  // "глубина", вдоль Z, заподлицо с задним краем главного сегмента, Z<0)
-  // -- поэтому extent-аргументы переставлены местами.
-  if (wing) {
-    const wingMesh = new THREE.Mesh(buildSlabGeometry(wing.lengthM, wing.widthM, thicknessM, edge.type), stoneMaterial);
-    const xSign = wing.corner === 'right' ? 1 : -1;
-    wingMesh.position.set(
-      xSign * (widthM / 2 + wing.lengthM / 2),
-      0,
-      -(lengthM / 2 - wing.widthM / 2),
-    );
-    group.add(wingMesh);
-  }
-
-  // Варочная панель (всегда врезная) и накладная мойка (всегда сверху, без
-  // сквозного выреза) по-прежнему рисуются этой тёмной плашкой-маркером, а
-  // не настоящим отверстием -- варочную панель эта задача не трогает, а
-  // накладной мойке сквозной вырез и не нужен по модели (ставится поверх
-  // цельной плиты). Врезная/интегрированная мойка теперь режет саму плиту
-  // (см. sinkHoles выше) и через этот маркер уже не рисуется.
-  function addCutoutMarker(cutout, isRaised) {
-    const geometry = new THREE.BoxGeometry(cutout.cut.widthM, CUTOUT_MARKER_DEPTH_M, cutout.cut.lengthM);
-    const mesh = new THREE.Mesh(geometry, markerMaterial);
-    const yCenter = isRaised
-      ? thicknessM / 2 + CUTOUT_MARKER_DEPTH_M / 2
-      : thicknessM / 2 - CUTOUT_MARKER_DEPTH_M / 2;
-    mesh.position.set(toLocalX(cutout.cut.xM), yCenter, toLocalZ(cutout.cut.zM));
-    group.add(mesh);
-  }
-  // Undermount/integrated already got a real hole in the main slab above --
-  // only overlay still needs the raised seating-mark, since it sits on top
-  // of a solid (uncut) countertop rather than through it.
-  if (sink && sink.type === 'overlay') addCutoutMarker(sink, true);
-  if (cooktop) addCutoutMarker(cooktop, false);
-
-  // Отверстия: маленькие символические цилиндры, пронизывающие толщину.
-  function addHoleMarker(hole) {
-    if (!hole) return;
-    const geometry = new THREE.CylinderGeometry(hole.radiusM, hole.radiusM, thicknessM * 1.4, 12);
-    const mesh = new THREE.Mesh(geometry, markerMaterial);
-    mesh.position.set(toLocalX(hole.position.xM), 0, toLocalZ(hole.position.zM));
-    group.add(mesh);
-  }
-  if (holes) {
-    addHoleMarker(holes.mixer);
-    addHoleMarker(holes.socket);
-    addHoleMarker(holes.dispenser);
-  }
-
-  // Фартук: тонкая вертикальная панель вдоль стенового края -- КОНСТАНТНЫЙ
-  // X (widthM -- короткая сторона, глубина от стены), тянется вдоль ВСЕЙ
-  // длины Z (lengthM -- длинный пробег вдоль стены). backsplash.lengthM
-  // (реальный пользовательский ввод) поэтому идёт в Z-протяжённость бокса,
-  // а не в X, как было раньше. Тот же материал, что и столешница -- это
-  // реальный камень, а не маркер.
-  if (backsplash) {
-    const geometry = new THREE.BoxGeometry(BACKSPLASH_PANEL_DEPTH_M, backsplash.heightM, backsplash.lengthM);
-    const mesh = new THREE.Mesh(geometry, stoneMaterial);
-    mesh.position.set(-(widthM / 2 + BACKSPLASH_PANEL_DEPTH_M / 2), thicknessM / 2 + backsplash.heightM / 2, 0);
-    group.add(mesh);
-  }
-
-  // Стеновая панель: та же ориентация и та же стеновая сторона, что и
-  // фартук выше -- просто более крупная панель со своими размерами.
-  if (wallPanel) {
-    const geometry = new THREE.BoxGeometry(WALL_PANEL_DEPTH_M, wallPanel.heightM, wallPanel.lengthM);
-    const mesh = new THREE.Mesh(geometry, stoneMaterial);
-    mesh.position.set(-(widthM / 2 + WALL_PANEL_DEPTH_M / 2), thicknessM / 2 + wallPanel.heightM / 2, 0);
-    group.add(mesh);
-  }
-
-  // Бортик: невысокая приподнятая полоса вдоль ТОЙ ЖЕ стеновой стороны
-  // (константный X), что и фартук/стеновая панель выше -- все три примыкают
-  // к одной и той же стене, а не к разным краям столешницы. Тянется вдоль
-  // Z на всю свою длину (curb.lengthM), а не вдоль X, как было раньше.
-  // Квадратное сечение (высота = глубина) -- нет реальных данных для формы
-  // сечения, только длина.
-  if (curb) {
-    const geometry = new THREE.BoxGeometry(curb.heightM, curb.heightM, curb.lengthM);
-    const mesh = new THREE.Mesh(geometry, stoneMaterial);
-    mesh.position.set(-(widthM / 2 + curb.heightM / 2), thicknessM / 2 + curb.heightM / 2, 0);
-    group.add(mesh);
-  }
-
-  // Остров: отдельная самостоятельная плита лицом к длинному пробегу
-  // столешницы, со смещением по WIDTH (offsetXM/offsetZM -- уже готовые
-  // локальные координаты, см. attachment-geometry.js).
-  if (island) {
-    const mesh = new THREE.Mesh(buildSlabGeometry(island.widthM, island.lengthM, thicknessM, edge.type), stoneMaterial);
-    mesh.position.set(island.offsetXM, 0, island.offsetZM);
-    group.add(mesh);
-  }
-
-  // Барная стойка: продолжение столешницы за одним из LENGTH-концов (Z),
-  // а не по WIDTH -- поэтому не может занять то же место, что и остров
-  // выше, даже если оба выбраны одновременно.
-  if (barCounter) {
-    const mesh = new THREE.Mesh(buildSlabGeometry(barCounter.widthM, barCounter.lengthM, thicknessM, edge.type), stoneMaterial);
-    mesh.position.set(barCounter.offsetXM, 0, barCounter.offsetZM);
-    group.add(mesh);
-  }
-
+  const materials = buildMaterials(materialDescriptor);
+  group.userData.materials = materials;
+  layout.parts.forEach(part => {
+    const cast = part.role !== 'context' && part.role !== 'context-glass';
+    if (part.kind === 'prism') {
+      addMesh(group, buildPrismGeometry(part), materials[part.role], null, cast);
+    } else if (part.kind === 'box') {
+      addMesh(group, new THREE.BoxGeometry(...part.size), materials[part.role], part.center, cast);
+    } else if (part.kind === 'basin') {
+      buildBasin(group, part, materials[part.role]);
+    } else if (part.kind === 'cooktop') {
+      buildCooktop(group, part, materials);
+    } else if (part.kind === 'seams') {
+      const positions = new Float32Array(part.segments.flat());
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      group.add(new THREE.LineSegments(geometry, materials.seam));
+    }
+  });
+  if (layout.bounds) buildFloor(group, layout, materials);
   return group;
 }
 
 function disposeGroup(group) {
-  group.traverse(obj => {
-    if (obj.geometry) obj.geometry.dispose();
-    if (obj.material) obj.material.dispose();
-  });
+  group.traverse(obj => { if (obj.geometry) obj.geometry.dispose(); });
+  Object.values(group.userData.materials || {}).forEach(m => m.dispose());
 }
 
-function frameCameraOnModel(geometryModel) {
-  const maxDim = Math.max(geometryModel.widthM, geometryModel.lengthM, 0.5);
-  return maxDim * 1.8;
+// ---- lights --------------------------------------------------------------
+
+// Soft architectural light, placed relative to the model so a 0.4 m step
+// and a 5 m kitchen get the same quality of light and shadow.
+function placeLights(bounds) {
+  const c = [0, 1, 2].map(i => (bounds.min[i] + bounds.max[i]) / 2);
+  const size = Math.max(bounds.max[0] - bounds.min[0], bounds.max[1] - bounds.min[1], bounds.max[2] - bounds.min[2], 0.5);
+  const at = (light, dir, dist) => {
+    light.position.set(c[0] + dir[0] * dist, c[1] + dir[1] * dist, c[2] + dir[2] * dist);
+    light.target.position.set(c[0], c[1], c[2]);
+    light.target.updateMatrixWorld();
+  };
+  at(keyLight, [0.8, 1.2, 0.55], size * 2.5);
+  at(fillLight, [1, 0.3, -0.7], size * 2.5);
+  at(rimLight, [-1, 0.8, -0.25], size * 2.5);
+  const cam = keyLight.shadow.camera;
+  const half = size * 1.1 + 0.6;
+  cam.left = -half; cam.right = half; cam.top = half; cam.bottom = -half;
+  cam.near = 0.1; cam.far = size * 6 + 2;
+  cam.updateProjectionMatrix();
+}
+
+// ---- camera --------------------------------------------------------------
+
+function currentDirection() {
+  const d = camera.position.clone().sub(controls.target);
+  return d.lengthSq() > 1e-9 ? [d.x, d.y, d.z] : [1, 0.8, 1];
+}
+
+function frame(direction) {
+  if (!lastBounds) return;
+  const fit = window.CameraFraming.fitCamera({ bounds: lastBounds, direction, fovDeg: FOV_DEG, aspect: camera.aspect, padding: framePadding });
+  controls.target.set(...fit.target);
+  camera.position.set(...fit.position);
+  camera.near = Math.max(0.01, fit.distance / 100);
+  camera.far = fit.distance * 40;
+  camera.updateProjectionMatrix();
+  controls.minDistance = fit.distance * 0.3;
+  controls.maxDistance = fit.distance * 3.5;
+  controls.update();
 }
 
 function init(canvasEl) {
   currentCanvas = canvasEl;
   // CameraPresetTracker lives in visualizer/camera-preset-tracker.js (a UMD
   // script, not an ES module, so it can't be `import`ed here) -- read it off
-  // the global it already attaches to `window`, same pattern as
-  // VisualizerConstants below.
+  // the global it already attaches to `window`.
   cameraPresetTracker = window.CameraPresetTracker.createCameraPresetTracker();
   renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 0.9;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
+  textures = buildTextures();
   scene = new THREE.Scene();
-  scene.background = new THREE.Color('#f4f4f4');
+  scene.background = textures.background;
+  scene.environment = buildEnvironment();
 
-  camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100);
+  camera = new THREE.PerspectiveCamera(FOV_DEG, 1, 0.01, 100);
   camera.position.set(1.5, 1.2, 1.5);
 
-  const hemi = new THREE.HemisphereLight('#ffffff', '#444444', 1.1);
-  scene.add(hemi);
-  const dir = new THREE.DirectionalLight('#ffffff', 0.8);
-  dir.position.set(2, 3, 2);
-  scene.add(dir);
+  scene.add(new THREE.HemisphereLight('#fff2e0', '#2b231c', 0.3));
+  keyLight = new THREE.DirectionalLight('#ffefd9', 1.5);
+  keyLight.castShadow = true;
+  keyLight.shadow.mapSize.set(2048, 2048);
+  keyLight.shadow.bias = -0.0003;
+  keyLight.shadow.normalBias = 0.015;
+  fillLight = new THREE.DirectionalLight('#dde5ee', 0.45);
+  rimLight = new THREE.DirectionalLight('#ffe3c4', 1.3);
+  [keyLight, fillLight, rimLight].forEach(l => { scene.add(l); scene.add(l.target); });
 
   controls = new OrbitControls(camera, canvasEl);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
+  controls.maxPolarAngle = Math.PI * 0.49;
+  controls.addEventListener('start', () => { userAdjusted = true; });
 
   resizeObserver = new ResizeObserver(() => resize());
   resizeObserver.observe(canvasEl.parentElement);
@@ -343,45 +390,47 @@ function resize() {
   renderer.setSize(clientWidth, clientHeight, false);
   camera.aspect = clientWidth / clientHeight;
   camera.updateProjectionMatrix();
+  // A new canvas shape (Result layout, rotating a phone) changes what fits:
+  // reframe, unless the client is currently looking around by hand.
+  if (hasModel && !userAdjusted) frame(currentDirection());
 }
 
 function update(geometryModel, materialDescriptor) {
-  const isFirstModel = !productGroup;
+  const layout = window.SceneLayout.buildSceneLayout(geometryModel);
   if (productGroup) {
     scene.remove(productGroup);
     disposeGroup(productGroup);
   }
-  productGroup = buildProductGroup(geometryModel, materialDescriptor);
+  productGroup = buildProductGroup(layout, materialDescriptor);
   scene.add(productGroup);
+  if (layout.bounds) placeLights(layout.bounds);
 
-  // Every update() call (not just the first) adopts the current product's
-  // own default -- so switching products mid-session immediately changes
-  // what "Сбросить вид" returns to, without needing a page reload.
+  // Every update() adopts the current product's own default -- switching
+  // products immediately changes what "Сбросить вид" returns to.
   cameraPresetTracker.setDefaultFromGeometryModel(geometryModel);
 
-  controls.target.set(0, 0, 0);
-  if (isFirstModel) {
-    resetView();
-  } else {
-    controls.update();
-  }
+  const action = window.CameraFraming.decideCameraAction({
+    hasPrevious: hasModel,
+    previousProductKey: lastProductKey,
+    nextProductKey: geometryModel.productKey,
+    previousBounds: lastBounds,
+    nextBounds: layout.bounds,
+  });
+  lastBounds = layout.bounds;
+  framePadding = layout.framePadding;
+  lastProductKey = geometryModel.productKey;
+  hasModel = true;
+  if (action === 'reset') resetView();
+  else if (action === 'refit') { frame(currentDirection()); userAdjusted = false; }
 }
 
 function setView(presetName) {
-  const distance = productGroup ? frameCameraOnModel({
-    widthM: productGroup.userData.widthM || 2,
-    lengthM: productGroup.userData.lengthM || 2,
-  }) : 2;
-  // CAMERA_PRESETS lives in visualizer/constants.js (a UMD script, not an ES
-  // module, so it can't be `import`ed here) -- read it off the global it
-  // already attaches to `window`, so there's one source of truth for the 4
-  // view directions instead of a second copy hardcoded in this file.
+  // CAMERA_PRESETS lives in visualizer/constants.js -- one source of truth
+  // for the view directions.
   const presetsByName = window.VisualizerConstants.CAMERA_PRESETS;
   const preset = presetsByName[presetName] || presetsByName.iso;
-  const [dx, dy, dz] = preset.direction;
-  camera.position.set(dx * distance, dy * distance, dz * distance);
-  controls.target.set(0, 0, 0);
-  controls.update();
+  frame(preset.direction);
+  userAdjusted = false;
 }
 
 function resetView() {
@@ -396,9 +445,14 @@ function dispose() {
   if (resizeObserver) resizeObserver.disconnect();
   if (productGroup) disposeGroup(productGroup);
   if (controls) controls.dispose();
+  if (scene && scene.environment) scene.environment.dispose();
+  if (textures) Object.values(textures).forEach(t => t.dispose());
   if (renderer) renderer.dispose();
   renderer = scene = camera = controls = productGroup = currentCanvas = resizeObserver = null;
+  keyLight = fillLight = rimLight = null;
   cameraPresetTracker = null;
+  textures = null;
+  lastBounds = null; lastProductKey = null; hasModel = false; userAdjusted = false;
 }
 
 const ThreeScene = { init, update, setView, resetView, dispose };
