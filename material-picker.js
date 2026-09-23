@@ -67,6 +67,17 @@
     return sortStones(filtered, sortKey);
   }
 
+  // Whether the "Сбросить" affordance (filter-row button and empty-state
+  // action) should be shown/enabled -- true the moment any search text or
+  // any filter selection exists, regardless of whether it actually excludes
+  // anything yet.
+  function hasActiveFilters({ query, countries, categories, colors }) {
+    return !!query
+      || (countries && countries.length > 0)
+      || (categories && categories.length > 0)
+      || (colors && colors.length > 0);
+  }
+
   const BATCH_SIZE = 40;
 
   // One reusable "dropdown with checkboxes inside" component backs all
@@ -141,6 +152,18 @@
     return { getSelected, reset, closePanel };
   }
 
+  // "1 материал" / "2 материала" / "5 материалов" -- same irregular-plural
+  // shape as the existing pluralizeSlabs() in sayanmramor-calculator.html,
+  // kept local here since this module has no shared string-utils import.
+  function pluralizeMaterials(n) {
+    const mod10 = n % 10, mod100 = n % 100;
+    let word;
+    if (mod10 === 1 && mod100 !== 11) word = 'материал';
+    else if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) word = 'материала';
+    else word = 'материалов';
+    return n + ' ' + word;
+  }
+
   function init({ stones, onSelect }) {
     const overlay = document.getElementById('pickerOverlay');
     const searchInput = document.getElementById('pickerSearch');
@@ -150,6 +173,9 @@
     const grid = document.getElementById('pickerGrid');
     const sentinel = document.getElementById('pickerSentinel');
     const emptyMessage = document.getElementById('pickerEmpty');
+    const metaEl = document.getElementById('pickerMeta');
+    const resetFiltersBtn = document.getElementById('pickerResetFilters');
+    const emptyResetBtn = document.getElementById('pickerEmptyReset');
     const lightboxOverlay = document.getElementById('lightboxOverlay');
     const lightboxClose = document.getElementById('lightboxClose');
     const lightboxImg = document.getElementById('lightboxImg');
@@ -281,6 +307,15 @@
       isLoadingBatch = false;
     }
 
+    function resetAllFilters() {
+      currentQuery = '';
+      searchInput.value = '';
+      currentCountries = []; countryDropdown.reset();
+      currentCategories = []; categoryDropdown.reset();
+      currentColors = []; colorDropdown.reset();
+      resetAndRender();
+    }
+
     function resetAndRender() {
       filteredList = filterAndSort(stones, {
         query: currentQuery, countries: currentCountries,
@@ -291,6 +326,13 @@
       renderedCount = 0;
       emptyMessage.hidden = filteredList.length > 0;
       sentinel.hidden = filteredList.length === 0;
+      // A real, computed count -- not shown at all while a search/filter
+      // combination has wiped out every result (the empty state already
+      // explains that; a "0 материалов" line next to it would be noise).
+      metaEl.textContent = filteredList.length > 0 ? pluralizeMaterials(filteredList.length) : '';
+      resetFiltersBtn.hidden = !hasActiveFilters({
+        query: currentQuery, countries: currentCountries, categories: currentCategories, colors: currentColors,
+      });
       results.scrollTop = 0;
       renderNextBatch();
     }
@@ -304,6 +346,9 @@
       currentQuery = searchInput.value.trim();
       resetAndRender();
     });
+
+    resetFiltersBtn.addEventListener('click', resetAllFilters);
+    emptyResetBtn.addEventListener('click', resetAllFilters);
 
     function applySortButtonLabels() {
       sortButtons.forEach(btn => {
@@ -384,6 +429,6 @@
 
   return {
     minPricePerM2, matchesSearch, matchesCountryFilter, matchesCategoryFilter, matchesColorFilter,
-    sortStones, filterAndSort, init,
+    sortStones, filterAndSort, hasActiveFilters, pluralizeMaterials, init,
   };
 });

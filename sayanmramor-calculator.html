@@ -436,6 +436,32 @@
   .material-field-text { flex: 1; }
   .material-field-chevron { color: var(--muted); font-size: 12px; }
 
+  /* Крупный preview выбранного камня (§11) -- фото доминирует, подпись
+     тихая и короткая (название + "категория · страна"), никаких рейтингов/
+     технических полей. Reserves a fixed image aspect-ratio so revealing it
+     after selection doesn't shove Далее/Назад around. */
+  .material-preview {
+    display: flex; gap: 16px; align-items: center;
+    margin-top: 14px; padding: 14px; border-radius: 12px;
+    background: var(--card); border: 1px solid var(--line);
+  }
+  .material-preview[hidden] { display: none; }
+  .material-preview-image {
+    flex: none; width: 96px; height: 96px; border-radius: 8px; overflow: hidden;
+    background: var(--stone);
+  }
+  .material-preview-image img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .material-preview-info { min-width: 0; }
+  .material-preview-label {
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px;
+    color: var(--muted); margin-bottom: 4px;
+  }
+  .material-preview-name {
+    font-size: var(--configurator-heading); font-weight: 700; color: var(--ink);
+    overflow-wrap: break-word;
+  }
+  .material-preview-meta { font-size: var(--configurator-muted); color: var(--muted); margin-top: 2px; }
+
   /* ---- Material picker -------------------------------------------------
      A full-screen sample wall. The sheet is plain white so stone colour reads
      true, all chrome lives above one hairline, and the grid below it is the
@@ -518,7 +544,7 @@
     background: var(--pick-accent); border-color: var(--pick-accent);
     color: #fff;
   }
-  .filter-dropdown-btn.active:hover { background: #ef4f16; border-color: #ef4f16; }
+  .filter-dropdown-btn.active:hover { background: var(--accent-ink); border-color: var(--accent-ink); }
   .filter-dropdown-btn.active .caret { opacity: 0.9; }
   .filter-dropdown-panel {
     position: absolute; top: calc(100% + 8px); left: 0; z-index: 5;
@@ -653,14 +679,23 @@
 
   .picker-empty {
     display: block; text-align: center; padding: 76px 20px;
-    color: var(--pick-ink); font-size: 15px; font-weight: 700;
+    color: var(--pick-ink);
   }
   .picker-empty[hidden] { display: none; }
-  .picker-empty::after {
-    content: 'Попробуйте другое название или снимите фильтры.';
-    display: block; margin-top: 8px;
-    font-size: 13.5px; font-weight: 400; color: var(--pick-muted);
+  .picker-empty p { font-size: 15px; font-weight: 700; margin-bottom: 16px; }
+  /* Reused by both the empty-state action and the filter-row reset --
+     same quiet, secondary treatment (not a second orange CTA competing
+     with the accent used for card selection). */
+  .picker-reset-btn {
+    padding: 8px 16px; border: 1px solid var(--pick-line); border-radius: 999px;
+    background: #fff; font-size: 13.5px; font-family: inherit; font-weight: 500;
+    color: var(--pick-muted); cursor: pointer; transition: border-color 0.15s, color 0.15s;
   }
+  .picker-reset-btn:hover { border-color: var(--pick-accent); color: var(--pick-ink); }
+  .picker-reset-btn[hidden] { display: none; }
+  /* "124 материала" -- a real, computed count, not decoration; sits between
+     the filter row and the sort control, quiet secondary text. */
+  .picker-meta { padding: 0 20px 10px; font-size: 12.5px; color: var(--pick-muted); }
   .picker-sentinel { height: 1px; }
   .picker-sentinel[hidden] { display: none; }
 
@@ -864,6 +899,21 @@
           <span class="material-field-text" id="materialFieldText">Загрузка материалов…</span>
           <span class="material-field-chevron" aria-hidden="true">▾</span>
         </button>
+      </div>
+      <!-- Крупный preview выбранного камня -- те же данные, что уже читает
+           handleMaterialSelected() для .material-field выше (никакого
+           второго material state/picker), просто показаны крупно: фото
+           (главный визуальный элемент), название, категория и страна.
+           Скрыт, пока ничего не выбрано; hardness_category сюда сознательно
+           не попадает -- это ставка/классификация, а не факт о камне для
+           клиента. -->
+      <div class="material-preview" id="materialPreview" hidden>
+        <div class="material-preview-image"><img id="materialPreviewImg" alt=""></div>
+        <div class="material-preview-info">
+          <div class="material-preview-label">Выбран</div>
+          <div class="material-preview-name" id="materialPreviewName"></div>
+          <div class="material-preview-meta" id="materialPreviewMeta"></div>
+        </div>
       </div>
     </section>
 
@@ -1273,7 +1323,9 @@
       <button type="button" class="filter-dropdown-btn" aria-haspopup="true" aria-expanded="false"></button>
       <div class="filter-dropdown-panel" hidden></div>
     </div>
+    <button type="button" id="pickerResetFilters" class="picker-reset-btn" hidden>Сбросить</button>
   </div>
+  <div class="picker-meta" id="pickerMeta"></div>
   <div class="picker-sort" id="pickerSort">
     <button type="button" class="sort-btn active" data-sort-field="name" data-sort-dir="asc">A-Z</button>
     <button type="button" class="sort-btn" data-sort-field="price" data-sort-dir="asc">Цена ↑</button>
@@ -1281,7 +1333,10 @@
   <div class="picker-results" id="pickerResults">
     <div class="picker-grid" id="pickerGrid"></div>
     <div class="picker-sentinel" id="pickerSentinel"></div>
-    <div class="picker-empty" id="pickerEmpty" hidden>Ничего не найдено</div>
+    <div class="picker-empty" id="pickerEmpty" hidden>
+      <p>Материалы не найдены</p>
+      <button type="button" id="pickerEmptyReset" class="picker-reset-btn">Сбросить фильтры</button>
+    </div>
   </div>
 </div>
 
@@ -1413,6 +1468,10 @@
     materialFieldThumb.hidden = true;
   });
   const materialFieldText = document.getElementById('materialFieldText');
+  const materialPreviewEl = document.getElementById('materialPreview');
+  const materialPreviewImgEl = document.getElementById('materialPreviewImg');
+  const materialPreviewNameEl = document.getElementById('materialPreviewName');
+  const materialPreviewMetaEl = document.getElementById('materialPreviewMeta');
   let selectedStoneId = null;
   let picker = null;
   let dimsTouched = false;
@@ -1766,6 +1825,11 @@
 
   function handleMaterialSelected(stoneId) {
     const stone = STONES_BY_ID[stoneId];
+    // Defensive: every real caller (picker card click, URL-bootstrap via
+    // resolveInitialStoneId) already only ever passes a real id -- this
+    // guard exists so a future/invalid caller can't crash the whole
+    // calculator instead of just being a no-op.
+    if (!stone) return;
     selectedStoneId = stoneId;
     materialFieldText.textContent = stone.name;
     if (stone.image) {
@@ -1774,7 +1838,24 @@
     } else {
       materialFieldThumb.hidden = true;
     }
+    updateMaterialPreview(stone);
     calculate();
+  }
+
+  // Крупный preview (§11) -- те же данные, что уже определяют
+  // materialFieldText/materialFieldThumb выше; category_label_ru/countries[0]
+  // уже читались в других местах этого файла (например, breakdown), здесь
+  // просто показаны крупнее. hardness_category сюда намеренно не попадает.
+  function updateMaterialPreview(stone) {
+    materialPreviewImgEl.src = stone.image ? 'data/' + stone.image : '';
+    materialPreviewImgEl.hidden = !stone.image;
+    materialPreviewNameEl.textContent = stone.name;
+    const metaParts = [];
+    if (stone.category_label_ru) metaParts.push(stone.category_label_ru);
+    const country = stone.countries && stone.countries[0];
+    if (country && country.label_ru) metaParts.push(country.label_ru);
+    materialPreviewMetaEl.textContent = metaParts.join(' · ');
+    materialPreviewEl.hidden = false;
   }
 
   materialField.addEventListener('click', () => {
@@ -2223,7 +2304,16 @@
     setPriceValue('≈ ' + formatRub(result.total));
 
     let html = `Площадь: <span>${(width * length).toFixed(2)} м²</span><br>`;
-    html += `Материал: <span>${escapeHtml(stone.name)}</span><br>`;
+    const stoneMetaParts = [];
+    if (stone.category_label_ru) stoneMetaParts.push(stone.category_label_ru);
+    const stoneCountry = stone.countries && stone.countries[0];
+    if (stoneCountry && stoneCountry.label_ru) stoneMetaParts.push(stoneCountry.label_ru);
+    // Kept as ONE floated span (same as every other breakdown row) rather
+    // than a second element -- .result-breakdown span is float:right for
+    // the label/value layout, and a second inline span after a floated one
+    // would not sit where you'd expect.
+    const stoneDisplay = stoneMetaParts.length ? `${stone.name} (${stoneMetaParts.join(' · ')})` : stone.name;
+    html += `Материал: <span>${escapeHtml(stoneDisplay)}</span><br>`;
     html += `Изделие: <span>${product.label}</span>`;
     const subcategoryRow = currentSubcategoryRow();
     if (subcategoryRow) {
