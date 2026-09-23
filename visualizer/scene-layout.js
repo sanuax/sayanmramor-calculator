@@ -229,7 +229,13 @@
       runM = m.lengthM; heightM = m.widthM;
       y0 = m.productKey === 'panno' ? (heightM < 2.2 ? 0.9 : 0.1) : 0;
     }
-    parts.push(box('stone', [0, y0 + heightM / 2, 0], [T, heightM, runM]));
+    const wall = box('stone', [0, y0 + heightM / 2, 0], [T, heightM, runM]);
+    // The joints' grid on the room-side face, for the renderer to give each
+    // piece its own stone (presentation only -- no geometry changes).
+    if (m.surface && m.surface.pattern) {
+      wall.tiling = { plane: 'front', pattern: m.surface.pattern, moduleM: m.surface.moduleM, z0: -runM / 2, y0 };
+    }
+    parts.push(wall);
     const seams = faceSeams(T / 2 + 0.001, runM, heightM, y0, m.surface);
     if (seams.length) parts.push({ kind: 'seams', role: 'seam', segments: seams });
     if (m.productKey === 'panno') {
@@ -264,8 +270,11 @@
 
   function floorParts(m) {
     const W = m.widthM, L = m.lengthM, T = m.visualThicknessM;
-    const parts = [prism('stone', rect(-W / 2, W / 2, -L / 2, L / 2), 0, T, { name: 'floor' })];
     const layout = m.surface;
+    const tiling = layout && layout.pattern
+      ? { tiling: { plane: 'top', pattern: layout.pattern, moduleM: layout.moduleM, x0: -W / 2, x1: W / 2, z0: -L / 2, z1: L / 2 } }
+      : {};
+    const parts = [prism('stone', rect(-W / 2, W / 2, -L / 2, L / 2), 0, T, Object.assign({ name: 'floor' }, tiling))];
     if (layout && layout.pattern) {
       const y = T + 0.001, mod = layout.moduleM;
       let segs = [];

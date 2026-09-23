@@ -80,8 +80,6 @@ function repeatTexture(canvas, repeat, colorSpace) {
 function buildTextures() {
   // Fine grain: micro-roughness/bump so light breaks up like on real stone.
   const grain = noiseCanvas(256, 48, 2, 150, 255);
-  // Broad, very low-contrast mottling -- depth in the colour, not a pattern.
-  const cloud = noiseCanvas(256, 3, 4, 226, 255);
   const bg = document.createElement('canvas');
   bg.width = 2; bg.height = 256;
   const g = bg.getContext('2d');
@@ -103,7 +101,6 @@ function buildTextures() {
   background.colorSpace = THREE.SRGBColorSpace;
   return {
     grain: repeatTexture(grain, 1.5),
-    cloud: repeatTexture(cloud, 0.6, THREE.SRGBColorSpace),
     background,
     floorFade: new THREE.CanvasTexture(fade),
   };
@@ -132,22 +129,217 @@ function buildEnvironment() {
   return texture;
 }
 
+// ---- stone photos (loaded on demand, cached) ------------------------------
+
+// Only the selected stone's photo is ever loaded -- never the catalog. A
+// few recent ones stay cached so switching back is instant; older ones are
+// released from the GPU.
+const STONE_CACHE_LIMIT = 6;
+// The studio light is warm (the scene's art direction). A photo already
+// carries the stone's true color, so it gets a faint cool tint that
+// cancels the warm cast on the stone only -- a beige travertine stays
+// beige instead of turning to honey-colored wood.
+const PHOTO_TINT = '#eef1f6';
+const stoneTextures = new Map(); // imageUrl -> { promise, entry, lastUsed }
+let stoneUseCounter = 0;
+
+// The photo as a texture: a thin border cropped off, the stone's tone
+// adjusted by the descriptor (calm stones slightly softer), mirrored past
+// its edges -- a bookmatch, never a visible tile grid.
+// Mean color (sRGB 0..1) and luminance of an image, from an 8x8 probe.
+function meanColor(source, sx, sy, sw, sh) {
+  const probe = document.createElement('canvas');
+  probe.width = probe.height = 8;
+  const p = probe.getContext('2d');
+  p.drawImage(source, sx, sy, sw, sh, 0, 0, 8, 8);
+  const data = p.getImageData(0, 0, 8, 8).data;
+  const mean = [0, 0, 0];
+  for (let i = 0; i < data.length; i += 4) { mean[0] += data[i]; mean[1] += data[i + 1]; mean[2] += data[i + 2]; }
+  const color = mean.map(c => c / (data.length / 4) / 255);
+  return { color, luminance: 0.2126 * color[0] + 0.7152 * color[1] + 0.0722 * color[2] };
+}
+
+function photoTexture(img, desc) {
+  const crop = desc.imageCrop || 0;
+  const sx = img.naturalWidth * crop, sy = img.naturalHeight * crop;
+  const sw = img.naturalWidth - 2 * sx, sh = img.naturalHeight - 2 * sy;
+  const gain = window.MaterialAdapter.photoExposure(desc, meanColor(img, sx, sy, sw, sh).luminance);
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = Math.round(1024 * sh / sw);
+  const ctx = canvas.getContext('2d');
+  const filters = [];
+  if (gain !== 1) filters.push(`brightness(${gain})`);
+  if (desc.contrast !== 1) filters.push(`contrast(${desc.contrast})`);
+  if (desc.saturation !== 1) filters.push(`saturate(${desc.saturation})`);
+  if (filters.length) ctx.filter = filters.join(' ');
+  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = texture.wrapT = THREE.MirroredRepeatWrapping;
+  texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  // Mean color of the finished photo: seams, and dark-stone lighting.
+  return Object.assign({ texture }, meanColor(canvas, 0, 0, canvas.width, canvas.height));
+}
+
+function loadStonePhoto(desc) {
+  const cached = stoneTextures.get(desc.imageUrl);
+  if (cached) { cached.lastUsed = ++stoneUseCounter; return cached.promise; }
+  const record = { entry: null, lastUsed: ++stoneUseCounter };
+  record.promise = new Promise(resolve => {
+    const img = new Image();
+    img.decoding = 'async';
+    img.onload = () => {
+      // The renderer may have been disposed while the photo was loading.
+      if (!renderer) { resolve(null); return; }
+      try { record.entry = photoTexture(img, desc); } catch (e) { record.entry = null; }
+      resolve(record.entry);
+    };
+    // A missing or broken photo: the procedural stone stays -- no error UI.
+    img.onerror = () => resolve(null);
+    img.src = desc.imageUrl;
+  });
+  stoneTextures.set(desc.imageUrl, record);
+  evictStonePhotos(desc.imageUrl);
+  return record.promise;
+}
+
+function evictStonePhotos(keepUrl) {
+  if (stoneTextures.size <= STONE_CACHE_LIMIT) return;
+  const oldest = [...stoneTextures.entries()]
+    .filter(([url, r]) => url !== keepUrl && r.entry)
+    .sort((a, b) => a[1].lastUsed - b[1].lastUsed);
+  while (stoneTextures.size > STONE_CACHE_LIMIT && oldest.length) {
+    const [url, r] = oldest.shift();
+    r.entry.texture.dispose();
+    stoneTextures.delete(url);
+  }
+}
+
 // ---- materials -----------------------------------------------------------
 
-function buildMaterials(desc) {
-  const stone = new THREE.MeshPhysicalMaterial({
-    color: desc.fallbackColor,
-    map: textures.cloud,
-    roughness: desc.roughness,
-    roughnessMap: textures.grain,
-    metalness: desc.metalness || 0,
-    clearcoat: desc.clearcoat || 0,
-    clearcoatRoughness: 0.14,
-    bumpMap: textures.grain,
-    bumpScale: 0.35,
-    envMapIntensity: 0.7,
+// The procedural stone's color map, one per pattern/amount (a handful at
+// most), built on first use: soft clouding or a fine speckle, both from the
+// deterministic noise above, lightest at 255 so the stone keeps its color.
+const proceduralMaps = new Map();
+function proceduralMap({ pattern, amount }) {
+  const key = pattern + ':' + amount;
+  if (!proceduralMaps.has(key)) {
+    const lo = Math.round(255 * (1 - amount));
+    const canvas = pattern === 'speckle' ? noiseCanvas(256, 64, 2, lo, 255) : noiseCanvas(256, 3, 4, lo, 255);
+    proceduralMaps.set(key, repeatTexture(canvas, 1, THREE.SRGBColorSpace));
+  }
+  return proceduralMaps.get(key);
+}
+
+// Per-material copy of a shared procedural texture at the stone's pattern
+// scale (the copy shares the pixels; only its repeat differs).
+function scaledTexture(source, perMetre, desc) {
+  const t = source.clone();
+  t.repeat.set(perMetre * desc.patternSizeM[0], perMetre * desc.patternSizeM[1]);
+  t.needsUpdate = true;
+  return t;
+}
+
+// (Re)dresses the stone material for a descriptor: finish first (instant),
+// then the stone's photo once it is loaded. The procedural look -- the
+// stone's listed color over soft mottling -- is shown meanwhile and stays
+// for a stone without a usable photo.
+function applyStone(materials, desc) {
+  const stone = materials.stone;
+  (materials.owned || []).forEach(t => t.dispose());
+  const grain = scaledTexture(textures.grain, 1.5, desc);
+  const cloud = scaledTexture(proceduralMap(desc.procedural), desc.procedural.pattern === 'speckle' ? 2.5 : 0.6, desc);
+  materials.owned = [grain, cloud];
+  materials.descriptor = desc;
+  stone.color.set(desc.fallbackColor);
+  stone.map = cloud;
+  stone.roughness = desc.roughness;
+  stone.roughnessMap = desc.microGrain ? grain : null;
+  stone.metalness = desc.metalness || 0;
+  stone.clearcoat = desc.clearcoat || 0;
+  stone.clearcoatRoughness = desc.clearcoatRoughness;
+  stone.bumpMap = desc.bumpScale > 0 ? grain : null;
+  stone.bumpScale = desc.bumpScale;
+  stone.envMapIntensity = desc.envMapIntensity;
+  stone.userData.tileUniforms.stoneTileOn.value = 0;
+  stone.needsUpdate = true;
+  materials.seam.color.set(desc.fallbackColor).multiplyScalar(0.62);
+
+  if (desc.source !== 'image') return;
+  loadStonePhoto(desc).then(photo => {
+    // Only if this stone is still the one on screen.
+    if (!photo || materials.descriptor !== desc || !productGroup || productGroup.userData.materials !== materials) return;
+    const tuned = window.MaterialAdapter.adjustForLuminance(desc, photo.luminance);
+    stone.color.set(PHOTO_TINT);
+    stone.map = photo.texture;
+    stone.envMapIntensity = tuned.envMapIntensity;
+    stone.clearcoat = tuned.clearcoat;
+    stone.clearcoatRoughness = tuned.clearcoatRoughness;
+    const tiles = materials.tiled && window.MaterialAdapter.tileParams(materials.tiled.tiling, materials.tiled.projection, desc.patternSizeM);
+    if (tiles) {
+      const u = stone.userData.tileUniforms;
+      u.stoneTileCell.value.set(...tiles.cell);
+      u.stoneTileRoom.value.set(...tiles.room);
+      u.stoneTileSplit.value.set(...tiles.split);
+      u.stoneTileOn.value = 1;
+    }
+    stone.needsUpdate = true;
+    materials.seam.color.setRGB(...photo.color, THREE.SRGBColorSpace).multiplyScalar(0.62);
   });
-  const seamColor = new THREE.Color(desc.fallbackColor).multiplyScalar(0.62);
+}
+
+// Tiled surfaces (see MaterialAdapter.tileCoords): the photo is sampled
+// per tile -- each tile its own region, chosen by a fixed hash of the tile's
+// grid cell. textureGrad keeps the mip level continuous across the joints.
+const STONE_TILE_VERTEX = `
+attribute vec2 stoneTile;
+varying vec2 vStoneTile;
+`;
+const STONE_TILE_FRAGMENT = `
+uniform float stoneTileOn;
+uniform vec2 stoneTileCell;
+uniform vec2 stoneTileRoom;
+uniform vec2 stoneTileSplit;
+varying vec2 vStoneTile;
+`;
+const STONE_TILE_MAP = `
+#ifdef USE_MAP
+  vec2 stoneUv = vMapUv;
+  vec2 stoneGx = dFdx(vMapUv), stoneGy = dFdy(vMapUv);
+  vec2 tileGx = dFdx(vStoneTile) * stoneTileCell, tileGy = dFdy(vStoneTile) * stoneTileCell;
+  if (stoneTileOn > 0.5 && vStoneTile.x > -1000.0) {
+    vec2 cell = floor(vStoneTile) * stoneTileSplit;
+    vec2 pick = fract(sin(vec2(dot(cell, vec2(127.1, 311.7)), dot(cell, vec2(269.5, 183.3)))) * 43758.5453);
+    // Split axes restart the photo in every tile; a joint-free axis runs on.
+    stoneUv = mix(vStoneTile, fract(vStoneTile), stoneTileSplit) * stoneTileCell + pick * stoneTileRoom;
+    stoneGx = tileGx;
+    stoneGy = tileGy;
+  }
+  diffuseColor *= textureGrad(map, stoneUv, stoneGx, stoneGy);
+#endif
+`;
+
+function buildStoneMaterial(desc) {
+  const stone = new THREE.MeshPhysicalMaterial({ color: desc.fallbackColor });
+  const uniforms = {
+    stoneTileOn: { value: 0 },
+    stoneTileCell: { value: new THREE.Vector2(1, 1) },
+    stoneTileRoom: { value: new THREE.Vector2(0, 0) },
+    stoneTileSplit: { value: new THREE.Vector2(1, 1) },
+  };
+  stone.userData.tileUniforms = uniforms;
+  stone.onBeforeCompile = shader => {
+    Object.assign(shader.uniforms, uniforms);
+    shader.vertexShader = STONE_TILE_VERTEX + shader.vertexShader.replace('#include <uv_vertex>', '#include <uv_vertex>\n  vStoneTile = stoneTile;');
+    shader.fragmentShader = STONE_TILE_FRAGMENT + shader.fragmentShader.replace('#include <map_fragment>', STONE_TILE_MAP);
+  };
+  stone.customProgramCacheKey = () => 'stone-tiles';
+  return stone;
+}
+
+function buildMaterials(desc) {
+  const stone = buildStoneMaterial(desc);
   return {
     stone,
     metal: new THREE.MeshStandardMaterial({ color: '#9a9ea2', metalness: 0.85, roughness: 0.32, envMapIntensity: 1.1, side: THREE.DoubleSide }),
@@ -158,7 +350,7 @@ function buildMaterials(desc) {
     // than any stone so the product stays the brightest thing in view.
     context: new THREE.MeshStandardMaterial({ color: '#6f675d', roughness: 0.95, metalness: 0, envMapIntensity: 0.4 }),
     'context-glass': new THREE.MeshPhysicalMaterial({ color: '#5f676c', roughness: 0.05, metalness: 0, transparent: true, opacity: 0.45, envMapIntensity: 1.3 }),
-    seam: new THREE.LineBasicMaterial({ color: seamColor, transparent: true, opacity: 0.7 }),
+    seam: new THREE.LineBasicMaterial({ color: desc.fallbackColor, transparent: true, opacity: 0.7 }),
     burner: new THREE.MeshBasicMaterial({ color: '#4d4a47' }),
   };
 }
@@ -262,11 +454,63 @@ function buildFloor(group, layout, materials) {
   mesh.receiveShadow = true;
 }
 
+// Layout-space vertex positions/normals of a stone mesh, kept so its UVs
+// can be re-projected for another stone without rebuilding the geometry.
+function captureStoneMesh(mesh, part, index) {
+  mesh.updateMatrix();
+  const { position, normal } = mesh.geometry.attributes;
+  const normalMatrix = new THREE.Matrix3().getNormalMatrix(mesh.matrix);
+  const positions = new Float32Array(position.count * 3);
+  const normals = new Float32Array(position.count * 3);
+  const v = new THREE.Vector3();
+  for (let i = 0; i < position.count; i++) {
+    v.fromBufferAttribute(position, i).applyMatrix4(mesh.matrix);
+    positions[i * 3] = v.x; positions[i * 3 + 1] = v.y; positions[i * 3 + 2] = v.z;
+    v.fromBufferAttribute(normal, i).applyMatrix3(normalMatrix).normalize();
+    normals[i * 3] = v.x; normals[i * 3 + 1] = v.y; normals[i * 3 + 2] = v.z;
+  }
+  const projection = window.MaterialAdapter.partProjection(part, index);
+  const tiles = window.MaterialAdapter.tileCoords(positions, normals, part.tiling, projection);
+  mesh.geometry.setAttribute('stoneTile', new THREE.BufferAttribute(tiles, 2));
+  return { mesh, positions, normals, projection, tiling: part.tiling || null };
+}
+
+// Every stone part is its own piece of stone at the stone's physical
+// pattern size (see MaterialAdapter.partProjection).
+function projectStoneUVs(group, desc) {
+  group.userData.stoneMeshes.forEach(({ mesh, positions, normals, projection }) => {
+    const uv = window.MaterialAdapter.stoneUVs(positions, normals, { projection, patternSizeM: desc.patternSizeM });
+    mesh.geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  });
+  group.userData.patternSizeM = desc.patternSizeM.join('x');
+}
+
 function buildProductGroup(layout, materialDescriptor) {
   const group = new THREE.Group();
   const materials = buildMaterials(materialDescriptor);
   group.userData.materials = materials;
+  group.userData.stoneMeshes = [];
+  let stoneIndex = 0;
   layout.parts.forEach(part => {
+    const before = group.children.length;
+    buildPart(group, part, materials);
+    if (part.role === 'stone') {
+      const index = stoneIndex++;
+      group.children.slice(before).forEach(mesh => {
+        if (mesh.isMesh) group.userData.stoneMeshes.push(captureStoneMesh(mesh, part, index));
+      });
+    }
+  });
+  if (layout.bounds) buildFloor(group, layout, materials);
+  const tiled = group.userData.stoneMeshes.find(m => m.tiling);
+  materials.tiled = tiled ? { tiling: tiled.tiling, projection: tiled.projection } : null;
+  projectStoneUVs(group, materialDescriptor);
+  applyStone(materials, materialDescriptor);
+  return group;
+}
+
+function buildPart(group, part, materials) {
+  {
     const cast = part.role !== 'context' && part.role !== 'context-glass';
     if (part.kind === 'prism') {
       addMesh(group, buildPrismGeometry(part), materials[part.role], null, cast);
@@ -282,14 +526,16 @@ function buildProductGroup(layout, materialDescriptor) {
       geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
       group.add(new THREE.LineSegments(geometry, materials.seam));
     }
-  });
-  if (layout.bounds) buildFloor(group, layout, materials);
-  return group;
+  }
 }
 
 function disposeGroup(group) {
   group.traverse(obj => { if (obj.geometry) obj.geometry.dispose(); });
-  Object.values(group.userData.materials || {}).forEach(m => m.dispose());
+  const materials = group.userData.materials || {};
+  // Photo textures belong to the cache, not to a material; only this
+  // group's own scaled copies are released here.
+  (materials.owned || []).forEach(t => t.dispose());
+  Object.values(materials).forEach(m => { if (m && m.isMaterial) m.dispose(); });
 }
 
 // ---- lights --------------------------------------------------------------
@@ -396,12 +642,24 @@ function resize() {
 }
 
 function update(geometryModel, materialDescriptor) {
+  // Same geometry, another stone (or the same one again): only the stone
+  // material changes -- meshes, lights, camera and controls stay as they are.
+  const geometryKey = JSON.stringify(geometryModel);
+  if (productGroup && productGroup.userData.geometryKey === geometryKey) {
+    const materials = productGroup.userData.materials;
+    const previous = materials.descriptor;
+    if (previous && JSON.stringify(previous) === JSON.stringify(materialDescriptor)) return;
+    if (productGroup.userData.patternSizeM !== materialDescriptor.patternSizeM.join('x')) projectStoneUVs(productGroup, materialDescriptor);
+    applyStone(materials, materialDescriptor);
+    return;
+  }
   const layout = window.SceneLayout.buildSceneLayout(geometryModel);
   if (productGroup) {
     scene.remove(productGroup);
     disposeGroup(productGroup);
   }
   productGroup = buildProductGroup(layout, materialDescriptor);
+  productGroup.userData.geometryKey = geometryKey;
   scene.add(productGroup);
   if (layout.bounds) placeLights(layout.bounds);
 
@@ -447,6 +705,10 @@ function dispose() {
   if (controls) controls.dispose();
   if (scene && scene.environment) scene.environment.dispose();
   if (textures) Object.values(textures).forEach(t => t.dispose());
+  stoneTextures.forEach(r => { if (r.entry) r.entry.texture.dispose(); });
+  stoneTextures.clear();
+  proceduralMaps.forEach(t => t.dispose());
+  proceduralMaps.clear();
   if (renderer) renderer.dispose();
   renderer = scene = camera = controls = productGroup = currentCanvas = resizeObserver = null;
   keyLight = fillLight = rimLight = null;
