@@ -32,7 +32,7 @@ test('every one of the 9 products has a working state contract: dimensions, prod
     'product', 'stone', 'dimensions', 'shape', 'wing', 'corner', 'edgeLineItems',
     'sinkCounts', 'cooktopCount', 'holeCounts', 'curbLengthM', 'backsplash', 'wallPanel',
     'island', 'barCounter', 'edge', 'additionalWorks', 'bookmatchMode', 'options',
-    'subcategory', 'productConfig',
+    'subcategory', 'stepCount', 'productConfig',
   ];
   ALL_PRODUCT_KEYS.forEach(key => {
     const state = readState(key, {});

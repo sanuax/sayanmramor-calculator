@@ -168,6 +168,7 @@
       material: buildMaterial(state.stone),
       edge,
       riser: key === 'stupeni' ? !!(state.productConfig && state.productConfig.stupeni && state.productConfig.stupeni.riser) : null,
+      steps: state.stepCount ? { count: state.stepCount } : null,
       additionalWorksAvailable: !!caps.supportsCountertopExtras,
       additionalWorks: caps.supportsCountertopExtras ? buildAdditionalWorks(state) : [],
       options,
@@ -242,6 +243,9 @@
       value: d.lengthMm + ' × ' + d.widthMm + ' мм',
       detail: d.lengthLabel.toLowerCase() + ' × ' + d.widthLabel.toLowerCase() + ' · ' + formatArea(d.areaM2),
     });
+    if (c.steps) {
+      specs.push({ key: 'steps', label: 'Количество ступеней', value: c.steps.count + ' шт.', detail: '' });
+    }
     if (c.shape && c.shape.wing) {
       const two = c.shape.wing.count === 2;
       specs.push({ key: 'wing', label: two ? 'Крылья' : 'Крыло', value: c.shape.wing.lengthMm + ' × ' + c.shape.wing.widthMm + ' мм', detail: two ? 'длина × ширина, каждое из двух' : 'длина × ширина' });

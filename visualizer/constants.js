@@ -51,11 +51,8 @@
   // Stairs/steps: the calculator has no step count, rise or tread-depth
   // input, so these are standard proportions used only to draw a readable
   // flight. Never shown as a spec.
-  const VISUAL_STEPS_ILLUSTRATION_COUNT = 4;
   const VISUAL_STAIR_RISE_M = 0.17;
   const VISUAL_STAIR_TREAD_DEPTH_M = 0.3;
-  const VISUAL_STAIR_MIN_STEPS = 3;
-  const VISUAL_STAIR_MAX_STEPS = 16;
   const VISUAL_RISER_THICKNESS_M = 0.02;
   // Joint module for floor/wall/facade layouts that name a pattern but not a
   // tile size -- illustrates the chosen layout, not a real tile size.
@@ -84,8 +81,7 @@
     VISUAL_FALLBACK_CUTOUT_GAP_M, VISUAL_FALLBACK_CUTOUT_FRONT_MARGIN_M,
     VISUAL_FALLBACK_CURB_HEIGHT_M, VISUAL_FALLBACK_ISLAND_GAP_M, VISUAL_FALLBACK_BAR_COUNTER_GAP_M,
     VISUAL_FALLBACK_FLOOR_THICKNESS_M,
-    VISUAL_STEPS_ILLUSTRATION_COUNT, VISUAL_STAIR_RISE_M, VISUAL_STAIR_TREAD_DEPTH_M,
-    VISUAL_STAIR_MIN_STEPS, VISUAL_STAIR_MAX_STEPS, VISUAL_RISER_THICKNESS_M,
+    VISUAL_STAIR_RISE_M, VISUAL_STAIR_TREAD_DEPTH_M, VISUAL_RISER_THICKNESS_M,
     VISUAL_LAYOUT_MODULE_M, VISUAL_LARGE_FORMAT_MODULE_M,
   };
 });

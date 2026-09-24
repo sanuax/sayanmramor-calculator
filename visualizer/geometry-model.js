@@ -78,11 +78,13 @@
         kind: 'steps',
         variant: STEP_VARIANTS[id] || 'straight',
         risers: !!(state.productConfig && state.productConfig.stupeni && state.productConfig.stupeni.riser),
+        // The client's «Количество ступеней» -- drawn exactly.
+        count: state.stepCount,
       };
     }
     if (productKey === 'lestnitsa') {
       // Type B: the entered size is the cladded flight (width x run).
-      return { kind: 'flight', shape: STAIR_SHAPES[id] || 'straight', risers: STAIR_WITH_RISERS.includes(id) };
+      return { kind: 'flight', shape: STAIR_SHAPES[id] || 'straight', risers: STAIR_WITH_RISERS.includes(id), count: state.stepCount };
     }
     return null;
   }

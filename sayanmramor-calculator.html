@@ -438,6 +438,7 @@
      система, отделённая подзаголовком. */
   .choice-group { margin-top: 20px; }
   .choice-title { font-size: var(--configurator-text); font-weight: 700; color: var(--ink); margin-bottom: 8px; }
+  .step-count-unit { max-width: 240px; }
 
   .reveal-rows { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
   .reveal-row {
@@ -1135,6 +1136,19 @@
           <div class="choice-title" id="stairRiserTitle">Подступенки</div>
           <div class="card-grid" id="stairRiserGrid" role="radiogroup" aria-labelledby="stairRiserTitle"></div>
         </div>
+        <!-- «Количество ступеней» (Лестницы, Ступени): the visible field is
+             validated as the client types; only a valid whole number reaches
+             #step-count, which constructor-state.js reads -- so the 3D, the
+             summary and the Result always show the same count. -->
+        <div class="choice-group" id="stepCountField" hidden>
+          <div class="field-unit step-count-unit">
+            <span class="unit-label">Количество ступеней</span>
+            <input type="number" id="stepCountInput" min="1" max="30" step="1" inputmode="numeric">
+            <span class="unit">шт.</span>
+          </div>
+          <div class="error" id="stepCountError">Введите целое число от 1 до 30</div>
+        </div>
+        <input type="hidden" id="step-count" value="">
         <select id="productSubcategory" hidden></select>
         <input type="number" id="subcategoryQty" placeholder="Количество, шт." min="0" step="1" style="margin-top:14px;display:none">
       </div>
@@ -2184,6 +2198,12 @@
   }
   const productSubcategorySelect = document.getElementById('productSubcategory');
   const typeCardGrid = document.getElementById('typeCardGrid');
+  const stepCountField = document.getElementById('stepCountField');
+  const stepCountInput = document.getElementById('stepCountInput');
+  const stepCountHidden = document.getElementById('step-count');
+  const stepCountError = document.getElementById('stepCountError');
+  // Last valid count per product (starts at the shared defaults).
+  const stepCountByProduct = Object.assign({}, ConstructorState.STEP_COUNT_DEFAULTS);
   const stairRiserField = document.getElementById('stairRiserField');
   const stairRiserGrid = document.getElementById('stairRiserGrid');
   const subcategoryQtyInput = document.getElementById('subcategoryQty');
@@ -2403,7 +2423,18 @@
 
   function updateSubcategoryQtyVisibility() {
     const row = currentSubcategoryRow();
-    subcategoryQtyInput.style.display = row && row.unit === 'шт.' ? '' : 'none';
+    // «Ступени»: the number of pieces is «Количество ступеней» itself.
+    subcategoryQtyInput.style.display = row && row.unit === 'шт.' && selectedProductKey !== 'stupeni' ? '' : 'none';
+  }
+
+  // «Количество ступеней»: show for the two stair products with that
+  // product's last valid count, in both the visible and the state field.
+  function syncStepCountField() {
+    const count = stepCountByProduct[selectedProductKey];
+    stepCountField.hidden = count === undefined;
+    stepCountError.style.display = 'none';
+    stepCountHidden.value = count === undefined ? '' : String(count);
+    stepCountInput.value = stepCountHidden.value;
   }
 
   // Номера шагов у "Тип изделия"/"Вариант исполнения" в разметке статичны
@@ -2588,6 +2619,7 @@
     productSubcategorySelect.innerHTML = '';
     typeCardGrid.innerHTML = '';
     stairRiserField.hidden = true;
+    syncStepCountField();
     if (product.hideVariantStep) return;
     const rows = getSubcategoriesForProduct(product.label);
     const cards = TYPE_CARDS[productKey] || [];
@@ -2912,10 +2944,13 @@
     const subcategoryRow = currentSubcategoryRow();
     if (subcategoryRow) {
       html += `<br>Вариант: <span>${escapeHtml(subcategoryLabel(subcategoryRow))}</span>`;
-      const subcategoryQty = parseFloat(subcategoryQtyInput.value) || 0;
+      const subcategoryQty = constructorState.subcategory.qty;
       if (subcategoryRow.unit === 'шт.' && subcategoryQty > 0) {
         html += ` (${subcategoryQty} шт.)`;
       }
+    }
+    if (constructorState.stepCount) {
+      html += `<br>Ступеней: <span>${constructorState.stepCount} шт.</span>`;
     }
     if (optionLabels.length) {
       html += `<br>Опции: <span>${optionLabels.join(', ')}</span>`;
@@ -3063,6 +3098,23 @@
   });
 
   productSubcategorySelect.addEventListener('change', () => { updateSubcategoryQtyVisibility(); calculate(); });
+  // Only a valid whole number in range becomes the count; while the field
+  // holds anything else the 3D keeps the last valid count and an error says
+  // why, and leaving the field puts that count back into it.
+  stepCountInput.addEventListener('input', () => {
+    const raw = stepCountInput.value.trim();
+    const n = raw === '' ? NaN : Number(raw);
+    const valid = ConstructorState.isValidStepCount(n);
+    stepCountError.style.display = valid ? 'none' : 'block';
+    if (!valid) return;
+    stepCountByProduct[selectedProductKey] = n;
+    stepCountHidden.value = String(n);
+    calculate();
+  });
+  stepCountInput.addEventListener('change', () => {
+    stepCountInput.value = stepCountHidden.value;
+    stepCountError.style.display = 'none';
+  });
   subcategoryQtyInput.addEventListener('input', calculate);
   productShapeSelect.addEventListener('change', () => { updateWingVisibility(); calculate(); });
   ['wing-width', 'wing-length'].forEach(id => document.getElementById(id).addEventListener('input', calculate));

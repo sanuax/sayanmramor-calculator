@@ -259,9 +259,9 @@ test('steps variants from the real "type" selection: winder fans around a pivot,
   assert.notEqual(heading(winder[0]).toFixed(3), heading(winder[winder.length - 1]).toFixed(3), 'winder treads turn');
 });
 
-test('stairs (лестница): a flight whose treads cover the walking length, risers in stone only for "+ подступенки" rows', () => {
-  const plain = layoutFor('lestnitsa', { width: { value: '1000' }, length: { value: '3000' }, productSubcategory: { value: 'STAIR-01' } });
-  const withRisers = layoutFor('lestnitsa', { width: { value: '1000' }, length: { value: '3000' }, productSubcategory: { value: 'STAIR-02' } });
+test('stairs (лестница): the client\'s number of treads covers the walking length, risers in stone only for "+ подступенки" rows', () => {
+  const plain = layoutFor('lestnitsa', { width: { value: '1000' }, length: { value: '3000' }, 'step-count': { value: '10' }, productSubcategory: { value: 'STAIR-01' } });
+  const withRisers = layoutFor('lestnitsa', { width: { value: '1000' }, length: { value: '3000' }, 'step-count': { value: '10' }, productSubcategory: { value: 'STAIR-02' } });
   const treads = named(plain, 'tread');
   assert.equal(treads.length, 10);
   const run = extent([].concat(...treads.map(t => t.outline)));
@@ -445,4 +445,54 @@ test('backlight is drawn as light, never framed as part of the product', () => {
   assert.ok(panel.parts.some(p => p.role === 'light'));
   const plain = layoutFor('panno', { width: { value: '1200' }, length: { value: '2000' }, productSubcategory: { value: 'PANEL-01' } });
   assert.deepEqual(panel.bounds, plain.bounds);
+});
+
+// ---- «Количество ступеней»: the client's count is the only source ---------
+
+test('steps: N entered -> N treads, for every step type, and the type change keeps N', () => {
+  ['STEP-01', 'STEP-02', 'STEP-03'].forEach(type => {
+    [1, 2, 4, 8, 10, 30].forEach(n => {
+      const layout = layoutFor('stupeni', { width: { value: '300' }, length: { value: '1200' }, 'step-count': { value: String(n) }, productSubcategory: { value: type } });
+      assert.equal(named(layout, 'tread').length, n, type + ' x ' + n);
+    });
+  });
+  const winder = named(layoutFor('stupeni', { 'step-count': { value: '8' }, productSubcategory: { value: 'STEP-02' } }), 'tread');
+  assert.ok(winder.every(t => t.outline.length === 4), 'winder treads stay wedges');
+  const radius = named(layoutFor('stupeni', { 'step-count': { value: '8' }, productSubcategory: { value: 'STEP-03' } }), 'tread');
+  assert.ok(radius.every(t => t.outline.length > 4), 'radius treads keep their arc');
+});
+
+test('stairs: N entered -> N treads for every flight shape (landing not counted), with or without risers', () => {
+  ['STAIR-01', 'STAIR-02', 'STAIR-03', 'STAIR-05', 'STAIR-07', 'STAIR-08'].forEach(type => {
+    [1, 5, 8, 12, 30].forEach(n => {
+      const layout = layoutFor('lestnitsa', { width: { value: '1000' }, length: { value: '3600' }, 'step-count': { value: String(n) }, productSubcategory: { value: type } });
+      assert.equal(named(layout, 'tread').length, n, type + ' x ' + n);
+    });
+  });
+});
+
+test('step count: invalid input never reaches the model -- the product default is used instead of a broken scene', () => {
+  const { STEP_COUNT_DEFAULTS, STEP_COUNT_RANGE, isValidStepCount } = ConstructorState;
+  assert.deepEqual(STEP_COUNT_RANGE, { min: 1, max: 30 });
+  ['0', '-3', 'abc', '', '4.5', '31', '1e9', 'Infinity', 'NaN'].forEach(v => {
+    assert.equal(named(layoutFor('stupeni', { 'step-count': { value: v } }), 'tread').length, STEP_COUNT_DEFAULTS.stupeni, JSON.stringify(v));
+  });
+  [1, 30].forEach(n => assert.ok(isValidStepCount(n)));
+  [0, 31, 2.5, NaN, Infinity, -1].forEach(n => assert.equal(isValidStepCount(n), false, String(n)));
+  // Other products never carry a step count.
+  assert.equal(modelFor('pol', { 'step-count': { value: '8' } }).stairs, null);
+});
+
+test('step count: the camera fits the whole flight from 1 to 30 steps, and bounds grow with the count', () => {
+  let previous = 0;
+  [1, 2, 4, 8, 10, 12, 30].forEach(n => {
+    const layout = layoutFor('stupeni', { width: { value: '300' }, length: { value: '1200' }, 'step-count': { value: String(n) } });
+    layout.parts.forEach(p => assert.ok(contains(layout.bounds, p), 'part outside the framed bounds at ' + n));
+    const direction = CAMERA_PRESETS['iso-side-high'].direction;
+    const fit = CameraFraming.fitCamera({ bounds: layout.bounds, direction, fovDeg: 40, aspect: 1.4, padding: 0.1 });
+    assert.ok(CameraFraming.cornersInView({ bounds: layout.bounds, position: fit.position, target: fit.target, fovDeg: 40, aspect: 1.4 }), 'in view at ' + n);
+    const height = layout.bounds.max[1] - layout.bounds.min[1];
+    assert.ok(height > previous, 'the flight grows with the count');
+    previous = height;
+  });
 });

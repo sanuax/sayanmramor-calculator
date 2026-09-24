@@ -69,6 +69,7 @@
         material: c.material,
         edge: c.edge,
         riser: c.riser,
+        steps: c.steps || null,
         additionalWorks: c.additionalWorks,
         options: c.options,
       },

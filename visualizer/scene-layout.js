@@ -669,8 +669,10 @@
     }
   }
 
-  function clampSteps(n) {
-    return Math.min(C.VISUAL_STAIR_MAX_STEPS, Math.max(C.VISUAL_STAIR_MIN_STEPS, Math.round(n)));
+  // The client's step count (GeometryModel.stairs.count) is drawn exactly.
+  // A model built without one (no calculator state) still gets a flight.
+  function stepCountOf(s) {
+    return Math.max(1, Math.round(s.count || 1));
   }
 
   function stairParts(m) {
@@ -682,7 +684,7 @@
 
     if (s.kind === 'steps') {
       // The entered size is one tread: lengthM across the flight, widthM deep.
-      const count = C.VISUAL_STEPS_ILLUSTRATION_COUNT;
+      const count = stepCountOf(s);
       if (s.variant === 'winder') {
         const rOut = m.lengthM;
         const angle = Math.min(Math.PI / 4.5, Math.max(Math.PI / 18, m.widthM / (0.6 * rOut)));
@@ -694,9 +696,10 @@
       return { parts, floorY: 0 };
     }
 
-    // Лестница: widthM is the flight's width, lengthM its walking length.
+    // Лестница: widthM is the flight's width, lengthM its walking length,
+    // shared by exactly the client's number of treads.
     const width = m.widthM;
-    const n = clampSteps(m.lengthM / C.VISUAL_STAIR_TREAD_DEPTH_M);
+    const n = stepCountOf(s);
     const depth = m.lengthM / n;
     if (s.shape === 'spiral') {
       const rOut = Math.max(0.6, width);

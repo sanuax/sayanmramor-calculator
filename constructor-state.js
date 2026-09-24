@@ -71,6 +71,27 @@
     return { type, count: type ? sinkCounts[type] : 0, position: null };
   }
 
+  // Количество ступеней («Лестницы», «Ступени»): the whole number of treads
+  // the client asks for -- the ONE source of the flight drawn in 3D, of the
+  // Result's "Количество ступеней" row and of the lead. The calculator keeps
+  // only valid values in #step-count (the visible field validates first), so
+  // the product default is used only when there is no UI at all; it is the
+  // same default the visible field starts with. 30 is a technical cap (no
+  // business limit exists): a flight that tall is still one scene.
+  const STEP_COUNT_RANGE = { min: 1, max: 30 };
+  const STEP_COUNT_DEFAULTS = { lestnitsa: 12, stupeni: 4 };
+
+  function isValidStepCount(n) {
+    return Number.isInteger(n) && n >= STEP_COUNT_RANGE.min && n <= STEP_COUNT_RANGE.max;
+  }
+
+  function readStepCount(doc, productKey) {
+    if (!(productKey in STEP_COUNT_DEFAULTS)) return null;
+    const raw = String(doc.getElementById('step-count').value).trim();
+    const n = raw === '' ? NaN : Number(raw);
+    return isValidStepCount(n) ? n : STEP_COUNT_DEFAULTS[productKey];
+  }
+
   function readConstructorState({ doc, selectedProductKey, product, stone, hasAdditionalWork }) {
     const d = doc;
     const cap = (name) => !!(product && hasAdditionalWork(product, name));
@@ -174,8 +195,11 @@
       },
       subcategory: {
         id: d.getElementById('productSubcategory').value || null,
-        qty: numFromField(d, 'subcategoryQty'),
+        // For «Ступени» the number of pieces IS the step count (stepCount
+        // below) -- the generic "Количество, шт." is not its source.
+        qty: selectedProductKey === 'stupeni' ? 0 : numFromField(d, 'subcategoryQty'),
       },
+      stepCount: readStepCount(d, selectedProductKey),
       // Product-specific state that doesn't fit the shared fields above --
       // same "always the same shape, capability-zeroed when not this
       // product" convention as island/barCounter/etc. above, so the state
@@ -245,5 +269,5 @@
     return { rates, extraLineItems, extraDimensions };
   }
 
-  return { readConstructorState, buildPricingInputs };
+  return { readConstructorState, buildPricingInputs, STEP_COUNT_RANGE, STEP_COUNT_DEFAULTS, isValidStepCount };
 });

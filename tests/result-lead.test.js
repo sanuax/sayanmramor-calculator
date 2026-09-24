@@ -319,7 +319,7 @@ test('steps result: type row from the subcategory, riser row, edge -- and no add
     subcategory: { id: 'STEP-02', label: 'Ступень — Забежная', unit: 'м²' },
   });
   const view = ResultModel.buildResultView(c);
-  assert.deepEqual(view.specs.map(s => s.key), ['type', 'dimensions', 'material', 'edge', 'riser']);
+  assert.deepEqual(view.specs.map(s => s.key), ['type', 'dimensions', 'steps', 'material', 'edge', 'riser']);
   assert.equal(view.specs.find(s => s.key === 'riser').value, 'С подступенками');
   assert.equal(view.specs.find(s => s.key === 'type').value, 'Ступень — Забежная');
   assert.equal(view.works, null);
@@ -369,4 +369,16 @@ test('П-shaped countertop: the shape and both wings reach the Result', () => {
   assert.equal(c.shape.label, 'П-образная');
   assert.equal(c.shape.corner, null);
   assert.equal(c.shape.wing.count, 2);
+});
+
+test('step count: one value in state, Result and lead -- «Ступени» never also shows the generic piece count', () => {
+  const c = configFor('stupeni', { 'step-count': { value: '8' }, subcategoryQty: { value: '3' } }, { subcategory: { id: 'STEP-01', label: 'Прямая', unit: 'шт.' } });
+  assert.deepEqual(c.steps, { count: 8 });
+  assert.equal(c.type.quantity, null, 'no second, different quantity next to the type');
+  const view = ResultModel.buildResultView(c);
+  assert.equal(view.specs.find(s => s.key === 'steps').value, '8 шт.');
+  const lestnitsa = configFor('lestnitsa', { 'step-count': { value: '12' } });
+  assert.deepEqual(lestnitsa.steps, { count: 12 });
+  assert.equal(configFor('pol', { 'step-count': { value: '12' } }).steps, null);
+  assert.deepEqual(payloadFor('lestnitsa', { 'step-count': { value: '5' } }).configuration.steps, { count: 5 });
 });
