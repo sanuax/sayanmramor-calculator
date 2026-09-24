@@ -37,3 +37,19 @@ test('Back/Next carry SVG arrows, not text glyphs', () => {
   assert.match(html, /id="stepNextBtn"><span>Далее<\/span><svg class="step-nav-arrow"/);
   assert.doesNotMatch(html, /← Назад|Далее →/);
 });
+
+test('cooktop: the row itself is the switch -- no nested single-option card', () => {
+  assert.match(html, /<button type="button" class="work-item-head" data-toggle-field="cut-cooktop"/);
+  assert.doesNotMatch(html, /Вырез под панель/);
+});
+
+test('type cards: client-facing names only -- no rate-catalog suffixes or riser combinations', () => {
+  const block = html.slice(html.indexOf('const TYPE_CARDS = {'), html.indexOf('const RISER_CARDS'));
+  const titles = [...block.matchAll(/title: '([^']+)'/g)].map(m => m[1]);
+  assert.ok(titles.length >= 30, 'every product type has a card');
+  titles.forEach(t => assert.doesNotMatch(t, /тандартн|—|подступен/i, t));
+});
+
+test('countertop shape offers П-образная', () => {
+  assert.match(html, /<option value="ushape">П-образная<\/option>/);
+});

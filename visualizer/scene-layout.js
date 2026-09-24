@@ -19,7 +19,8 @@
 //   basin   -- open-top box hanging below yTop: center [x,yTop,z], size [sx,depth,sz]
 //   cooktop -- glass plate sitting on yTop: center [x,yTop,z], size [sx,sy,sz]
 //   seams   -- line segments [[x1,y1,z1,x2,y2,z2],...] drawn on a surface
-// Roles: stone | metal | glass | body (stair structure) | context | context-glass | seam.
+// Roles: stone | metal | glass | body (stair structure) | context | context-glass | seam
+// | light (a backlight glow -- not part of the product's bounds).
 // 'context' parts (a wall, a window) help read the product but are not part
 // of it -- they are excluded from the bounds the camera frames.
 (function (root, factory) {
@@ -113,11 +114,12 @@
       parts.push(box('stone', [W / 2 - 0.01, bottom - T / 2, 0], [0.02, T, L]));
     }
 
-    if (m.wing) {
-      const { widthM: ww, lengthM: wl, corner } = m.wing;
+    // Г: one wing at the chosen end of the run; П: one at each end.
+    const wings = m.wings && m.wings.length ? m.wings : (m.wing ? [m.wing] : []);
+    wings.forEach(({ widthM: ww, lengthM: wl, corner }) => {
       const z0 = corner === 'left' ? L / 2 - ww : -L / 2;
       parts.push(prism('stone', rect(W / 2, W / 2 + wl, z0, z0 + ww), bottom, top, { edge, name: 'wing' }));
-    }
+    });
 
     if (m.sink) {
       const c = m.sink.cut;
@@ -187,8 +189,97 @@
 
   // ---- windowsill: the sill in a window opening ---------------------------
 
+  // Plan of each windowsill type, in the sill's local frame (window wall at
+  // x = -W/2, room toward +X, run along Z): the sill outline and the window
+  // line it sits against (walked so the outside is on its left).
+  function sillPlan(variant, W, L) {
+    const xw = -W / 2;
+    if (variant === 'corner') {
+      // Two windows meeting in a corner at the +Z end: the sill turns and
+      // runs along the second wall into the room.
+      const reach = Math.max(W + 0.3, L * 0.6);
+      return {
+        outline: [[xw, -L / 2], [W / 2, -L / 2], [W / 2, L / 2 - W], [xw + reach, L / 2 - W], [xw + reach, L / 2], [xw, L / 2]],
+        windowLine: [[xw, -L / 2], [xw, L / 2], [xw + reach, L / 2]],
+      };
+    }
+    if (variant === 'bay' || variant === 'bay-radius') {
+      // Эркер: the window bulges out of the wall; the sill fills the bay and
+      // keeps its depth into the room along the whole run.
+      const D = Math.min(0.45, L * 0.25);
+      let bay;
+      if (variant === 'bay') {
+        bay = [[xw, -L / 2], [xw - D, -L / 2 + D], [xw - D, L / 2 - D], [xw, L / 2]];
+      } else {
+        bay = [];
+        const n = 12;
+        for (let i = 0; i <= n; i++) {
+          const t = i / n;
+          bay.push([xw - D * Math.sin(Math.PI * t), -L / 2 + L * t]);
+        }
+      }
+      return { outline: bay.concat([[W / 2, L / 2], [W / 2, -L / 2]]), windowLine: bay };
+    }
+    if (variant === 'figured') {
+      // Фигурный: a shaped room-side edge -- fuller in the middle, drawn in
+      // at both ends -- against an ordinary straight window.
+      const A = Math.min(W * 0.3, 0.1);
+      const front = [];
+      const n = 16;
+      for (let i = 0; i <= n; i++) {
+        const z = -L / 2 + L * (i / n);
+        front.push([W / 2 - A + A * (1 + Math.cos(Math.PI * 2 * z / L)), z]);
+      }
+      return { outline: [[xw, -L / 2]].concat(front, [[xw, L / 2]]), windowLine: null };
+    }
+    return null;
+  }
+
+  // A window wall along a plan polyline: solid wall below the sill and above
+  // the opening, glass in between, mullions at the turns, and a short solid
+  // return past both ends.
+  function windowWallAlong(parts, line, sillTop) {
+    const wallT = 0.14, openY1 = sillTop + 1.3, yLow = -0.8, yHigh = openY1 + 0.45, margin = 0.5;
+    const band = (p, q, t0, t1) => {
+      const dx = q[0] - p[0], dz = q[1] - p[1], len = Math.hypot(dx, dz) || 1;
+      const n = [-dz / len, dx / len];
+      return [[p[0] + n[0] * t0, p[1] + n[1] * t0], [q[0] + n[0] * t0, q[1] + n[1] * t0], [q[0] + n[0] * t1, q[1] + n[1] * t1], [p[0] + n[0] * t1, p[1] + n[1] * t1]];
+    };
+    const extend = (from, to, by) => {
+      const dx = to[0] - from[0], dz = to[1] - from[1], len = Math.hypot(dx, dz) || 1;
+      return [to[0] + dx / len * by, to[1] + dz / len * by];
+    };
+    const ends = [[extend(line[1], line[0], margin), line[0]], [line[line.length - 1], extend(line[line.length - 2], line[line.length - 1], margin)]];
+    ends.forEach(([p, q]) => parts.push(prism('context', band(p, q, 0, wallT), yLow, yHigh)));
+    for (let i = 0; i + 1 < line.length; i++) {
+      const p = line[i], q = line[i + 1];
+      parts.push(prism('context', band(p, q, 0, wallT), yLow, sillTop));
+      parts.push(prism('context', band(p, q, 0, wallT), openY1, yHigh));
+      parts.push(prism('context-glass', band(p, q, 0.02, 0.032), sillTop, openY1));
+    }
+    // Mullions at the turns of a faceted bay; along a curve (many short
+    // facets) only every third one, so the glazing does not read as slats.
+    const every = line.length > 5 ? 3 : 1;
+    for (let i = 1; i + 1 < line.length; i++) {
+      if (i % every !== 0) continue;
+      const [x, z] = line[i], r = 0.03;
+      parts.push(prism('context', [[x - r, z - r], [x + r, z - r], [x + r, z + r], [x - r, z + r]], sillTop, openY1));
+    }
+  }
+
   function windowsillParts(m) {
-    const parts = countertopParts(Object.assign({}, m, { sink: null, cooktop: null, holes: null, backsplash: null, wallPanel: null, curb: null, island: null, barCounter: null, wing: null }));
+    const variant = (m.sill && m.sill.variant) || 'straight';
+    const plan = sillPlan(variant, m.widthM, m.lengthM);
+    if (plan && plan.windowLine) {
+      const T = m.visualThicknessM;
+      const parts = [prism('stone', plan.outline, -T / 2, T / 2, { edge: m.edge ? m.edge.type : null, name: 'main' })];
+      windowWallAlong(parts, plan.windowLine, T / 2);
+      return parts;
+    }
+    // Фигурный: the same window as the straight sill, the slab's own outline.
+    const parts = plan
+      ? [prism('stone', plan.outline, -m.visualThicknessM / 2, m.visualThicknessM / 2, { edge: m.edge ? m.edge.type : null, name: 'main' })]
+      : countertopParts(Object.assign({}, m, { sink: null, cooktop: null, holes: null, backsplash: null, wallPanel: null, curb: null, island: null, barCounter: null, wing: null, wings: null }));
     const W = m.widthM, L = m.lengthM, T = m.visualThicknessM;
     const wallT = 0.14, x = -W / 2 - wallT / 2;
     const openZ = Math.max(L / 2 - 0.06, L * 0.4);
@@ -220,6 +311,138 @@
     return segs;
   }
 
+  // Joint lines on the room-side face (x = xFace) along a 2D polyline in
+  // (z, y) -- a medallion, a diamond, a frame.
+  function facePolyline(xFace, pts, closed) {
+    const segs = [];
+    const n = closed ? pts.length : pts.length - 1;
+    for (let i = 0; i < n; i++) {
+      const [z0, y0] = pts[i], [z1, y1] = pts[(i + 1) % pts.length];
+      segs.push([xFace, y0, z0, xFace, y1, z1]);
+    }
+    return segs;
+  }
+
+  function circlePoints(cu, cv, r, n) {
+    const pts = [];
+    for (let i = 0; i < n; i++) pts.push([cu + r * Math.cos(i / n * 2 * Math.PI), cv + r * Math.sin(i / n * 2 * Math.PI)]);
+    return pts;
+  }
+
+  // A thin warm light line (LED strip) -- role 'light', outside the bounds.
+  function lightBox(center, size) {
+    return box('light', center, size);
+  }
+
+  // Panno treatments on top of the plain stone slab.
+  function panelTreatment(parts, variant, runM, heightM, y0, T) {
+    const xFace = T / 2 + 0.001;
+    const short = Math.min(runM, heightM);
+    if (variant === 'framed') {
+      // Декоративное: a raised stone frame around the field.
+      const fw = Math.min(0.12, Math.max(0.04, short * 0.08)), d = 0.02, x = T / 2 + d / 2;
+      parts.push(box('stone', [x, y0 + heightM - fw / 2, 0], [d, fw, runM]));
+      parts.push(box('stone', [x, y0 + fw / 2, 0], [d, fw, runM]));
+      parts.push(box('stone', [x, y0 + heightM / 2, runM / 2 - fw / 2], [d, heightM - 2 * fw, fw]));
+      parts.push(box('stone', [x, y0 + heightM / 2, -runM / 2 + fw / 2], [d, heightM - 2 * fw, fw]));
+      return;
+    }
+    if (variant === 'inlay') {
+      // Художественное / наборное: a composition of pieces -- an inset
+      // border, a diamond and a round medallion in the centre.
+      const b = short * 0.08, cy = y0 + heightM / 2;
+      const hz = runM / 2 - b, hy = heightM / 2 - b;
+      const r = short * 0.22;
+      const segs = [].concat(
+        facePolyline(xFace, [[-hz, cy - hy], [hz, cy - hy], [hz, cy + hy], [-hz, cy + hy]], true),
+        facePolyline(xFace, [[0, cy - hy], [hz, cy], [0, cy + hy], [-hz, cy]], true),
+        facePolyline(xFace, circlePoints(0, cy, r, 32), true),
+        facePolyline(xFace, circlePoints(0, cy, r * 0.62, 24), true));
+      parts.push({ kind: 'seams', role: 'seam', segments: segs });
+      return;
+    }
+    if (variant === 'backlit') {
+      // С подсветкой: warm light escaping from behind all four edges.
+      const x = -T / 2 - 0.02, g = 0.012, o = 0.04;
+      parts.push(lightBox([x, y0 + heightM + o / 2, 0], [g, o, runM + 2 * o]));
+      parts.push(lightBox([x, y0 - o / 2, 0], [g, o, runM + 2 * o]));
+      parts.push(lightBox([x, y0 + heightM / 2, runM / 2 + o / 2], [g, heightM, o]));
+      parts.push(lightBox([x, y0 + heightM / 2, -runM / 2 - o / 2], [g, heightM, o]));
+    }
+  }
+
+  // Радиусная стена: the cladding follows an arc in plan, bowed toward the
+  // room, with its joints along the arc.
+  function radiusWallParts(m, runM, heightM, T) {
+    const sag = Math.min(runM * 0.18, 1.2);
+    const R = (runM * runM / 4 + sag * sag) / (2 * sag);
+    const cx = sag - R, half = Math.asin(Math.min(1, runM / 2 / R));
+    const n = 24, front = [], back = [];
+    for (let i = 0; i <= n; i++) {
+      const a = -half + 2 * half * (i / n);
+      front.push([cx + R * Math.cos(a), R * Math.sin(a)]);
+      back.push([cx + (R - T) * Math.cos(a), (R - T) * Math.sin(a)]);
+    }
+    const parts = [prism('stone', front.concat(back.reverse()), 0, heightM, { name: 'wall' })];
+    const segs = [];
+    const mod = (m.surface && m.surface.moduleM) || C.VISUAL_LAYOUT_MODULE_M;
+    const cols = Math.max(2, Math.round(runM / mod));
+    for (let i = 1; i < cols; i++) {
+      const a = -half + 2 * half * (i / cols), x = cx + (R + 0.001) * Math.cos(a), z = (R + 0.001) * Math.sin(a);
+      segs.push([x, 0, z, x, heightM, z]);
+    }
+    for (let y = mod; y < heightM - 1e-6 && segs.length < MAX_SEAMS; y += mod) {
+      for (let i = 0; i < n; i++) {
+        const a0 = -half + 2 * half * (i / n), a1 = -half + 2 * half * ((i + 1) / n), r1 = R + 0.001;
+        segs.push([cx + r1 * Math.cos(a0), y, r1 * Math.sin(a0), cx + r1 * Math.cos(a1), y, r1 * Math.sin(a1)]);
+      }
+    }
+    parts.push({ kind: 'seams', role: 'seam', segments: segs });
+    return { parts, floorY: 0, framePadding: 0.14 };
+  }
+
+  // Facade types other than a plain clad wall.
+  function facadeFormParts(form, runM, heightM, T) {
+    const parts = [];
+    if (form === 'surround') {
+      // Фасадный элемент: a stone window surround on a plaster wall.
+      const base = 0.6, fw = Math.min(0.25, Math.max(0.08, Math.min(runM, heightM) * 0.14)), d = 0.08;
+      parts.push(box('stone', [d / 2, base + heightM - fw / 2, 0], [d, fw, runM]));
+      parts.push(box('stone', [d * 0.6, base + fw * 0.4, 0], [d * 1.2, fw * 0.8, runM + 0.06]));
+      parts.push(box('stone', [d / 2, base + heightM / 2, runM / 2 - fw / 2], [d, heightM - 1.8 * fw, fw]));
+      parts.push(box('stone', [d / 2, base + heightM / 2, -runM / 2 + fw / 2], [d, heightM - 1.8 * fw, fw]));
+      parts.push(box('context-glass', [0.005, base + heightM / 2, 0], [0.01, heightM - 1.8 * fw, runM - 2 * fw]));
+      parts.push(box('context', [-0.1, (base + heightM + 0.8) / 2, 0], [0.2, base + heightM + 0.8, runM + 2]));
+      return { parts, floorY: 0, framePadding: 0.25 };
+    }
+    if (form === 'columns') {
+      // Колонны: a row of round columns with bases, capitals and a beam.
+      const count = Math.min(6, Math.max(2, Math.round(runM / 1.4) + 1));
+      const d = Math.min(0.5, Math.max(0.2, runM / (count * 2.4)));
+      const capH = 0.14, beamH = 0.24;
+      const shaftTop = Math.max(0.6, heightM - capH - beamH);
+      for (let i = 0; i < count; i++) {
+        const z = -runM / 2 + d / 2 + (runM - d) * (count === 1 ? 0.5 : i / (count - 1));
+        parts.push(box('stone', [0, 0.06, z], [d * 1.3, 0.12, d * 1.3]));
+        parts.push(prism('stone', circlePoints(0, z, d / 2, 20), 0.12, shaftTop, { name: 'column' }));
+        parts.push(box('stone', [0, shaftTop + capH / 2, z], [d * 1.35, capH, d * 1.35]));
+      }
+      parts.push(box('stone', [0, shaftTop + capH + beamH / 2, 0], [d * 1.4, beamH, runM + d * 0.4]));
+      parts.push(box('context', [-d - 0.6, (heightM + 0.6) / 2, 0], [0.2, heightM + 0.6, runM + 2]));
+      return { parts, floorY: 0, framePadding: 0.18 };
+    }
+    if (form === 'cornice') {
+      // Декоративные элементы: a stepped stone cornice crowning a wall.
+      const base = 2.2, h = heightM;
+      parts.push(box('stone', [0.05, base + h * 0.175, 0], [0.1, h * 0.35, runM]));
+      parts.push(box('stone', [0.09, base + h * 0.475, 0], [0.18, h * 0.25, runM + 0.08]));
+      parts.push(box('stone', [0.14, base + h * 0.8, 0], [0.28, h * 0.4, runM + 0.16]));
+      parts.push(box('context', [-0.1, base / 2, 0], [0.2, base, runM + 1.6]));
+      return { parts, floorY: 0, framePadding: 0.3 };
+    }
+    return null;
+  }
+
   function verticalParts(m) {
     const T = m.visualThicknessM;
     const parts = [];
@@ -231,6 +454,12 @@
       runM = m.lengthM; heightM = m.widthM;
       y0 = m.productKey === 'panno' ? (heightM < 2.2 ? 0.9 : 0.1) : 0;
     }
+    const form = m.surface && m.surface.form;
+    if (m.productKey === 'stena' && form === 'radius') return radiusWallParts(m, runM, heightM, T);
+    if (m.productKey === 'fasad' && form && form !== 'plinth') {
+      const facade = facadeFormParts(form, runM, heightM, T);
+      if (facade) return facade;
+    }
     const wall = box('stone', [0, y0 + heightM / 2, 0], [T, heightM, runM]);
     // The joints' grid on the room-side face, for the renderer to give each
     // piece its own stone (presentation only -- no geometry changes).
@@ -241,12 +470,28 @@
     const seams = faceSeams(T / 2 + 0.001, runM, heightM, y0, m.surface);
     if (seams.length) parts.push({ kind: 'seams', role: 'seam', segments: seams });
     if (m.productKey === 'panno') {
+      const variant = (m.panel && m.panel.variant) || 'plain';
+      panelTreatment(parts, variant, runM, heightM, y0, T);
       // A panel hangs on a wall -- drawn as neutral context behind it, with
       // enough of it in frame to read as "on the wall".
-      // 15 mm stand-off so the panel casts a readable shadow line on the wall.
+      // 15 mm stand-off so the panel casts a readable shadow line on the wall
+      // (more for a backlit panel, so the light has room to escape).
+      const standOff = variant === 'backlit' ? 0.05 : 0.015;
       const wallH = Math.max(2.7, y0 + heightM + 0.5);
-      parts.push(box('context', [-T / 2 - 0.015 - 0.05, wallH / 2, 0], [0.1, wallH, runM + 1.6]));
+      parts.push(box('context', [-T / 2 - standOff - 0.05, wallH / 2, 0], [0.1, wallH, runM + 1.6]));
       return { parts, floorY: 0, framePadding: 0.3 };
+    }
+    if (m.surface && m.surface.light) {
+      // Стена с подсветкой: light lines along the top and the foot.
+      parts.push(lightBox([T / 2 + 0.01, y0 + heightM - 0.01, 0], [0.012, 0.012, runM]));
+      parts.push(lightBox([T / 2 + 0.01, y0 + 0.01, 0], [0.012, 0.012, runM]));
+    }
+    if (form === 'plinth') {
+      // Цоколь: the stone band at the foot of a plaster wall, capped by a
+      // projecting stone drip; framed with the wall above it in view.
+      parts.push(box('stone', [T / 2 + 0.02, heightM + 0.03, 0], [T + 0.04, 0.06, runM + 0.04]));
+      parts.push(box('context', [-0.03, heightM + 0.06 + 1.1, 0], [T, 2.2, runM]));
+      return { parts, floorY: 0, framePadding: 0.45 };
     }
     return { parts, floorY: 0, framePadding: 0.14 };
   }
@@ -270,6 +515,24 @@
     return segs;
   }
 
+  // Floor seams (x, z plane) with the part inside radius R around the
+  // origin cut away.
+  function clipOutsideCircle(segs, R) {
+    const out = [];
+    segs.forEach(s => {
+      const [ax, ay, az, bx, by, bz] = s;
+      const dx = bx - ax, dz = bz - az;
+      const A = dx * dx + dz * dz, B = 2 * (ax * dx + az * dz), Cc = ax * ax + az * az - R * R;
+      const disc = B * B - 4 * A * Cc;
+      if (A === 0 || disc <= 0) { out.push(s); return; }
+      const t1 = (-B - Math.sqrt(disc)) / (2 * A), t2 = (-B + Math.sqrt(disc)) / (2 * A);
+      const at = t => [ax + dx * t, ay, az + dz * t];
+      if (t1 > 0) out.push([ax, ay, az].concat(at(Math.min(1, t1))));
+      if (t2 < 1) out.push(at(Math.max(0, t2)).concat([bx, by, bz]));
+    });
+    return out;
+  }
+
   function floorParts(m) {
     const W = m.widthM, L = m.lengthM, T = m.visualThicknessM;
     const layout = m.surface;
@@ -280,11 +543,35 @@
     if (layout && layout.pattern) {
       const y = T + 0.001, mod = layout.moduleM;
       let segs = [];
+      // По рисунку: a border band of half a module around the field.
+      const b = layout.motif === 'border' ? Math.min(mod / 2, W / 6, L / 6) : 0;
       if (layout.pattern === 'diagonal') {
         segs = diagonalSeams(-W / 2, W / 2, -L / 2, L / 2, y, mod);
       } else {
-        for (let x = -W / 2 + mod; x < W / 2 - 1e-6 && segs.length < MAX_SEAMS; x += mod) segs.push([x, y, -L / 2, x, y, L / 2]);
-        for (let z = -L / 2 + mod; z < L / 2 - 1e-6 && segs.length < MAX_SEAMS; z += mod) segs.push([-W / 2, y, z, W / 2, y, z]);
+        for (let x = -W / 2 + b + mod; x < W / 2 - b - 1e-6 && segs.length < MAX_SEAMS; x += mod) segs.push([x, y, -L / 2 + b, x, y, L / 2 - b]);
+        for (let z = -L / 2 + b + mod; z < L / 2 - b - 1e-6 && segs.length < MAX_SEAMS; z += mod) segs.push([-W / 2 + b, y, z, W / 2 - b, y, z]);
+      }
+      if (b > 0) {
+        const x0 = -W / 2 + b, x1 = W / 2 - b, z0 = -L / 2 + b, z1 = L / 2 - b;
+        segs.push([x0, y, z0, x1, y, z0], [x1, y, z0, x1, y, z1], [x1, y, z1, x0, y, z1], [x0, y, z1, x0, y, z0]);
+      }
+      if (layout.motif === 'medallion') {
+        // Художественная: a round medallion with a rosette in the middle of
+        // the diagonal field (the field's joints stop at its rim).
+        const R = Math.min(W, L) * 0.25;
+        segs = clipOutsideCircle(segs, R);
+        const ring = (r, n) => {
+          for (let i = 0; i < n; i++) {
+            const a0 = i / n * 2 * Math.PI, a1 = (i + 1) / n * 2 * Math.PI;
+            segs.push([r * Math.cos(a0), y, r * Math.sin(a0), r * Math.cos(a1), y, r * Math.sin(a1)]);
+          }
+        };
+        ring(R, 48);
+        ring(R * 0.7, 40);
+        for (let i = 0; i < 8; i++) {
+          const a = i / 8 * 2 * Math.PI;
+          segs.push([0, y, 0, R * 0.7 * Math.cos(a), y, R * 0.7 * Math.sin(a)]);
+        }
       }
       if (segs.length) parts.push({ kind: 'seams', role: 'seam', segments: segs });
     }

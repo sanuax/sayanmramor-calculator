@@ -297,7 +297,7 @@ test('panel/wall/facade stand vertical; floor lies flat with the chosen layout\'
   const floorStraight = layoutFor('pol', { width: { value: '3000' }, length: { value: '4000' }, productSubcategory: { value: 'FLOOR-01' } });
   const floorPattern = layoutFor('pol', { width: { value: '3000' }, length: { value: '4000' }, productSubcategory: { value: 'FLOOR-04' } });
   assert.ok(floorStraight.parts.some(p => p.kind === 'seams'));
-  assert.equal(floorPattern.parts.some(p => p.kind === 'seams'), false, 'a custom pattern is not invented');
+  assert.ok(floorPattern.parts.some(p => p.kind === 'seams'), '«По рисунку» draws its border band');
 
   const sill = layoutFor('podokonnik', { width: { value: '300' }, length: { value: '1500' } });
   assert.ok(sill.parts.some(p => p.role === 'context-glass'), 'window glass above the sill');
@@ -359,4 +359,90 @@ test('integrated sink: the stone bowl carries the slab edge profile and thicknes
   assert.equal(bowl.role, 'stone');
   assert.equal(bowl.edge, 'rounding');
   assert.equal(bowl.slabThicknessM, main.y1 - main.y0);
+});
+
+// ---- product types: every type a client can pick draws differently ----------
+
+// A coarse fingerprint of a layout: which parts (kind/role/name), how many
+// seams, and the rounded extent of the product itself.
+function fingerprint(layout) {
+  const parts = layout.parts.map(p => p.kind + ':' + p.role + ':' + (p.name || '') + (p.kind === 'seams' ? ':' + p.segments.length : '')).sort().join('|');
+  const b = layout.bounds;
+  return parts + '#' + (b ? b.min.concat(b.max).map(v => v.toFixed(2)).join(',') : 'none');
+}
+
+const TYPE_IDS = {
+  podokonnik: ['SILL-01', 'SILL-02', 'SILL-03', 'SILL-04', 'SILL-05'],
+  panno: ['PANEL-01', 'PANEL-02', 'PANEL-03', 'PANEL-04'],
+  pol: ['FLOOR-01', 'FLOOR-02', 'FLOOR-03', 'FLOOR-04', 'FLOOR-05'],
+  stena: ['WALL-01', 'WALL-02', 'WALL-03', 'WALL-04', 'WALL-05'],
+  fasad: ['FACADE-01', 'FACADE-02', 'FACADE-03', 'FACADE-04', 'FACADE-05'],
+  stupeni: ['STEP-01', 'STEP-02', 'STEP-03'],
+  lestnitsa: ['STAIR-01', 'STAIR-03', 'STAIR-05', 'STAIR-07'],
+};
+
+test('every type of every product draws a different 3D scene (no two types share one model)', () => {
+  const dims = { width: { value: '1200' }, length: { value: '3000' } };
+  Object.entries(TYPE_IDS).forEach(([key, ids]) => {
+    const prints = ids.map(id => fingerprint(layoutFor(key, Object.assign({ productSubcategory: { value: id } }, dims))));
+    assert.equal(new Set(prints).size, ids.length, key + ': ' + ids.join(', '));
+  });
+});
+
+test('countertop shapes: straight = one slab, Г = one wing, П = a wing at each end of the run', () => {
+  const wingDims = { 'wing-width': { value: '600' }, 'wing-length': { value: '1400' } };
+  const straight = layoutFor('stoleshnitsa_kuhnya', Object.assign({ productShape: { value: 'straight' } }, wingDims));
+  const l = layoutFor('stoleshnitsa_kuhnya', Object.assign({ productShape: { value: 'lshape' } }, wingDims));
+  const u = layoutFor('stoleshnitsa_kuhnya', Object.assign({ productShape: { value: 'ushape' } }, wingDims));
+  assert.equal(named(straight, 'wing').length, 0);
+  assert.equal(named(l, 'wing').length, 1);
+  const uw = named(u, 'wing');
+  assert.equal(uw.length, 2);
+  const [a, b] = uw.map(w => extent(w.outline));
+  assert.ok(a.z0 > 0 !== b.z0 > 0, 'the two wings sit at opposite ends of the run');
+  assert.equal(modelFor('stoleshnitsa_kuhnya', Object.assign({ productShape: { value: 'ushape' } }, wingDims)).shape, 'ushape');
+  // The camera frames the whole П.
+  assert.ok(uw.every(w => contains(u.bounds, w)));
+  assert.ok(u.bounds.max[0] - u.bounds.min[0] > straight.bounds.max[0] - straight.bounds.min[0]);
+});
+
+test('П-shape + island: the island stands clear of both wings', () => {
+  const u = layoutFor('stoleshnitsa_kuhnya', Object.assign({ productShape: { value: 'ushape' }, 'wing-width': { value: '600' }, 'wing-length': { value: '1400' } }, ISLAND));
+  const island = extent(named(u, 'island')[0].outline);
+  named(u, 'wing').forEach(w => assert.ok(island.x0 > extent(w.outline).x1, 'island past the wing ends'));
+});
+
+test('windowsill types change the slab: corner turns, bays bulge out of the wall, figured has a shaped front', () => {
+  const sill = id => named(layoutFor('podokonnik', { width: { value: '300' }, length: { value: '1500' }, productSubcategory: { value: id } }), 'main')[0];
+  const straight = extent(sill('SILL-01').outline);
+  const corner = extent(sill('SILL-02').outline);
+  const bay = extent(sill('SILL-03').outline);
+  const radius = sill('SILL-04');
+  const figured = sill('SILL-05');
+  assert.ok(corner.x1 > straight.x1 + 0.2, 'the corner sill runs along the second wall');
+  assert.ok(bay.x0 < straight.x0 - 0.1, 'the bay sill reaches out into the bay');
+  assert.ok(radius.outline.length > sill('SILL-03').outline.length + 5, 'the radius bay is a curve, not three facets');
+  assert.ok(figured.outline.length > 8 && extent(figured.outline).x1 > straight.x1, 'the figured sill has a shaped, fuller front');
+  ['SILL-02', 'SILL-03', 'SILL-04'].forEach(id => {
+    const layout = layoutFor('podokonnik', { width: { value: '300' }, length: { value: '1500' }, productSubcategory: { value: id } });
+    assert.ok(layout.parts.some(p => p.role === 'context-glass'), id + ': glazed along its window line');
+  });
+});
+
+test('stair type and risers are independent: every shape with and without risers', () => {
+  [['STAIR-01', 'STAIR-02'], ['STAIR-03', 'STAIR-04'], ['STAIR-05', 'STAIR-06'], ['STAIR-07', 'STAIR-08']].forEach(([off, on]) => {
+    const dims = { width: { value: '1000' }, length: { value: '3000' } };
+    const a = layoutFor('lestnitsa', Object.assign({ productSubcategory: { value: off } }, dims));
+    const b = layoutFor('lestnitsa', Object.assign({ productSubcategory: { value: on } }, dims));
+    assert.equal(named(a, 'riser').length, 0, off);
+    assert.ok(named(b, 'riser').length > 0, on);
+    assert.equal(named(a, 'tread').length, named(b, 'tread').length, 'the same flight either way');
+  });
+});
+
+test('backlight is drawn as light, never framed as part of the product', () => {
+  const panel = layoutFor('panno', { width: { value: '1200' }, length: { value: '2000' }, productSubcategory: { value: 'PANEL-04' } });
+  assert.ok(panel.parts.some(p => p.role === 'light'));
+  const plain = layoutFor('panno', { width: { value: '1200' }, length: { value: '2000' }, productSubcategory: { value: 'PANEL-01' } });
+  assert.deepEqual(panel.bounds, plain.bounds);
 });

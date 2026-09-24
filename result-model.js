@@ -31,7 +31,7 @@
     return (productKey && RESULT_TITLES[productKey]) || 'Ваше изделие';
   }
 
-  const SHAPE_LABELS = { straight: 'Прямая', lshape: 'Г-образная' };
+  const SHAPE_LABELS = { straight: 'Прямая', lshape: 'Г-образная', ushape: 'П-образная' };
   const CORNER_LABELS = { left: 'угол слева', right: 'угол справа' };
   const SINK_LABELS = { overlay: 'накладная', undermount: 'снизу', integrated: 'интегрированная' };
   const HOLE_LABELS = { mixer: 'смеситель', socket: 'розетку', dispenser: 'дозатор' };
@@ -122,12 +122,13 @@
     let shape = null;
     if (caps.supportsShapeSelection) {
       const isL = state.shape === 'lshape';
+      const hasWings = isL || state.shape === 'ushape';
       shape = {
         type: state.shape,
         label: SHAPE_LABELS[state.shape] || SHAPE_LABELS.straight,
         corner: isL ? state.corner : null,
         cornerLabel: isL ? (CORNER_LABELS[state.corner] || null) : null,
-        wing: isL && hasArea(state.wing) ? { lengthMm: mToMm(state.wing.lengthM), widthMm: mToMm(state.wing.widthM) } : null,
+        wing: hasWings && hasArea(state.wing) ? { lengthMm: mToMm(state.wing.lengthM), widthMm: mToMm(state.wing.widthM), count: isL ? 1 : 2 } : null,
       };
     }
 
@@ -242,7 +243,8 @@
       detail: d.lengthLabel.toLowerCase() + ' × ' + d.widthLabel.toLowerCase() + ' · ' + formatArea(d.areaM2),
     });
     if (c.shape && c.shape.wing) {
-      specs.push({ key: 'wing', label: 'Крыло', value: c.shape.wing.lengthMm + ' × ' + c.shape.wing.widthMm + ' мм', detail: 'длина × ширина' });
+      const two = c.shape.wing.count === 2;
+      specs.push({ key: 'wing', label: two ? 'Крылья' : 'Крыло', value: c.shape.wing.lengthMm + ' × ' + c.shape.wing.widthMm + ' мм', detail: two ? 'длина × ширина, каждое из двух' : 'длина × ширина' });
     }
     if (c.material) {
       const meta = [c.material.categoryLabel, c.material.country].filter(Boolean);

@@ -89,13 +89,15 @@
       island: cap('island'), barCounter: cap('barCounter'),
     } : null;
 
-    // shape/wing/corner: real user-entered geometry (Прямая/Г-образная).
+    // shape/wing/corner: real user-entered geometry (Прямая/Г-образная/
+    // П-образная -- a П uses the same wing size for both of its wings).
     // Zeroed/forced to 'straight' for a product without supportsShapeSelection,
     // same defensive-zeroing pattern as the countertop-extras fields below --
     // wing.widthM/lengthM are only promoted to a real ProductGeometryModel.wing
     // by buildGeometryModel() once both are > 0 (see visualizer/geometry-model.js).
     const supportsShapeSelection = !!(capabilities && capabilities.supportsShapeSelection);
-    const shape = supportsShapeSelection && d.getElementById('productShape').value === 'lshape' ? 'lshape' : 'straight';
+    const shapeValue = d.getElementById('productShape').value;
+    const shape = supportsShapeSelection && (shapeValue === 'lshape' || shapeValue === 'ushape') ? shapeValue : 'straight';
     const wing = {
       widthM: supportsShapeSelection ? mmToM(numFromField(d, 'wing-width')) : 0,
       lengthM: supportsShapeSelection ? mmToM(numFromField(d, 'wing-length')) : 0,

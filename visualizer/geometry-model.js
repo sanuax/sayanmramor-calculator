@@ -45,16 +45,29 @@
   };
   // "Ступени + подступенки" rows, plus the full-cladding/entrance rows.
   const STAIR_WITH_RISERS = ['STAIR-02', 'STAIR-04', 'STAIR-06', 'STAIR-08', 'STAIR-12', 'STAIR-13'];
+  // Every type a client can pick draws differently: a joint layout
+  // (pattern/moduleM), a floor motif (border/medallion), a wall/facade form
+  // or a backlight. Presentation only -- none of this affects the price.
   const SURFACE_LAYOUTS = {
     'FLOOR-01': { pattern: 'grid', moduleM: VISUAL_LAYOUT_MODULE_M },
     'FLOOR-02': { pattern: 'diagonal', moduleM: VISUAL_LAYOUT_MODULE_M },
     'FLOOR-03': { pattern: 'grid', moduleM: VISUAL_LARGE_FORMAT_MODULE_M },
+    'FLOOR-04': { pattern: 'grid', moduleM: VISUAL_LAYOUT_MODULE_M, motif: 'border' },
+    'FLOOR-05': { pattern: 'diagonal', moduleM: VISUAL_LAYOUT_MODULE_M, motif: 'medallion' },
     'WALL-01': { pattern: 'grid', moduleM: VISUAL_LAYOUT_MODULE_M },
     'WALL-02': { pattern: 'panels', moduleM: VISUAL_LAYOUT_MODULE_M },
     'WALL-03': { pattern: 'grid', moduleM: VISUAL_LARGE_FORMAT_MODULE_M },
+    'WALL-04': { pattern: 'grid', moduleM: VISUAL_LAYOUT_MODULE_M, form: 'radius' },
+    'WALL-05': { pattern: 'grid', moduleM: VISUAL_LARGE_FORMAT_MODULE_M, light: true },
     'FACADE-01': { pattern: 'grid', moduleM: VISUAL_LAYOUT_MODULE_M },
-    'FACADE-04': { pattern: 'grid', moduleM: VISUAL_LAYOUT_MODULE_M },
+    'FACADE-02': { pattern: null, moduleM: null, form: 'surround' },
+    'FACADE-03': { pattern: null, moduleM: null, form: 'columns' },
+    'FACADE-04': { pattern: 'grid', moduleM: VISUAL_LAYOUT_MODULE_M, form: 'plinth' },
+    'FACADE-05': { pattern: null, moduleM: null, form: 'cornice' },
   };
+  // Windowsill plan shapes and panel treatments, by the same 'type' row.
+  const SILL_VARIANTS = { 'SILL-02': 'corner', 'SILL-03': 'bay', 'SILL-04': 'bay-radius', 'SILL-05': 'figured' };
+  const PANEL_VARIANTS = { 'PANEL-02': 'framed', 'PANEL-03': 'inlay', 'PANEL-04': 'backlit' };
 
   function buildStairs(productKey, state) {
     const id = state.subcategory ? state.subcategory.id : null;
@@ -80,6 +93,10 @@
     return SURFACE_LAYOUTS[id] || { pattern: null, moduleM: null };
   }
 
+  function typeId(state) {
+    return state.subcategory ? state.subcategory.id : null;
+  }
+
   function buildGeometryModel(state) {
     const { widthM, lengthM } = state.dimensions;
     const productKey = state.product ? state.product.key : null;
@@ -89,9 +106,15 @@
     // (always present, possibly zero) to a real geometry element once both
     // dimensions are actually filled in -- see
     // docs/superpowers/specs/2026-09-21-3d-visualizer-design.md.
-    const wing = state.shape === 'lshape' && state.wing.widthM > 0 && state.wing.lengthM > 0
-      ? { widthM: state.wing.widthM, lengthM: state.wing.lengthM, corner: state.corner }
-      : null;
+    // П-образная = the main run plus a wing at EACH end, both of the entered
+    // wing size (the same wing fields as the L-shape; the corner choice only
+    // applies to an L). `wing` stays the single L-shape wing it always was.
+    const hasWingSize = state.wing.widthM > 0 && state.wing.lengthM > 0;
+    const wingAt = corner => ({ widthM: state.wing.widthM, lengthM: state.wing.lengthM, corner });
+    let wings = [];
+    if (hasWingSize && state.shape === 'lshape') wings = [wingAt(state.corner)];
+    if (hasWingSize && state.shape === 'ushape') wings = [wingAt('left'), wingAt('right')];
+    const wing = state.shape === 'lshape' ? (wings[0] || null) : null;
 
     const hasSink = state.additionalWorks.sink && state.additionalWorks.sink.count > 0;
     const hasCooktop = state.additionalWorks.cooktop && state.additionalWorks.cooktop.count > 0;
@@ -103,9 +126,10 @@
 
     return {
       productKey,
-      shape: wing ? 'lshape' : 'straight',
+      shape: wings.length === 2 ? 'ushape' : (wing ? 'lshape' : 'straight'),
       widthM, lengthM,
       wing,
+      wings,
       visualThicknessM: productKey === 'pol' ? VISUAL_FALLBACK_FLOOR_THICKNESS_M : VISUAL_FALLBACK_THICKNESS_M,
       // The product's own default camera angle -- see PRODUCTS[key].cameraPreset
       // in product-types.js. Falls back to 'iso' whenever a product hasn't set
@@ -122,10 +146,12 @@
       // Island faces the main segment's own LENGTH run, offset along WIDTH
       // -- see attachment-geometry.js. Bar counter extends past one
       // LENGTH-end instead, so the two can never occupy the same space.
-      island: resolveIsland(pickActiveVariant(state.island.standard, state.island.figured, ['standard', 'figured']), widthM, lengthM, wing),
-      barCounter: resolveBarCounter(pickActiveVariant(state.barCounter.standard, state.barCounter.complex, ['standard', 'complex']), lengthM, wing),
+      island: resolveIsland(pickActiveVariant(state.island.standard, state.island.figured, ['standard', 'figured']), widthM, lengthM, wings),
+      barCounter: resolveBarCounter(pickActiveVariant(state.barCounter.standard, state.barCounter.complex, ['standard', 'complex']), lengthM, wings),
       stairs: buildStairs(productKey, state),
       surface: buildSurface(productKey, state),
+      sill: productKey === 'podokonnik' ? { variant: SILL_VARIANTS[typeId(state)] || 'straight' } : null,
+      panel: productKey === 'panno' ? { variant: PANEL_VARIANTS[typeId(state)] || 'plain' } : null,
     };
   }
 

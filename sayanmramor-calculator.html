@@ -434,6 +434,10 @@
   }
   .pick-card.selected .pc-check { visibility: visible; background: var(--accent); border-color: var(--accent); }
   .pick-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  /* Второй вопрос внутри шага (подступенки у лестницы) -- та же карточная
+     система, отделённая подзаголовком. */
+  .choice-group { margin-top: 20px; }
+  .choice-title { font-size: var(--configurator-text); font-weight: 700; color: var(--ink); margin-bottom: 8px; }
 
   .reveal-rows { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
   .reveal-row {
@@ -498,6 +502,17 @@
   .work-item-body-inner { overflow: hidden; }
   .work-item-body-pad { padding: 0 16px 16px; }
   .reveal-row.filled { border-color: var(--accent); background: var(--accent-soft); }
+  /* Позиция с единственным вариантом (варочная панель): сама строка --
+     переключатель, без раскрытия и второго клика. */
+  .work-item:has(.work-item-head.selected) { border-color: var(--accent); background: var(--accent-soft); }
+  .work-item-check {
+    flex: none; width: 22px; height: 22px; border-radius: 50%;
+    border: 1.5px solid var(--line); background: var(--card);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; line-height: 1; color: transparent;
+  }
+  .work-item-head.selected .work-item-check { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .work-item-head:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 12px; }
 
   /* Диаграмма размеров: перенесено буквально из согласованного
      V2-конструктора (https://claude.ai/artifact/8fkDjjV6vDdwZypMQwN7zK). */
@@ -1102,28 +1117,26 @@
          (see step-engine wiring below) -- 3D/price/summary/product-picker/
          progress bar/nav buttons all live outside it and never animate. -->
     <div class="step-viewport" id="stepViewport">
-    <!-- 'type': reuses the SAME real subcategory select/data (PRODUCT_SUBCATEGORIES
-         via getSubcategoriesForProduct(), constructor-state.js's existing
-         #productSubcategory/#subcategoryQty read) that used to be a
-         standalone "Вариант исполнения" step for every product. Now it is
-         one more StepEngine-governed step, shown only for products whose
-         PRODUCT_STEPS includes 'type' (see step-engine.js) -- kitchen/bath
-         never get it (their real, geometry-connected form choice is the
-         'shape' step below), and it never appears as a separate legacy
-         step. Honesty note: for lestnitsa/panno/podokonnik/pol/stena/fasad/
-         stupeni, selecting a value here does NOT yet affect pricing or 3D
-         geometry (PRODUCT_SUBCATEGORIES stays display-only, see
-         rate-catalog.js) -- this is a real, working control, not a fake
-         one, but its downstream effect is a known gap, not implemented in
-         this task. The heading text is set per-product by
-         updateTypeStepTitle() below (there is no one label that fits
-         "Тип лестницы"/"Укладка пола"/"Тип объекта" equally well). -->
+    <!-- 'type': the client's type choice as visual cards (TYPE_CARDS below)
+         -- clean names, one icon each, no rate-catalog wording. The cards
+         drive the hidden #productSubcategory select that constructor-state.js
+         reads, so the state still carries a real PRODUCT_SUBCATEGORIES id
+         (the catalog itself is unchanged). Every type draws its own 3D (see
+         visualizer/geometry-model.js); it does not affect the price. For a
+         staircase the type is the flight's SHAPE only -- risers are their own
+         question below (the hidden select then holds the catalog row for
+         shape + risers). Kitchen/bath never get this step (their form choice
+         is the 'shape' step). -->
     <section class="step" data-step-id="type" id="productSubcategoryField" style="display:none">
       <div class="step-head"><span class="step-num">1</span><h2 class="step-title" id="typeStepTitle">Тип</h2></div>
       <div class="field">
-        <label for="productSubcategory" class="visually-hidden-label">Тип</label>
-        <select id="productSubcategory"></select>
-        <input type="number" id="subcategoryQty" placeholder="Количество, шт." min="0" step="1" style="margin-top:8px;display:none">
+        <div class="card-grid" id="typeCardGrid" role="radiogroup" aria-labelledby="typeStepTitle"></div>
+        <div class="choice-group" id="stairRiserField" hidden>
+          <div class="choice-title" id="stairRiserTitle">Подступенки</div>
+          <div class="card-grid" id="stairRiserGrid" role="radiogroup" aria-labelledby="stairRiserTitle"></div>
+        </div>
+        <select id="productSubcategory" hidden></select>
+        <input type="number" id="subcategoryQty" placeholder="Количество, шт." min="0" step="1" style="margin-top:14px;display:none">
       </div>
     </section>
 
@@ -1185,7 +1198,7 @@
           <!-- Показывается только для lshape -- диаграмма не рисует крыло
                (не придумываем новую геометрию), только явно оговаривает,
                что это схема главного сегмента. -->
-          <div class="dim-note" id="dimShapeNote" hidden>Показан основной сегмент. Крыло указывается отдельно, ниже.</div>
+          <div class="dim-note" id="dimShapeNote" hidden>Показан основной сегмент. Крыло указывается отдельно, на шаге «Форма».</div>
         </div>
         <div class="error" id="dimError">Укажите ширину и длину больше нуля</div>
       </div>
@@ -1201,15 +1214,16 @@
         <select id="productShape" hidden>
           <option value="straight">Прямая</option>
           <option value="lshape">Г-образная</option>
+          <option value="ushape">П-образная</option>
         </select>
         <div class="field-row" id="wingField" style="margin-top:14px;display:none">
           <div class="field-unit">
-            <span class="unit-label">Крыло, ширина</span>
+            <span class="unit-label" id="wingWidthLabel">Крыло, ширина</span>
             <input type="number" id="wing-width" min="0" step="1" placeholder="600">
             <span class="unit">мм</span>
           </div>
           <div class="field-unit">
-            <span class="unit-label">Крыло, длина</span>
+            <span class="unit-label" id="wingLengthLabel">Крыло, длина</span>
             <input type="number" id="wing-length" min="0" step="1" placeholder="1000">
             <span class="unit">мм</span>
           </div>
@@ -1230,7 +1244,9 @@
       <div class="step-head"><span class="step-num">4</span><h2 class="step-title">Подступенок</h2></div>
       <p class="step-sub">Отдельный параметр от формы ступени — см. шаг «Тип».</p>
       <div class="field">
-        <label class="checkbox-row">
+        <div class="card-grid" id="stupeniRiserGrid" role="radiogroup" aria-label="Подступенки"></div>
+        <!-- Real field constructor-state.js reads; the cards above drive it. -->
+        <label class="checkbox-row" style="display:none">
           <input type="checkbox" id="stupeni-riser"> С подступенками
         </label>
       </div>
@@ -1310,27 +1326,18 @@
           </div></div></div>
         </div>
 
+        <!-- Один вариант -- один клик: строка сама включает/выключает вырез
+             (скрытое поле = 1 или пусто), без раскрытия и вложенной карточки. -->
         <div id="group-cooktop-cutout" class="work-item" style="display:none">
-          <button type="button" class="work-item-head" aria-expanded="false">
+          <button type="button" class="work-item-head" data-toggle-field="cut-cooktop" aria-pressed="false">
             <span class="work-item-icon" aria-hidden="true"><svg viewBox="0 0 60 42"><rect x="4" y="6" width="52" height="34" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5" rx="2"/><rect x="16" y="12" width="28" height="22" fill="none" stroke="var(--stone-line)" stroke-width="1.6"/><circle cx="23" cy="19" r="3.4" fill="none" stroke="var(--stone-line)" stroke-width="1.4"/><circle cx="37" cy="19" r="3.4" fill="none" stroke="var(--stone-line)" stroke-width="1.4"/><circle cx="23" cy="28" r="3.4" fill="none" stroke="var(--stone-line)" stroke-width="1.4"/><circle cx="37" cy="28" r="3.4" fill="none" stroke="var(--stone-line)" stroke-width="1.4"/></svg></span>
             <span class="work-item-text">
               <span class="work-item-title">Варочная панель</span>
               <span class="work-item-hint">Вырез под варочную поверхность</span>
             </span>
-            <span class="work-item-chevron" aria-hidden="true"><svg viewBox="0 0 12 12" fill="none"><path d="M3 4.5 L6 7.5 L9 4.5" stroke="var(--muted)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <span class="work-item-check" aria-hidden="true">✓</span>
           </button>
-          <div class="work-item-body"><div class="work-item-body-inner"><div class="work-item-body-pad">
-            <!-- Карточка сама является переключателем: выбрана = один вырез. -->
-            <div class="card-grid">
-              <div class="pick-card" data-toggle-field="cut-cooktop" role="button" tabindex="0" aria-pressed="false">
-                <span class="pc-check">✓</span>
-                <svg viewBox="0 0 60 34" aria-hidden="true"><rect x="4" y="6" width="52" height="22" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5" rx="2"/><rect x="18" y="10" width="24" height="14" fill="none" stroke="var(--stone-line)" stroke-width="1.6"/><circle cx="24" cy="14.5" r="2.4" fill="none" stroke="var(--stone-line)" stroke-width="1.3"/><circle cx="36" cy="14.5" r="2.4" fill="none" stroke="var(--stone-line)" stroke-width="1.3"/><circle cx="24" cy="20" r="2.4" fill="none" stroke="var(--stone-line)" stroke-width="1.3"/><circle cx="36" cy="20" r="2.4" fill="none" stroke="var(--stone-line)" stroke-width="1.3"/></svg>
-                <div class="pc-title">Вырез под панель</div>
-                <div class="pc-desc">Один вырез под встраиваемую варочную панель</div>
-              </div>
-            </div>
-            <input type="hidden" id="cut-cooktop" value="">
-          </div></div></div>
+          <input type="hidden" id="cut-cooktop" value="">
         </div>
 
         <div id="group-holes" class="work-item" style="display:none">
@@ -1827,6 +1834,82 @@
     stoleshnitsa_kuhnya: 'Мойка, варочная панель, остров',
   };
 
+  // Типы изделий -- что выбирает клиент: чистое название, короткое пояснение
+  // и иконка в общей сетке (viewBox 64x40, ось x = 32). `ids` -- строки
+  // PRODUCT_SUBCATEGORIES (rate-catalog.js не меняется); у лестницы тип --
+  // это форма марша, и `ids` = [без подступенков, с подступенками]: вторая
+  // половина выбора -- отдельный вопрос «Подступенки». Строки каталога,
+  // которые не являются самостоятельным выбором клиента (STAIR-09..13 --
+  // элементы облицовки, STEP-04 -- подступенок), здесь не показываются.
+  // Объявлено здесь, а не рядом с renderSubcategoryOptions(): URL-bootstrap
+  // ниже синхронно выбирает изделие и доходит до этих данных.
+  function typeIcon(inner) {
+    return '<svg viewBox="0 0 64 40" aria-hidden="true">' + inner + '</svg>';
+  }
+  const TYPE_CARDS = {
+    lestnitsa: [
+      { ids: ['STAIR-01', 'STAIR-02'], title: 'Прямая', desc: 'Один марш', icon: typeIcon('<rect x="24" y="5" width="16" height="30" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M24 10 H40 M24 15 H40 M24 20 H40 M24 25 H40 M24 30 H40" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/>') },
+      { ids: ['STAIR-03', 'STAIR-04'], title: 'Г-образная', desc: 'Поворот через площадку', icon: typeIcon('<rect x="17" y="16" width="12" height="19" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="17" y="5" width="12" height="11" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="29" y="5" width="18" height="11" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M17 20 H29 M17 24 H29 M17 28 H29 M17 32 H29 M33 5 V16 M37 5 V16 M41 5 V16" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/>') },
+      { ids: ['STAIR-05', 'STAIR-06'], title: 'П-образная', desc: 'Два марша и площадка', icon: typeIcon('<rect x="14" y="15" width="12" height="20" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="38" y="15" width="12" height="20" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="14" y="5" width="36" height="10" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M14 19 H26 M14 23 H26 M14 27 H26 M14 31 H26 M38 19 H50 M38 23 H50 M38 27 H50 M38 31 H50" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/>') },
+      { ids: ['STAIR-07', 'STAIR-08'], title: 'Винтовая', desc: 'Ступени вокруг опоры', icon: typeIcon('<circle cx="32" cy="20" r="15" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M35.5 20.0 L47.0 20.0 M34.8 22.1 L44.1 28.8 M33.1 23.3 L36.6 34.3 M30.9 23.3 L27.4 34.3 M29.2 22.1 L19.9 28.8 M28.5 20.0 L17.0 20.0 M29.2 17.9 L19.9 11.2 M30.9 16.7 L27.4 5.7 M33.1 16.7 L36.6 5.7 M34.8 17.9 L44.1 11.2" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/><circle cx="32" cy="20" r="3.5" fill="var(--card)" stroke="var(--stone-line)" stroke-width="1.1"/>') },
+    ],
+    panno: [
+      { ids: ['PANEL-01'], title: 'Стеновое', desc: 'Цельная плита на стене', icon: typeIcon('<rect x="22" y="5" width="20" height="30" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/>') },
+      { ids: ['PANEL-02'], title: 'Декоративное', desc: 'С рамкой из камня', icon: typeIcon('<rect x="22" y="5" width="20" height="30" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="25.5" y="8.5" width="13" height="23" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/>') },
+      { ids: ['PANEL-03'], title: 'Художественное', desc: 'Наборная композиция', icon: typeIcon('<rect x="22" y="5" width="20" height="30" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M32 8 L39 20 L32 32 L25 20 Z" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/><circle cx="32" cy="20" r="4" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/>') },
+      { ids: ['PANEL-04'], title: 'С подсветкой', desc: 'Свет из-за краёв панно', icon: typeIcon('<rect x="18" y="2" width="28" height="36" rx="4" fill="#f3d6bb"/><rect x="22" y="5" width="20" height="30" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/>') },
+    ],
+    podokonnik: [
+      { ids: ['SILL-01'], title: 'Прямой', desc: 'Одна плита в проёме', icon: typeIcon('<path d="M14 12 H50 V24 H14 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M6 12 H58" fill="none" stroke="var(--wall-line)" stroke-width="3.5" stroke-linecap="square"/><path d="M20 12 H44" fill="none" stroke="var(--card)" stroke-width="1.3"/>') },
+      { ids: ['SILL-02'], title: 'Угловой', desc: 'Два окна в углу', icon: typeIcon('<g transform="translate(7 -4)"><path d="M12 12 H44 V34 H34 V22 H12 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M6 12 H44 V36" fill="none" stroke="var(--wall-line)" stroke-width="3.5" stroke-linecap="square"/><path d="M12 12 H38 M44 18 V30" fill="none" stroke="var(--card)" stroke-width="1.3"/></g>') },
+      { ids: ['SILL-03'], title: 'Эркерный', desc: 'Эркер из трёх граней', icon: typeIcon('<path d="M14 24 H18 L24 10 H40 L46 24 H50 V32 H14 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M6 24 H18 L24 10 H40 L46 24 H58" fill="none" stroke="var(--wall-line)" stroke-width="3.5" stroke-linecap="square"/><path d="M19.6 20.3 L22.4 13.7 M27 10 H37 M41.6 13.7 L44.4 20.3" fill="none" stroke="var(--card)" stroke-width="1.3"/>') },
+      { ids: ['SILL-04'], title: 'Эркерный радиусный', desc: 'Плавная дуга эркера', icon: typeIcon('<path d="M14 24 H18 C18 16 24 10 32 10 C40 10 46 16 46 24 H50 V32 H14 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M6 24 H18 C18 16 24 10 32 10 C40 10 46 16 46 24 H58" fill="none" stroke="var(--wall-line)" stroke-width="3.5" stroke-linecap="square"/><path d="M18.4 21 C19 15 24.6 10.4 32 10.4 C39.4 10.4 45 15 45.6 21" fill="none" stroke="var(--card)" stroke-width="1.3" stroke-dasharray="4.5 2"/>') },
+      { ids: ['SILL-05'], title: 'Фигурный', desc: 'Фигурный передний край', icon: typeIcon('<path d="M12 12 H52 V19 C46 19 42 28 32 28 C22 28 18 19 12 19 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M6 12 H58" fill="none" stroke="var(--wall-line)" stroke-width="3.5" stroke-linecap="square"/><path d="M20 12 H44" fill="none" stroke="var(--card)" stroke-width="1.3"/>') },
+    ],
+    pol: [
+      { ids: ['FLOOR-01'], title: 'Прямая раскладка', desc: 'Ровная сетка плит', icon: typeIcon('<rect x="16" y="4" width="32" height="32" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M24 4 V36 M32 4 V36 M40 4 V36 M16 12 H48 M16 20 H48 M16 28 H48" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/>') },
+      { ids: ['FLOOR-02'], title: 'Диагональная', desc: 'Сетка под 45°', icon: typeIcon('<rect x="16" y="4" width="32" height="32" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M16 28 L24 36 M16 20 L32 36 M16 12 L40 36 M16 4 L48 36 M24 4 L48 28 M32 4 L48 20 M40 4 L48 12 M16 12 L24 4 M16 20 L32 4 M16 28 L40 4 M16 36 L48 4 M24 36 L48 12 M32 36 L48 20 M40 36 L48 28" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/>') },
+      { ids: ['FLOOR-03'], title: 'Крупноформатные плиты', desc: 'Большие плиты, мало швов', icon: typeIcon('<rect x="16" y="4" width="32" height="32" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M32 4 V36 M16 20 H48" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/>') },
+      { ids: ['FLOOR-04'], title: 'По рисунку', desc: 'Поле с бордюром', icon: typeIcon('<rect x="16" y="4" width="32" height="32" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="20" y="8" width="24" height="24" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/><path d="M32 8 V32 M20 20 H44 M16 4 L20 8 M48 4 L44 8 M16 36 L20 32 M48 36 L44 32" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/>') },
+      { ids: ['FLOOR-05'], title: 'Художественная', desc: 'С медальоном в центре', icon: typeIcon('<rect x="16" y="4" width="32" height="32" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M16 12 L40 36 M16 4 L48 36 M24 4 L48 28 M16 28 L40 4 M16 36 L48 4 M24 36 L48 12" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/><circle cx="32" cy="20" r="8" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><circle cx="32" cy="20" r="5" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/><path d="M32 15 V25 M27 20 H37 M28.5 16.5 L35.5 23.5 M35.5 16.5 L28.5 23.5" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/>') },
+    ],
+    stena: [
+      { ids: ['WALL-01'], title: 'Облицовка', desc: 'Сетка плит', icon: typeIcon('<rect x="10" y="6" width="44" height="28" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M21 6 V34 M32 6 V34 M43 6 V34 M10 15.3 H54 M10 24.7 H54" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/>') },
+      { ids: ['WALL-02'], title: 'Стеновые панели', desc: 'Панели во всю высоту', icon: typeIcon('<rect x="10" y="6" width="44" height="28" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M21 6 V34 M32 6 V34 M43 6 V34" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/>') },
+      { ids: ['WALL-03'], title: 'Крупноформатные плиты', desc: 'Большие плиты, мало швов', icon: typeIcon('<rect x="10" y="6" width="44" height="28" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M32 6 V34 M10 20 H54" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/>') },
+      { ids: ['WALL-04'], title: 'Радиусная', desc: 'Стена по дуге', icon: typeIcon('<path d="M10 9 Q32 3 54 9 V33 Q32 39 10 33 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M17 7.4 V34.6 M24.5 6.2 V35.8 M32 6 V36 M39.5 6.2 V35.8 M47 7.4 V34.6" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/>') },
+      { ids: ['WALL-05'], title: 'С подсветкой', desc: 'Световые линии', icon: typeIcon('<rect x="10" y="7" width="44" height="26" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M32 7 V33 M10 20 H54" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/><path d="M11 4.5 H53 M11 35.5 H53" fill="none" stroke="#e3a77a" stroke-width="2" stroke-linecap="round"/>') },
+    ],
+    fasad: [
+      { ids: ['FACADE-01'], title: 'Фасад здания', desc: 'Облицовка стены', icon: typeIcon('<rect x="14" y="6" width="36" height="30" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M14 16 H50 M14 26 H50 M23 6 V16 M41 6 V16 M32 16 V26 M23 26 V36 M41 26 V36" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/><rect x="19" y="10" width="7" height="9" fill="var(--card)" stroke="var(--stone-line)" stroke-width="1.1"/><rect x="38" y="10" width="7" height="9" fill="var(--card)" stroke="var(--stone-line)" stroke-width="1.1"/>') },
+      { ids: ['FACADE-02'], title: 'Фасадный элемент', desc: 'Наличник окна', icon: typeIcon('<rect x="8" y="4" width="48" height="32" fill="var(--wall)" stroke="var(--wall-line)" stroke-width="1.2"/><rect x="22" y="7" width="20" height="26" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="26" y="11" width="12" height="22" fill="var(--card)" stroke="var(--stone-line)" stroke-width="1.1"/><rect x="20" y="32" width="24" height="3" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/>') },
+      { ids: ['FACADE-03'], title: 'Колонны', desc: 'Облицовка колонн', icon: typeIcon('<rect x="11" y="4" width="42" height="4" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="13" y="8" width="10" height="3" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="27" y="8" width="10" height="3" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="41" y="8" width="10" height="3" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="15" y="11" width="6" height="22" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="29" y="11" width="6" height="22" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="43" y="11" width="6" height="22" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="13" y="33" width="10" height="3" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="27" y="33" width="10" height="3" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="41" y="33" width="10" height="3" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/>') },
+      { ids: ['FACADE-04'], title: 'Цоколь', desc: 'Нижний пояс стены', icon: typeIcon('<rect x="10" y="4" width="44" height="22" fill="var(--wall)" stroke="var(--wall-line)" stroke-width="1.2"/><rect x="10" y="26" width="44" height="10" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M21 26 V36 M32 26 V36 M43 26 V36" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/>') },
+      { ids: ['FACADE-05'], title: 'Декоративные элементы', desc: 'Карниз и пояса', icon: typeIcon('<rect x="10" y="14" width="44" height="22" fill="var(--wall)" stroke="var(--wall-line)" stroke-width="1.2"/><rect x="8" y="4" width="48" height="4" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="10" y="8" width="44" height="3" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="12" y="11" width="40" height="3" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/>') },
+    ],
+    stupeni: [
+      { ids: ['STEP-01'], title: 'Прямая', desc: 'Прямоугольная ступень', icon: typeIcon('<rect x="12" y="12" width="40" height="16" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M12 25 H52" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/>') },
+      { ids: ['STEP-02'], title: 'Забежная', desc: 'Клиновидная, для поворота', icon: typeIcon('<path d="M12 16 L52 8 V32 L12 24 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M12 21.6 L52 28.4" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/>') },
+      { ids: ['STEP-03'], title: 'Радиусная', desc: 'Скруглённый передний край', icon: typeIcon('<path d="M12 10 H52 V22 Q32 36 12 22 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M12 19 Q32 32 52 19" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/>') },
+    ],
+  };
+  // «Подступенки» -- один и тот же выбор у лестницы и у ступеней.
+  const RISER_CARDS = [
+    { value: false, title: 'Без подступенков', desc: 'Открытые ступени', icon: typeIcon('<rect x="10" y="31" width="13" height="3" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="21" y="25" width="13" height="3" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="32" y="19" width="13" height="3" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="43" y="13" width="12" height="3" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M9 37 L56 10" fill="none" stroke="var(--wall-line)" stroke-width="1.2"/>') },
+    { value: true, title: 'С подступенками', desc: 'Закрытые ступени', icon: typeIcon('<path d="M10 37 V31 H21 V25 H32 V19 H43 V13 H55 V37 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M10 31 H21 M21 25 H32 M32 19 H43 M43 13 H55" fill="none" stroke="var(--stone-line)" stroke-width="2"/>') },
+  ];
+  // Каталожная строка -> карточка (для подписей в сводке и в Итоге).
+  function typeCardFor(id) {
+    for (const key of Object.keys(TYPE_CARDS)) {
+      const found = TYPE_CARDS[key].find(c => c.ids.includes(id));
+      if (found) return found;
+    }
+    return null;
+  }
+  // Выбор на шаге «Тип»: индекс карточки + подступенки (только у лестницы).
+  let typeCardIndex = 0;
+  let stairRisers = false;
+
   const { SAW_MARGIN_CM, AREA_WASTE_FACTOR, WORK_RATES, MISC_FLAT_SUM, MISC_RATE_PER_M2, COMPLEX_SHAPE_MULTIPLIER, COUNTERTOP_EXTRAS_RATES } = ProductTypes;
 
   const productGrid = document.getElementById('productGrid');
@@ -1979,11 +2062,19 @@
   const shapeCornerSelect = document.getElementById('shape-corner');
   function updateWingVisibility() {
     const isLshape = productShapeSelect.value === 'lshape';
-    wingField.style.display = isLshape ? '' : 'none';
+    const isUshape = productShapeSelect.value === 'ushape';
+    // П-образная: те же поля крыла, одинаковые для обоих крыльев; угол
+    // выбирается только у Г-образной.
+    wingField.style.display = isLshape || isUshape ? '' : 'none';
     shapeCornerSelect.style.display = isLshape ? '' : 'none';
-    // Диаграмма размеров сама не рисует крыло (см. #dimShapeNote в разметке)
-    // -- только явно оговаривает при lshape, что показан главный сегмент.
-    dimShapeNote.hidden = !isLshape;
+    document.getElementById('wingWidthLabel').textContent = isUshape ? 'Крылья, ширина' : 'Крыло, ширина';
+    document.getElementById('wingLengthLabel').textContent = isUshape ? 'Крылья, длина' : 'Крыло, длина';
+    // Диаграмма размеров сама не рисует крылья (см. #dimShapeNote в разметке)
+    // -- только явно оговаривает, что показан главный сегмент.
+    dimShapeNote.hidden = !(isLshape || isUshape);
+    dimShapeNote.textContent = isUshape
+      ? 'Показан основной сегмент. Два одинаковых крыла указываются на шаге «Форма».'
+      : 'Показан основной сегмент. Крыло указывается отдельно, на шаге «Форма».';
   }
 
   function svgIcon(inner, viewBox) {
@@ -2045,10 +2136,12 @@
   // всегда выбран ровно один вариант, без снятия по повторному клику -- у
   // shape в ConstructorState нет валидного состояния "форма не выбрана".
   const SHAPE_TYPES = [
-    { value: 'straight', title: 'Прямая', desc: 'Стандартная прямоугольная столешница',
+    { value: 'straight', title: 'Прямая', desc: 'Один прямоугольный сегмент',
       icon: svgIcon('<rect x="10" y="20" width="40" height="20" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="2" rx="2"/>') },
     { value: 'lshape', title: 'Г-образная', desc: 'Угловая столешница из двух сегментов',
       icon: svgIcon('<path d="M10 10 H30 V30 H50 V50 H10 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="2"/>') },
+    { value: 'ushape', title: 'П-образная', desc: 'Три сегмента: основной и два крыла',
+      icon: svgIcon('<path d="M10 10 H24 V36 H36 V10 H50 V50 H10 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="2"/>') },
   ];
   const shapeCardGrid = document.getElementById('shapeCardGrid');
 
@@ -2090,6 +2183,9 @@
     });
   }
   const productSubcategorySelect = document.getElementById('productSubcategory');
+  const typeCardGrid = document.getElementById('typeCardGrid');
+  const stairRiserField = document.getElementById('stairRiserField');
+  const stairRiserGrid = document.getElementById('stairRiserGrid');
   const subcategoryQtyInput = document.getElementById('subcategoryQty');
   const typeStepTitleEl = document.getElementById('typeStepTitle');
   const summaryTitleEl = document.getElementById('summaryTitle');
@@ -2296,9 +2392,13 @@
     return rows.find(r => r.id === productSubcategorySelect.value) || null;
   }
 
+  // Название типа для клиента -- то же, что на карточке (без каталожных
+  // приписок «— Стандартный» и т.п.); у лестницы подступенки дописываются
+  // как часть описания конфигурации, а не как отдельный тип.
   function subcategoryLabel(row) {
-    if (row.shape === 'Любая') return row.variant;
-    return row.variant ? `${row.shape} — ${row.variant}` : row.shape;
+    const card = typeCardFor(row.id);
+    if (card) return card.title + (card.ids.length > 1 && card.ids[1] === row.id ? ', с подступенками' : '');
+    return row.shape === 'Любая' ? row.variant : row.shape;
   }
 
   function updateSubcategoryQtyVisibility() {
@@ -2486,24 +2586,81 @@
   // #productSubcategory/#subcategoryQty read are all unchanged.
   function renderSubcategoryOptions(product, productKey) {
     productSubcategorySelect.innerHTML = '';
+    typeCardGrid.innerHTML = '';
+    stairRiserField.hidden = true;
     if (product.hideVariantStep) return;
-    let rows = getSubcategoriesForProduct(product.label);
-    // STEP-04 ("Подступенок — Стандартный") is a riser YES/NO, not a tread
-    // shape -- mixing it into the SAME select as STEP-01..03 (Прямая/
-    // Забежная/Радиусная) would make 'type' answer two different questions
-    // at once. It now has its own real control -- see the 'riser' step
-    // (#stupeni-riser) -- so it is excluded here, not silently dropped.
-    if (productKey === 'stupeni') {
-      rows = rows.filter(row => row.shape !== 'Подступенок');
-    }
-    rows.forEach(row => {
+    const rows = getSubcategoriesForProduct(product.label);
+    const cards = TYPE_CARDS[productKey] || [];
+    // The hidden select holds exactly the catalog rows the cards can pick
+    // (STEP-04 -- the riser -- has its own question, see the 'riser' step).
+    cards.forEach(c => c.ids.forEach(id => {
+      const row = rows.find(r => r.id === id);
+      if (!row) return;
       const opt = document.createElement('option');
       opt.value = row.id;
       opt.textContent = subcategoryLabel(row);
       productSubcategorySelect.appendChild(opt);
+    }));
+    cards.forEach((c, index) => {
+      typeCardGrid.appendChild(choiceCard(c, () => { typeCardIndex = index; applyTypeSelection(true); }));
     });
-    updateSubcategoryQtyVisibility();
+    if (productKey === 'lestnitsa') {
+      stairRiserField.hidden = false;
+      stairRiserGrid.innerHTML = '';
+      RISER_CARDS.forEach(r => stairRiserGrid.appendChild(choiceCard(r, () => { stairRisers = r.value; applyTypeSelection(true); })));
+    }
+    typeCardIndex = 0;
+    stairRisers = false;
+    applyTypeSelection(false);
   }
+
+  // One visual card of the type/riser choices (same .pick-card system as
+  // the edge/shape cards).
+  function choiceCard(def, onSelect) {
+    const card = document.createElement('div');
+    card.className = 'pick-card';
+    card.setAttribute('role', 'radio');
+    card.setAttribute('aria-checked', 'false');
+    card.setAttribute('aria-label', def.title);
+    card.setAttribute('tabindex', '0');
+    card.innerHTML = '<span class="pc-check">✓</span>' + def.icon +
+      '<div class="pc-title">' + def.title + '</div><div class="pc-desc">' + def.desc + '</div>';
+    card.addEventListener('click', onSelect);
+    card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(); } });
+    return card;
+  }
+
+  function markSelected(grid, index) {
+    Array.prototype.forEach.call(grid.children, (c, i) => {
+      c.classList.toggle('selected', i === index);
+      c.setAttribute('aria-checked', String(i === index));
+    });
+  }
+
+  // Cards -> the hidden select constructor-state.js reads.
+  function applyTypeSelection(notify) {
+    const cards = TYPE_CARDS[selectedProductKey] || [];
+    const card = cards[typeCardIndex];
+    if (!card) return;
+    productSubcategorySelect.value = card.ids.length > 1 ? card.ids[stairRisers ? 1 : 0] : card.ids[0];
+    markSelected(typeCardGrid, typeCardIndex);
+    if (!stairRiserField.hidden) markSelected(stairRiserGrid, stairRisers ? 1 : 0);
+    if (notify) productSubcategorySelect.dispatchEvent(new Event('change', { bubbles: true }));
+    else updateSubcategoryQtyVisibility();
+  }
+
+  // Ступени: «Подступенки» -- те же две карточки, что у лестницы; данные --
+  // прежний чекбокс #stupeni-riser (constructor-state.js).
+  (function initStupeniRiserCards() {
+    const grid = document.getElementById('stupeniRiserGrid');
+    const box = document.getElementById('stupeni-riser');
+    RISER_CARDS.forEach(r => grid.appendChild(choiceCard(r, () => {
+      box.checked = r.value;
+      box.dispatchEvent(new Event('change', { bubbles: true }));
+      markSelected(grid, r.value ? 1 : 0);
+    })));
+    markSelected(grid, box.checked ? 1 : 0);
+  })();
 
   function updateTypeStepTitle(productKey) {
     typeStepTitleEl.textContent = TYPE_STEP_TITLES[productKey] || 'Тип';
@@ -2755,8 +2912,8 @@
     const subcategoryRow = currentSubcategoryRow();
     if (subcategoryRow) {
       html += `<br>Вариант: <span>${escapeHtml(subcategoryLabel(subcategoryRow))}</span>`;
-      if (subcategoryRow.unit === 'шт.') {
-        const subcategoryQty = parseFloat(subcategoryQtyInput.value) || 0;
+      const subcategoryQty = parseFloat(subcategoryQtyInput.value) || 0;
+      if (subcategoryRow.unit === 'шт.' && subcategoryQty > 0) {
         html += ` (${subcategoryQty} шт.)`;
       }
     }
@@ -2846,7 +3003,9 @@
       input.dispatchEvent(new Event('input', { bubbles: true }));
     };
     card.addEventListener('click', toggle);
-    card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
+    if (card.tagName !== 'BUTTON') {
+      card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
+    }
   });
 
   // Остров (Прямоугольный/Фигурный) и барная стойка (Стандартная/Сложная) --
@@ -2887,7 +3046,7 @@
   // заполненного варианта -- чисто визуальные обработчики, не влияют на
   // calculate()/state (те продолжают слушать те же самые input-события,
   // что и раньше, см. блок выше).
-  document.querySelectorAll('#countertopExtras .work-item-head').forEach(head => {
+  document.querySelectorAll('#countertopExtras .work-item-head:not([data-toggle-field])').forEach(head => {
     head.addEventListener('click', () => {
       const item = head.closest('.work-item');
       const isOpen = item.classList.toggle('open');

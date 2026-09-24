@@ -352,6 +352,8 @@ function buildMaterials(desc) {
     'context-glass': new THREE.MeshPhysicalMaterial({ color: '#5f676c', roughness: 0.05, metalness: 0, transparent: true, opacity: 0.45, envMapIntensity: 1.3 }),
     seam: new THREE.LineBasicMaterial({ color: desc.fallbackColor, transparent: true, opacity: 0.7 }),
     burner: new THREE.MeshBasicMaterial({ color: '#4d4a47' }),
+    // Backlight (a panel or wall «с подсветкой»): a warm LED glow, unlit.
+    light: new THREE.MeshBasicMaterial({ color: '#ffd7a3' }),
   };
 }
 
@@ -537,7 +539,7 @@ function buildProductGroup(layout, materialDescriptor) {
 
 function buildPart(group, part, materials) {
   {
-    const cast = part.role !== 'context' && part.role !== 'context-glass';
+    const cast = part.role !== 'context' && part.role !== 'context-glass' && part.role !== 'light';
     if (part.kind === 'prism') {
       addMesh(group, buildPrismGeometry(part), materials[part.role], null, cast);
     } else if (part.kind === 'box') {

@@ -78,6 +78,13 @@
   // kitchen, no two pieces of stone occupying the same floor.
   // Local Z (same frame as offsetZM): a 'right' wing sits at the -Z end of
   // the run, a 'left' wing at the +Z end.
+  // Callers pass the model's wings (an array: none, one for an L, two for a
+  // П) -- or, as before, a single wing object.
+  function wingList(wings) {
+    if (Array.isArray(wings)) return wings;
+    return wings ? [wings] : [];
+  }
+
   function islandRunCenter(islandLengthM, mainLengthM, wing) {
     if (!wing || !mainLengthM || wing.lengthM <= VISUAL_FALLBACK_ISLAND_GAP_M) return 0;
     const clearFromWing = mainLengthM / 2 - wing.widthM - VISUAL_FALLBACK_ISLAND_GAP_M;
@@ -85,13 +92,17 @@
     return Math.max(0, islandLengthM / 2 - clearFromWing);
   }
 
-  function resolveIsland(island, mainWidthM, mainLengthM, wing) {
+  function resolveIsland(island, mainWidthM, mainLengthM, wings) {
     if (!island || island.widthM <= 0 || island.lengthM <= 0) return null;
+    const list = wingList(wings);
+    // A П-shape closes the room side at both ends: the island stands past
+    // the ends of its wings instead, centred on the run.
+    const reach = list.length === 2 ? Math.max(list[0].lengthM, list[1].lengthM) : 0;
     return {
       widthM: island.widthM, lengthM: island.lengthM,
       variant: island.variant || 'standard',
-      offsetXM: mainWidthM / 2 + VISUAL_FALLBACK_ISLAND_GAP_M + island.widthM / 2,
-      offsetZM: islandRunCenter(island.lengthM, mainLengthM, wing),
+      offsetXM: mainWidthM / 2 + reach + VISUAL_FALLBACK_ISLAND_GAP_M + island.widthM / 2,
+      offsetZM: list.length === 2 ? 0 : islandRunCenter(island.lengthM, mainLengthM, list[0] || null),
       source: 'fallback-offset', // width/length are real; the gap from the main countertop is a guess
     };
   }
@@ -103,9 +114,10 @@
   // It continues the run from the FREE end: with an L-shape whose wing sits
   // at the +Z end ('left' corner), the bar goes to the -Z end instead of
   // crowding the corner.
-  function resolveBarCounter(barCounter, mainLengthM, wing) {
+  function resolveBarCounter(barCounter, mainLengthM, wings) {
     if (!barCounter || barCounter.widthM <= 0 || barCounter.lengthM <= 0) return null;
-    const side = wing && wing.corner === 'left' ? -1 : 1;
+    const list = wingList(wings);
+    const side = list.length === 1 && list[0].corner === 'left' ? -1 : 1;
     return {
       widthM: barCounter.widthM, lengthM: barCounter.lengthM,
       variant: barCounter.variant || 'standard',

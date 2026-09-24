@@ -441,7 +441,7 @@ test('walls: a grid wall is tiled on its room-side face; a panel wall is split a
 });
 
 test('a surface without a chosen layout is not tiled (no joints are invented)', () => {
-  const custom = layoutFor('pol', { width: { value: '3000' }, length: { value: '4000' }, productSubcategory: { value: 'FLOOR-04' } });
+  const custom = layoutFor('pol', { width: { value: '3000' }, length: { value: '4000' }, productSubcategory: { value: '' } });
   assert.equal(named(custom, 'floor')[0].tiling, undefined);
   assert.equal(MaterialAdapter.tileParams(undefined, { upright: false }, MARBLE.patternSizeM), null);
   const out = MaterialAdapter.tileCoords(new Float32Array([0, 0, 0]), new Float32Array([0, 1, 0]), undefined, { grain: [0, 1] });

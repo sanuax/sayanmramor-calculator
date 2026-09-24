@@ -362,3 +362,11 @@ test('options row lists exactly the checked options with the checkbox wording', 
     { key: 'install', label: 'Монтаж на объекте' },
   ]);
 });
+
+test('П-shaped countertop: the shape and both wings reach the Result', () => {
+  const c = configFor('stoleshnitsa_kuhnya', { productShape: { value: 'ushape' }, 'wing-width': { value: '600' }, 'wing-length': { value: '1200' } });
+  assert.equal(c.shape.type, 'ushape');
+  assert.equal(c.shape.label, 'П-образная');
+  assert.equal(c.shape.corner, null);
+  assert.equal(c.shape.wing.count, 2);
+});
