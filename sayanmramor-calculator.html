@@ -451,6 +451,7 @@
     background: var(--stone);
   }
   .material-preview-image img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .material-preview-image img[hidden] { display: none; }
   .material-preview-info { min-width: 0; }
   .material-preview-label {
     font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px;
@@ -1119,7 +1120,7 @@
          control: the choice IS captured, just not priced yet. -->
     <section class="step" data-step-id="riser" style="display:none">
       <div class="step-head"><span class="step-num">4</span><h2 class="step-title">Подступенок</h2></div>
-      <p class="step-sub">Отдельный параметр от формы ступени -- см. шаг «Тип».</p>
+      <p class="step-sub">Отдельный параметр от формы ступени — см. шаг «Тип».</p>
       <div class="field">
         <label class="checkbox-row">
           <input type="checkbox" id="stupeni-riser"> С подступенками
@@ -1664,6 +1665,9 @@
   const materialFieldText = document.getElementById('materialFieldText');
   const materialPreviewEl = document.getElementById('materialPreview');
   const materialPreviewImgEl = document.getElementById('materialPreviewImg');
+  // A stone whose photo is missing keeps the plain stone-coloured tile, not
+  // the browser's broken-image icon (same as the field thumbnail above).
+  materialPreviewImgEl.addEventListener('error', () => { materialPreviewImgEl.hidden = true; });
   const materialPreviewNameEl = document.getElementById('materialPreviewName');
   const materialPreviewMetaEl = document.getElementById('materialPreviewMeta');
   let selectedStoneId = null;
@@ -2060,6 +2064,12 @@
   // pricing logic (pricing.js/product-types.js) works entirely in meters, so
   // this is the single conversion point between the two -- callers read a
   // field's raw mm value and convert here rather than each doing its own /1000.
+  // Displayed measures use a decimal comma, as on the Result screen
+  // (ResultModel.formatArea) -- "0,96 м²", not "0.96 м²".
+  function decimal2(n) {
+    return n.toFixed(2).replace('.', ',');
+  }
+
   function mmToM(mmValue) {
     return mmValue / 1000;
   }
@@ -2440,13 +2450,13 @@
     // never drift apart.
     if (product.supportsEdgeWork) constructorState.edgeLineItems.forEach(item => {
       const labels = { straight: 'кромка прямая', figured: 'кромка фигурная/сложная', rounding: 'скругление', bevel: 'скос/фаска', 'stone-wrap': 'подгиб камнем' };
-      optionLabels.push(`${labels[item.type]}: ${mmToM(item.lengthMm).toFixed(2)} м.п.`);
+      optionLabels.push(`${labels[item.type]}: ${decimal2(mmToM(item.lengthMm))} м.п.`);
     });
-    if (constructorState.curbLengthM > 0) optionLabels.push(`бортик: ${constructorState.curbLengthM} м.п.`);
+    if (constructorState.curbLengthM > 0) optionLabels.push(`бортик: ${decimal2(constructorState.curbLengthM)} м.п.`);
     const fartukAreaM2 = constructorState.backsplash.widthM * constructorState.backsplash.lengthM;
-    if (fartukAreaM2 > 0) optionLabels.push(`фартук: ${fartukAreaM2.toFixed(2)} м²`);
+    if (fartukAreaM2 > 0) optionLabels.push(`фартук: ${decimal2(fartukAreaM2)} м²`);
     const ostrovAreaM2 = constructorState.island.standard.widthM * constructorState.island.standard.lengthM;
-    if (ostrovAreaM2 > 0) optionLabels.push(`остров/полуостров: ${ostrovAreaM2.toFixed(2)} м²`);
+    if (ostrovAreaM2 > 0) optionLabels.push(`остров/полуостров: ${decimal2(ostrovAreaM2)} м²`);
     const QUANTITY_LABELS = [
       [constructorState.sinkCounts.overlay, 'вырез под накладную раковину'],
       [constructorState.sinkCounts.undermount, 'вырез под подшивную раковину'],
@@ -2463,7 +2473,7 @@
       [constructorState.barCounter.standard.widthM * constructorState.barCounter.standard.lengthM, 'барная стойка стандартная'],
       [constructorState.barCounter.complex.widthM * constructorState.barCounter.complex.lengthM, 'барная стойка сложная'],
     ];
-    AREA_LABELS.forEach(([areaM2, label]) => { if (areaM2 > 0) optionLabels.push(`${label}: ${areaM2.toFixed(2)} м²`); });
+    AREA_LABELS.forEach(([areaM2, label]) => { if (areaM2 > 0) optionLabels.push(`${label}: ${decimal2(areaM2)} м²`); });
 
     const result = Pricing.calculatePrice({
       stone,
@@ -2515,7 +2525,7 @@
 
     setPriceValue('≈ ' + formatRub(result.total));
 
-    let html = `Площадь: <span>${(width * length).toFixed(2)} м²</span><br>`;
+    let html = `Площадь: <span>${decimal2(width * length)} м²</span><br>`;
     const stoneMetaParts = [];
     if (stone.category_label_ru) stoneMetaParts.push(stone.category_label_ru);
     const stoneCountry = stone.countries && stone.countries[0];
@@ -2541,7 +2551,7 @@
     breakdown.innerHTML = html;
 
     if (product.type === 'A' && result.remainderM2 !== null) {
-      remainderOut.textContent = 'Остаток слэба после раскроя: ' + result.remainderM2.toFixed(2) + ' м²';
+      remainderOut.textContent = 'Остаток слэба после раскроя: ' + decimal2(result.remainderM2) + ' м²';
     }
 
     if (result.nSlabs > 1) {
