@@ -927,6 +927,15 @@
   .lead-success-title { font-size: var(--configurator-heading); font-weight: 700; color: var(--ink); margin-bottom: 6px; }
   .lead-success p { margin: 0 0 16px; font-size: var(--configurator-text); color: var(--muted); line-height: 1.5; }
 
+  .result-showroom-link {
+    display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px;
+    margin-top: -12px; padding: 12px 18px; border: 1px solid var(--line); border-radius: 4px;
+    background: transparent; font-size: var(--configurator-text); font-weight: 700;
+    color: var(--ink); text-decoration: none; transition: border-color 0.15s, background-color 0.15s;
+  }
+  .result-showroom-link:hover { border-color: var(--stone-line); background: var(--card); }
+  .result-showroom-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .result-showroom-link[hidden] { display: none; }
   .result-edit-actions { display: flex; flex-wrap: wrap; gap: 8px; }
   .result-edit-btn {
     padding: 8px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--card);
@@ -1420,6 +1429,10 @@
             <button type="button" class="lead-secondary-btn" id="leadEditBtn">Изменить контакты</button>
           </div>
         </div>
+
+        <!-- Secondary action: the same product in the site's 3D house. A
+             plain link (URL contract only), never in place of the lead CTA. -->
+        <a class="result-showroom-link" id="resultShowroomLink" href="#" hidden>Посмотреть изделие в доме <span aria-hidden="true">→</span></a>
 
         <div class="result-works" id="resultWorksBlock" hidden>
           <div class="result-block-title">Дополнительные работы</div>
@@ -2670,6 +2683,7 @@
   const resultLinesEl = document.getElementById('resultLines');
   const resultEditActionsEl = document.getElementById('resultEditActions');
   const resultCtaBtn = document.getElementById('resultCtaBtn');
+  const resultShowroomLink = document.getElementById('resultShowroomLink');
   const leadForm = document.getElementById('leadForm');
   const leadSuccessEl = document.getElementById('leadSuccess');
   const leadFields = {
@@ -2748,6 +2762,10 @@
       row.append(el('dt', null, line.label), el('dd', null, ResultModel.formatRub(line.amountRub)));
       return row;
     }));
+
+    const showroomUrl = UrlBootstrap.buildShowroomUrl(selectedProductKey, selectedStoneId, PRODUCTS, STONES_BY_ID);
+    resultShowroomLink.hidden = !showroomUrl;
+    if (showroomUrl) resultShowroomLink.href = showroomUrl;
 
     const stepLabels = Object.assign({}, StepEngine.STEP_LABELS, { type: TYPE_STEP_TITLES[selectedProductKey] || StepEngine.STEP_LABELS.type });
     resultEditActionsEl.replaceChildren(...ResultModel.buildEditTargets(StepEngine.getSteps(selectedProductKey), stepLabels).map(target => {
