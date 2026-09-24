@@ -1659,7 +1659,7 @@
   const SCENE_FLOOR = '<rect class="ps-floor" x="0" y="68" width="120" height="12"/>';
   const PRODUCT_ICONS = {
     // Лестница: целый марш с площадкой и перилами.
-    lestnitsa: SCENE_FLOOR + '<g transform="translate(-9 0)">' +
+    lestnitsa: SCENE_FLOOR + '<g transform="translate(-15 0)">' +
       '<path class="ps-stone" d="M102 68V60H91V52H80V44H69V36H58V28H36V68Z"/>' +
       '<path class="ps-side" d="M102 60V68L114 61V53Z M91 52V60L103 53V45Z M80 44V52L92 45V37Z M69 36V44L81 37V29Z M58 28V36L70 29V21Z"/>' +
       '<path class="ps-top" d="M91 60H102L114 53H103Z M80 52H91L103 45H92Z M69 44H80L92 37H81Z M58 36H69L81 29H70Z M36 28H58L70 21H48Z"/>' +
@@ -1675,29 +1675,33 @@
       '<path class="ps-vein" d="M60 9C53 19 49 28 54 37S51 53 45 63 M60 9C67 19 71 28 66 37S69 53 75 63 M60 23C56 29 57 34 60 37C63 34 64 29 60 23Z"/>' +
       '<path class="ps-joint" d="M60 9V63"/>' +
       '<path class="ps-shadow" d="M40 68H82L84 70H38Z"/>',
-    // Подоконник: окно со светом снаружи и толстая каменная плита,
-    // выступающая из стены.
-    podokonnik: SCENE_FLOOR + '<g transform="translate(-6 2)">' +
-      '<rect class="ps-glass" x="40" y="6" width="50" height="35"/>' +
-      '<rect class="ps-glow" x="40" y="6" width="50" height="35"/>' +
-      '<path class="ps-frame" d="M40 6H90V41H40Z M65 6V41"/>' +
-      '<path class="ps-top" d="M22 48H98L110 41H34Z"/>' +
-      '<path class="ps-glow" d="M46 46H84L92 41.5H54Z"/>' +
-      '<rect class="ps-stone" x="22" y="48" width="76" height="6"/>' +
-      '<path class="ps-side" d="M98 48L110 41V47L98 54Z"/>' +
-      '<path class="ps-vein" d="M26 52C40 50 52 53 66 50S88 51 96 49"/>' +
-      '<path class="ps-shadow" d="M24 54H98L100 57H26Z"/></g>',
-    // Пол: угол комнаты с каменным полом крупного формата.
+    // Подоконник: фронтальная сцена, точка схода (60, 26) на оси. Проём 48x36
+    // по оси, стекло утоплено к точке схода (k = 5/6, откосы), две створки --
+    // импост ровно на оси; плита выходит в комнату (k = 11/9), свес по 3 с
+    // каждой стороны проёма, толщина 6 по всей ширине.
+    podokonnik: SCENE_FLOOR +
+      '<path class="ps-wall-side" d="M36 8L84 8L80 11L40 11Z"/>' +
+      '<path class="ps-wall" d="M36 8L40 11L40 41L36 44Z M84 8L84 44L80 41L80 11Z"/>' +
+      '<rect class="ps-glass" x="40" y="11" width="40" height="30"/>' +
+      '<rect class="ps-glow" x="40" y="11" width="40" height="30"/>' +
+      '<path class="ps-frame" d="M40 11L80 11L80 41L40 41Z M60 11V41"/>' +
+      '<path class="ps-top" d="M40 41L80 41L84 44L87 44L93 48L27 48L33 44L36 44Z"/>' +
+      '<path class="ps-glow" d="M40 41L80 41L84 44L36 44Z"/>' +
+      '<rect class="ps-stone" x="27" y="48" width="66" height="6"/>' +
+      '<path class="ps-vein" d="M29 52C40 50 50 52.5 60 51S80 50 91 52"/>' +
+      '<path class="ps-shadow" d="M29 54L91 54L89 56.5L31 56.5Z"/>',
+    // Пол: угол комнаты на оси x=60, плинтусные линии по (±12, 7) -- тот же
+    // наклон, что и глубина в остальных сценах; швы -- единая сетка с шагом
+    // 1.5 этого вектора, окно и пятно света лежат на той же сетке.
     pol:
-      '<path class="ps-wall" d="M44 51.5H120V0H44Z"/>' +
-      '<path class="ps-wall-side" d="M0 77.2L44 51.5V0H0Z"/>' +
-      '<rect class="ps-glass" x="76" y="12" width="28" height="30"/>' +
-      '<rect class="ps-glow" x="76" y="12" width="28" height="30"/>' +
-      '<path class="ps-frame" d="M76 12H104V42H76Z M90 12V42"/>' +
-      '<path class="ps-top" d="M2 76H76L118 51.5H44Z"/>' +
-      '<path class="ps-glow" d="M58 68H86L102 58.6H74Z"/>' +
-      '<path class="ps-vein" d="M10 74C30 70 42 66 68 62S100 56 112 53"/>' +
-      '<path class="ps-joint" d="M12.5 69.9H86.5M23 63.75H97M33.5 57.6H107.5M20.5 76L62.5 51.5M39 76L81 51.5M57.5 76L99.5 51.5"/>',
+      '<path class="ps-wall-side" d="M0 0L60 0L60 30L0 65Z"/>' +
+      '<path class="ps-wall" d="M60 0L120 0L120 65L60 30Z"/>' +
+      '<path class="ps-glass" d="M42 4.5L42 30.5L24 41L24 15Z"/>' +
+      '<path class="ps-glow" d="M42 4.5L42 30.5L24 41L24 15Z"/>' +
+      '<path class="ps-frame" d="M42 4.5L42 30.5L24 41L24 15Z M33 9.75L33 35.75"/>' +
+      '<path class="ps-top" d="M60 30L120 65L120 80L0 80L0 65Z"/>' +
+      '<path class="ps-glow" d="M60 51L42 61.5L78 82.5L96 72Z"/>' +
+      '<path class="ps-joint" d="M78 40.5L10.29 80M42 40.5L109.71 80M96 51L46.29 80M24 51L73.71 80M114 61.5L82.29 80M6 61.5L37.71 80"/>',
     // Стена: облицовка крупноформатными плитами по всей высоте, рисунок
     // камня проходит через швы.
     stena: SCENE_FLOOR +
@@ -1707,7 +1711,7 @@
       '<path class="ps-vein" d="M10 58C28 52 40 54 56 42S88 28 110 20 M10 32C24 28 34 32 48 23"/>' +
       '<path class="ps-joint" d="M10 27H110M10 47.5H110M35 6V68M60 6V68M85 6V68"/>',
     // Фасад: дом с каменным объёмом, окнами и стеклянной пристройкой.
-    fasad: SCENE_FLOOR +
+    fasad: SCENE_FLOOR + '<g transform="translate(-4 0)">' +
       '<path class="ps-side" d="M78 24L90 17V61L78 68Z"/>' +
       '<rect class="ps-stone" x="14" y="24" width="64" height="44"/>' +
       '<path class="ps-joint" d="M14 35H78M14 46H78M14 57H78M40 24V35M62 35V46M32 46V57M54 57V68"/>' +
@@ -1723,25 +1727,25 @@
       '<rect class="ps-glow" x="78" y="42" width="30" height="26"/>' +
       '<path class="ps-frame" d="M78 42H108V68H78Z M88 42V68 M98 42V68"/>' +
       '<path class="ps-cab" d="M76 39H110V42H76Z M110 39L118 34.3V37.3L110 42Z"/>' +
-      '<path class="ps-core-top" d="M76 39H110L118 34.3H84Z"/>',
+      '<path class="ps-core-top" d="M76 39H110L118 34.3H84Z"/></g>',
     // Столешница в ванную: подвесная каменная столешница с накладной
     // раковиной и смесителем, круглое зеркало с подсветкой, деревянный ящик.
-    stoleshnitsa_vannaya: SCENE_FLOOR +
-      '<circle class="ps-halo" cx="66" cy="20" r="15.5"/>' +
-      '<circle class="ps-glass" cx="66" cy="20" r="14"/>' +
-      '<circle class="ps-rim" cx="66" cy="20" r="14"/>' +
-      '<rect class="ps-wood" x="32" y="53" width="60" height="9"/>' +
-      '<path class="ps-handle" d="M56 57.5H68"/>' +
+    stoleshnitsa_vannaya: SCENE_FLOOR + '<g transform="translate(-6 0)">' +
+      '<circle class="ps-halo" cx="72" cy="20" r="15.5"/>' +
+      '<circle class="ps-glass" cx="72" cy="20" r="14"/>' +
+      '<circle class="ps-rim" cx="72" cy="20" r="14"/>' +
+      '<path class="ps-shadow" d="M36 61.5H96L100 63.5H40Z"/>' +
+      '<rect class="ps-wood" x="36" y="49.5" width="60" height="12"/>' +
+      '<path class="ps-handle" d="M60 57.5H72"/>' +
       '<path class="ps-top" d="M24 48H96L108 41H36Z"/>' +
       '<rect class="ps-stone" x="24" y="48" width="72" height="5"/>' +
       '<path class="ps-side" d="M96 48L108 41V46L96 53Z"/>' +
       '<path class="ps-metal" d="M88 42.5V29C88 27 87 26 85 26H78V28"/>' +
       '<path class="ps-bowl" d="M54 38H78C78 43.5 73 46 66 46C59 46 54 43.5 54 38Z"/>' +
-      '<ellipse class="ps-bowl-in" cx="66" cy="38" rx="12" ry="2"/>' +
-      '<path class="ps-shadow" d="M32 62H92L94 64H34Z"/>',
+      '<ellipse class="ps-bowl-in" cx="66" cy="38" rx="12" ry="2"/></g>',
     // Столешница на кухню: длинная рабочая поверхность на тумбах с мойкой,
     // смесителем и варочной панелью, подвесные светильники.
-    stoleshnitsa_kuhnya: SCENE_FLOOR +
+    stoleshnitsa_kuhnya: SCENE_FLOOR + '<g transform="translate(2 0)">' +
       '<path class="ps-metal" d="M40 0V8 M84 0V8"/>' +
       '<path class="ps-metal-f" d="M35 12H45L42 8H38Z M79 12H89L86 8H82Z"/>' +
       '<ellipse class="ps-glow" cx="40" cy="12.5" rx="6" ry="1.4"/>' +
@@ -1759,23 +1763,24 @@
       '<ellipse class="ps-ring-hot" cx="72.4" cy="41.5" rx="3.6" ry="1.1"/>' +
       '<ellipse class="ps-ring" cx="86.2" cy="41.5" rx="3.6" ry="1.1"/>' +
       '<ellipse class="ps-ring" cx="76" cy="39.4" rx="3.2" ry="0.95"/>' +
-      '<ellipse class="ps-ring" cx="89.7" cy="39.4" rx="3.2" ry="0.95"/>',
-    // Ступени: три широкие ступени без перил и площадки (в отличие от
-    // узкого высокого марша с перилами у лестницы); верхняя каменная
-    // проступь приподнята над основанием -- ступень читается как изделие.
-    stupeni: SCENE_FLOOR + '<g transform="translate(-10 0)">' +
-      '<path class="ps-stone" d="M76 68V58H62V48H48V38H34V68Z"/>' +
-      '<path class="ps-side" d="M76 58V68L106 50.5V40.5Z M62 48V58L92 40.5V30.5Z M48 38V48L78 30.5V20.5Z"/>' +
-      '<path class="ps-top" d="M62 58H76L106 40.5H92Z M48 48H62L92 30.5H78Z"/>' +
-      '<path class="ps-joint" d="M73 58L103 40.5M71 58L101 40.5M59 48L89 30.5M57 48L87 30.5"/>' +
-      '<path class="ps-core-top" d="M34 38H48L78 20.5H64Z"/>' +
-      '<path class="ps-shadow" d="M36 37H47L72 22.4H61Z"/>' +
-      '<path class="ps-vein" d="M38 64C46 58 54 62 62 56S72 60 74 63"/>' +
-      '<path class="ps-guide" d="M34 31V37 M49 31V37 M79 13.5V19.5"/>' +
-      '<path class="ps-top" d="M34 27H49L79 9.5H64Z"/>' +
-      '<rect class="ps-stone" x="34" y="27" width="15" height="3"/>' +
-      '<path class="ps-side" d="M49 27V30L79 12.5V9.5Z"/>' +
-      '<path class="ps-joint" d="M46 27L76 9.5M44 27L74 9.5"/></g>',
+      '<ellipse class="ps-ring" cx="89.7" cy="39.4" rx="3.2" ry="0.95"/></g>',
+    // Ступени: три отдельных каменных блока в центральной перспективе с оси
+    // x=60 (s = 100/(Z+100)); ширина 76, высота 10, шаг 16 одинаковы для всех,
+    // свесы слева и справа равны. Без перил и бокового основания -- в отличие
+    // от лестничного марша в профиль.
+    stupeni: SCENE_FLOOR +
+      '<path class="ps-stone" d="M22 58L98 58L98 68L22 68Z"/>' +
+      '<path class="ps-vein" d="M24 65C42 61 50 66 60 63S82 61 96 64"/>' +
+      '<path class="ps-top" d="M22 58L98 58L92.76 47.24L27.24 47.24Z"/>' +
+      '<path class="ps-shadow" d="M26.37 49.03L93.63 49.03L92.76 47.24L27.24 47.24Z"/>' +
+      '<path class="ps-joint" d="M23.73 56.47H96.27M24.25 55.36H95.75"/>' +
+      '<path class="ps-stone" d="M27.24 38.62L92.76 38.62L92.76 47.24L27.24 47.24Z"/>' +
+      '<path class="ps-top" d="M27.24 38.62L92.76 38.62L88.79 31.52L31.21 31.52Z"/>' +
+      '<path class="ps-shadow" d="M30.54 32.71L89.46 32.71L88.79 31.52L31.21 31.52Z"/>' +
+      '<path class="ps-joint" d="M28.64 37.63H91.36M29.04 36.9H90.96"/>' +
+      '<path class="ps-stone" d="M31.21 23.94L88.79 23.94L88.79 31.52L31.21 31.52Z"/>' +
+      '<path class="ps-top" d="M31.21 23.94L88.79 23.94L85.68 19.19L34.32 19.19Z"/>' +
+      '<path class="ps-joint" d="M32.39 23.28H87.61M32.69 22.8H87.31"/>',
   };
   // Короткая вторая строка -- только там, где она действительно помогает
   // различить изделия (две столешницы); отражает их реальные доп. работы.
