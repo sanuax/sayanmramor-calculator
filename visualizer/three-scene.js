@@ -416,6 +416,32 @@ function addMesh(group, geometry, material, position, cast) {
   return mesh;
 }
 
+// Integrated sink: a real hollow stone bowl under the slab's opening --
+// stone walls of real thickness around the cavity and a stone floor -- so
+// its inner faces are there from any camera angle. (Built from single-sided
+// planes, as the steel basins are, the walls faced outward and vanished
+// when looking into the bowl.) The cavity is flush with the opening, which
+// the slab's own extrusion bevel insets by bevelFor(slab).size.
+const STONE_BOWL_WALL_M = 0.02;
+function buildStoneBowl(group, part, materials) {
+  const [cx, top, cz] = part.center;
+  const [sx, depth, sz] = part.size;
+  const inset = bevelFor({ role: 'stone', y0: 0, y1: part.slabThicknessM || 0, edge: part.edge }).size;
+  const w = sx / 2 - inset, l = sz / 2 - inset, t = STONE_BOWL_WALL_M;
+  const shape = new THREE.Shape();
+  shape.moveTo(-w - t, -l - t); shape.lineTo(w + t, -l - t); shape.lineTo(w + t, l + t); shape.lineTo(-w - t, l + t); shape.closePath();
+  const cavity = new THREE.Path();
+  cavity.moveTo(-w, -l); cavity.lineTo(-w, l); cavity.lineTo(w, l); cavity.lineTo(w, -l); cavity.closePath();
+  shape.holes.push(cavity);
+  const walls = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false });
+  walls.rotateX(-Math.PI / 2);
+  addMesh(group, walls, materials.stone, [cx, top - depth, cz]);
+  addMesh(group, new THREE.BoxGeometry(2 * (w + t), t, 2 * (l + t)), materials.stone, [cx, top - depth - t / 2, cz]);
+  const drain = new THREE.CircleGeometry(Math.min(w, l) * 0.18, 32);
+  drain.rotateX(-Math.PI / 2);
+  addMesh(group, drain, materials.metal, [cx, top - depth + 0.0008, cz], false);
+}
+
 function buildBasin(group, part, material) {
   const [cx, top, cz] = part.center;
   const [sx, depth, sz] = part.size;
@@ -516,6 +542,8 @@ function buildPart(group, part, materials) {
       addMesh(group, buildPrismGeometry(part), materials[part.role], null, cast);
     } else if (part.kind === 'box') {
       addMesh(group, new THREE.BoxGeometry(...part.size), materials[part.role], part.center, cast);
+    } else if (part.kind === 'basin' && part.role === 'stone') {
+      buildStoneBowl(group, part, materials);
     } else if (part.kind === 'basin') {
       buildBasin(group, part, materials[part.role]);
     } else if (part.kind === 'cooktop') {

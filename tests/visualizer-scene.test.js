@@ -350,3 +350,13 @@ test('edge is a geometry parameter only for products that support edge work (a l
   assert.equal(modelFor('pol', { 'edge-round': { value: '2000' } }).edge.type, null);
   assert.equal(modelFor('podokonnik', { 'edge-round': { value: '2000' } }).edge.type, 'rounding');
 });
+
+test('integrated sink: the stone bowl carries the slab edge profile and thickness (so its cavity is flush with the opening)', () => {
+  const layout = layoutFor('stoleshnitsa_kuhnya', { 'cut-sink-integrated': { value: '1' }, 'edge-type': { value: 'rounding' } });
+  const main = named(layout, 'main')[0];
+  const bowl = named(layout, 'sink')[0];
+  assert.equal(bowl.kind, 'basin');
+  assert.equal(bowl.role, 'stone');
+  assert.equal(bowl.edge, 'rounding');
+  assert.equal(bowl.slabThicknessM, main.y1 - main.y0);
+});

@@ -123,8 +123,10 @@
       const c = m.sink.cut;
       const x = lx(c.xM), z = lz(c.zM);
       if (m.sink.type === 'integrated') {
-        // Same stone, no rim: the bowl continues the countertop itself.
-        parts.push({ kind: 'basin', role: 'stone', center: [x, bottom, z], size: [c.widthM, 0.16, c.lengthM], name: 'sink' });
+        // Same stone, no rim: the bowl continues the countertop itself. The
+        // slab's edge profile and thickness let the renderer make the bowl's
+        // inner walls flush with the opening cut through the slab.
+        parts.push({ kind: 'basin', role: 'stone', center: [x, bottom, z], size: [c.widthM, 0.16, c.lengthM], edge, slabThicknessM: T, name: 'sink' });
       } else if (m.sink.type === 'overlay') {
         // Sits on top: a steel rim over the cut-out, bowl below.
         parts.push(prism('metal', rect(x - c.widthM / 2 - 0.03, x + c.widthM / 2 + 0.03, z - c.lengthM / 2 - 0.03, z + c.lengthM / 2 + 0.03),

@@ -234,3 +234,22 @@ test('readConstructorState forces shape to "straight" and zeroes wing for a prod
   assert.deepEqual(state.wing, { widthM: 0, lengthM: 0 });
   assert.equal(state.corner, 'left');
 });
+
+test('readConstructorState.edge: a profile chosen in #edge-type is the edge (no length), and adds no priced edge line', () => {
+  const doc = createFakeDoc({ width: { value: '600' }, length: { value: '2000' }, 'edge-type': { value: 'rounding' } });
+  const state = ConstructorState.readConstructorState({
+    doc, selectedProductKey: 'stoleshnitsa_kuhnya', product: PRODUCTS.stoleshnitsa_kuhnya,
+    stone: null, hasAdditionalWork,
+  });
+  assert.deepEqual(state.edge, { type: 'rounding', lengthMm: null });
+  assert.deepEqual(state.edgeLineItems, []);
+});
+
+test('readConstructorState.edge: an unknown #edge-type value is ignored, and legacy length fields keep priority', () => {
+  const read = values => ConstructorState.readConstructorState({
+    doc: createFakeDoc(Object.assign({ width: { value: '600' }, length: { value: '2000' } }, values)),
+    selectedProductKey: 'podokonnik', product: PRODUCTS.podokonnik, stone: null, hasAdditionalWork,
+  });
+  assert.deepEqual(read({ 'edge-type': { value: 'nonsense' } }).edge, { type: null, lengthMm: null });
+  assert.deepEqual(read({ 'edge-type': { value: 'bevel' }, 'edge-straight': { value: '800' } }).edge, { type: 'straight', lengthMm: 800 });
+});

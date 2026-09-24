@@ -61,3 +61,10 @@ test('existing null-rate behaviour is unchanged: with today\'s catalog an edge c
     assert.equal(withEdge.total, without.total, key);
   });
 });
+
+test('a profile chosen without a length (#edge-type) never changes the price, even with a non-null edge rate', () => {
+  const { inputs, result, state } = pricingFor('podokonnik', { 'edge-type': { value: 'bevel' } }, EDGE_RATE);
+  assert.equal(state.edge.type, 'bevel');
+  assert.deepEqual(inputs.extraLineItems, []);
+  assert.equal(result.total, pricingFor('podokonnik', {}, EDGE_RATE).result.total);
+});

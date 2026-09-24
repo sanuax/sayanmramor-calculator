@@ -36,9 +36,20 @@
     return items;
   }
 
+  // The edge step is a single profile choice: the calculator's UI stores the
+  // chosen profile in #edge-type and has no length input (a typed length
+  // never changed the model -- the profile is applied to the whole edge).
+  // There is no automatic edge-length rule yet, so such a selection carries
+  // lengthMm: null and adds no priced edgeLineItems; the legacy per-type
+  // length fields above are still read for pricing, unchanged.
+  function readSelectedEdgeType(doc) {
+    const value = doc.getElementById('edge-type').value;
+    return EDGE_FIELDS.some(f => f.type === value) ? value : null;
+  }
+
   // Fixed priority order, not magnitude -- see docs/superpowers/specs/2026-09-21-3d-visualizer-design.md.
-  function deriveSingleEdge(edgeLineItems) {
-    if (edgeLineItems.length === 0) return { type: null, lengthMm: null };
+  function deriveSingleEdge(edgeLineItems, selectedType) {
+    if (edgeLineItems.length === 0) return { type: selectedType || null, lengthMm: null };
     const winner = EDGE_FIELDS.find(f => edgeLineItems.some(item => item.type === f.type));
     const item = edgeLineItems.find(i => i.type === winner.type);
     return { type: item.type, lengthMm: item.lengthMm };
@@ -148,7 +159,7 @@
       wallPanel,
       island,
       barCounter,
-      edge: deriveSingleEdge(edgeLineItems),
+      edge: deriveSingleEdge(edgeLineItems, readSelectedEdgeType(d)),
       additionalWorks: {
         sink: deriveSingleSink(sinkCounts),
         cooktop: { count: cooktopCount, position: null },
