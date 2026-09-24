@@ -272,34 +272,118 @@
   }
   .checkbox-row input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
 
-  /* Тип изделия: та же визуальная масса/размер/стиль заливки, что у
-     .pick-card (иконки var(--stone)/var(--stone-line), область 44px) --
-     сама карточка остаётся на radio+:has() (менять логику выбора не нужно),
-     меняется только визуальный вес. Иконка НЕ перекрашивается при выборе --
-     тот же принцип, что и у .pick-card (только рамка/фон/подпись меняются). */
-  /* auto-fill, not a fixed 3-column split: on a wide desktop the grid fits
-     MORE cards per row at the same comfortable size instead of stretching
-     each of the 9 product cards to an unnaturally wide box. */
-  .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+  /* Тип изделия: карточка = мини-сцена изделия в его архитектурном
+     контексте (тёмный графит, камень, металл, стекло, тёплый свет) + подпись.
+     Все сцены нарисованы в одном viewBox 120x80, с одной косоугольной
+     проекцией (глубина = +12/-7) и общей линией пола, поэтому читаются как
+     одна серия. Выбор -- по-прежнему radio + :has(); hover/selected меняют
+     только цвет рамки/тени и свет внутри сцены, но не размеры карточки. */
+  /* Фиксированное число колонок вместо auto-fill: 9 карточек ложатся ровно
+     (2 -> 3x3 -> 5+4), без «хвоста» из двух карточек на широком экране. */
+  .product-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  @media (min-width: 560px) { .product-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (min-width: 1100px) { .product-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
   .product-card {
     position: relative;
-    display: flex; flex-direction: column; align-items: center; gap: 6px;
-    padding: 12px 10px 10px;
-    border: 1.5px solid var(--line); border-radius: 12px;
+    display: flex; flex-direction: column;
+    margin: 0; padding: 6px;
+    border: 1px solid var(--line); border-radius: 12px;
     background: var(--card);
-    text-align: center;
+    /* сбрасываем глобальный стиль label (uppercase/разрядка) */
+    text-transform: none; letter-spacing: 0;
     cursor: pointer;
-    transition: border-color 0.15s, background-color 0.15s;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
   }
-  .product-card:hover { background: var(--card-hover); border-color: var(--stone-line); }
+  .product-card:hover { border-color: var(--stone-line); }
   .product-card input {
     position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none;
   }
-  .product-card svg { width: 100%; height: 44px; }
-  .product-card-label { font-size: var(--configurator-text); font-weight: 700; line-height: 1.25; color: var(--ink); }
-  .product-card:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+  .product-card-scene {
+    --ps-bg: #27211b; --ps-wall: #302922; --ps-wall-side: #221d17; --ps-floor: #3a3129;
+    --ps-stone: #d3c8b6; --ps-top: #e9e2d4; --ps-side: #a4957c;
+    --ps-joint: rgba(96, 82, 62, 0.45); --ps-vein: rgba(128, 110, 86, 0.6);
+    --ps-metal: #9a8f82; --ps-glass: #394541; --ps-light: #f0c795;
+    --ps-wood: #74553c; --ps-cab: #3d352c; --ps-dark: #1a1612;
+    position: relative; display: block; overflow: hidden;
+    aspect-ratio: 3 / 2; border-radius: 8px; background: var(--ps-bg);
+  }
+  /* Мягкий тёплый свет сверху -- один источник для всех сцен; на hover
+     чуть ярче (анимируется только opacity слоя). */
+  .product-card-scene::before {
+    content: ""; position: absolute; inset: 0;
+    background: radial-gradient(90% 70% at 55% 0%, rgba(240, 199, 149, 0.16), rgba(240, 199, 149, 0) 70%);
+    opacity: 0.7; transition: opacity 0.4s ease;
+  }
+  .product-card-scene svg {
+    position: relative; display: block; width: 100%; height: 100%;
+    transform-origin: 50% 75%; transition: transform 0.5s var(--pick-ease);
+  }
+  .product-card:hover .product-card-scene::before { opacity: 1; }
+  .product-card:hover .product-card-scene svg { transform: scale(1.035); }
+  .product-card-check {
+    position: absolute; top: 8px; right: 8px; width: 22px; height: 22px;
+    display: grid; place-items: center; border-radius: 50%;
+    background: var(--accent); color: #fff;
+    opacity: 0; transform: scale(0.8); transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+  .product-card-check svg { width: 12px; height: 12px; }
+  .product-card-text {
+    display: flex; align-items: flex-start; gap: 8px;
+    padding: 10px 6px 6px;
+  }
+  .product-card-names { flex: 1 1 auto; min-width: 0; }
+  .product-card-label { display: block; font-size: var(--configurator-text); font-weight: 600; line-height: 1.3; color: var(--ink); }
+  .product-card-hint { display: block; margin-top: 2px; font-size: var(--configurator-muted); font-weight: 400; line-height: 1.35; color: var(--muted); }
+  .product-card-arrow {
+    flex: 0 0 auto; width: 16px; height: 16px; margin-top: 2px; color: var(--accent);
+    opacity: 0; transform: translateX(-4px); transition: opacity 0.25s ease, transform 0.25s ease;
+  }
+  .product-card:hover .product-card-arrow { opacity: 1; transform: none; }
+  .product-card:has(input:checked) {
+    border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); background: var(--accent-soft);
+  }
   .product-card:has(input:checked) .product-card-label { color: var(--accent-ink); }
+  .product-card:has(input:checked) .product-card-check { opacity: 1; transform: none; }
+  .product-card:has(input:checked) .product-card-arrow { opacity: 0; }
   .product-card:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) {
+    .product-card, .product-card *, .product-card-scene::before { transition: none !important; }
+    .product-card:hover .product-card-scene svg { transform: none; }
+  }
+  /* Палитра мини-сцен (классы внутри SVG из PRODUCT_ICONS). */
+  .ps-floor { fill: var(--ps-floor); }
+  .ps-wall { fill: var(--ps-wall); }
+  .ps-wall-side { fill: var(--ps-wall-side); }
+  .ps-stone { fill: var(--ps-stone); }
+  .ps-top { fill: var(--ps-top); }
+  .ps-side { fill: var(--ps-side); }
+  .ps-core { fill: #4a4137; }
+  .ps-core-top { fill: #5b5146; }
+  .ps-glass { fill: var(--ps-glass); }
+  .ps-wood { fill: var(--ps-wood); }
+  .ps-cab { fill: var(--ps-cab); }
+  .ps-cab-side { fill: #2e2720; }
+  .ps-dark { fill: var(--ps-dark); }
+  .ps-bowl { fill: #f4f0e9; }
+  .ps-bowl-in { fill: #c9bfaf; }
+  .ps-metal-f { fill: var(--ps-metal); }
+  .ps-glow { fill: var(--ps-light); opacity: 0.22; }
+  .ps-wash { fill: var(--ps-light); opacity: 0.08; }
+  .ps-shadow { fill: #000; opacity: 0.3; }
+  .ps-joint, .ps-vein, .ps-metal, .ps-frame, .ps-guide, .ps-halo, .ps-rim, .ps-ring, .ps-ring-hot, .ps-cab-line, .ps-handle {
+    fill: none; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .ps-joint { stroke: var(--ps-joint); stroke-width: 0.6; }
+  .ps-vein { stroke: var(--ps-vein); stroke-width: 0.7; }
+  .ps-metal { stroke: var(--ps-metal); stroke-width: 1.2; }
+  .ps-frame { stroke: var(--ps-metal); stroke-width: 0.9; }
+  .ps-guide { stroke: var(--ps-light); stroke-width: 0.7; stroke-dasharray: 1.4 1.6; opacity: 0.75; }
+  .ps-halo { stroke: var(--ps-light); stroke-width: 3; opacity: 0.2; }
+  .ps-rim { stroke: var(--ps-light); stroke-width: 0.8; opacity: 0.85; }
+  .ps-ring { stroke: #5f564c; stroke-width: 0.7; }
+  .ps-ring-hot { stroke: var(--ps-light); stroke-width: 0.8; }
+  .ps-cab-line { stroke: #231e18; stroke-width: 0.8; }
+  .ps-handle { stroke: #c2a98e; stroke-width: 0.9; }
 
   /* Кромка/форма: перенесено буквально из согласованного V2-конструктора
      (https://claude.ai/artifact/8fkDjjV6vDdwZypMQwN7zK) -- .card-grid/
@@ -1568,38 +1652,136 @@
   const { PRODUCTS, hasAdditionalWork } = ProductTypes;
   const { getSubcategoriesForProduct, getAdditionalWorkRate } = RateCatalog;
 
-  // Мини-иллюстрации типов изделий -- тот же визуальный язык, что и у
-  // остальных карточек V2 (var(--stone)/var(--stone-line) заливка, viewBox
-  // 0 0 60 60, 2-4 простые формы на иконку), а не системные пиктограммы.
+  // Мини-сцены типов изделий: изделие в своём архитектурном контексте, чтобы
+  // оно узнавалось ещё до чтения подписи. Общая система: viewBox 0 0 120 80,
+  // пол от y=68, одна косоугольная проекция (глубина = +12/-7), цвета --
+  // только классы .ps-* (палитра в CSS), никаких внешних картинок.
+  const SCENE_FLOOR = '<rect class="ps-floor" x="0" y="68" width="120" height="12"/>';
   const PRODUCT_ICONS = {
-    // Лестница: профиль сбоку, восходящие ступени одним замкнутым контуром.
-    lestnitsa: '<path d="M8 46 L8 36 H20 V26 H32 V16 H44 V46 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="2"/>',
-    // Панно: рамка + декоративный медальон внутри.
-    panno: '<rect x="8" y="8" width="44" height="44" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="2"/>' +
-      '<circle cx="30" cy="30" r="13" fill="none" stroke="var(--stone-line)" stroke-width="2"/>',
-    // Подоконник: оконный проём + выступающая плита подоконника снизу.
-    podokonnik: '<rect x="14" y="6" width="32" height="26" fill="none" stroke="var(--stone-line)" stroke-width="2"/>' +
-      '<rect x="6" y="32" width="48" height="10" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="2"/>',
-    // Пол: плита сверху + линии раскладки плит/досок.
-    pol: '<rect x="6" y="14" width="48" height="32" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="2"/>' +
-      '<path d="M6 30 H54 M22 14 V46 M38 14 V46" stroke="var(--stone-line)" stroke-width="1.4"/>',
-    // Стена: облицовка со швами вразбежку.
-    stena: '<rect x="6" y="10" width="48" height="40" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="2"/>' +
-      '<path d="M6 26 H54 M6 38 H54 M20 10 V26 M38 26 V38 M30 38 V50" stroke="var(--stone-line)" stroke-width="1.4"/>',
-    // Фасад: силуэт здания с двускатной крышей и окнами.
-    fasad: '<path d="M8 50 V22 L30 8 L52 22 V50 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="2"/>' +
-      '<rect x="18" y="30" width="10" height="10" fill="none" stroke="var(--stone-line)" stroke-width="1.6"/>' +
-      '<rect x="34" y="30" width="10" height="10" fill="none" stroke="var(--stone-line)" stroke-width="1.6"/>',
-    // Столешница в ванную: плита с врезной раковиной (без тумбы).
-    stoleshnitsa_vannaya: '<rect x="6" y="30" width="48" height="12" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="2"/>' +
-      '<ellipse cx="30" cy="24" rx="14" ry="6" fill="none" stroke="var(--stone-line)" stroke-width="2"/>',
-    // Столешница на кухню: то же самое + тумба снизу -- отличает её от
-    // столешницы в ванную выше.
-    stoleshnitsa_kuhnya: '<rect x="6" y="26" width="48" height="12" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="2"/>' +
-      '<rect x="6" y="38" width="48" height="12" fill="none" stroke="var(--stone-line)" stroke-width="1.6"/>' +
-      '<ellipse cx="20" cy="20" rx="10" ry="5" fill="none" stroke="var(--stone-line)" stroke-width="2"/>',
-    // Ступени: два широких марша, короче и проще полной лестницы выше.
-    stupeni: '<path d="M8 46 V34 H26 V22 H44 V46 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="2"/>',
+    // Лестница: целый марш с площадкой и перилами.
+    lestnitsa: SCENE_FLOOR + '<g transform="translate(-9 0)">' +
+      '<path class="ps-stone" d="M102 68V60H91V52H80V44H69V36H58V28H36V68Z"/>' +
+      '<path class="ps-side" d="M102 60V68L114 61V53Z M91 52V60L103 53V45Z M80 44V52L92 45V37Z M69 36V44L81 37V29Z M58 28V36L70 29V21Z"/>' +
+      '<path class="ps-top" d="M91 60H102L114 53H103Z M80 52H91L103 45H92Z M69 44H80L92 37H81Z M58 36H69L81 29H70Z M36 28H58L70 21H48Z"/>' +
+      '<path class="ps-vein" d="M40 62C50 56 56 60 66 52S84 50 96 64"/>' +
+      '<path class="ps-metal" d="M100 45L58 15H38 M96 42.2V60 M85 34.3V52 M74 26.4V44 M63 18.6V36 M42 15V28"/></g>',
+    // Панно: одна вертикальная плита с зеркальной (bookmatch) раскладкой
+    // рисунка, подсвеченная сверху.
+    panno: SCENE_FLOOR +
+      '<path class="ps-wash" d="M50 3H70L88 66H32Z"/>' +
+      '<rect class="ps-metal-f" x="49" y="1.5" width="22" height="1.6" rx="0.8"/>' +
+      '<path class="ps-side" d="M78 9L81.5 7V61L78 63Z"/>' +
+      '<rect class="ps-stone" x="42" y="9" width="36" height="54"/>' +
+      '<path class="ps-vein" d="M60 9C53 19 49 28 54 37S51 53 45 63 M60 9C67 19 71 28 66 37S69 53 75 63 M60 23C56 29 57 34 60 37C63 34 64 29 60 23Z"/>' +
+      '<path class="ps-joint" d="M60 9V63"/>' +
+      '<path class="ps-shadow" d="M40 68H82L84 70H38Z"/>',
+    // Подоконник: окно со светом снаружи и толстая каменная плита,
+    // выступающая из стены.
+    podokonnik: SCENE_FLOOR + '<g transform="translate(-6 2)">' +
+      '<rect class="ps-glass" x="40" y="6" width="50" height="35"/>' +
+      '<rect class="ps-glow" x="40" y="6" width="50" height="35"/>' +
+      '<path class="ps-frame" d="M40 6H90V41H40Z M65 6V41"/>' +
+      '<path class="ps-top" d="M22 48H98L110 41H34Z"/>' +
+      '<path class="ps-glow" d="M46 46H84L92 41.5H54Z"/>' +
+      '<rect class="ps-stone" x="22" y="48" width="76" height="6"/>' +
+      '<path class="ps-side" d="M98 48L110 41V47L98 54Z"/>' +
+      '<path class="ps-vein" d="M26 52C40 50 52 53 66 50S88 51 96 49"/>' +
+      '<path class="ps-shadow" d="M24 54H98L100 57H26Z"/></g>',
+    // Пол: угол комнаты с каменным полом крупного формата.
+    pol:
+      '<path class="ps-wall" d="M44 51.5H120V0H44Z"/>' +
+      '<path class="ps-wall-side" d="M0 77.2L44 51.5V0H0Z"/>' +
+      '<rect class="ps-glass" x="76" y="12" width="28" height="30"/>' +
+      '<rect class="ps-glow" x="76" y="12" width="28" height="30"/>' +
+      '<path class="ps-frame" d="M76 12H104V42H76Z M90 12V42"/>' +
+      '<path class="ps-top" d="M2 76H76L118 51.5H44Z"/>' +
+      '<path class="ps-glow" d="M58 68H86L102 58.6H74Z"/>' +
+      '<path class="ps-vein" d="M10 74C30 70 42 66 68 62S100 56 112 53"/>' +
+      '<path class="ps-joint" d="M12.5 69.9H86.5M23 63.75H97M33.5 57.6H107.5M20.5 76L62.5 51.5M39 76L81 51.5M57.5 76L99.5 51.5"/>',
+    // Стена: облицовка крупноформатными плитами по всей высоте, рисунок
+    // камня проходит через швы.
+    stena: SCENE_FLOOR +
+      '<path class="ps-side" d="M110 6L114 3.7V65.7L110 68Z"/>' +
+      '<rect class="ps-stone" x="10" y="6" width="100" height="62"/>' +
+      '<ellipse class="ps-wash" cx="60" cy="8" rx="50" ry="22"/>' +
+      '<path class="ps-vein" d="M10 58C28 52 40 54 56 42S88 28 110 20 M10 32C24 28 34 32 48 23"/>' +
+      '<path class="ps-joint" d="M10 27H110M10 47.5H110M35 6V68M60 6V68M85 6V68"/>',
+    // Фасад: дом с каменным объёмом, окнами и стеклянной пристройкой.
+    fasad: SCENE_FLOOR +
+      '<path class="ps-side" d="M78 24L90 17V61L78 68Z"/>' +
+      '<rect class="ps-stone" x="14" y="24" width="64" height="44"/>' +
+      '<path class="ps-joint" d="M14 35H78M14 46H78M14 57H78M40 24V35M62 35V46M32 46V57M54 57V68"/>' +
+      '<rect class="ps-glass" x="22" y="30" width="12" height="32"/>' +
+      '<rect class="ps-glass" x="44" y="30" width="26" height="12"/>' +
+      '<rect class="ps-glow" x="22" y="30" width="12" height="32"/>' +
+      '<rect class="ps-glow" x="44" y="30" width="26" height="12"/>' +
+      '<path class="ps-frame" d="M22 30H34V62H22Z M44 30H70V42H44Z M57 30V42"/>' +
+      '<path class="ps-cab" d="M10 24V19H82V24Z M82 19L94 12V17L82 24Z"/>' +
+      '<path class="ps-core-top" d="M10 19H82L94 12H22Z"/>' +
+      '<path class="ps-glass" d="M108 42L116 37.3V63.3L108 68Z"/>' +
+      '<rect class="ps-glass" x="78" y="42" width="30" height="26"/>' +
+      '<rect class="ps-glow" x="78" y="42" width="30" height="26"/>' +
+      '<path class="ps-frame" d="M78 42H108V68H78Z M88 42V68 M98 42V68"/>' +
+      '<path class="ps-cab" d="M76 39H110V42H76Z M110 39L118 34.3V37.3L110 42Z"/>' +
+      '<path class="ps-core-top" d="M76 39H110L118 34.3H84Z"/>',
+    // Столешница в ванную: подвесная каменная столешница с накладной
+    // раковиной и смесителем, круглое зеркало с подсветкой, деревянный ящик.
+    stoleshnitsa_vannaya: SCENE_FLOOR +
+      '<circle class="ps-halo" cx="66" cy="20" r="15.5"/>' +
+      '<circle class="ps-glass" cx="66" cy="20" r="14"/>' +
+      '<circle class="ps-rim" cx="66" cy="20" r="14"/>' +
+      '<rect class="ps-wood" x="32" y="53" width="60" height="9"/>' +
+      '<path class="ps-handle" d="M56 57.5H68"/>' +
+      '<path class="ps-top" d="M24 48H96L108 41H36Z"/>' +
+      '<rect class="ps-stone" x="24" y="48" width="72" height="5"/>' +
+      '<path class="ps-side" d="M96 48L108 41V46L96 53Z"/>' +
+      '<path class="ps-metal" d="M88 42.5V29C88 27 87 26 85 26H78V28"/>' +
+      '<path class="ps-bowl" d="M54 38H78C78 43.5 73 46 66 46C59 46 54 43.5 54 38Z"/>' +
+      '<ellipse class="ps-bowl-in" cx="66" cy="38" rx="12" ry="2"/>' +
+      '<path class="ps-shadow" d="M32 62H92L94 64H34Z"/>',
+    // Столешница на кухню: длинная рабочая поверхность на тумбах с мойкой,
+    // смесителем и варочной панелью, подвесные светильники.
+    stoleshnitsa_kuhnya: SCENE_FLOOR +
+      '<path class="ps-metal" d="M40 0V8 M84 0V8"/>' +
+      '<path class="ps-metal-f" d="M35 12H45L42 8H38Z M79 12H89L86 8H82Z"/>' +
+      '<ellipse class="ps-glow" cx="40" cy="12.5" rx="6" ry="1.4"/>' +
+      '<ellipse class="ps-glow" cx="84" cy="12.5" rx="6" ry="1.4"/>' +
+      '<rect class="ps-cab" x="4" y="49" width="96" height="19"/>' +
+      '<path class="ps-cab-side" d="M100 49L112 42V61L100 68Z"/>' +
+      '<path class="ps-cab-line" d="M28 49V68M52 49V68M76 49V68"/>' +
+      '<path class="ps-handle" d="M10 52.5H22M34 52.5H46M58 52.5H70M82 52.5H94"/>' +
+      '<path class="ps-top" d="M2 44H102L114 37H14Z"/>' +
+      '<rect class="ps-stone" x="2" y="44" width="100" height="5"/>' +
+      '<path class="ps-side" d="M102 44L114 37V42L102 49Z"/>' +
+      '<path class="ps-dark" d="M20.4 42.6H46.4L53 38.75H27Z"/>' +
+      '<path class="ps-metal" d="M41 38.5V28C41 25 39 24 37 24C35 24 33 25 33 28V30"/>' +
+      '<path class="ps-dark" d="M61.8 42.95H91.8L100.2 38.05H70.2Z"/>' +
+      '<ellipse class="ps-ring-hot" cx="72.4" cy="41.5" rx="3.6" ry="1.1"/>' +
+      '<ellipse class="ps-ring" cx="86.2" cy="41.5" rx="3.6" ry="1.1"/>' +
+      '<ellipse class="ps-ring" cx="76" cy="39.4" rx="3.2" ry="0.95"/>' +
+      '<ellipse class="ps-ring" cx="89.7" cy="39.4" rx="3.2" ry="0.95"/>',
+    // Ступени: три широкие ступени без перил и площадки (в отличие от
+    // узкого высокого марша с перилами у лестницы); верхняя каменная
+    // проступь приподнята над основанием -- ступень читается как изделие.
+    stupeni: SCENE_FLOOR + '<g transform="translate(-10 0)">' +
+      '<path class="ps-stone" d="M76 68V58H62V48H48V38H34V68Z"/>' +
+      '<path class="ps-side" d="M76 58V68L106 50.5V40.5Z M62 48V58L92 40.5V30.5Z M48 38V48L78 30.5V20.5Z"/>' +
+      '<path class="ps-top" d="M62 58H76L106 40.5H92Z M48 48H62L92 30.5H78Z"/>' +
+      '<path class="ps-joint" d="M73 58L103 40.5M71 58L101 40.5M59 48L89 30.5M57 48L87 30.5"/>' +
+      '<path class="ps-core-top" d="M34 38H48L78 20.5H64Z"/>' +
+      '<path class="ps-shadow" d="M36 37H47L72 22.4H61Z"/>' +
+      '<path class="ps-vein" d="M38 64C46 58 54 62 62 56S72 60 74 63"/>' +
+      '<path class="ps-guide" d="M34 31V37 M49 31V37 M79 13.5V19.5"/>' +
+      '<path class="ps-top" d="M34 27H49L79 9.5H64Z"/>' +
+      '<rect class="ps-stone" x="34" y="27" width="15" height="3"/>' +
+      '<path class="ps-side" d="M49 27V30L79 12.5V9.5Z"/>' +
+      '<path class="ps-joint" d="M46 27L76 9.5M44 27L74 9.5"/></g>',
+  };
+  // Короткая вторая строка -- только там, где она действительно помогает
+  // различить изделия (две столешницы); отражает их реальные доп. работы.
+  const PRODUCT_HINTS = {
+    stoleshnitsa_vannaya: 'Раковина, отверстия, бортик',
+    stoleshnitsa_kuhnya: 'Мойка, варочная панель, остров',
   };
 
   const { SAW_MARGIN_CM, AREA_WASTE_FACTOR, WORK_RATES, MISC_FLAT_SUM, MISC_RATE_PER_M2, COMPLEX_SHAPE_MULTIPLIER, COUNTERTOP_EXTRAS_RATES } = ProductTypes;
@@ -1964,22 +2146,34 @@
       calculate();
     });
 
-    const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    // viewBox 0 0 60 60 + var(--stone)/var(--stone-line) fill, same
-    // convention as svgIcon() below (edge/shape cards) -- each shape in
-    // PRODUCT_ICONS specifies its own fill/stroke, so the outer <svg> itself
-    // stays paint-free (unlike the old currentColor line-icon version).
-    icon.setAttribute('viewBox', '0 0 60 60');
-    icon.setAttribute('aria-hidden', 'true');
-    icon.innerHTML = PRODUCT_ICONS[key] || '';
+    const scene = document.createElement('span');
+    scene.className = 'product-card-scene';
+    // viewBox 0 0 120 80 -- общая система мини-сцен (см. PRODUCT_ICONS);
+    // цвета задают классы .ps-*, у самого <svg> заливки нет.
+    scene.innerHTML =
+      '<svg viewBox="0 0 120 80" aria-hidden="true">' + (PRODUCT_ICONS[key] || '') + '</svg>' +
+      '<span class="product-card-check" aria-hidden="true"><svg viewBox="0 0 12 12"><path d="M2.5 6.2L5 8.5L9.5 3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>';
 
+    const text = document.createElement('span');
+    text.className = 'product-card-text';
+    const names = document.createElement('span');
+    names.className = 'product-card-names';
     const label = document.createElement('span');
     label.className = 'product-card-label';
     label.textContent = val.label;
+    names.appendChild(label);
+    if (PRODUCT_HINTS[key]) {
+      const hint = document.createElement('span');
+      hint.className = 'product-card-hint';
+      hint.textContent = PRODUCT_HINTS[key];
+      names.appendChild(hint);
+    }
+    text.appendChild(names);
+    text.insertAdjacentHTML('beforeend', '<svg class="product-card-arrow" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8H13M9 4L13 8L9 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>');
 
     card.appendChild(input);
-    card.appendChild(icon);
-    card.appendChild(label);
+    card.appendChild(scene);
+    card.appendChild(text);
     productGrid.appendChild(card);
   });
 
