@@ -134,6 +134,22 @@ test('the plain rectangle diagram: real proportions; the length under it and the
   close(r.w / r.h, 2);
 });
 
+test('the rectangle with the length upright («Высота стены»): the length left of it, the width under it, inside the viewBox', () => {
+  [[2700, 4000], [4000, 2700], [0, 0], [3000, 0], [50, 12000], [99999999, 3], [1, 1]].forEach(([l, w]) => {
+    [['Высота стены', 'Ширина стены'], [l + ' мм', w + ' мм']].forEach(([lt, wt]) => {
+      const { rect, length, width } = D.rectLayout(l, w, lt, wt, { lengthAxis: 'vertical' });
+      const label = l + 'x' + w + ' ' + lt;
+      close(length.y1, rect.y, label); close(length.y2, rect.y + rect.h, label);
+      close(width.x1, rect.x, label); close(width.x2, rect.x + rect.w, label);
+      assert.ok(length.x < rect.x && D.labelBox(length.label).x1 < rect.x, label + ': the height left of the shape');
+      assert.ok(width.y > rect.y + rect.h && D.labelBox(width.label).y0 > rect.y + rect.h, label + ': the width under the shape');
+      inside(length, label); inside(width, label);
+    });
+  });
+  const wall = D.rectLayout(2700, 4000, 'a', 'b', { lengthAxis: 'vertical' }).rect;
+  close(wall.w / wall.h, 4000 / 2700);
+});
+
 test('the page draws every dimension through dimension-diagram.js -- no hand-placed dimension line is left', () => {
   const script = html.slice(html.indexOf('</defs>'));
   assert.doesNotMatch(script, /marker-(start|end)="url\(#dimArrow/, 'markers only come from DimensionDiagram.svg');

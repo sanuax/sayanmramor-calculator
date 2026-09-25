@@ -260,6 +260,33 @@
     return [f.priceNote, f.visualNote].filter(Boolean).join(' ');
   }
 
+  // What the price does not cover although the client entered it -- the
+  // price is one step of «Ступени» (Type A, one piece; the count and the
+  // risers are drawn, not priced) and only the main run of a Г/П
+  // countertop (its wing sizes do not reach pricing.js). null: nothing.
+  function priceScopeNote({ productKey, riser, wingCount }) {
+    const notes = [];
+    if (productKey === 'stupeni') {
+      notes.push(riser ? 'Стоимость указана за одну ступень, подступенок в расчёт не входит.' : 'Стоимость указана за одну ступень.');
+    }
+    if (wingCount > 0) {
+      notes.push(wingCount > 1 ? 'Стоимость указана за основной сегмент, крылья в расчёт не входят.' : 'Стоимость указана за основной сегмент, крыло в расчёт не входит.');
+    }
+    return notes.length ? notes.join(' ') : null;
+  }
+
+  // The same note straight from the constructor state (the page's summary).
+  function priceScopeNoteForState(state) {
+    const key = state.product ? state.product.key : null;
+    const caps = (state.product && state.product.capabilities) || {};
+    const hasWings = caps.supportsShapeSelection && (state.shape === 'lshape' || state.shape === 'ushape') && hasArea(state.wing);
+    return priceScopeNote({
+      productKey: key,
+      riser: key === 'stupeni' && !!(state.productConfig && state.productConfig.stupeni && state.productConfig.stupeni.riser),
+      wingCount: hasWings ? (state.shape === 'ushape' ? 2 : 1) : 0,
+    });
+  }
+
   // Display rows for the Result screen: only rows that apply to this
   // product and actually carry a value -- no empty/"—"/null lines.
   function buildResultView(configuration) {
@@ -307,7 +334,10 @@
       ? c.additionalWorks.map(w => ({ key: w.key, label: w.label, detail: formatWorkDetail(w) }))
       : null;
 
-    return { title: c.product.title, specs, works, note: c.facade ? facadeNote(c.facade) : null };
+    const note = c.facade ? facadeNote(c.facade) : priceScopeNote({
+      productKey: c.product.key, riser: !!c.riser, wingCount: c.shape && c.shape.wing ? c.shape.wing.count : 0,
+    });
+    return { title: c.product.title, specs, works, note };
   }
 
   // Edit shortcuts: every real step of this product except the Result
@@ -321,6 +351,7 @@
   return {
     RESULT_TITLES,
     resultTitle, buildConfiguration, summarizePricing, buildResultView, buildEditTargets,
+    priceScopeNote, priceScopeNoteForState,
     formatRub, formatWorkDetail,
   };
 });

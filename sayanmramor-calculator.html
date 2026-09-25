@@ -1649,8 +1649,9 @@
       <div class="result-panel">
         <div class="result-eyebrow">Конфигурация готова</div>
         <dl class="result-specs" id="resultSpecs"></dl>
-        <!-- «Фасады»: what the price covers («Стоимость указана за облицовку
-             колонн.») -- right under the sizes it is counted from. -->
+        <!-- What the price covers («Стоимость указана за облицовку колонн.»,
+             «…за одну ступень.», «…за основной сегмент…») -- right under the
+             sizes it is counted from (ResultModel.buildResultView note). -->
         <p class="result-note" id="resultScopeNote" hidden></p>
 
         <div class="result-pricing">
@@ -2125,7 +2126,9 @@
   // wording. Every other product keeps the generic pair.
   const DIMENSION_LABELS = {
     pol: { length: 'Длина помещения', width: 'Ширина помещения' },
-    stena: { length: 'Высота стены', width: 'Ширина стены' },
+    // The length field is the wall's height: the diagram draws it upright,
+    // as the 3D does (lengthAxis), with the width across.
+    stena: { length: 'Высота стены', width: 'Ширина стены', lengthAxis: 'vertical' },
     // Ступени: the size of ONE step (length across it, depth front to back),
     // then the count. Лестницы: the whole stair's size, then the count --
     // the calculator derives the tread depth (GeometryModel.stairPlan).
@@ -2195,7 +2198,8 @@
     // с плейсхолдер-величинами), подписи -- названия полей.
     const layout = DimensionDiagram.rectLayout(l, w,
       l > 0 ? l + ' мм' : currentDimLabels.length,
-      w > 0 ? w + ' мм' : currentDimLabels.width);
+      w > 0 ? w + ' мм' : currentDimLabels.width,
+      { lengthAxis: currentDimLabels.lengthAxis });
     dimRect.setAttribute('x', layout.rect.x);
     dimRect.setAttribute('y', layout.rect.y);
     dimRect.setAttribute('width', layout.rect.w);
@@ -3574,7 +3578,16 @@
     }
 
     updatedAtOut.textContent = 'Расчёт по ценам на ' + formatDate(UPDATED_AT) + ', точная цена подтверждается менеджером.';
-    return { state: constructorState, outcome: { kind: 'ok', result, message: warningOut.textContent || null } };
+    const message = warningOut.textContent || null;
+    // What the price leaves out of the entered configuration (one step, a
+    // countertop's wings) -- beside the price here; the Result shows it with
+    // the sizes (#resultScopeNote), so it is not part of the message.
+    const scopeNote = ResultModel.priceScopeNoteForState(constructorState);
+    if (scopeNote) {
+      warningOut.textContent = message ? message + ' ' + scopeNote : scopeNote;
+      warningOut.style.display = 'block';
+    }
+    return { state: constructorState, outcome: { kind: 'ok', result, message } };
   }
 
   [widthInput, lengthInput].forEach(el => {

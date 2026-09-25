@@ -222,13 +222,15 @@
     }
     if (variant === 'figured') {
       // Фигурный: a shaped room-side edge -- fuller in the middle, drawn in
-      // at both ends -- against an ordinary straight window.
+      // at both ends -- against an ordinary straight window. The entered
+      // width is the sill's full depth (the slab it is cut from, the priced
+      // rectangle): the fullest point reaches it, the ends are drawn in.
       const A = Math.min(W * 0.3, 0.1);
       const front = [];
       const n = 16;
       for (let i = 0; i <= n; i++) {
         const z = -L / 2 + L * (i / n);
-        front.push([W / 2 - A + A * (1 + Math.cos(Math.PI * 2 * z / L)), z]);
+        front.push([W / 2 - A + A * Math.cos(Math.PI * 2 * z / L), z]);
       }
       return { outline: [[xw, -L / 2]].concat(front, [[xw, L / 2]]), windowLine: null };
     }

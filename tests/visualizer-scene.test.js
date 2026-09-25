@@ -364,9 +364,11 @@ test('integrated sink: the stone bowl carries the slab edge profile and thicknes
 // ---- product types: every type a client can pick draws differently ----------
 
 // A coarse fingerprint of a layout: which parts (kind/role/name), how many
-// seams, and the rounded extent of the product itself.
+// seams and outline points (a figured sill fills the same rectangle as a
+// straight one, only its outline differs), and the rounded extent.
 function fingerprint(layout) {
-  const parts = layout.parts.map(p => p.kind + ':' + p.role + ':' + (p.name || '') + (p.kind === 'seams' ? ':' + p.segments.length : '')).sort().join('|');
+  const parts = layout.parts.map(p => p.kind + ':' + p.role + ':' + (p.name || '') + (p.kind === 'seams' ? ':' + p.segments.length : '') +
+    (p.outline ? ':' + p.outline.length : '')).sort().join('|');
   const b = layout.bounds;
   return parts + '#' + (b ? b.min.concat(b.max).map(v => v.toFixed(2)).join(',') : 'none');
 }
@@ -422,7 +424,14 @@ test('windowsill types change the slab: corner turns, bays bulge out of the wall
   assert.ok(corner.x1 > straight.x1 + 0.2, 'the corner sill runs along the second wall');
   assert.ok(bay.x0 < straight.x0 - 0.1, 'the bay sill reaches out into the bay');
   assert.ok(radius.outline.length > sill('SILL-03').outline.length + 5, 'the radius bay is a curve, not three facets');
-  assert.ok(figured.outline.length > 8 && extent(figured.outline).x1 > straight.x1, 'the figured sill has a shaped, fuller front');
+  assert.ok(figured.outline.length > 8, 'the figured sill has a shaped front');
+  // The entered width is its full depth: the fullest point reaches exactly
+  // the straight sill's front, the ends are drawn in -- never deeper than the
+  // 300 mm the client entered (and the priced 1500 x 300 rectangle).
+  const f = extent(figured.outline);
+  assert.ok(Math.abs(f.x1 - straight.x1) < 1e-9 && Math.abs((f.x1 - f.x0) - 0.3) < 1e-9, 'depth = the entered width');
+  const endsX = figured.outline.filter(([, z]) => Math.abs(Math.abs(z) - 0.75) < 1e-9).map(([x]) => x);
+  assert.ok(endsX.some(x => x < straight.x1 - 0.05), 'the front is drawn in at the ends');
   ['SILL-02', 'SILL-03', 'SILL-04'].forEach(id => {
     const layout = layoutFor('podokonnik', { width: { value: '300' }, length: { value: '1500' }, productSubcategory: { value: id } });
     assert.ok(layout.parts.some(p => p.role === 'context-glass'), id + ': glazed along its window line');

@@ -203,19 +203,24 @@
   // the real proportions of length x width in a 130-unit square area (the
   // longer side fills it, the shorter keeps the ratio, never under 36 so it
   // stays visible), the length GAP under it, the width GAP left of it.
+  // lengthAxis 'vertical': the length field is the drawn height instead --
+  // «Стены», whose length field is «Высота стены» (the 3D stands it up).
   const RECT_AREA = { x: 70, y: 20, size: 130, min: 36 };
-  function rectLayout(lengthMm, widthMm, lengthText, widthText) {
-    const effL = lengthMm > 0 ? lengthMm : 1.55;
-    const effW = widthMm > 0 ? widthMm : 1;
+  function rectLayout(lengthMm, widthMm, lengthText, widthText, options) {
+    const lengthUp = !!(options && options.lengthAxis === 'vertical');
+    const effL = lengthMm > 0 ? lengthMm : (lengthUp ? 1 : 1.55);
+    const effW = widthMm > 0 ? widthMm : (lengthUp ? 1.55 : 1);
     const scale = RECT_AREA.size / Math.max(effL, effW);
-    const w = Math.max(RECT_AREA.min, effL * scale);
-    const h = Math.max(RECT_AREA.min, effW * scale);
+    const w = Math.max(RECT_AREA.min, (lengthUp ? effW : effL) * scale);
+    const h = Math.max(RECT_AREA.min, (lengthUp ? effL : effW) * scale);
     const x = RECT_AREA.x + (RECT_AREA.size - w) / 2;
     const y = RECT_AREA.y + (RECT_AREA.size - h) / 2;
+    const across = text => horizontal({ x1: x, x2: x + w, edgeY: y + h, text });
+    const up = text => vertical({ y1: y, y2: y + h, edgeX: x, text });
     return {
       rect: { x, y, w, h },
-      length: horizontal({ x1: x, x2: x + w, edgeY: y + h, text: lengthText }),
-      width: vertical({ y1: y, y2: y + h, edgeX: x, text: widthText }),
+      length: lengthUp ? up(lengthText) : across(lengthText),
+      width: lengthUp ? across(widthText) : up(widthText),
     };
   }
 
