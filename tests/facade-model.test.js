@@ -454,7 +454,7 @@ test('what the price covers: «Стоимость указана за облиц
   const d = FacadeModel.describeFacade(facadeOf(fields('FACADE-03', 'round', { radius: 200, height: 3000 }, 4)));
   assert.equal(d.areaTitle, 'Площадь облицовки колонн');
   assert.equal(d.priceNote, 'Стоимость указана за облицовку колонн.');
-  assert.match(d.visualNote, /База, капитель и перемычка/);
+  assert.equal(d.visualNote, 'Архитектурные элементы колоннады на 3D — визуальный образ и в расчёт не входят.');
   assert.equal(d.quantityText, '4 колонны');
   FacadeModel.FACADE_TYPES.forEach(t => {
     assert.match(FacadeModel.priceNote(t), /^Стоимость указана за .+\.$/, t.id);
