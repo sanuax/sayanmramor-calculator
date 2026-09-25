@@ -1253,17 +1253,20 @@
               <g id="dimFacadeG" style="display:none"></g>
               <g id="dimRectG">
               <rect id="dimRect" x="117" y="27" width="36" height="126" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5" rx="3"></rect>
-              <line id="dimLengthLine" x1="117" y1="162" x2="153" y2="162" stroke="var(--muted)" stroke-width="1.2" marker-start="url(#dimArrowStart)" marker-end="url(#dimArrowEnd)"></line>
-              <text id="dimLengthLabel" x="135" y="180" text-anchor="middle" font-size="12" fill="var(--ink)" font-weight="700">Длина</text>
-              <line id="dimWidthLine" x1="50" y1="27" x2="50" y2="153" stroke="var(--muted)" stroke-width="1.2" marker-start="url(#dimArrowStart)" marker-end="url(#dimArrowEnd)"></line>
-              <text id="dimWidthLabel" x="40" y="90" text-anchor="middle" font-size="12" fill="var(--ink)" font-weight="700">Ширина</text>
+              <!-- The rectangle's two dimensions (DimensionDiagram.rectLayout). -->
+              <g id="dimRectDims"></g>
               </g>
+              <!-- The one arrowhead of every dimension on every diagram
+                   (dimension-diagram.js ARROW): in user units, so it is the
+                   same size whatever the line's stroke; the tip of its
+                   outline (round join, stroke 1.2 -> 0.6 past the vertex)
+                   ends exactly on the line's end point (refX 7.6). -->
               <defs>
-                <marker id="dimArrowStart" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto-start-reverse">
-                  <path d="M0,1 L7,4 L0,7" fill="none" stroke="var(--muted)" stroke-width="1.4"></path>
+                <marker id="dimArrowStart" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="6" refX="7.6" refY="3" orient="auto-start-reverse" overflow="visible">
+                  <path d="M0,0 L7,3 L0,6" fill="none" stroke="var(--muted)" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round"></path>
                 </marker>
-                <marker id="dimArrowEnd" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
-                  <path d="M0,1 L7,4 L0,7" fill="none" stroke="var(--muted)" stroke-width="1.4"></path>
+                <marker id="dimArrowEnd" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="6" refX="7.6" refY="3" orient="auto" overflow="visible">
+                  <path d="M0,0 L7,3 L0,6" fill="none" stroke="var(--muted)" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round"></path>
                 </marker>
               </defs>
             </svg>
@@ -1804,6 +1807,7 @@
 <script src="product-types.js"></script>
 <script src="rate-catalog.js"></script>
 <script src="facade-model.js"></script>
+<script src="dimension-diagram.js"></script>
 <script src="step-engine.js"></script>
 <script src="result-model.js"></script>
 <script src="lead-payload.js"></script>
@@ -2161,20 +2165,12 @@
   // соотношения сторон прямоугольника на схеме), реагирует на те же самые
   // #width/#length поля, что уже читает calculate()/constructor-state.js.
   const dimRect = document.getElementById('dimRect');
-  const dimLengthLine = document.getElementById('dimLengthLine');
-  const dimLengthLabel = document.getElementById('dimLengthLabel');
-  const dimWidthLine = document.getElementById('dimWidthLine');
-  const dimWidthLabel = document.getElementById('dimWidthLabel');
+  const dimRectDims = document.getElementById('dimRectDims');
   // Горизонтальная ось диаграммы всегда = Длина, вертикальная = Ширина.
-  // Прямоугольник вписывается в квадратную область AREA_SIZE x AREA_SIZE:
-  // большая из двух реальных величин растягивается ровно до AREA_SIZE, а
-  // вторая масштабируется тем же коэффициентом -- т.е. реальное соотношение
-  // сторон (l/w) сохраняется один в один, а не подгоняется под фиксированную
-  // высоту, как раньше. MIN_RECT -- это ТОЛЬКО визуальный пол для очень
-  // маленькой стороны (чтобы фигура не схлопывалась в невидимую линию),
-  // применяется исключительно к меньшей стороне и не влияет на то, какая
-  // сторона больше -- направление (портрет/альбом) от него не зависит.
-  const DIM_AREA_X = 70, DIM_AREA_Y = 20, DIM_AREA_SIZE = 130, DIM_MIN_RECT = 36;
+  // Пропорции прямоугольника и положение обоих размеров считает
+  // DimensionDiagram.rectLayout (dimension-diagram.js): реальное соотношение
+  // сторон, размерные линии -- на отступе от краёв фигуры, наконечники --
+  // ровно на её границах, всё внутри схемы.
   function updateDimDiagram() {
     const l = parseFloat(lengthInput.value) || 0;
     const w = parseFloat(widthInput.value) || 0;
@@ -2195,41 +2191,16 @@
       return;
     }
     dimHintEl.hidden = true;
-    // Без реальных значений показываем условную альбомную заготовку (тот же
-    // расчёт, просто с плейсхолдер-величинами вместо l/w).
-    const effL = l > 0 ? l : 1.55;
-    const effW = w > 0 ? w : 1;
-    const scale = DIM_AREA_SIZE / Math.max(effL, effW);
-    const rectW = Math.max(DIM_MIN_RECT, effL * scale);
-    const rectH = Math.max(DIM_MIN_RECT, effW * scale);
-    const rectX = DIM_AREA_X + (DIM_AREA_SIZE - rectW) / 2;
-    const rectY = DIM_AREA_Y + (DIM_AREA_SIZE - rectH) / 2;
-
-    dimRect.setAttribute('x', rectX);
-    dimRect.setAttribute('y', rectY);
-    dimRect.setAttribute('width', rectW);
-    dimRect.setAttribute('height', rectH);
-
-    const lengthLineY = DIM_AREA_Y + DIM_AREA_SIZE + 12;
-    dimLengthLine.setAttribute('x1', rectX);
-    dimLengthLine.setAttribute('x2', rectX + rectW);
-    dimLengthLine.setAttribute('y1', lengthLineY);
-    dimLengthLine.setAttribute('y2', lengthLineY);
-    dimLengthLabel.setAttribute('x', rectX + rectW / 2);
-    dimLengthLabel.setAttribute('y', lengthLineY + 18);
-    dimLengthLabel.textContent = l > 0 ? l + ' мм' : currentDimLabels.length;
-
-    const widthLineX = DIM_AREA_X - 20;
-    dimWidthLine.setAttribute('y1', rectY);
-    dimWidthLine.setAttribute('y2', rectY + rectH);
-    dimWidthLine.setAttribute('x1', widthLineX);
-    dimWidthLine.setAttribute('x2', widthLineX);
-    const widthLabelX = widthLineX - 10;
-    const widthLabelY = rectY + rectH / 2;
-    dimWidthLabel.setAttribute('x', widthLabelX);
-    dimWidthLabel.setAttribute('y', widthLabelY);
-    dimWidthLabel.setAttribute('transform', 'rotate(-90 ' + widthLabelX + ' ' + widthLabelY + ')');
-    dimWidthLabel.textContent = w > 0 ? w + ' мм' : currentDimLabels.width;
+    // Без реальных значений -- условная альбомная заготовка (тот же расчёт
+    // с плейсхолдер-величинами), подписи -- названия полей.
+    const layout = DimensionDiagram.rectLayout(l, w,
+      l > 0 ? l + ' мм' : currentDimLabels.length,
+      w > 0 ? w + ' мм' : currentDimLabels.width);
+    dimRect.setAttribute('x', layout.rect.x);
+    dimRect.setAttribute('y', layout.rect.y);
+    dimRect.setAttribute('width', layout.rect.w);
+    dimRect.setAttribute('height', layout.rect.h);
+    dimRectDims.innerHTML = DimensionDiagram.svg(layout.length) + DimensionDiagram.svg(layout.width);
   }
 
   // ---- Схема размеров: ступень / лестница --------------------------------
@@ -2242,17 +2213,11 @@
     if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
     return many;
   }
-  const DIAGRAM_TEXT = 'font-size="12" fill="var(--ink)" font-weight="700" text-anchor="middle"';
   const DIAGRAM_STONE = 'fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"';
   const DIAGRAM_JOINT = 'stroke="var(--stone-line)" stroke-width="1" fill="none"';
-  function diagramArrow(x1, y1, x2, y2) {
-    return '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="var(--muted)" stroke-width="1.2" marker-start="url(#dimArrowStart)" marker-end="url(#dimArrowEnd)"/>';
-  }
-  function diagramText(x, y, text, vertical, anchor) {
-    const rot = vertical ? ' transform="rotate(-90 ' + x + ' ' + y + ')"' : '';
-    const attrs = anchor ? DIAGRAM_TEXT.replace('text-anchor="middle"', 'text-anchor="' + anchor + '"') : DIAGRAM_TEXT;
-    return '<text x="' + x + '" y="' + y + '" ' + attrs + rot + '>' + escapeHtml(text) + '</text>';
-  }
+  // Every dimension below is placed by dimension-diagram.js (one geometry for
+  // all diagrams); these only name what is measured.
+  const dimSvg = dim => DimensionDiagram.svg(dim);
   // Short words on the drawing while a field is empty -- the full field
   // names are right under it, and a long name would run into the drawing.
   const DIAGRAM_SHORT_LABELS = { steps: ['длина', 'глубина'], flight: ['длина', 'ширина'], spiral: ['диаметр', 'ширина'] };
@@ -2280,18 +2245,22 @@
         const a = rh * 0.35, b = rh * 1.65;
         svg += '<path d="M' + x0 + ' ' + (cy - a / 2) + ' L' + x1 + ' ' + (cy - b / 2) + ' L' + x1 + ' ' + (cy + b / 2) + ' L' + x0 + ' ' + (cy + a / 2) + ' Z" ' + DIAGRAM_STONE + '/>';
         bottom = cy + b / 2;
-        svg += diagramArrow(cx, y0, cx, y1); // the depth is taken at mid-length
-      } else if (info.variant === 'radius') {
-        const bulge = Math.max(4, p.bulgeM * s);
-        svg += '<path d="M' + x0 + ' ' + y0 + ' H' + x1 + ' V' + y1 + ' Q' + cx + ' ' + (y1 + 2 * bulge) + ' ' + x0 + ' ' + y1 + ' Z" ' + DIAGRAM_STONE + '/>';
-        bottom = y1 + bulge;
-        svg += diagramArrow(x0 - 10, y0, x0 - 10, y1);
+        // The depth is taken at mid-length, across the step itself; its
+        // label sits left of the step.
+        svg += dimSvg(DimensionDiagram.vertical({ y1: y0, y2: y1, lineX: cx }));
+        svg += DimensionDiagram.labelSvg(DimensionDiagram.fitLabel({ x: x0 - DimensionDiagram.GAP, y: cy + 4, text: widText, anchor: 'end' }));
       } else {
-        svg += '<rect x="' + x0 + '" y="' + y0 + '" width="' + rw + '" height="' + rh + '" rx="2" ' + DIAGRAM_STONE + '/>';
-        svg += diagramArrow(x0 - 10, y0, x0 - 10, y1);
+        if (info.variant === 'radius') {
+          const bulge = Math.max(4, p.bulgeM * s);
+          svg += '<path d="M' + x0 + ' ' + y0 + ' H' + x1 + ' V' + y1 + ' Q' + cx + ' ' + (y1 + 2 * bulge) + ' ' + x0 + ' ' + y1 + ' Z" ' + DIAGRAM_STONE + '/>';
+          bottom = y1 + bulge;
+        } else {
+          svg += '<rect x="' + x0 + '" y="' + y0 + '" width="' + rw + '" height="' + rh + '" rx="2" ' + DIAGRAM_STONE + '/>';
+        }
+        // The depth left of the step, its label beside it (horizontal).
+        svg += dimSvg(DimensionDiagram.vertical({ y1: y0, y2: y1, edgeX: x0, text: widText, label: 'beside' }));
       }
-      svg += diagramArrow(x0, bottom + 12, x1, bottom + 12) + diagramText(cx, bottom + 30, lenText);
-      svg += diagramText(x0 - 16, cy + 4, widText, false, 'end');
+      svg += dimSvg(DimensionDiagram.horizontal({ x1: x0, x2: x1, edgeY: bottom, text: lenText }));
       svg += '<text x="226" y="80" font-size="20" font-weight="800" fill="var(--accent-ink)" text-anchor="middle">× ' + n + '</text>';
       svg += '<text x="226" y="97" font-size="11" fill="var(--muted)" text-anchor="middle">' + plural(n, 'ступень', 'ступени', 'ступеней') + '</text>';
     } else if (info.variant === 'spiral') {
@@ -2303,8 +2272,10 @@
         svg += '<line x1="' + (cx + r * Math.cos(a)) + '" y1="' + (cy + r * Math.sin(a)) + '" x2="' + (cx + R * Math.cos(a)) + '" y2="' + (cy + R * Math.sin(a)) + '" ' + DIAGRAM_JOINT + '/>';
       }
       svg += '<circle cx="' + cx + '" cy="' + cy + '" r="' + Math.max(3, r) + '" fill="var(--card)" stroke="var(--stone-line)" stroke-width="1.5"/>';
-      svg += diagramArrow(cx - R, cy + R + 10, cx + R, cy + R + 10) + diagramText(cx, cy + R + 28, lenText);
-      svg += diagramArrow(cx + Math.max(3, r), cy, cx + R, cy) + diagramText(cx + R + 8, cy + 4, widText, false, 'start');
+      // The diameter under the circle; one step's width from the post to the
+      // rim, its label just outside the circle.
+      svg += dimSvg(DimensionDiagram.horizontal({ x1: cx - R, x2: cx + R, edgeY: cy + R, text: lenText }));
+      svg += dimSvg(DimensionDiagram.horizontal({ x1: cx + Math.max(3, r), x2: cx + R, lineY: cy, text: widText, label: 'after' }));
     } else {
       // The flight(s) in plan, one line per step; the landing plain.
       const d = p.treadDepthM, n1 = p.flights[0], n2 = p.flights[1] || 0;
@@ -2332,8 +2303,8 @@
           for (let k = 1; k < n2; k++) svg += '<line x1="' + (lx - k * d * s) + '" y1="' + ty + '" x2="' + (lx - k * d * s) + '" y2="' + (ty + w) + '" ' + DIAGRAM_JOINT + '/>';
         }
       }
-      svg += diagramArrow(x0, yb + 12, x0 + L * s, yb + 12) + diagramText(130, yb + 30, lenText);
-      svg += diagramArrow(x0 - 12, yb - w, x0 - 12, yb) + diagramText(x0 - 22, yb - w / 2, widText, true);
+      svg += dimSvg(DimensionDiagram.horizontal({ x1: x0, x2: x0 + L * s, edgeY: yb, text: lenText }));
+      svg += dimSvg(DimensionDiagram.vertical({ y1: yb - w, y2: yb, edgeX: x0, text: widText }));
     }
     dimStairG.innerHTML = svg;
     document.getElementById('dimSvg').setAttribute('aria-label', 'Схема: ' + currentDimLabels.length.toLowerCase() + ', ' + currentDimLabels.width.toLowerCase() + ', ' + n + ' ' + plural(n, 'ступень', 'ступени', 'ступеней'));
@@ -3192,16 +3163,14 @@
     const STONE = 'fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"';
     const WALL = 'fill="var(--wall)" stroke="var(--wall-line)" stroke-width="1.2"';
     const OPEN = 'fill="var(--card)" stroke="var(--stone-line)" stroke-width="1.1"';
-    const LINE = 'stroke="var(--muted)" stroke-width="1.2" marker-start="url(#dimArrowStart)" marker-end="url(#dimArrowEnd)"';
-    const TEXT = 'font-size="12" fill="var(--ink)" font-weight="700" text-anchor="middle"';
     const rect = (x, y, w, h, style) => '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" ' + style + '/>';
-    const text = (x, y, t, extra) => '<text x="' + x + '" y="' + y + '" ' + TEXT + (extra || '') + '>' + t + '</text>';
-    const hDim = (x1, x2, y, t) => '<line x1="' + x1 + '" y1="' + y + '" x2="' + x2 + '" y2="' + y + '" ' + LINE + '/>' + text((x1 + x2) / 2, y + 16, t);
-    const vDim = (x, y1, y2, t, right) => {
-      const tx = right ? x + 12 : x - 10, ty = (y1 + y2) / 2;
-      return '<line x1="' + x + '" y1="' + y1 + '" x2="' + x + '" y2="' + y2 + '" ' + LINE + '/>' +
-        text(tx, ty, t, ' transform="rotate(-90 ' + tx + ' ' + ty + ')"');
-    };
+    // Dimensions and labels are placed by dimension-diagram.js: a dimension
+    // GAP outside the edge it measures, arrow tips on the boundaries, all
+    // inside the diagram.
+    const D2 = DimensionDiagram;
+    const text = (x, y, t) => D2.labelSvg(D2.fitLabel({ x, y, text: t, anchor: 'middle' }));
+    const hDim = (x1, x2, edgeY, t) => D2.svg(D2.horizontal({ x1, x2, edgeY, text: t }));
+    const vDim = (y1, y2, edgeX, t, side) => D2.svg(D2.vertical({ y1, y2, edgeX, text: t, side }));
     // Real proportions of w x h inside maxW x maxH, each side at least min.
     const fit = (w, h, maxW, maxH, min) => {
       const s = Math.min(maxW / w, maxH / h);
@@ -3213,7 +3182,7 @@
       const f = fit(size(across), size('height'), 150, type.key === 'plinth' ? 90 : 120, 20);
       const x = 145 - f.w / 2, y = type.key === 'plinth' ? 148 - f.h : 80 - f.h / 2;
       if (type.key === 'plinth') svg += rect(x, 24, f.w, y - 24, WALL);
-      svg += rect(x, y, f.w, f.h, STONE) + hDim(x, x + f.w, y + f.h + 12, label(across)) + vDim(x - 16, y, y + f.h, label('height'));
+      svg += rect(x, y, f.w, f.h, STONE) + hDim(x, x + f.w, y + f.h, label(across)) + vDim(y, y + f.h, x, label('height'));
     } else if (type.key === 'surround') {
       const door = form.id === 'door';
       const W = size('openingWidth'), H = size('openingHeight'), b = size('frame');
@@ -3222,25 +3191,26 @@
       const x = 145 - f.w / 2, y = 40;
       svg += rect(x, y, f.w, f.h, STONE) + rect(x + bp, y + bp, wp, hp, OPEN) +
         text(145, y - 10, 'Обрамление: ' + label('frame')) +
-        hDim(x + bp, x + bp + wp, y + f.h + 12, label('openingWidth')) + vDim(x - 16, y + bp, y + bp + hp, label('openingHeight'));
+        hDim(x + bp, x + bp + wp, y + f.h, label('openingWidth')) + vDim(y + bp, y + bp + hp, x, label('openingHeight'));
     } else if (type.key === 'column' || type.key === 'pilaster') {
       const square = form.id === 'square';
       const across = type.key === 'pilaster' ? size('width') : (square ? size('side') : 2 * size('radius'));
       const f = fit(across, size('height'), 60, 120, 12);
       const x = 110 - f.w / 2, y = 84 - f.h / 2;
       if (type.key === 'pilaster') svg += rect(x - 26, y - 6, f.w + 52, f.h + 6, WALL);
-      svg += rect(x, y, f.w, f.h, STONE) + vDim(x - 16, y, y + f.h, label('height'));
+      svg += rect(x, y, f.w, f.h, STONE) + vDim(y, y + f.h, x, label('height'));
       if (type.key === 'column' && !square) svg += '<path d="M' + (x + f.w * 0.3) + ' ' + y + ' V' + (y + f.h) + '" fill="none" stroke="var(--stone-line)" stroke-width="1" opacity="0.6"/>';
-      // The cross-section, on the right.
+      // The cross-section, on the right: the radius from the centre to the
+      // circle (tip on the circle), the side along the square's own side.
       if (type.key === 'column' && !square) {
-        svg += '<circle cx="205" cy="70" r="24" ' + STONE + '/><path d="M205 70 H229" fill="none" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#dimArrowEnd)"/>' +
-          text(205, 112, 'R = ' + label('radius'));
+        svg += '<circle cx="205" cy="70" r="24" ' + STONE + '/>' +
+          D2.svg(D2.radius({ cx: 205, cy: 70, r: 24, text: 'R = ' + label('radius') }));
       } else if (type.key === 'column') {
-        svg += rect(183, 48, 44, 44, STONE) + hDim(183, 227, 104, label('side'));
+        svg += rect(183, 48, 44, 44, STONE) + hDim(183, 227, 92, label('side'));
       } else {
         const pd = Math.min(28, Math.max(6, 40 * size('projection') / size('width')));
         svg += '<path d="M168 88 H242" fill="none" stroke="var(--wall-line)" stroke-width="3"/>' + rect(185, 88 - pd, 40, pd, STONE) +
-          text(205, 112, 'Ширина: ' + label('width'), ' font-size="11"') + text(205, 128, 'Выступ: ' + label('projection'), ' font-size="11"');
+          text(205, 112, 'Ширина: ' + label('width')) + text(205, 128, 'Выступ: ' + label('projection'));
       }
     } else {
       // Карниз / пояс in section: the wall on the left, the profile out to the right.
@@ -3258,7 +3228,7 @@
         svg += rect(wx, top + 10, f.w, f.h, STONE);
       }
       const y0 = type.key === 'cornice' ? top : top + 10;
-      svg += vDim(wx + f.w + 14, y0, y0 + f.h, label('height'), true) + hDim(wx, wx + f.w, y0 + f.h + 12, label('projection')) +
+      svg += vDim(y0, y0 + f.h, wx + f.w, label('height'), 'right') + hDim(wx, wx + f.w, y0 + f.h, label('projection')) +
         text(130, 178, 'Длина: ' + label('length'));
     }
     g.innerHTML = svg;
