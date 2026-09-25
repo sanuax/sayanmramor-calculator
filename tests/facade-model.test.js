@@ -279,8 +279,12 @@ test('Result and lead: type, form, every size by name, quantity and area -- stru
   assert.equal(spec('facade.height').value, '3000 мм');
   assert.equal(spec('facade.quantity').value, '4 шт.');
   assert.equal(spec('facade.area').value, '15,08 м²');
-  assert.match(spec('facade.area').detail, /3,77 м² × 4/);
+  assert.equal(spec('facade.area').detail, '3,77 м² × 4 колонны');
+  assert.equal(spec('type').label, 'Изделие');
   assert.equal(spec('dimensions'), undefined);
+  assert.match(view.note, /^Стоимость указана за облицовку колонн\./);
+  // The lead keeps the type, shape, radius, height, quantity, both areas and the formula.
+  assert.equal(f.priceNote, 'Стоимость указана за облицовку колонн.');
 
   const pricing = ResultModel.summarizePricing({ kind: 'ok', result: priceOf(state) }, '2026-09-15T23:53:23+03:00');
   const lead = LeadPayload.buildLeadPayload({ configuration, pricing, contact: { name: 'Анна', phone: '+79161234567', comment: null }, createdAt: '2026-09-25T10:00:00.000Z' });
@@ -323,7 +327,111 @@ test('3D round column: a cylinder of the entered radius and height; square: a pr
   const bigger = named(layoutOf(fields('FACADE-03', 'round', { radius: 400, height: 3200 }, 1)), 'column')[0];
   close(Math.max(...bigger.outline.map(([x]) => x)), 0.4);
   const taller = named(layoutOf(fields('FACADE-03', 'round', { radius: 250, height: 4500 }, 1)), 'column')[0];
-  close(taller.y1, 4.5);
+  close(taller.y1 - taller.y0, 4.5);
+});
+
+test('3D column reads as architecture: base, shaft, ring, top slab -- the shaft is the priced surface, the rest is visualOnly', () => {
+  const layout = layoutOf(fields('FACADE-03', 'round', { radius: 200, height: 3000 }, 1));
+  const one = name => named(layout, name);
+  ['column-base', 'column', 'column-ring', 'column-slab'].forEach(name => assert.equal(one(name).length, 1, name));
+  const [base, shaft, ring, slab] = ['column-base', 'column', 'column-ring', 'column-slab'].map(name => one(name)[0]);
+  // Stacked bottom to top, no gaps.
+  close(base.y0, 0); close(shaft.y0, base.y1); close(ring.y0, shaft.y1); close(slab.y0, ring.y1);
+  // The shaft: radius R, exactly H tall -- 2πRH is its side surface.
+  close(shaft.y1 - shaft.y0, 3);
+  close(2 * Math.PI * 0.2 * (shaft.y1 - shaft.y0), facadeOf(fields('FACADE-03', 'round', { radius: 200, height: 3000 }, 1)).pieceAreaM2);
+  assert.equal(shaft.visualOnly, undefined, 'the shaft is priced');
+  [base, ring, slab].forEach(p => assert.equal(p.visualOnly, true, p.name));
+  // The shaft stays the main element: base/ring/slab only a little wider and far shorter.
+  const radius = part => Math.max(...part.outline.map(([x]) => x));
+  [base, ring, slab].forEach(p => {
+    assert.ok(radius(p) > 0.2 && radius(p) <= 0.2 * 1.45 + 1e-9, p.name + ' a little wider than the shaft');
+    assert.ok(p.y1 - p.y0 < 0.1 * 3, p.name + ' short next to the shaft');
+  });
+  // One column: no lintel.
+  assert.equal(one('lintel').length, 0);
+});
+
+test('3D column proportions: H stretches the shaft only; R / A scale base and top with the section; a small column never gets a huge base', () => {
+  const partsOf = values => {
+    const layout = layoutOf(values);
+    const get = name => named(layout, name)[0];
+    return { base: get('column-base'), shaft: get('column'), slab: get('column-slab') };
+  };
+  const h = p => p.y1 - p.y0;
+  const r = part => part.kind === 'box' ? part.size[0] / 2 : Math.max(...part.outline.map(([x]) => x));
+  const a = partsOf(fields('FACADE-03', 'round', { radius: 200, height: 3000 }, 1));
+  const tall = partsOf(fields('FACADE-03', 'round', { radius: 200, height: 6000 }, 1));
+  close(h(tall.shaft), 6);
+  close(h(tall.base), h(a.base), 'the base keeps its height');
+  close(h(tall.slab), h(a.slab), 'the top keeps its height');
+  const thick = partsOf(fields('FACADE-03', 'round', { radius: 400, height: 3000 }, 1));
+  close(r(thick.base) / r(thick.shaft), r(a.base) / r(a.shaft), 'the base scales with the radius');
+  close(r(thick.slab) / r(thick.shaft), r(a.slab) / r(a.shaft), 'the top scales with the radius');
+  const square = partsOf(fields('FACADE-03', 'square', { side: 400, height: 3000 }, 1));
+  assert.equal(square.shaft.kind, 'box');
+  assert.equal(square.base.kind, 'box');
+  close(square.base.size[0] / square.shaft.size[0], 1.32, 'square base scales with A');
+  close(square.shaft.size[1], 3);
+  // A small, short column: base and top stay a small share of it.
+  const small = partsOf(fields('FACADE-03', 'round', { radius: 50, height: 800 }, 1));
+  assert.ok(h(small.base) <= 0.07 * 0.8 + 1e-9);
+  assert.ok(r(small.base) <= 0.05 * 1.45);
+});
+
+test('the lintel over a group of columns is a separate, visual-only element -- never in the columns\' area or price', () => {
+  const sizes = { radius: 200, height: 3000 };
+  const four = layoutOf(fields('FACADE-03', 'round', sizes, 4));
+  assert.equal(named(four, 'column').length, 4, '4 columns as a group');
+  const lintel = named(four, 'lintel');
+  assert.equal(lintel.length, 1);
+  assert.equal(lintel[0].visualOnly, true);
+  assert.equal(lintel[0].role, 'context', 'drawn as the building, not as stone');
+  // The priced area is the shafts' side surface only -- the same with or
+  // without the lintel, base or top, and the price follows it alone.
+  const f4 = facadeOf(fields('FACADE-03', 'round', sizes, 4));
+  close(f4.areaM2, 4 * 2 * Math.PI * 0.2 * 3);
+  const shafts = named(four, 'column').reduce((s, c) => s + 2 * Math.PI * 0.2 * (c.y1 - c.y0), 0);
+  close(shafts, f4.areaM2);
+  close(priceOf(stateFor(fields('FACADE-03', 'round', sizes, 4))).fabrication, WORK_RATES.fasad.fabricationRatePerM2 * f4.areaM2);
+  // More than 6: still 6 drawn, all counted.
+  const twenty = facadeOf(fields('FACADE-03', 'round', sizes, 20));
+  close(twenty.areaM2, 20 * 2 * Math.PI * 0.2 * 3);
+  assert.equal(named(layoutOf(fields('FACADE-03', 'round', sizes, 20)), 'column').length, 6);
+});
+
+test('the worked examples: 4 × R200 × H3000 = 15,08 м²; 4 × A400 × H3000 = 19,20 м²', () => {
+  const round = facadeOf(fields('FACADE-03', 'round', { radius: 200, height: 3000 }, 4));
+  const square = facadeOf(fields('FACADE-03', 'square', { side: 400, height: 3000 }, 4));
+  assert.equal(Math.round(round.pieceAreaM2 * 100) / 100, 3.77);
+  assert.equal(Math.round(round.areaM2 * 100) / 100, 15.08);
+  close(square.pieceAreaM2, 4.8);
+  close(square.areaM2, 19.2);
+});
+
+test('no other facade type draws visual-only extras -- its stone is exactly what is priced', () => {
+  const sizes = { length: 6000, height: 3000, width: 500, projection: 200, openingWidth: 1200, openingHeight: 1500, frame: 150 };
+  FacadeModel.FACADE_TYPES.filter(t => t.key !== 'column').forEach(t => t.forms.forEach(f => {
+    const layout = layoutOf(fields(t.id, f.id, sizes, 2));
+    assert.ok(layout.parts.every(p => !p.visualOnly), t.id + '/' + f.id);
+  }));
+});
+
+test('what the price covers: «Стоимость указана за облицовку колонн.», and the 3D-only parts are named', () => {
+  const d = FacadeModel.describeFacade(facadeOf(fields('FACADE-03', 'round', { radius: 200, height: 3000 }, 4)));
+  assert.equal(d.areaTitle, 'Площадь облицовки колонн');
+  assert.equal(d.priceNote, 'Стоимость указана за облицовку колонн.');
+  assert.match(d.visualNote, /База, капитель и перемычка/);
+  assert.equal(d.quantityText, '4 колонны');
+  FacadeModel.FACADE_TYPES.forEach(t => {
+    assert.match(FacadeModel.priceNote(t), /^Стоимость указана за .+\.$/, t.id);
+    assert.ok(t.areaTitle, t.id);
+  });
+  assert.equal(FacadeModel.countLabel(1, ['колонна', 'колонны', 'колонн']), '1 колонна');
+  assert.equal(FacadeModel.countLabel(4, ['колонна', 'колонны', 'колонн']), '4 колонны');
+  assert.equal(FacadeModel.countLabel(11, ['колонна', 'колонны', 'колонн']), '11 колонн');
+  assert.equal(FacadeModel.countLabel(22, ['колонна', 'колонны', 'колонн']), '22 колонны');
+  assert.equal(FacadeModel.countLabel(25, ['колонна', 'колонны', 'колонн']), '25 колонн');
 });
 
 test('3D quantity: the pieces are drawn side by side, up to 6', () => {

@@ -553,6 +553,12 @@
   .dim-diagram { display: flex; justify-content: center; margin-bottom: 16px; }
   .dim-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; max-width: 320px; margin: 0 auto; }
   .dim-fields[hidden] { display: none; }
+  /* «Фасады»: the area, its breakdown, the formula and what the price
+     covers -- one line each, the total first. */
+  #facadeAreaNote { display: grid; gap: 2px; max-width: 360px; margin: 14px auto 0; line-height: 1.45; }
+  #facadeAreaNote[hidden] { display: none; }
+  .facade-area-total { color: var(--ink); font-size: var(--configurator-text); font-weight: 700; }
+  .facade-area-scope { margin-top: 6px; color: #5a5247; }
   .dim-note { font-size: var(--configurator-muted); color: var(--muted); text-align: center; margin-top: 12px; }
   /* Ступени/лестницы: a titled size block and the step count right under it,
      in the same centred column as the size fields. */
@@ -1640,6 +1646,9 @@
       <div class="result-panel">
         <div class="result-eyebrow">Конфигурация готова</div>
         <dl class="result-specs" id="resultSpecs"></dl>
+        <!-- «Фасады»: what the price covers («Стоимость указана за облицовку
+             колонн.») -- right under the sizes it is counted from. -->
+        <p class="result-note" id="resultScopeNote" hidden></p>
 
         <div class="result-pricing">
           <div class="result-block-title">Предварительная стоимость</div>
@@ -3142,19 +3151,33 @@
     updateFacadeAreaNote();
   }
 
-  // What is clad and how it is counted -- and, once every size is in, the
-  // area it gives (one piece x the quantity).
+  // What is clad, how it is counted and what the price covers -- and, once
+  // every size is in, the area it gives (one piece x the quantity):
+  //   Площадь облицовки колонн: 15,08 м²
+  //   3,77 м² × 4 колонны
+  //   Формула: боковая поверхность колонны = 2 × π × R × H.
+  //   Стоимость указана за облицовку колонн. (+ what the 3D shows only as image)
   function updateFacadeAreaNote() {
     const type = currentFacadeType();
     if (!type) return;
     const cfg = FacadeModel.readFacadeConfig(document, type.id);
     const form = FacadeModel.getForm(type, cfg.form);
-    const surface = form.surface.charAt(0).toUpperCase() + form.surface.slice(1);
-    document.getElementById('facadeAreaNote').textContent = cfg.complete
-      ? 'Площадь облицовки: ' + decimal2(cfg.areaM2) + ' м²' +
-        (cfg.quantity > 1 ? ' (' + decimal2(cfg.pieceAreaM2) + ' м² × ' + cfg.quantity + ')' : '') +
-        '. ' + surface + ': ' + form.formula + '.'
-      : surface + ': ' + form.formula + '.';
+    const note = document.getElementById('facadeAreaNote');
+    const line = (cls, text) => {
+      const el = document.createElement('span');
+      el.className = cls;
+      el.textContent = text;
+      return el;
+    };
+    const lines = [];
+    if (cfg.complete) {
+      lines.push(line('facade-area-total', type.areaTitle + ': ' + decimal2(cfg.areaM2) + ' м²'));
+      if (cfg.quantity > 1) lines.push(line('facade-area-line', decimal2(cfg.pieceAreaM2) + ' м² × ' + FacadeModel.countLabel(cfg.quantity, type.quantity.nouns)));
+    }
+    // The formula never breaks across lines («4 × A × H» stays whole).
+    lines.push(line('facade-area-line', 'Формула: ' + form.surface + ' = ' + form.formula.replace(/ /g, ' ') + '.'));
+    lines.push(line('facade-area-scope', [FacadeModel.priceNote(type), type.visualNote].filter(Boolean).join(' ')));
+    note.replaceChildren(...lines);
   }
 
   // The size diagram for a facade: the chosen form drawn with the client's
@@ -3823,6 +3846,10 @@
       row.append(el('dt', null, spec.label), dd);
       return row;
     }));
+
+    const scopeNoteEl = document.getElementById('resultScopeNote');
+    scopeNoteEl.hidden = !view.note;
+    scopeNoteEl.textContent = view.note || '';
 
     resultWorksBlockEl.hidden = view.works === null;
     if (view.works) {

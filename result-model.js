@@ -249,9 +249,15 @@
     if (f.quantity !== null) specs.push({ key: 'facade.quantity', label: 'Количество', value: f.quantity + ' ' + f.unit, detail: '' });
     specs.push({
       key: 'facade.area', label: 'Площадь облицовки', value: formatArea(f.areaM2),
-      detail: (f.quantity > 1 ? formatArea(f.pieceAreaM2) + ' × ' + f.quantity + ' · ' : '') + f.formula,
+      detail: f.quantity > 1 ? formatArea(f.pieceAreaM2) + ' × ' + f.quantityText : '',
     });
     return specs;
+  }
+
+  // What a facade's price covers (and what the 3D shows only as the image),
+  // shown with its sizes: «Стоимость указана за облицовку колонн.»
+  function facadeNote(f) {
+    return [f.priceNote, f.visualNote].filter(Boolean).join(' ');
   }
 
   // Display rows for the Result screen: only rows that apply to this
@@ -260,7 +266,8 @@
     const c = configuration;
     const specs = [];
     if (c.type) {
-      specs.push({ key: 'type', label: 'Тип', value: c.type.label, detail: c.type.quantity ? c.type.quantity + ' шт.' : '' });
+      // A facade's type IS the product the client orders («Изделие: Колонны»).
+      specs.push({ key: 'type', label: c.facade ? 'Изделие' : 'Тип', value: c.type.label, detail: c.type.quantity ? c.type.quantity + ' шт.' : '' });
     }
     if (c.shape) {
       specs.push({ key: 'shape', label: 'Форма', value: c.shape.label, detail: c.shape.cornerLabel || '' });
@@ -300,7 +307,7 @@
       ? c.additionalWorks.map(w => ({ key: w.key, label: w.label, detail: formatWorkDetail(w) }))
       : null;
 
-    return { title: c.product.title, specs, works };
+    return { title: c.product.title, specs, works, note: c.facade ? facadeNote(c.facade) : null };
   }
 
   // Edit shortcuts: every real step of this product except the Result

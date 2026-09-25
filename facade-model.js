@@ -51,8 +51,9 @@
     return { key, label, placeholderMm };
   }
 
-  function quantity(label) {
-    return Object.assign({ label, unit: 'шт.' }, QUANTITY_LIMITS);
+  // `nouns`: the piece in Russian for 1 / 2-4 / 5+ («4 колонны»).
+  function quantity(label, nouns) {
+    return Object.assign({ label, unit: 'шт.', nouns }, QUANTITY_LIMITS);
   }
 
   // Each form: `params` in the order the client fills them in; `area(p)`
@@ -60,11 +61,16 @@
   // the same in words (shown next to the area); `surface` what that area is.
   // `cameraPreset` is the 3D's default angle for the type (visualizer/
   // constants.js) -- a column is read from an angle, a wall from the front.
+  // What the price is for, in the client's words: `areaTitle` heads the
+  // area, `priceScope` completes «Стоимость указана за …», and `visualNote`
+  // names what the 3D shows only as the architectural image (a column's base
+  // and top, the lintel over a colonnade) -- never part of the area above.
   const FACADE_TYPES = [
     {
       id: 'FACADE-01', key: 'wall', title: 'Фасад здания', desc: 'Облицовка стены',
       cameraPreset: 'front',
-      quantity: quantity('Количество одинаковых участков'),
+      quantity: quantity('Количество одинаковых участков', ['участок', 'участка', 'участков']),
+      areaTitle: 'Площадь облицовки стены', priceScope: 'облицовку стены',
       forms: [{
         id: 'wall', title: null,
         params: [param('length', 'Длина стены', 8000), param('height', 'Высота стены', 3000)],
@@ -75,7 +81,8 @@
     {
       id: 'FACADE-04', key: 'plinth', title: 'Цоколь', desc: 'Нижний пояс стены',
       cameraPreset: 'front',
-      quantity: quantity('Количество одинаковых участков'),
+      quantity: quantity('Количество одинаковых участков', ['участок', 'участка', 'участков']),
+      areaTitle: 'Площадь облицовки цоколя', priceScope: 'облицовку цоколя',
       forms: [{
         id: 'plinth', title: null,
         params: [param('length', 'Длина участка', 8000), param('height', 'Высота цоколя', 600)],
@@ -88,7 +95,8 @@
       // around an opening, so its sizes are now the opening's and the frame's.
       id: 'FACADE-02', key: 'surround', title: 'Обрамление проёма', desc: 'Наличник окна или двери',
       cameraPreset: 'front',
-      quantity: quantity('Количество проёмов'),
+      quantity: quantity('Количество проёмов', ['проём', 'проёма', 'проёмов']),
+      areaTitle: 'Площадь обрамления проёмов', priceScope: 'обрамление проёмов',
       forms: [
         {
           id: 'window', title: 'Окно', desc: 'Обрамление с четырёх сторон',
@@ -108,7 +116,9 @@
       // Колонны: only the side surface is clad (the top and the foot are not).
       id: 'FACADE-03', key: 'column', title: 'Колонны', desc: 'Облицовка колонн',
       cameraPreset: 'iso-eye-level',
-      quantity: quantity('Количество колонн'),
+      quantity: quantity('Количество колонн', ['колонна', 'колонны', 'колонн']),
+      areaTitle: 'Площадь облицовки колонн', priceScope: 'облицовку колонн',
+      visualNote: 'База, капитель и перемычка на 3D — архитектурный образ, в расчёт не входят.',
       forms: [
         {
           id: 'round', title: 'Круглая', desc: 'Круглое сечение',
@@ -129,7 +139,8 @@
       // two sides are clad, the back is the wall.
       id: 'FACADE-06', key: 'pilaster', title: 'Пилястры', desc: 'Плоская колонна на стене',
       cameraPreset: 'iso-eye-level',
-      quantity: quantity('Количество пилястр'),
+      quantity: quantity('Количество пилястр', ['пилястра', 'пилястры', 'пилястр']),
+      areaTitle: 'Площадь облицовки пилястр', priceScope: 'облицовку пилястр',
       forms: [{
         id: 'pilaster', title: null,
         params: [param('width', 'Ширина пилястры', 400), param('projection', 'Выступ от стены', 100), param('height', 'Высота пилястры', 3000)],
@@ -143,6 +154,7 @@
       id: 'FACADE-07', key: 'cornice', title: 'Карниз', desc: 'Венчающий профиль стены',
       cameraPreset: 'front',
       quantity: null,
+      areaTitle: 'Площадь облицовки карниза', priceScope: 'облицовку карниза',
       forms: [{
         id: 'cornice', title: null,
         params: [param('length', 'Длина карниза', 8000), param('height', 'Высота профиля', 300), param('projection', 'Вынос карниза', 250)],
@@ -156,6 +168,7 @@
       id: 'FACADE-08', key: 'belt', title: 'Фасадный пояс', desc: 'Горизонтальная тяга по стене',
       cameraPreset: 'front',
       quantity: null,
+      areaTitle: 'Площадь облицовки пояса', priceScope: 'облицовку пояса',
       forms: [{
         id: 'belt', title: null,
         params: [param('length', 'Длина пояса', 8000), param('height', 'Высота пояса', 200), param('projection', 'Выступ от стены', 60)],
@@ -168,7 +181,8 @@
       // insert) -- its face is clad.
       id: 'FACADE-05', key: 'decor', title: 'Декоративный элемент', desc: 'Плоская вставка на стене',
       cameraPreset: 'front',
-      quantity: quantity('Количество элементов'),
+      quantity: quantity('Количество элементов', ['элемент', 'элемента', 'элементов']),
+      areaTitle: 'Площадь декоративных элементов', priceScope: 'декоративные элементы',
       forms: [{
         id: 'decor', title: null,
         params: [param('width', 'Ширина элемента', 600), param('height', 'Высота элемента', 800)],
@@ -241,6 +255,20 @@
     };
   }
 
+  // «4 колонны», «1 проём», «5 элементов».
+  function countLabel(n, nouns) {
+    const m10 = n % 10, m100 = n % 100;
+    const i = m10 === 1 && m100 !== 11 ? 0 : (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? 1 : 2);
+    return n + ' ' + nouns[i];
+  }
+
+  // What the price covers, as the client reads it: «Стоимость указана за
+  // облицовку колонн.» -- plus, where the 3D shows more than is priced (a
+  // column's base and top), the note that those are only the image.
+  function priceNote(type) {
+    return 'Стоимость указана за ' + type.priceScope + '.';
+  }
+
   // The same configuration as plain data for the Result and the lead:
   // every size under its own name, in millimetres.
   function describeFacade(config) {
@@ -259,16 +287,21 @@
       quantity: type.quantity ? config.quantity : null,
       quantityLabel: type.quantity ? type.quantity.label : null,
       unit: type.quantity ? type.quantity.unit : null,
+      // «4 колонны» -- the quantity in words (null for a linear product).
+      quantityText: type.quantity ? countLabel(config.quantity, type.quantity.nouns) : null,
       surface: form.surface,
       formula: form.formula,
       pieceAreaM2: round2(config.pieceAreaM2),
       areaM2: round2(config.areaM2),
+      areaTitle: type.areaTitle,
+      priceNote: priceNote(type),
+      visualNote: type.visualNote || null,
     };
   }
 
   return {
     QUANTITY_LIMITS, PARAM_FIELDS, FORM_FIELD, QUANTITY_FIELD, FACADE_TYPES,
     getType, getForm, quantityRange, isValidQuantity, readQuantity, computeAreas,
-    readFacadeConfig, describeFacade,
+    readFacadeConfig, describeFacade, countLabel, priceNote,
   };
 });

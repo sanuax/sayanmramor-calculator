@@ -430,6 +430,51 @@
     return box('context', [-0.1, heightM / 2, 0], [0.2, heightM, runM]);
   }
 
+  // Колонны as architecture: base, shaft, a transition ring and a top slab,
+  // and -- over a group -- the lintel they carry.
+  //
+  // PRICED vs SHOWN: the SHAFT alone is the clad product -- a cylinder of
+  // radius R (a square prism of side A), exactly H tall, i.e. the very
+  // surface 2πRH / 4AH counts (facade-model.js). Everything else here is the
+  // architectural image and is marked `visualOnly: true`: the base, the ring
+  // and the slab (stone, so the column reads as one), and the lintel (the
+  // building's beam, drawn as context, not stone). No pricing code reads
+  // the scene; the flag is there so nobody ever sums these parts into the
+  // columns' area.
+  //
+  // Proportions follow the section and are bounded by the height, so the
+  // shaft stays the main element: a taller column only stretches the shaft,
+  // a thicker one widens everything, and a slim or short column never gets
+  // an oversized base.
+  function columnParts(f, n) {
+    const p = f.params;
+    const square = f.form === 'square';
+    const D = square ? p.side : 2 * p.radius;
+    const H = p.height;
+    const baseH = Math.min(0.07 * H, Math.max(0.05, 0.4 * D));
+    const ringH = Math.min(0.025 * H, Math.max(0.02, 0.12 * D));
+    const slabH = Math.min(0.05 * H, Math.max(0.04, 0.3 * D));
+    const baseW = D * 1.32, ringW = D * 1.12, slabW = D * 1.42;
+    const shaftTop = baseH + H, ringTop = shaftTop + ringH, top = ringTop + slabH;
+    const { centres, run } = rowCentres(n, slabW, Math.max(1, D * 1.8));
+    const visual = (part, name) => Object.assign(part, { name, visualOnly: true });
+    const piece = (w, y0, y1, z) => square
+      ? box('stone', [0, (y0 + y1) / 2, z], [w, y1 - y0, w])
+      : prism('stone', circlePoints(0, z, w / 2, 40), y0, y1);
+    const parts = [];
+    centres.forEach(z => {
+      parts.push(visual(piece(baseW, 0, baseH, z), 'column-base'));
+      parts.push(named(piece(D, baseH, shaftTop, z), 'column'));
+      parts.push(visual(piece(ringW, shaftTop, ringTop, z), 'column-ring'));
+      parts.push(visual(piece(slabW, ringTop, top, z), 'column-slab'));
+    });
+    if (n > 1) {
+      const lintelH = Math.min(0.4, Math.max(0.15, slabW * 0.6));
+      parts.push(visual(box('context', [0, top + lintelH / 2, 0], [slabW * 1.02, lintelH, run]), 'lintel'));
+    }
+    return { parts, floorY: 0, framePadding: 0.22 };
+  }
+
   function facadeParts(m) {
     const f = m.facade;
     const p = f.params;
@@ -473,17 +518,7 @@
       return { parts, floorY: 0, framePadding: 0.2 };
     }
 
-    if (f.type === 'column') {
-      // Free-standing columns, side by side: round = a cylinder of the
-      // entered radius, square = a prism of the entered side.
-      const size = f.form === 'square' ? p.side : 2 * p.radius;
-      const { centres } = rowCentres(n, size, Math.max(1, size * 1.5));
-      centres.forEach(z => {
-        if (f.form === 'square') parts.push(named(box('stone', [0, p.height / 2, z], [p.side, p.height, p.side]), 'column'));
-        else parts.push(prism('stone', circlePoints(0, z, p.radius, 40), 0, p.height, { name: 'column' }));
-      });
-      return { parts, floorY: 0, framePadding: 0.16 };
-    }
+    if (f.type === 'column') return columnParts(f, n);
 
     if (f.type === 'pilaster') {
       // Flat columns standing out of the wall by their projection.
