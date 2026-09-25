@@ -164,6 +164,9 @@
         lengthMm, widthMm,
         areaM2: Math.round(state.dimensions.lengthM * state.dimensions.widthM * 100) / 100,
         lengthLabel: labels.length, widthLabel: labels.width,
+        // "Размер ступени" / "Размер лестницы" -- the client's own name for
+        // this pair of sizes (null: the generic "Размер").
+        title: labels.title || null,
       },
       material: buildMaterial(state.stone),
       edge,
@@ -239,7 +242,7 @@
     }
     const d = c.dimensions;
     specs.push({
-      key: 'dimensions', label: 'Размер',
+      key: 'dimensions', label: d.title || 'Размер',
       value: d.lengthMm + ' × ' + d.widthMm + ' мм',
       detail: d.lengthLabel.toLowerCase() + ' × ' + d.widthLabel.toLowerCase() + ' · ' + formatArea(d.areaM2),
     });

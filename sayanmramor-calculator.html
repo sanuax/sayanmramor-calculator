@@ -438,7 +438,6 @@
      система, отделённая подзаголовком. */
   .choice-group { margin-top: 20px; }
   .choice-title { font-size: var(--configurator-text); font-weight: 700; color: var(--ink); margin-bottom: 8px; }
-  .step-count-unit { max-width: 240px; }
 
   .reveal-rows { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
   .reveal-row {
@@ -521,6 +520,12 @@
   .dim-diagram { display: flex; justify-content: center; margin-bottom: 16px; }
   .dim-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; max-width: 320px; margin: 0 auto; }
   .dim-note { font-size: var(--configurator-muted); color: var(--muted); text-align: center; margin-top: 12px; }
+  /* Ступени/лестницы: a titled size block and the step count right under it,
+     in the same centred column as the size fields. */
+  .dim-block-title, .dim-count-title { max-width: 320px; margin: 0 auto 8px; font-size: var(--configurator-text); font-weight: 700; color: var(--ink); }
+  .dim-count { max-width: 320px; margin: 18px auto 0; }
+  .dim-count .field-unit { max-width: calc(50% - 6px); }
+  .dim-count .error { margin-bottom: 0; }
 
   /* The picker's trigger deliberately keeps the same silhouette as the <select>
      and number inputs beside it -- it is one more field in the same form, and
@@ -1136,19 +1141,6 @@
           <div class="choice-title" id="stairRiserTitle">Подступенки</div>
           <div class="card-grid" id="stairRiserGrid" role="radiogroup" aria-labelledby="stairRiserTitle"></div>
         </div>
-        <!-- «Количество ступеней» (Лестницы, Ступени): the visible field is
-             validated as the client types; only a valid whole number reaches
-             #step-count, which constructor-state.js reads -- so the 3D, the
-             summary and the Result always show the same count. -->
-        <div class="choice-group" id="stepCountField" hidden>
-          <div class="field-unit step-count-unit">
-            <span class="unit-label">Количество ступеней</span>
-            <input type="number" id="stepCountInput" min="1" max="30" step="1" inputmode="numeric">
-            <span class="unit">шт.</span>
-          </div>
-          <div class="error" id="stepCountError">Введите целое число от 1 до 30</div>
-        </div>
-        <input type="hidden" id="step-count" value="">
         <select id="productSubcategory" hidden></select>
         <input type="number" id="subcategoryQty" placeholder="Количество, шт." min="0" step="1" style="margin-top:14px;display:none">
       </div>
@@ -1190,11 +1182,16 @@
         <div class="dim-wrap">
           <div class="dim-diagram">
             <svg id="dimSvg" viewBox="0 0 260 190" width="260" height="190" role="img" aria-label="Схема изделия с размерами длины и ширины">
+              <!-- Ступени/лестницы: a tread or a flight instead of the plain
+                   rectangle (drawStairDiagram below). -->
+              <g id="dimStairG"></g>
+              <g id="dimRectG">
               <rect id="dimRect" x="117" y="27" width="36" height="126" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5" rx="3"></rect>
               <line id="dimLengthLine" x1="117" y1="162" x2="153" y2="162" stroke="var(--muted)" stroke-width="1.2" marker-start="url(#dimArrowStart)" marker-end="url(#dimArrowEnd)"></line>
               <text id="dimLengthLabel" x="135" y="180" text-anchor="middle" font-size="12" fill="var(--ink)" font-weight="700">Длина</text>
               <line id="dimWidthLine" x1="50" y1="27" x2="50" y2="153" stroke="var(--muted)" stroke-width="1.2" marker-start="url(#dimArrowStart)" marker-end="url(#dimArrowEnd)"></line>
               <text id="dimWidthLabel" x="40" y="90" text-anchor="middle" font-size="12" fill="var(--ink)" font-weight="700">Ширина</text>
+              </g>
               <defs>
                 <marker id="dimArrowStart" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto-start-reverse">
                   <path d="M0,1 L7,4 L0,7" fill="none" stroke="var(--muted)" stroke-width="1.4"></path>
@@ -1205,6 +1202,7 @@
               </defs>
             </svg>
           </div>
+          <div class="dim-block-title" id="dimBlockTitle" hidden></div>
           <div class="dim-fields">
             <div class="field-unit"><span class="unit-label" id="dimLengthUnitLabel">Длина</span><input type="number" id="length" min="0" step="1" placeholder="2000"><span class="unit">мм</span></div>
             <div class="field-unit"><span class="unit-label" id="dimWidthUnitLabel">Ширина</span><input type="number" id="width" min="0" step="1" placeholder="600"><span class="unit">мм</span></div>
@@ -1213,6 +1211,23 @@
                (не придумываем новую геометрию), только явно оговаривает,
                что это схема главного сегмента. -->
           <div class="dim-note" id="dimShapeNote" hidden>Показан основной сегмент. Крыло указывается отдельно, на шаге «Форма».</div>
+          <!-- What the sizes mean for the chosen step/stair type, and the
+               tread depth the calculator derives (GeometryModel.stairPlan). -->
+          <div class="dim-note" id="dimHint" hidden></div>
+          <!-- «Количество ступеней» (Лестницы, Ступени), right under the sizes:
+               the visible field is validated as the client types; only a valid
+               whole number reaches #step-count, which constructor-state.js
+               reads -- so the 3D, the summary and the Result always agree. -->
+          <div class="dim-count" id="stepCountField" hidden>
+            <div class="dim-count-title">Количество ступеней</div>
+            <div class="field-unit">
+              <span class="unit-label">Количество</span>
+              <input type="number" id="stepCountInput" min="1" max="30" step="1" inputmode="numeric">
+              <span class="unit">шт.</span>
+            </div>
+            <div class="error" id="stepCountError">Введите целое число от 1 до 30</div>
+          </div>
+          <input type="hidden" id="step-count" value="">
         </div>
         <div class="error" id="dimError">Укажите ширину и длину больше нуля</div>
       </div>
@@ -1981,7 +1996,17 @@
   const DIMENSION_LABELS = {
     pol: { length: 'Длина помещения', width: 'Ширина помещения' },
     stena: { length: 'Высота стены', width: 'Ширина стены' },
+    // Ступени: the size of ONE step (length across it, depth front to back),
+    // then the count. Лестницы: the whole stair's size, then the count --
+    // the calculator derives the tread depth (GeometryModel.stairPlan).
+    // `block` heads the size fields, `title` names the pair in the summary
+    // and the Result, `area` is what length x width is for this product.
+    stupeni: { block: 'Размер одной ступени', title: 'Размер ступени', length: 'Длина ступени', width: 'Глубина ступени', area: 'Площадь одной ступени', placeholder: [1200, 300] },
+    lestnitsa: { block: 'Размеры лестницы', title: 'Размер лестницы', length: 'Длина лестницы', width: 'Ширина лестницы', area: 'Площадь (длина × ширина)', placeholder: [3000, 1000] },
   };
+  // Винтовая лестница: in plan a circle -- its two sizes are the stair's
+  // diameter and one step's width (from the centre post to the edge).
+  const SPIRAL_DIMENSION_LABELS = { block: 'Размеры лестницы', title: 'Размер лестницы', length: 'Диаметр лестницы', width: 'Ширина ступени', area: 'Площадь (диаметр × ширина)', placeholder: [2000, 800] };
   const DEFAULT_DIMENSION_LABELS = { length: 'Длина', width: 'Ширина' };
   // Read by updateDimDiagram() (defined further down) for its own fallback
   // label text -- same TDZ reasoning as the other module-scope state above.
@@ -2027,6 +2052,14 @@
   function updateDimDiagram() {
     const l = parseFloat(lengthInput.value) || 0;
     const w = parseFloat(widthInput.value) || 0;
+    const stairs = selectedProductKey === 'stupeni' || selectedProductKey === 'lestnitsa';
+    dimRectG.style.display = stairs ? 'none' : '';
+    dimStairG.style.display = stairs ? '' : 'none';
+    if (stairs) {
+      drawStairDiagram(l, w);
+      return;
+    }
+    dimHintEl.hidden = true;
     // Без реальных значений показываем условную альбомную заготовку (тот же
     // расчёт, просто с плейсхолдер-величинами вместо l/w).
     const effL = l > 0 ? l : 1.55;
@@ -2062,6 +2095,134 @@
     dimWidthLabel.setAttribute('y', widthLabelY);
     dimWidthLabel.setAttribute('transform', 'rotate(-90 ' + widthLabelX + ' ' + widthLabelY + ')');
     dimWidthLabel.textContent = w > 0 ? w + ' мм' : currentDimLabels.width;
+  }
+
+  // ---- Схема размеров: ступень / лестница --------------------------------
+  // A simple picture of what the two sizes and the count mean -- one step
+  // "× N" for «Ступени», the flight in plan for «Лестницы» -- drawn from the
+  // same stair plan as the 3D, so the tread depth in the hint is the drawn one.
+  function plural(n, one, few, many) {
+    const m10 = n % 10, m100 = n % 100;
+    if (m10 === 1 && m100 !== 11) return one;
+    if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+    return many;
+  }
+  const DIAGRAM_TEXT = 'font-size="12" fill="var(--ink)" font-weight="700" text-anchor="middle"';
+  const DIAGRAM_STONE = 'fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"';
+  const DIAGRAM_JOINT = 'stroke="var(--stone-line)" stroke-width="1" fill="none"';
+  function diagramArrow(x1, y1, x2, y2) {
+    return '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="var(--muted)" stroke-width="1.2" marker-start="url(#dimArrowStart)" marker-end="url(#dimArrowEnd)"/>';
+  }
+  function diagramText(x, y, text, vertical) {
+    const rot = vertical ? ' transform="rotate(-90 ' + x + ' ' + y + ')"' : '';
+    return '<text x="' + x + '" y="' + y + '" ' + DIAGRAM_TEXT + rot + '>' + escapeHtml(text) + '</text>';
+  }
+  function mmOr(valueMm, label) {
+    return valueMm > 0 ? Math.round(valueMm) + ' мм' : label;
+  }
+
+  function drawStairDiagram(lMm, wMm) {
+    const ph = currentDimLabels.placeholder || [2000, 600];
+    const L = (lMm > 0 ? lMm : ph[0]) / 1000, W = (wMm > 0 ? wMm : ph[1]) / 1000;
+    const info = currentStairPlan(L, W);
+    const p = info.plan, n = p.count;
+    const lenText = mmOr(lMm, currentDimLabels.length), widText = mmOr(wMm, currentDimLabels.width);
+    let svg = '';
+    if (info.kind === 'steps') {
+      // One step from above, "× N" beside it.
+      const s = Math.min(140 / L, 90 / W);
+      const rw = Math.max(40, L * s), rh = Math.max(14, W * s);
+      const x0 = 120 - rw / 2, y0 = 78 - rh / 2, x1 = x0 + rw, y1 = y0 + rh;
+      let bottom = y1;
+      if (info.variant === 'winder') {
+        const a = rh * 0.35, b = rh * 1.65;
+        svg += '<path d="M' + x0 + ' ' + (78 - a / 2) + ' L' + x1 + ' ' + (78 - b / 2) + ' L' + x1 + ' ' + (78 + b / 2) + ' L' + x0 + ' ' + (78 + a / 2) + ' Z" ' + DIAGRAM_STONE + '/>';
+        bottom = 78 + b / 2;
+        svg += diagramArrow(120, y0, 120, y1);
+      } else if (info.variant === 'radius') {
+        const bulge = Math.max(4, p.bulgeM * s);
+        svg += '<path d="M' + x0 + ' ' + y0 + ' H' + x1 + ' V' + y1 + ' Q120 ' + (y1 + 2 * bulge) + ' ' + x0 + ' ' + y1 + ' Z" ' + DIAGRAM_STONE + '/>';
+        bottom = y1 + bulge;
+        svg += diagramArrow(x0 - 12, y0, x0 - 12, y1);
+      } else {
+        svg += '<rect x="' + x0 + '" y="' + y0 + '" width="' + rw + '" height="' + rh + '" rx="2" ' + DIAGRAM_STONE + '/>';
+        svg += diagramArrow(x0 - 12, y0, x0 - 12, y1);
+      }
+      svg += diagramArrow(x0, bottom + 12, x1, bottom + 12) + diagramText(120, bottom + 30, lenText);
+      const dx = info.variant === 'winder' ? 108 : x0 - 22;
+      svg += diagramText(dx, 78, widText, true);
+      svg += '<text x="222" y="80" font-size="20" font-weight="800" fill="var(--accent-ink)" text-anchor="middle">× ' + n + '</text>';
+      svg += '<text x="222" y="97" font-size="11" fill="var(--muted)" text-anchor="middle">' + plural(n, 'ступень', 'ступени', 'ступеней') + '</text>';
+    } else if (info.variant === 'spiral') {
+      // A circle: the diameter across, one step's width from the post out.
+      const s = 120 / (2 * p.rOut), cx = 130, cy = 76, R = p.rOut * s, r = p.rIn * s;
+      svg += '<circle cx="' + cx + '" cy="' + cy + '" r="' + R + '" ' + DIAGRAM_STONE + '/>';
+      for (let k = 0; k < Math.min(n, 30); k++) {
+        const a = -Math.PI / 2 + k * p.angle;
+        svg += '<line x1="' + (cx + r * Math.cos(a)) + '" y1="' + (cy + r * Math.sin(a)) + '" x2="' + (cx + R * Math.cos(a)) + '" y2="' + (cy + R * Math.sin(a)) + '" ' + DIAGRAM_JOINT + '/>';
+      }
+      svg += '<circle cx="' + cx + '" cy="' + cy + '" r="' + Math.max(3, r) + '" fill="var(--card)" stroke="var(--stone-line)" stroke-width="1.5"/>';
+      svg += diagramArrow(cx - R, cy + R + 10, cx + R, cy + R + 10) + diagramText(cx, cy + R + 28, lenText);
+      svg += diagramArrow(cx + Math.max(3, r), cy, cx + R, cy) + diagramText(cx + (r + R) / 2, cy - 6, widText);
+    } else {
+      // The flight(s) in plan, one line per step; the landing plain.
+      const d = p.treadDepthM, n1 = p.flights[0], n2 = p.flights[1] || 0;
+      const u = info.variant === 'u', l = info.variant === 'l';
+      // П: the two flights run side by side -- the gap between them is drawn
+      // wider than its real 100 mm so they never read as one block.
+      const extentY = u ? 2.3 * W : (l ? W + n2 * d : W);
+      const s = Math.min(196 / L, 118 / extentY);
+      const gapPx = u ? Math.max(8, 0.3 * W * s) : 0;
+      const x0 = 130 - (L * s) / 2, yb = 20 + (118 + extentY * s) / 2;
+      const w = W * s, run1 = n1 * d * s;
+      svg += '<rect x="' + x0 + '" y="' + (yb - w) + '" width="' + run1 + '" height="' + w + '" ' + DIAGRAM_STONE + '/>';
+      for (let k = 1; k < n1; k++) svg += '<line x1="' + (x0 + k * d * s) + '" y1="' + (yb - w) + '" x2="' + (x0 + k * d * s) + '" y2="' + yb + '" ' + DIAGRAM_JOINT + '/>';
+      if (l || u) {
+        const lx = x0 + run1, lh = u ? 2 * w + gapPx : w;
+        svg += '<rect x="' + lx + '" y="' + (yb - lh) + '" width="' + w + '" height="' + lh + '" ' + DIAGRAM_STONE + '/>';
+        if (l && n2 > 0) {
+          const top = yb - w - n2 * d * s;
+          svg += '<rect x="' + lx + '" y="' + top + '" width="' + w + '" height="' + (n2 * d * s) + '" ' + DIAGRAM_STONE + '/>';
+          for (let k = 1; k < n2; k++) svg += '<line x1="' + lx + '" y1="' + (yb - w - k * d * s) + '" x2="' + (lx + w) + '" y2="' + (yb - w - k * d * s) + '" ' + DIAGRAM_JOINT + '/>';
+        }
+        if (u && n2 > 0) {
+          const ty = yb - lh, run2 = n2 * d * s;
+          svg += '<rect x="' + (lx - run2) + '" y="' + ty + '" width="' + run2 + '" height="' + w + '" ' + DIAGRAM_STONE + '/>';
+          for (let k = 1; k < n2; k++) svg += '<line x1="' + (lx - k * d * s) + '" y1="' + ty + '" x2="' + (lx - k * d * s) + '" y2="' + (ty + w) + '" ' + DIAGRAM_JOINT + '/>';
+        }
+      }
+      svg += diagramArrow(x0, yb + 12, x0 + L * s, yb + 12) + diagramText(130, yb + 30, lenText);
+      svg += diagramArrow(x0 - 12, yb - w, x0 - 12, yb) + diagramText(x0 - 22, yb - w / 2, widText, true);
+    }
+    dimStairG.innerHTML = svg;
+    document.getElementById('dimSvg').setAttribute('aria-label', 'Схема: ' + currentDimLabels.length.toLowerCase() + ', ' + currentDimLabels.width.toLowerCase() + ', ' + n + ' ' + plural(n, 'ступень', 'ступени', 'ступеней'));
+    updateDimHint(lMm, wMm, info);
+  }
+
+  // One line under the fields: what the sizes mean for this type, and -- for
+  // a stair -- the tread depth the calculator derives from them.
+  function updateDimHint(lMm, wMm, info) {
+    let text = '';
+    const p = info.plan;
+    const depthMm = Math.round(p.treadDepthM * 1000);
+    const known = lMm > 0 && wMm > 0;
+    if (info.kind === 'steps') {
+      text = info.variant === 'winder'
+        ? 'Забежная ступень: глубина — по середине ступени, к узкому краю ступень сужается.'
+        : info.variant === 'radius'
+          ? 'Радиусная ступень: глубина — по краям, в центре передний край выступает дугой.'
+          : 'Длина — поперёк ступени, глубина — от переднего края к стене.';
+    } else if (info.variant === 'spiral') {
+      text = known
+        ? 'Ступени идут по кругу вокруг опоры Ø ' + Math.round(p.rIn * 2000) + ' мм, глубина ступени по середине — ' + depthMm + ' мм.'
+        : 'Диаметр — вся лестница в плане, ширина ступени — от опоры до края.';
+    } else if (info.variant === 'l' || info.variant === 'u') {
+      text = 'Длина включает площадку поворота. ' + (known ? 'Глубина одной ступени: ' + depthMm + ' мм.' : 'Глубина одной ступени рассчитывается автоматически.');
+    } else {
+      text = known ? 'Глубина одной ступени: ' + depthMm + ' мм (длина ÷ количество ступеней).' : 'Глубина одной ступени рассчитывается автоматически: длина ÷ количество ступеней.';
+    }
+    dimHintEl.hidden = !text;
+    dimHintEl.textContent = text;
   }
   const dimShapeNote = document.getElementById('dimShapeNote');
   const priceOut = document.getElementById('priceOut');
@@ -2210,6 +2371,10 @@
   const typeStepTitleEl = document.getElementById('typeStepTitle');
   const summaryTitleEl = document.getElementById('summaryTitle');
   const dimLengthUnitLabelEl = document.getElementById('dimLengthUnitLabel');
+  const dimBlockTitleEl = document.getElementById('dimBlockTitle');
+  const dimHintEl = document.getElementById('dimHint');
+  const dimRectG = document.getElementById('dimRectG');
+  const dimStairG = document.getElementById('dimStairG');
   const dimWidthUnitLabelEl = document.getElementById('dimWidthUnitLabel');
   const extraBortikInput = document.getElementById('extra-bortik');
   const extraFartukWidthInput = document.getElementById('extra-fartuk-width');
@@ -2679,6 +2844,7 @@
     if (!stairRiserField.hidden) markSelected(stairRiserGrid, stairRisers ? 1 : 0);
     if (notify) productSubcategorySelect.dispatchEvent(new Event('change', { bubbles: true }));
     else updateSubcategoryQtyVisibility();
+    updateDimensionLabels(selectedProductKey);
   }
 
   // Ступени: «Подступенки» -- те же две карточки, что у лестницы; данные --
@@ -2702,10 +2868,32 @@
     summaryTitleEl.textContent = ResultModel.resultTitle(productKey);
   }
 
+  // The stair plan the 3D will draw for the current product/type/sizes/count
+  // (null for other products) -- one source for the diagram and the hint.
+  function currentStairPlan(lengthM, widthM) {
+    const id = productSubcategorySelect.value;
+    const count = Number(stepCountHidden.value) || 1;
+    if (selectedProductKey === 'stupeni') {
+      const variant = GeometryModel.STEP_VARIANTS[id] || 'straight';
+      return { kind: 'steps', variant, plan: GeometryModel.stairPlan('steps', variant, lengthM, widthM, count) };
+    }
+    if (selectedProductKey === 'lestnitsa') {
+      const variant = GeometryModel.STAIR_SHAPES[id] || 'straight';
+      return { kind: 'flight', variant, plan: GeometryModel.stairPlan('flight', variant, lengthM, widthM, count) };
+    }
+    return null;
+  }
+
   function updateDimensionLabels(productKey) {
-    currentDimLabels = DIMENSION_LABELS[productKey] || DEFAULT_DIMENSION_LABELS;
+    const isSpiral = productKey === 'lestnitsa' && GeometryModel.STAIR_SHAPES[productSubcategorySelect.value] === 'spiral';
+    currentDimLabels = isSpiral ? SPIRAL_DIMENSION_LABELS : (DIMENSION_LABELS[productKey] || DEFAULT_DIMENSION_LABELS);
     dimLengthUnitLabelEl.textContent = currentDimLabels.length;
     dimWidthUnitLabelEl.textContent = currentDimLabels.width;
+    const placeholder = currentDimLabels.placeholder || [2000, 600];
+    lengthInput.placeholder = String(placeholder[0]);
+    widthInput.placeholder = String(placeholder[1]);
+    dimBlockTitleEl.hidden = !currentDimLabels.block;
+    dimBlockTitleEl.textContent = currentDimLabels.block || '';
     updateDimDiagram();
   }
 
@@ -2929,7 +3117,11 @@
 
     setPriceValue('≈ ' + formatRub(result.total));
 
-    let html = `Площадь: <span>${decimal2(width * length)} м²</span><br>`;
+    let html = '';
+    if (currentDimLabels.title) {
+      html += `${currentDimLabels.title}: <span>${Math.round(length * 1000)} × ${Math.round(width * 1000)} мм</span><br>`;
+    }
+    html += `${currentDimLabels.area || 'Площадь'}: <span>${decimal2(width * length)} м²</span><br>`;
     const stoneMetaParts = [];
     if (stone.category_label_ru) stoneMetaParts.push(stone.category_label_ru);
     const stoneCountry = stone.countries && stone.countries[0];
@@ -3109,6 +3301,7 @@
     if (!valid) return;
     stepCountByProduct[selectedProductKey] = n;
     stepCountHidden.value = String(n);
+    updateDimDiagram();
     calculate();
   });
   stepCountInput.addEventListener('change', () => {

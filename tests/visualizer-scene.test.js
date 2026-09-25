@@ -496,3 +496,69 @@ test('step count: the camera fits the whole flight from 1 to 30 steps, and bound
     previous = height;
   });
 });
+
+// ---- размеры «Ступеней» и «Лестниц»: client sizes -> the drawn treads -------
+
+function stoneExtent(parts) {
+  return extent([].concat(...parts.map(p => p.outline)));
+}
+
+test('«Ступени»: длина x глубина of ONE step, N times -- 1200 x 300 x 8 is eight 1200 x 300 treads (every type)', () => {
+  const dims = { length: { value: '1200' }, width: { value: '300' }, 'step-count': { value: '8' } };
+  const straight = named(layoutFor('stupeni', Object.assign({ productSubcategory: { value: 'STEP-01' } }, dims)), 'tread');
+  assert.equal(straight.length, 8);
+  straight.forEach(t => {
+    const e = extent(t.outline);
+    assert.ok(Math.abs((e.z1 - e.z0) - 1.2) < 1e-9, 'length across');
+    assert.ok(Math.abs((e.x1 - e.x0) - 0.3) < 1e-9, 'depth front to back');
+  });
+  const radius = named(layoutFor('stupeni', Object.assign({ productSubcategory: { value: 'STEP-03' } }, dims)), 'tread');
+  assert.equal(radius.length, 8);
+  radius.forEach(t => assert.ok(Math.abs((extent(t.outline).z1 - extent(t.outline).z0) - 1.2) < 1e-9));
+  const winderModel = modelFor('stupeni', Object.assign({ productSubcategory: { value: 'STEP-02' } }, dims));
+  assert.ok(Math.abs((winderModel.stairs.plan.rOut - winderModel.stairs.plan.rIn) - 1.2) < 1e-9, 'a winder step is 1200 long from the pivot out');
+  assert.equal(named(SceneLayout.buildSceneLayout(winderModel), 'tread').length, 8);
+});
+
+test('«Лестницы» прямая: длина x ширина of the whole stair, N steps -> tread depth = length / N', () => {
+  const layout = layoutFor('lestnitsa', { length: { value: '3000' }, width: { value: '1000' }, 'step-count': { value: '10' }, productSubcategory: { value: 'STAIR-01' } });
+  const treads = named(layout, 'tread');
+  assert.equal(treads.length, 10);
+  treads.forEach(t => {
+    const e = extent(t.outline);
+    assert.ok(Math.abs((e.x1 - e.x0) - 0.3) < 1e-9, 'depth 300');
+    assert.ok(Math.abs((e.z1 - e.z0) - 1.0) < 1e-9, 'width 1000');
+  });
+  const all = stoneExtent(treads);
+  assert.ok(Math.abs((all.x1 - all.x0) - 3) < 1e-9, 'the whole run is the entered length');
+  const other = layoutFor('lestnitsa', { length: { value: '2000' }, width: { value: '800' }, 'step-count': { value: '8' }, productSubcategory: { value: 'STAIR-01' } });
+  assert.equal(named(other, 'tread').length, 8);
+  assert.ok(Math.abs(extent(named(other, 'tread')[0].outline).x1 - extent(named(other, 'tread')[0].outline).x0 - 0.25) < 1e-9);
+});
+
+test('«Лестницы» Г/П: the length includes the landing (not a step); П\'s second flight comes back to the start', () => {
+  const dims = { length: { value: '3000' }, width: { value: '1000' }, 'step-count': { value: '10' } };
+  ['STAIR-03', 'STAIR-05'].forEach(type => {
+    const layout = layoutFor('lestnitsa', Object.assign({ productSubcategory: { value: type } }, dims));
+    const treads = named(layout, 'tread'), landing = named(layout, 'landing');
+    assert.equal(treads.length, 10, type + ': the landing is not counted');
+    assert.equal(landing.length, 1);
+    const along = stoneExtent(treads.concat(landing));
+    assert.ok(Math.abs((along.x1 - along.x0) - 3) < 1e-9, type + ': 3000 along the first flight, landing included');
+    const landingE = extent(landing[0].outline);
+    assert.ok(Math.abs((landingE.x1 - landingE.x0) - 1) < 1e-9, type + ': the landing is one flight width deep');
+  });
+  const u = layoutFor('lestnitsa', Object.assign({ productSubcategory: { value: 'STAIR-05' } }, dims));
+  const back = named(u, 'tread').slice(5);
+  assert.ok(Math.abs(stoneExtent(back).x1 - 0) < 1e-9, 'the return flight ends where the first one started');
+});
+
+test('«Лестницы» винтовая: диаметр and ширина ступени both shape the stair', () => {
+  const at = (d, w) => layoutFor('lestnitsa', { length: { value: String(d) }, width: { value: String(w) }, 'step-count': { value: '12' }, productSubcategory: { value: 'STAIR-07' } });
+  const small = at(1600, 600), large = at(2400, 600), wide = at(2400, 1000);
+  const radius = l => { const e = stoneExtent(named(l, 'tread')); return Math.max(Math.abs(e.x0), Math.abs(e.x1), Math.abs(e.z0), Math.abs(e.z1)); };
+  assert.ok(radius(large) > radius(small), 'a larger diameter makes a larger stair');
+  assert.ok(radius(large) <= 1.2 + 1e-9, 'within the entered diameter');
+  const post = l => extent(named(l, 'column')[0].outline);
+  assert.ok(post(wide).x1 - post(wide).x0 < post(large).x1 - post(large).x0, 'wider steps leave a thinner centre post');
+});

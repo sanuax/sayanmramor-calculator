@@ -682,32 +682,33 @@
     const parts = [];
     const up = [-1, 0], side = [0, 1]; // flights climb away from the viewer (toward X-)
 
+    // Every size below comes from the model's stair plan (GeometryModel
+    // .stairPlan): the client's sizes already turned into tread sizes.
+    const p = s.plan;
     if (s.kind === 'steps') {
-      // The entered size is one tread: lengthM across the flight, widthM deep.
+      // Размер одной ступени x количество: N identical treads.
       const count = stepCountOf(s);
       if (s.variant === 'winder') {
-        const rOut = m.lengthM;
-        const angle = Math.min(Math.PI / 4.5, Math.max(Math.PI / 18, m.widthM / (0.6 * rOut)));
-        fanFlight(parts, { rIn: 0.08, rOut, count, angle, risers: s.risers, T, edge, column: false, straightOuter: true, startAngle: VIEWER_ANGLE });
+        fanFlight(parts, { rIn: p.rIn, rOut: p.rOut, count, angle: p.angle, risers: s.risers, T, edge, column: false, straightOuter: true, startAngle: VIEWER_ANGLE });
       } else {
-        const bulge = s.variant === 'radius' ? Math.min(m.widthM * 0.35, m.lengthM * 0.12) : 0;
-        straightFlight(parts, { origin: [0, 0], dir: up, across: side, width: m.lengthM, count, depth: m.widthM, level: 0, risers: s.risers, bulge, T, edge });
+        straightFlight(parts, { origin: [0, 0], dir: up, across: side, width: p.treadLengthM, count, depth: p.treadDepthM, level: 0, risers: s.risers, bulge: p.bulgeM, T, edge });
       }
       return { parts, floorY: 0 };
     }
 
-    // Лестница: widthM is the flight's width, lengthM its walking length,
-    // shared by exactly the client's number of treads.
+    // Лестница: ширина марша, and the tread depth the plan derived from the
+    // stair's length and the client's number of steps.
     const width = m.widthM;
     const n = stepCountOf(s);
-    const depth = m.lengthM / n;
+    const depth = p.treadDepthM;
     if (s.shape === 'spiral') {
-      const rOut = Math.max(0.6, width);
-      fanFlight(parts, { rIn: 0.1, rOut, count: n, angle: C.VISUAL_STAIR_TREAD_DEPTH_M / (0.6 * rOut), risers: s.risers, T, edge, column: true, startAngle: VIEWER_ANGLE });
+      fanFlight(parts, { rIn: p.rIn, rOut: p.rOut, count: n, angle: p.angle, risers: s.risers, T, edge, column: true, startAngle: VIEWER_ANGLE });
       return { parts, floorY: 0 };
     }
     if (s.shape === 'l' || s.shape === 'u') {
-      const n1 = Math.ceil(n / 2), n2 = n - n1;
+      // The landing (one flight width deep) is part of the stair's length,
+      // not a step.
+      const n1 = p.flights[0], n2 = p.flights[1];
       straightFlight(parts, { origin: [0, 0], dir: up, across: side, width, count: n1, depth, level: 0, risers: s.risers, bulge: 0, T, edge });
       const landingX0 = -n1 * depth;
       const landingTop = (n1 + 1) * RISE;

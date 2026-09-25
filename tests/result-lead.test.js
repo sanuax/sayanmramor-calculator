@@ -382,3 +382,24 @@ test('step count: one value in state, Result and lead -- «Ступени» neve
   assert.equal(configFor('pol', { 'step-count': { value: '12' } }).steps, null);
   assert.deepEqual(payloadFor('lestnitsa', { 'step-count': { value: '5' } }).configuration.steps, { count: 5 });
 });
+
+test('Result and lead name the sizes as the client entered them: «Размер ступени» / «Размер лестницы»', () => {
+  const steps = configFor('stupeni', { length: { value: '1200' }, width: { value: '300' }, 'step-count': { value: '8' } },
+    { dimensionLabels: { title: 'Размер ступени', length: 'Длина ступени', width: 'Глубина ступени' } });
+  const view = ResultModel.buildResultView(steps);
+  const dims = view.specs.find(s => s.key === 'dimensions');
+  assert.equal(dims.label, 'Размер ступени');
+  assert.equal(dims.value, '1200 × 300 мм');
+  assert.equal(view.specs.find(s => s.key === 'steps').value, '8 шт.');
+  assert.equal(ResultModel.buildResultView(configFor('pol', {})).specs.find(s => s.key === 'dimensions').label, 'Размер');
+  const lead = LeadPayload.buildLeadPayload({
+    configuration: configFor('lestnitsa', { length: { value: '3000' }, width: { value: '1000' }, 'step-count': { value: '10' } },
+      { dimensionLabels: { title: 'Размер лестницы', length: 'Длина лестницы', width: 'Ширина лестницы' } }),
+    pricing: { status: 'ok', currency: 'RUB', total: 1, lines: [], nSlabs: 1, reason: null, pricesUpdatedAt: null },
+    contact: { name: 'A', phone: '+70000000000', comment: '' },
+  });
+  assert.equal(lead.configuration.dimensions.lengthMm, 3000);
+  assert.equal(lead.configuration.dimensions.widthMm, 1000);
+  assert.equal(lead.configuration.dimensions.title, 'Размер лестницы');
+  assert.deepEqual(lead.configuration.steps, { count: 10 });
+});

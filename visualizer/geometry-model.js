@@ -15,7 +15,7 @@
   const isNode = typeof module !== 'undefined' && module.exports;
   const {
     VISUAL_FALLBACK_THICKNESS_M, VISUAL_FALLBACK_FLOOR_THICKNESS_M,
-    VISUAL_LAYOUT_MODULE_M, VISUAL_LARGE_FORMAT_MODULE_M,
+    VISUAL_LAYOUT_MODULE_M, VISUAL_LARGE_FORMAT_MODULE_M, VISUAL_STAIR_TREAD_DEPTH_M,
   } = isNode ? require('./constants.js') : globalRoot.VisualizerConstants;
   const { resolveSinkCutout, resolveCooktopCutout, resolveHoles } = isNode ? require('./cutout-geometry.js') : globalRoot.CutoutGeometry;
   const { resolveBacksplash, resolveCurb, resolveWallPanel, resolveIsland, resolveBarCounter } = isNode ? require('./attachment-geometry.js') : globalRoot.AttachmentGeometry;
@@ -69,22 +69,82 @@
   const SILL_VARIANTS = { 'SILL-02': 'corner', 'SILL-03': 'bay', 'SILL-04': 'bay-radius', 'SILL-05': 'figured' };
   const PANEL_VARIANTS = { 'PANEL-02': 'framed', 'PANEL-03': 'inlay', 'PANEL-04': 'backlit' };
 
+  // Client sizes -> the technical flight the 3D draws. One place for it: the
+  // calculator's size diagram and hint read the same plan, so what the client
+  // is told (e.g. "глубина одной ступени 300 мм") is what gets drawn.
+  //
+  // «Ступени» (kind 'steps') -- размер ОДНОЙ ступени:
+  //   lengthM = длина ступени (поперёк), widthM = глубина ступени;
+  //   a winder tread is a wedge around a pivot: its length runs out from the
+  //   pivot and its depth is measured at mid-length.
+  // «Лестницы» (kind 'flight') -- габариты лестницы:
+  //   straight: lengthM = длина марша в плане, widthM = ширина марша,
+  //             depth = length / count;
+  //   Г / П:    lengthM = габарит вдоль первого марша ВКЛЮЧАЯ площадку
+  //             (площадка = ширина марша), so depth = (length - width) / n1;
+  //             the landing is not a step;
+  //   spiral:   lengthM = диаметр лестницы, widthM = ширина ступени (от
+  //             опоры до края); the turn per step follows the usual walking
+  //             depth on the middle line.
+  const MIN_TREAD_DEPTH_M = 0.05;
+  const WINDER_PIVOT_M = 0.08;
+  function clampTurn(a) {
+    return Math.min(Math.PI / 4.5, Math.max(Math.PI / 18, a));
+  }
+
+  function stairPlan(kind, variant, lengthM, widthM, count) {
+    const n = Math.max(1, Math.round(count || 1));
+    if (kind === 'steps') {
+      if (variant === 'winder') {
+        const rIn = WINDER_PIVOT_M, rOut = rIn + lengthM;
+        return { count: n, rIn, rOut, angle: clampTurn(widthM / ((rIn + rOut) / 2)), treadLengthM: lengthM, treadDepthM: widthM };
+      }
+      return {
+        count: n, treadLengthM: lengthM, treadDepthM: widthM,
+        // Радиусная: the front edge bows out in the middle; its depth is the
+        // entered depth at both ends.
+        bulgeM: variant === 'radius' ? Math.min(widthM * 0.35, lengthM * 0.12) : 0,
+      };
+    }
+    if (variant === 'spiral') {
+      const rOut = Math.max(0.3, lengthM / 2);
+      const rIn = Math.min(rOut - 0.1, Math.max(0.08, rOut - widthM));
+      const rMid = (rIn + rOut) / 2;
+      const angle = clampTurn(VISUAL_STAIR_TREAD_DEPTH_M / rMid);
+      return { count: n, rIn, rOut, angle, treadLengthM: rOut - rIn, treadDepthM: angle * rMid };
+    }
+    if (variant === 'l' || variant === 'u') {
+      const n1 = Math.ceil(n / 2);
+      return {
+        count: n, flights: [n1, n - n1], landingM: widthM, treadLengthM: widthM,
+        treadDepthM: Math.max(MIN_TREAD_DEPTH_M, (lengthM - widthM) / n1),
+      };
+    }
+    return { count: n, flights: [n], treadLengthM: widthM, treadDepthM: lengthM / n };
+  }
+
   function buildStairs(productKey, state) {
     const id = state.subcategory ? state.subcategory.id : null;
     if (productKey === 'stupeni') {
       // Type A: the entered size is ONE tread (see pricing.js) -- drawn as a
       // short illustrative flight of identical treads.
+      const variant = STEP_VARIANTS[id] || 'straight';
       return {
         kind: 'steps',
-        variant: STEP_VARIANTS[id] || 'straight',
+        variant,
         risers: !!(state.productConfig && state.productConfig.stupeni && state.productConfig.stupeni.riser),
         // The client's «Количество ступеней» -- drawn exactly.
         count: state.stepCount,
+        plan: stairPlan('steps', variant, state.dimensions.lengthM, state.dimensions.widthM, state.stepCount),
       };
     }
     if (productKey === 'lestnitsa') {
       // Type B: the entered size is the cladded flight (width x run).
-      return { kind: 'flight', shape: STAIR_SHAPES[id] || 'straight', risers: STAIR_WITH_RISERS.includes(id), count: state.stepCount };
+      const shape = STAIR_SHAPES[id] || 'straight';
+      return {
+        kind: 'flight', shape, risers: STAIR_WITH_RISERS.includes(id), count: state.stepCount,
+        plan: stairPlan('flight', shape, state.dimensions.lengthM, state.dimensions.widthM, state.stepCount),
+      };
     }
     return null;
   }
@@ -157,5 +217,5 @@
     };
   }
 
-  return { buildGeometryModel };
+  return { buildGeometryModel, stairPlan, STAIR_SHAPES, STEP_VARIANTS };
 });

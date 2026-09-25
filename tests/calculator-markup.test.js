@@ -53,3 +53,11 @@ test('type cards: client-facing names only -- no rate-catalog suffixes or riser 
 test('countertop shape offers П-образная', () => {
   assert.match(html, /<option value="ushape">П-образная<\/option>/);
 });
+
+test('step count sits with the sizes (dimensions step), not on the type step', () => {
+  const dims = html.slice(html.indexOf('data-step-id="dimensions"'), html.indexOf('data-step-id="shape"'));
+  assert.match(dims, /id="stepCountInput"/);
+  assert.match(dims, /id="step-count"/);
+  const type = html.slice(html.indexOf('data-step-id="type"'), html.indexOf('data-step-id="material"'));
+  assert.doesNotMatch(type, /stepCountInput/);
+});
