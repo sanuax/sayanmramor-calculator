@@ -434,6 +434,10 @@
   }
   .pick-card.selected .pc-check { visibility: visible; background: var(--accent); border-color: var(--accent); }
   .pick-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  /* Кромка: the profile is the card's main element -- larger than the other
+     pick-card icons -- and all five cards share one row height. */
+  #edgeCardGrid { grid-auto-rows: 1fr; }
+  #edgeCardGrid .pick-card svg { height: 64px; }
   /* Второй вопрос внутри шага (подступенки у лестницы) -- та же карточная
      система, отделённая подзаголовком. */
   .choice-group { margin-top: 20px; }
@@ -2271,17 +2275,29 @@
   // выбор типа при нескольких одновременно ненулевых полях; здесь ненулевым
   // может быть только одно поле сразу, так что порядок отображения ни на что
   // не влияет функционально).
+  // Профили -- поперечные сечения одной плиты (viewBox 4 4 66 46): плита
+  // входит слева, передний край справа (x = 64), толщина 18 (y 10..28) --
+  // одинаковые масштаб, место и ориентация у всех пяти. Каждый профиль
+  // повторяет реальную кромку в 3D (three-scene.js bevelFor, scene-layout.js
+  // stone-wrap): обработка на верхнем И нижнем углу торца.
   const EDGE_TYPES = [
-    { type: 'straight', elId: 'edge-straight', title: 'Прямая', desc: 'Ровный срез без обработки',
-      icon: svgIcon('<rect x="14" y="12" width="24" height="36" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="2"/>') },
-    { type: 'rounding', elId: 'edge-round', title: 'Скругление', desc: 'Мягкий край без острых углов',
-      icon: svgIcon('<path d="M14 12 H26 A12 12 0 0 1 38 24 V48 H14 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="2"/>') },
-    { type: 'bevel', elId: 'edge-chamfer', title: 'Скос (фаска)', desc: 'Край срезан под углом',
-      icon: svgIcon('<path d="M14 12 H32 L38 18 V48 H14 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="2"/>') },
-    { type: 'figured', elId: 'edge-figured', title: 'Фигурная', desc: 'Волнообразный резной профиль',
-      icon: svgIcon('<path d="M14 12 H26 C36 12 36 20 30 22 C24 24 24 30 32 30 C38 30 38 36 38 40 V48 H14 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="2"/>') },
-    { type: 'stone-wrap', elId: 'edge-stonefold', title: 'Подгиб камнем', desc: 'Торец выглядит толще — камень подвёрнут вниз',
-      icon: svgIcon('<rect x="10" y="12" width="28" height="10" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="2"/><path d="M28 22 L38 22 L38 48 L30 48 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="2"/>') },
+    // Прямая: прямой вертикальный торец.
+    { type: 'straight', elId: 'edge-straight', title: 'Прямая', desc: 'Чёткий прямой край',
+      icon: svgIcon('<path d="M10 10 H64 V28 H10 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5" stroke-linejoin="round"/>', '4 4 66 46') },
+    // Скругление: плавный радиус на обоих углах (в 3D -- 12 мм на 40 мм).
+    { type: 'rounding', elId: 'edge-round', title: 'Скругление', desc: 'Мягкий закруглённый край',
+      icon: svgIcon('<path d="M10 10 H57 A7 7 0 0 1 64 17 V21 A7 7 0 0 1 57 28 H10 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5" stroke-linejoin="round"/>', '4 4 66 46') },
+    // Скос: один прямой срез на каждом углу (в 3D -- фаска 8 мм).
+    { type: 'bevel', elId: 'edge-chamfer', title: 'Скос (фаска)', desc: 'Срез под углом',
+      icon: svgIcon('<path d="M10 10 H58 L64 16 V22 L58 28 H10 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5" stroke-linejoin="round"/>', '4 4 66 46') },
+    // Фигурная: многогранный профиль -- в 3D кромка из трёх граней на каждом
+    // углу; грани видны, чем профиль и отличается от гладкого скругления.
+    { type: 'figured', elId: 'edge-figured', title: 'Фигурная', desc: 'Декоративный профиль',
+      icon: svgIcon('<path d="M10 10 H55 L59.5 11.2 L62.8 14.5 L64 19 L62.8 23.5 L59.5 26.8 L55 28 H10 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5" stroke-linejoin="round"/>', '4 4 66 46') },
+    // Подгиб камнем: камень возвращается вниз по торцу (в 3D -- каменный
+    // фартук высотой в толщину плиты под передним краем), торец вдвое выше.
+    { type: 'stone-wrap', elId: 'edge-stonefold', title: 'Подгиб камнем', desc: 'Визуально толстый торец',
+      icon: svgIcon('<path d="M10 10 H64 V46 H57 V28 H10 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5" stroke-linejoin="round"/>', '4 4 66 46') },
   ];
 
   const edgeCardGrid = document.getElementById('edgeCardGrid');
