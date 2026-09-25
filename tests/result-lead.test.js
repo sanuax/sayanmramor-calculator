@@ -50,7 +50,7 @@ function priceFor(productKey, state) {
     stone: state.stone, widthM: state.dimensions.widthM, lengthM: state.dimensions.lengthM,
     productType: PRODUCTS[productKey].type, rates, extraLineItems, extraDimensions,
     installEnabled: state.options.installEnabled, polishEnabled: state.options.polishEnabled, complexEnabled: state.options.complexEnabled,
-    marginCm: ProductTypes.SAW_MARGIN_CM, wasteFactor: ProductTypes.AREA_WASTE_FACTOR,
+    marginCm: ProductTypes.SAW_MARGIN_CM, usageLimit: ProductTypes.SLAB_USAGE_LIMIT,
   });
 }
 
@@ -298,8 +298,10 @@ test('kitchen result: L-shape with wing, edge, every countertop extra incl. cook
     'extra-ostrov-figured-width': { value: '900' }, 'extra-ostrov-figured-length': { value: '1800' },
     'extra-bar-complex-width': { value: '500' }, 'extra-bar-complex-length': { value: '1200' },
   });
-  assert.deepEqual(specKeys(c), ['shape', 'dimensions', 'wing', 'material', 'edge']);
+  // The product's own area (main run + wing) right after the wing it includes.
+  assert.deepEqual(specKeys(c), ['shape', 'dimensions', 'wing', 'area', 'material', 'edge']);
   const view = ResultModel.buildResultView(c);
+  assert.ok(c.dimensions.areaM2 > c.dimensions.sizeAreaM2, 'the wing is in the product area');
   assert.equal(view.specs.find(s => s.key === 'shape').detail, 'угол справа');
   assert.equal(view.specs.find(s => s.key === 'wing').value, '1200 × 600 мм');
   assert.deepEqual(c.additionalWorks.map(w => w.key), ['sink.integrated', 'cooktop', 'hole.socket', 'wallPanel', 'island.figured', 'barCounter.complex']);
@@ -319,7 +321,9 @@ test('steps result: type row from the subcategory, riser row, edge -- and no add
     subcategory: { id: 'STEP-02', label: 'Ступень — Забежная', unit: 'м²' },
   });
   const view = ResultModel.buildResultView(c);
-  assert.deepEqual(view.specs.map(s => s.key), ['type', 'dimensions', 'steps', 'material', 'edge', 'riser']);
+  // Every step's area on its own row («Площадь всех ступеней»).
+  assert.deepEqual(view.specs.map(s => s.key), ['type', 'dimensions', 'steps', 'area', 'material', 'edge', 'riser']);
+  assert.equal(view.specs.find(s => s.key === 'area').label, 'Площадь всех ступеней');
   assert.equal(view.specs.find(s => s.key === 'riser').value, 'С подступенками');
   assert.equal(view.specs.find(s => s.key === 'type').value, 'Ступень — Забежная');
   assert.equal(view.works, null);

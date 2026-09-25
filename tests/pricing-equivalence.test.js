@@ -7,7 +7,7 @@ const ProductTypes = require('../product-types.js');
 const RateCatalog = require('../rate-catalog.js');
 const ConstructorState = require('../constructor-state.js');
 
-const { PRODUCTS, hasAdditionalWork, WORK_RATES, MISC_FLAT_SUM, MISC_RATE_PER_M2, COMPLEX_SHAPE_MULTIPLIER, COUNTERTOP_EXTRAS_RATES, SAW_MARGIN_CM, AREA_WASTE_FACTOR } = ProductTypes;
+const { PRODUCTS, hasAdditionalWork, WORK_RATES, MISC_FLAT_SUM, MISC_RATE_PER_M2, COMPLEX_SHAPE_MULTIPLIER, COUNTERTOP_EXTRAS_RATES, SAW_MARGIN_CM, SLAB_USAGE_LIMIT } = ProductTypes;
 const { getAdditionalWorkRate } = RateCatalog;
 
 function mmToM(mm) { return mm / 1000; }
@@ -135,7 +135,7 @@ SCENARIOS.forEach(({ name, productKey, values }) => {
 
     const priceParams = {
       stone, widthM: state.dimensions.widthM, lengthM: state.dimensions.lengthM, productType: product.type,
-      marginCm: SAW_MARGIN_CM, wasteFactor: AREA_WASTE_FACTOR, allowSeam: product.allowSeam !== false,
+      marginCm: SAW_MARGIN_CM, usageLimit: SLAB_USAGE_LIMIT, allowSeam: product.allowSeam !== false,
       installEnabled: state.options.installEnabled, polishEnabled: state.options.polishEnabled, complexEnabled: state.options.complexEnabled,
     };
     const legacyResult = Pricing.calculatePrice(Object.assign({}, priceParams, legacy));

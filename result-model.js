@@ -18,6 +18,10 @@
   const FacadeModel = (typeof module !== 'undefined' && module.exports)
     ? require('./facade-model.js')
     : (typeof window !== 'undefined' ? window : globalThis).FacadeModel;
+  // Loaded after this file in the page -- looked up when used.
+  const Parts = () => ((typeof module !== 'undefined' && module.exports)
+    ? require('./product-parts.js')
+    : (typeof window !== 'undefined' ? window : globalThis).ProductParts);
 
   const RESULT_TITLES = {
     lestnitsa: 'Ваша лестница',
@@ -108,6 +112,48 @@
     };
   }
 
+  // The area of the product as it is cut and priced (its main parts).
+  function productAreaOf(state) {
+    if (!state.product) return state.dimensions.lengthM * state.dimensions.widthM;
+    return Parts().buildJob(state).mainAreaM2;
+  }
+
+  // Every step; a stair of several marches also as marches x steps and
+  // landings (a straight stair is one march -- nothing more to say).
+  function stepsOf(state) {
+    const stair = state.productConfig && state.productConfig.lestnitsa;
+    const steps = { count: state.stepCount };
+    if (stair && stair.marches > 1) {
+      Object.assign(steps, { marches: stair.marches, perMarch: stair.stepsPerMarch, landings: stair.landings });
+    }
+    return steps;
+  }
+
+  // The chosen type's own shape sizes, each under the client's name for it.
+  const SHAPE_SIZES = {
+    'WALL-04': [['wallRadius', 'Радиус стены', s => s.productConfig.stena && s.productConfig.stena.radiusM]],
+    'SILL-02': [['sillArm', 'Длина второго плеча', s => s.productConfig.podokonnik && s.productConfig.podokonnik.armLengthM]],
+    'SILL-03': [
+      ['sillBayDepth', 'Глубина эркера', s => s.productConfig.podokonnik && s.productConfig.podokonnik.bayDepthM],
+      ['sillBayFront', 'Передняя сторона эркера', s => s.productConfig.podokonnik && s.productConfig.podokonnik.bayFrontM],
+    ],
+    'SILL-04': [['sillBayDepth', 'Глубина эркера', s => s.productConfig.podokonnik && s.productConfig.podokonnik.bayDepthM]],
+  };
+
+  function shapeSizesOf(state) {
+    const id = state.subcategory ? state.subcategory.id : null;
+    const out = [];
+    (SHAPE_SIZES[id] || []).forEach(([key, label, get]) => {
+      const m = state.productConfig ? get(state) : 0;
+      if (m > 0) out.push({ key, label, valueMm: mToMm(m) });
+    });
+    const pc = state.productConfig || {};
+    const riserM = pc.stupeni && pc.stupeni.riser ? pc.stupeni.riserHeightM
+      : (pc.lestnitsa && pc.lestnitsa.risers ? pc.lestnitsa.riserHeightM : 0);
+    if (riserM > 0) out.push({ key: 'riserHeight', label: 'Высота подступенка', valueMm: mToMm(riserM) });
+    return out;
+  }
+
   // params:
   //   state            -- ConstructorState.readConstructorState() output
   //   productLabel     -- PRODUCTS[key].label
@@ -172,7 +218,12 @@
       shape,
       dimensions: facade ? null : {
         lengthMm, widthMm,
-        areaM2: Math.round(state.dimensions.lengthM * state.dimensions.widthM * 100) / 100,
+        // The product's own area as it is priced (product-parts.js): every
+        // step, the wings, the landings, a shaped sill -- not just length x
+        // width, which it equals for a plain rectangle.
+        areaM2: Math.round(productAreaOf(state) * 100) / 100,
+        areaLabel: key === 'stupeni' ? 'Площадь всех ступеней' : (labels.area || 'Площадь'),
+        sizeAreaM2: Math.round(state.dimensions.lengthM * state.dimensions.widthM * 100) / 100,
         lengthLabel: labels.length, widthLabel: labels.width,
         // "Размер ступени" / "Размер лестницы" -- the client's own name for
         // this pair of sizes (null: the generic "Размер").
@@ -182,7 +233,10 @@
       material: buildMaterial(state.stone),
       edge,
       riser: key === 'stupeni' ? !!(state.productConfig && state.productConfig.stupeni && state.productConfig.stupeni.riser) : null,
-      steps: state.stepCount ? { count: state.stepCount } : null,
+      steps: state.stepCount ? stepsOf(state) : null,
+      // The sizes of the shape beyond length x width that the price counts
+      // (a radius wall's radius, a sill's arm or bay, the riser height).
+      shapeSizes: shapeSizesOf(state),
       additionalWorksAvailable: !!caps.supportsCountertopExtras,
       additionalWorks: caps.supportsCountertopExtras ? buildAdditionalWorks(state) : [],
       options,
@@ -215,6 +269,8 @@
       ['installation', 'Монтаж', r.installation],
       ['polish', 'Полировка', r.polish],
       ['works', 'Кромка и дополнительные работы', (r.extras || 0) + (r.catalogExtras || 0)],
+      // Parts with their own rates (подступенки): 0 until the company sets them.
+      ['parts', 'Подступенки — работы', r.groupWork || 0],
       ['misc', 'Прочие работы', r.misc],
     ];
     const lines = candidates
@@ -260,33 +316,6 @@
     return [f.priceNote, f.visualNote].filter(Boolean).join(' ');
   }
 
-  // What the price does not cover although the client entered it -- the
-  // price is one step of «Ступени» (Type A, one piece; the count and the
-  // risers are drawn, not priced) and only the main run of a Г/П
-  // countertop (its wing sizes do not reach pricing.js). null: nothing.
-  function priceScopeNote({ productKey, riser, wingCount }) {
-    const notes = [];
-    if (productKey === 'stupeni') {
-      notes.push(riser ? 'Стоимость указана за одну ступень, подступенок в расчёт не входит.' : 'Стоимость указана за одну ступень.');
-    }
-    if (wingCount > 0) {
-      notes.push(wingCount > 1 ? 'Стоимость указана за основной сегмент, крылья в расчёт не входят.' : 'Стоимость указана за основной сегмент, крыло в расчёт не входит.');
-    }
-    return notes.length ? notes.join(' ') : null;
-  }
-
-  // The same note straight from the constructor state (the page's summary).
-  function priceScopeNoteForState(state) {
-    const key = state.product ? state.product.key : null;
-    const caps = (state.product && state.product.capabilities) || {};
-    const hasWings = caps.supportsShapeSelection && (state.shape === 'lshape' || state.shape === 'ushape') && hasArea(state.wing);
-    return priceScopeNote({
-      productKey: key,
-      riser: key === 'stupeni' && !!(state.productConfig && state.productConfig.stupeni && state.productConfig.stupeni.riser),
-      wingCount: hasWings ? (state.shape === 'ushape' ? 2 : 1) : 0,
-    });
-  }
-
   // Display rows for the Result screen: only rows that apply to this
   // product and actually carry a value -- no empty/"—"/null lines.
   function buildResultView(configuration) {
@@ -300,21 +329,36 @@
       specs.push({ key: 'shape', label: 'Форма', value: c.shape.label, detail: c.shape.cornerLabel || '' });
     }
     const d = c.dimensions;
+    let areaSpec = null;
     if (d) {
+      // A plain rectangle: its area beside its sizes. Anything more (every
+      // step, the wings, the landings, a shaped sill): the product's own
+      // area on its own row, under its own name.
+      const plain = d.sizeAreaM2 === undefined || Math.abs(d.areaM2 - d.sizeAreaM2) < 0.005;
+      const pair = d.lengthLabel.toLowerCase() + ' × ' + d.widthLabel.toLowerCase();
       specs.push({
         key: 'dimensions', label: d.title || 'Размер',
         value: d.lengthMm + ' × ' + d.widthMm + ' мм',
-        detail: d.lengthLabel.toLowerCase() + ' × ' + d.widthLabel.toLowerCase() + ' · ' + formatArea(d.areaM2),
+        detail: plain ? pair + ' · ' + formatArea(d.areaM2) : pair,
       });
+      // After the steps / wings it includes (pushed below).
+      if (!plain) areaSpec = { key: 'area', label: d.areaLabel || 'Площадь', value: formatArea(d.areaM2), detail: '' };
     }
     if (c.facade) facadeSpecs(c.facade).forEach(s => specs.push(s));
     if (c.steps) {
-      specs.push({ key: 'steps', label: 'Количество ступеней', value: c.steps.count + ' шт.', detail: '' });
+      // A stair with marches: every step, as marches x steps in one march.
+      const m = c.steps.marches;
+      specs.push({
+        key: 'steps', label: 'Количество ступеней', value: c.steps.count + ' шт.',
+        detail: m > 1 ? m + ' марша × ' + c.steps.perMarch + ' ступ. · ' + c.steps.landings + ' ' + (c.steps.landings === 1 ? 'площадка' : 'площадки') : '',
+      });
     }
+    (c.shapeSizes || []).forEach(s => specs.push({ key: 'shape.' + s.key, label: s.label, value: s.valueMm + ' мм', detail: '' }));
     if (c.shape && c.shape.wing) {
       const two = c.shape.wing.count === 2;
       specs.push({ key: 'wing', label: two ? 'Крылья' : 'Крыло', value: c.shape.wing.lengthMm + ' × ' + c.shape.wing.widthMm + ' мм', detail: two ? 'длина × ширина, каждое из двух' : 'длина × ширина' });
     }
+    if (areaSpec) specs.push(areaSpec);
     if (c.material) {
       const meta = [c.material.categoryLabel, c.material.country].filter(Boolean);
       if (!c.material.available) meta.push('нет в наличии');
@@ -334,10 +378,7 @@
       ? c.additionalWorks.map(w => ({ key: w.key, label: w.label, detail: formatWorkDetail(w) }))
       : null;
 
-    const note = c.facade ? facadeNote(c.facade) : priceScopeNote({
-      productKey: c.product.key, riser: !!c.riser, wingCount: c.shape && c.shape.wing ? c.shape.wing.count : 0,
-    });
-    return { title: c.product.title, specs, works, note };
+    return { title: c.product.title, specs, works, note: c.facade ? facadeNote(c.facade) : null };
   }
 
   // Edit shortcuts: every real step of this product except the Result
@@ -351,7 +392,6 @@
   return {
     RESULT_TITLES,
     resultTitle, buildConfiguration, summarizePricing, buildResultView, buildEditTargets,
-    priceScopeNote, priceScopeNoteForState,
     formatRub, formatWorkDetail,
   };
 });

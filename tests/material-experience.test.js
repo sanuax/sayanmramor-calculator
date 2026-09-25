@@ -39,7 +39,7 @@ test('material contributes to the existing pricing pipeline via stone.slabs -- n
   const ZERO_RATES = { fabricationRatePerM2: 0, installationRatePerM2: 0, polishRatePerM2: 0, miscFlatSum: 0, miscRatePerM2: 0, complexShapeMultiplier: 1 };
   const NO_OPTIONS = { installEnabled: false, polishEnabled: false, complexEnabled: false };
   const call = (stone) => Pricing.calculatePrice({
-    stone, widthM: 0.6, lengthM: 2, productType: 'A', rates: ZERO_RATES, ...NO_OPTIONS, marginCm: 4, wasteFactor: 1.3,
+    stone, widthM: 0.6, lengthM: 2, productType: 'A', rates: ZERO_RATES, ...NO_OPTIONS, marginCm: 4, usageLimit: 0.65,
   });
   const cheap = call({ slabs: [{ price_total_rub: 10000, width_cm: 300, length_cm: 300 }] });
   const pricier = call({ slabs: [{ price_total_rub: 20000, width_cm: 300, length_cm: 300 }] });

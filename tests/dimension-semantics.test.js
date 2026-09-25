@@ -1,10 +1,9 @@
 // tests/dimension-semantics.test.js
 //
 // One chain per product: the fields the client fills -> the size diagram ->
-// state.dimensions -> the 3D -> the priced area -> what the Result says the
-// price covers. Where they agree today this pins it; where the price
-// deliberately covers less than the configuration (one step, a countertop's
-// main run), the Result says so.
+// state.dimensions -> the 3D -> the priced area -> what the Result says.
+// The priced area is the whole product as it is cut (product-parts.js):
+// every step, a countertop's wings -- exactly the stone the 3D draws.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -26,14 +25,14 @@ function stateFor(key, values) {
   });
 }
 
-// The area the price is computed from (pricing.js: width x length, or a
-// facade's explicit cladded area).
+// The area the product's work is priced on: its main parts as they are cut
+// (the job product-parts.js builds for pricing.js).
 function pricedArea(state) {
   const inputs = ConstructorState.buildPricingInputs(state, {
     productRates: ProductTypes.WORK_RATES[state.product.key], miscFlatSum: null, miscRatePerM2: null,
     complexShapeMultiplier: 1.5, countertopExtrasRates: ProductTypes.COUNTERTOP_EXTRAS_RATES, getAdditionalWorkRate: () => null,
   });
-  return inputs.areaM2 !== null ? inputs.areaM2 : state.dimensions.widthM * state.dimensions.lengthM;
+  return inputs.job.mainAreaM2;
 }
 
 function layoutOf(state) {
@@ -139,51 +138,41 @@ test('«Лестницы», straight flight: the priced length x width is the dr
   });
 });
 
-test('«Ступени»: each drawn tread is the entered size of ONE step, the price is one step, and the Result says so', () => {
-  const state = stateFor('stupeni', sizes(300, 1200, Object.assign(type('STEP-01'), { 'step-count': { value: '4' } })));
-  assert.equal(state.stepCount, 4);
-  close(pricedArea(state), 0.36, 'one step');
-  const note = ResultModel.priceScopeNoteForState(state);
-  assert.equal(note, 'Стоимость указана за одну ступень.');
-  const riser = stateFor('stupeni', sizes(300, 1200, Object.assign(type('STEP-01'), { 'step-count': { value: '4' }, 'stupeni-riser': { checked: true } })));
-  assert.equal(ResultModel.priceScopeNoteForState(riser), 'Стоимость указана за одну ступень, подступенок в расчёт не входит.');
+test('«Ступени»: every drawn tread is the entered size of ONE step, and the price counts all of them', () => {
+  [1, 4, 12].forEach(n => {
+    const state = stateFor('stupeni', sizes(300, 1200, Object.assign(type('STEP-01'), { 'step-count': { value: String(n) } })));
+    assert.equal(state.stepCount, n);
+    close(pricedArea(state), 0.36 * n, n + ' steps');
+    close(planArea(layoutOf(state)), pricedArea(state), n + ': the drawn treads are the priced area');
+  });
 });
 
-test('Г/П countertop: the wings are drawn but not priced -- the Result says the price is the main run', () => {
+test('Г/П countertop: the main run and its wings are one product -- the priced area is all of it, as drawn', () => {
   const wing = { 'wing-width': { value: '600' }, 'wing-length': { value: '1400' } };
   const l = stateFor('stoleshnitsa_kuhnya', sizes(600, 2400, Object.assign({ productShape: { value: 'lshape' } }, wing)));
   const u = stateFor('stoleshnitsa_kuhnya', sizes(600, 2400, Object.assign({ productShape: { value: 'ushape' } }, wing)));
-  close(pricedArea(l), 1.44, 'Г: main run only');
-  close(pricedArea(u), 1.44, 'П: main run only');
-  assert.ok(planArea(layoutOf(l)) > pricedArea(l) + 0.5, 'the 3D draws the wing');
-  assert.equal(ResultModel.priceScopeNoteForState(l), 'Стоимость указана за основной сегмент, крыло в расчёт не входит.');
-  assert.equal(ResultModel.priceScopeNoteForState(u), 'Стоимость указана за основной сегмент, крылья в расчёт не входят.');
-  // No wing size yet, a straight top, another product with a stale shape: no note.
-  assert.equal(ResultModel.priceScopeNoteForState(stateFor('stoleshnitsa_kuhnya', sizes(600, 2400, { productShape: { value: 'lshape' } }))), null);
-  assert.equal(ResultModel.priceScopeNoteForState(stateFor('stoleshnitsa_kuhnya', sizes(600, 2400, wing))), null);
-  assert.equal(ResultModel.priceScopeNoteForState(stateFor('pol', sizes(3000, 4000, Object.assign({ productShape: { value: 'lshape' } }, wing)))), null);
+  close(pricedArea(l), 1.44 + 0.84, 'Г: main run + wing');
+  close(pricedArea(u), 1.44 + 2 * 0.84, 'П: main run + two wings');
+  close(planArea(layoutOf(l)), pricedArea(l), 'Г: as drawn');
+  close(planArea(layoutOf(u)), pricedArea(u), 'П: as drawn');
+  // No wing size yet: only the main run (nothing is made up).
+  close(pricedArea(stateFor('stoleshnitsa_kuhnya', sizes(600, 2400, { productShape: { value: 'lshape' } }))), 1.44, 'no wing size');
 });
 
-test('the Result note is the same note the summary shows; a facade keeps its own note', () => {
+test('the Result note: only a facade has one (what its price covers); nothing is left out of the others any more', () => {
   const wing = { 'wing-width': { value: '600' }, 'wing-length': { value: '1400' } };
-  const cases = [
-    ['stupeni', sizes(300, 1200, Object.assign(type('STEP-02'), { 'step-count': { value: '3' }, 'stupeni-riser': { checked: true } }))],
+  [
+    ['stupeni', sizes(300, 1200, Object.assign(type('STEP-02'), { 'step-count': { value: '3' }, 'stupeni-riser': { checked: true }, 'riser-height': { value: '170' } }))],
     ['stoleshnitsa_kuhnya', sizes(600, 2400, Object.assign({ productShape: { value: 'ushape' } }, wing))],
-    ['stoleshnitsa_vannaya', sizes(500, 1200, Object.assign({ productShape: { value: 'lshape' } }, wing))],
-    ['podokonnik', sizes(300, 1500, type('SILL-03'))],
     ['lestnitsa', sizes(1000, 3000, type('STAIR-03'))],
-  ];
-  cases.forEach(([key, values]) => {
-    const state = stateFor(key, values);
-    const configuration = ResultModel.buildConfiguration({ state, productLabel: ProductTypes.PRODUCTS[key].label, subcategory: null });
-    assert.equal(ResultModel.buildResultView(configuration).note, ResultModel.priceScopeNoteForState(state), key);
+  ].forEach(([key, values]) => {
+    const configuration = ResultModel.buildConfiguration({ state: stateFor(key, values), productLabel: ProductTypes.PRODUCTS[key].label, subcategory: null });
+    assert.equal(ResultModel.buildResultView(configuration).note, null, key);
   });
   const column = stateFor('fasad', { productSubcategory: { value: 'FACADE-03' }, 'facade-form': { value: 'round' }, 'facade-radius': { value: '200' }, 'facade-height': { value: '3000' }, 'facade-quantity': { value: '4' } });
   const view = ResultModel.buildResultView(ResultModel.buildConfiguration({ state: column, productLabel: 'Фасады', subcategory: null }));
   assert.match(view.note, /^Стоимость указана за облицовку колонн\./);
-  // The summary shows the note beside the price, but not in the message the
-  // Result repeats (it has the note under the sizes already).
-  assert.match(html, /const message = warningOut\.textContent \|\| null;[\s\S]*?priceScopeNoteForState\(constructorState\)[\s\S]*?outcome: \{ kind: 'ok', result, message \}/);
+  assert.doesNotMatch(html, /priceScopeNoteForState|Стоимость указана за одну ступень|крыло в расчёт не входит/);
 });
 
 test('«Фасады»: every drawn piece is the entered size, as many as entered, and the priced area is their cladding', () => {

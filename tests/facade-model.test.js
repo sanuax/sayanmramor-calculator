@@ -56,7 +56,7 @@ function priceOf(state) {
     stone: state.stone, widthM: state.dimensions.widthM, lengthM: state.dimensions.lengthM, areaM2,
     productType: PRODUCTS.fasad.type, rates, extraLineItems, extraDimensions,
     installEnabled: false, polishEnabled: false, complexEnabled: false,
-    marginCm: ProductTypes.SAW_MARGIN_CM, wasteFactor: ProductTypes.AREA_WASTE_FACTOR,
+    marginCm: ProductTypes.SAW_MARGIN_CM, usageLimit: ProductTypes.SLAB_USAGE_LIMIT,
   });
 }
 
@@ -237,9 +237,11 @@ test('price: a facade is priced by its cladded area (not by leftover width/lengt
   const r = priceOf(state);
   assert.equal(r.ok, true);
   close(r.fabrication, WORK_RATES.fasad.fabricationRatePerM2 * area);
-  // The stone covers the area x the waste factor (Type B, as before).
-  const typeB = Pricing.computeTypeBResultForArea(STONE.slabs, area, ProductTypes.AREA_WASTE_FACTOR);
-  assert.equal(r.subtotal, typeB.subtotal);
+  // A round column's cladding is a surface: the slabs cover the area, each
+  // used at most 65% (the 35% reserve).
+  const surface = Pricing.planSurface(STONE.slabs, area, ProductTypes.SLAB_USAGE_LIMIT);
+  assert.equal(r.subtotal, surface.used.reduce((s, u) => s + u.slab.price_total_rub, 0));
+  assert.ok(r.material.utilization <= ProductTypes.SLAB_USAGE_LIMIT + 1e-9);
   assert.equal(priceOf(stateFor(fields('FACADE-03', 'round', { height: 3000 }, 4))).reason, 'invalid_dimensions');
   // Other products are priced exactly as before (areaM2 null).
   const wallState = ConstructorState.readConstructorState({

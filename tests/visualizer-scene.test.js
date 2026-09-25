@@ -384,7 +384,11 @@ const TYPE_IDS = {
 };
 
 test('every type of every product draws a different 3D scene (no two types share one model)', () => {
-  const dims = { width: { value: '1200' }, length: { value: '3000' } };
+  // With every size a shaped type asks for (a sill's arm / bay, a wall's radius).
+  const dims = {
+    width: { value: '1200' }, length: { value: '3000' },
+    'sill-arm-length': { value: '1800' }, 'sill-bay-depth': { value: '500' }, 'sill-bay-front': { value: '1500' }, 'wall-radius': { value: '4000' },
+  };
   Object.entries(TYPE_IDS).forEach(([key, ids]) => {
     const prints = ids.map(id => fingerprint(layoutFor(key, Object.assign({ productSubcategory: { value: id } }, dims))));
     assert.equal(new Set(prints).size, ids.length, key + ': ' + ids.join(', '));
@@ -414,16 +418,29 @@ test('П-shape + island: the island stands clear of both wings', () => {
   named(u, 'wing').forEach(w => assert.ok(island.x0 > extent(w.outline).x1, 'island past the wing ends'));
 });
 
-test('windowsill types change the slab: corner turns, bays bulge out of the wall, figured has a shaped front', () => {
-  const sill = id => named(layoutFor('podokonnik', { width: { value: '300' }, length: { value: '1500' }, productSubcategory: { value: id } }), 'main')[0];
+test('windowsill types change the slab by the client\'s own sizes: the corner\'s arm, the bay\'s depth and front', () => {
+  const SIZES = { 'sill-arm-length': { value: '900' }, 'sill-bay-depth': { value: '400' }, 'sill-bay-front': { value: '800' } };
+  const sillLayout = (id, extra) => layoutFor('podokonnik', Object.assign({ width: { value: '300' }, length: { value: '1500' }, productSubcategory: { value: id } }, extra === undefined ? SIZES : extra));
+  const sill = (id, extra) => named(sillLayout(id, extra), 'main')[0];
   const straight = extent(sill('SILL-01').outline);
   const corner = extent(sill('SILL-02').outline);
   const bay = extent(sill('SILL-03').outline);
   const radius = sill('SILL-04');
   const figured = sill('SILL-05');
-  assert.ok(corner.x1 > straight.x1 + 0.2, 'the corner sill runs along the second wall');
-  assert.ok(bay.x0 < straight.x0 - 0.1, 'the bay sill reaches out into the bay');
+  // Exactly the entered sizes: the arm reaches 900 from the window line,
+  // the bays go 400 out of the wall, the bay's front window is 800.
+  assert.ok(Math.abs((corner.x1 - straight.x0) - 0.9) < 1e-9, 'the corner sill runs 900 along the second wall');
+  assert.ok(Math.abs((straight.x0 - bay.x0) - 0.4) < 1e-9, 'the bay sill reaches 400 out into the bay');
+  const front = sill('SILL-03').outline.filter(([x]) => Math.abs(x - bay.x0) < 1e-9).map(([, z]) => z);
+  assert.ok(Math.abs((Math.max(...front) - Math.min(...front)) - 0.8) < 1e-9, 'the bay front is 800');
+  assert.ok(Math.abs((straight.x0 - extent(radius.outline).x0) - 0.4) < 1e-9, 'the radius bay rises 400');
   assert.ok(radius.outline.length > sill('SILL-03').outline.length + 5, 'the radius bay is a curve, not three facets');
+  // Nothing the client did not enter is made up: without the arm / bay the
+  // 3D shows the plain sill of the entered length and depth.
+  ['SILL-02', 'SILL-03', 'SILL-04'].forEach(id => {
+    const e = extent(sill(id, {}).outline);
+    assert.ok(Math.abs(e.x0 - straight.x0) < 1e-9 && Math.abs(e.x1 - straight.x1) < 1e-9 && Math.abs(e.z1 - e.z0 - 1.5) < 1e-9, id + ' without its sizes');
+  });
   assert.ok(figured.outline.length > 8, 'the figured sill has a shaped front');
   // The entered width is its full depth: the fullest point reaches exactly
   // the straight sill's front, the ends are drawn in -- never deeper than the
@@ -433,8 +450,7 @@ test('windowsill types change the slab: corner turns, bays bulge out of the wall
   const endsX = figured.outline.filter(([, z]) => Math.abs(Math.abs(z) - 0.75) < 1e-9).map(([x]) => x);
   assert.ok(endsX.some(x => x < straight.x1 - 0.05), 'the front is drawn in at the ends');
   ['SILL-02', 'SILL-03', 'SILL-04'].forEach(id => {
-    const layout = layoutFor('podokonnik', { width: { value: '300' }, length: { value: '1500' }, productSubcategory: { value: id } });
-    assert.ok(layout.parts.some(p => p.role === 'context-glass'), id + ': glazed along its window line');
+    assert.ok(sillLayout(id).parts.some(p => p.role === 'context-glass'), id + ': glazed along its window line');
   });
 });
 
@@ -473,11 +489,12 @@ test('steps: N entered -> N treads, for every step type, and the type change kee
   assert.ok(radius.every(t => t.outline.length > 4), 'radius treads keep their arc');
 });
 
-test('stairs: N entered -> N treads for every flight shape (landing not counted), with or without risers', () => {
-  ['STAIR-01', 'STAIR-02', 'STAIR-03', 'STAIR-05', 'STAIR-07', 'STAIR-08'].forEach(type => {
+test('stairs: N entered -> N treads per march (Г/П: two marches -> 2N), landings not counted, with or without risers', () => {
+  const MARCHES = { 'STAIR-01': 1, 'STAIR-02': 1, 'STAIR-03': 2, 'STAIR-05': 2, 'STAIR-07': 1, 'STAIR-08': 1 };
+  Object.keys(MARCHES).forEach(type => {
     [1, 5, 8, 12, 30].forEach(n => {
-      const layout = layoutFor('lestnitsa', { width: { value: '1000' }, length: { value: '3600' }, 'step-count': { value: String(n) }, productSubcategory: { value: type } });
-      assert.equal(named(layout, 'tread').length, n, type + ' x ' + n);
+      const layout = layoutFor('lestnitsa', { width: { value: '1000' }, length: { value: '3600' }, 'step-count': { value: String(n) }, productSubcategory: { value: type }, 'riser-height': { value: '170' } });
+      assert.equal(named(layout, 'tread').length, MARCHES[type] * n, type + ' x ' + n);
     });
   });
 });
@@ -548,7 +565,8 @@ test('«Лестницы» прямая: длина x ширина of the whole 
 });
 
 test('«Лестницы» Г/П: the length includes the landing (not a step); П\'s second flight comes back to the start', () => {
-  const dims = { length: { value: '3000' }, width: { value: '1000' }, 'step-count': { value: '10' } };
+  // 5 steps in one march -> two marches of 5.
+  const dims = { length: { value: '3000' }, width: { value: '1000' }, 'step-count': { value: '5' } };
   ['STAIR-03', 'STAIR-05'].forEach(type => {
     const layout = layoutFor('lestnitsa', Object.assign({ productSubcategory: { value: type } }, dims));
     const treads = named(layout, 'tread'), landing = named(layout, 'landing');
@@ -594,7 +612,9 @@ test('step count range: «Забежные» 1..10, «Прямые»/«Ради�
 });
 
 test('Г/П «с подступенками»: the landing at the turn has its own stone riser; without risers nothing changes', () => {
-  const dims = { length: { value: '3000' }, width: { value: '1000' }, 'step-count': { value: '10' } };
+  // Г/П: 5 steps in one march (10 in all); straight/spiral: 10.
+  const dims = { length: { value: '3000' }, width: { value: '1000' }, 'step-count': { value: '5' }, 'riser-height': { value: '170' } };
+  const dims10 = Object.assign({}, dims, { 'step-count': { value: '10' } });
   [['STAIR-03', 'STAIR-04'], ['STAIR-05', 'STAIR-06']].forEach(([off, on]) => {
     const plain = layoutFor('lestnitsa', Object.assign({ productSubcategory: { value: off } }, dims));
     const withRisers = layoutFor('lestnitsa', Object.assign({ productSubcategory: { value: on } }, dims));
@@ -611,8 +631,8 @@ test('Г/П «с подступенками»: the landing at the turn has its o
     assert.ok(Math.abs(turn.y1 - named(withRisers, 'landing')[0].y0) < 1e-9, on + ': ...up to the landing slab');
   });
   // Straight and spiral stairs are unaffected.
-  const straight = layoutFor('lestnitsa', Object.assign({ productSubcategory: { value: 'STAIR-02' } }, dims));
+  const straight = layoutFor('lestnitsa', Object.assign({ productSubcategory: { value: 'STAIR-02' } }, dims10));
   assert.equal(named(straight, 'riser').length, 10);
-  const spiral = layoutFor('lestnitsa', Object.assign({ productSubcategory: { value: 'STAIR-08' } }, dims));
+  const spiral = layoutFor('lestnitsa', Object.assign({ productSubcategory: { value: 'STAIR-08' } }, dims10));
   assert.equal(named(spiral, 'riser').length, 10);
 });

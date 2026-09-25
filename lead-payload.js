@@ -72,6 +72,9 @@
         edge: c.edge,
         riser: c.riser,
         steps: c.steps || null,
+        // The shape's own priced sizes (радиус стены, плечо/эркер подоконника,
+        // высота подступенка) -- [] when the type has none.
+        shapeSizes: c.shapeSizes || [],
         additionalWorks: c.additionalWorks,
         options: c.options,
       },

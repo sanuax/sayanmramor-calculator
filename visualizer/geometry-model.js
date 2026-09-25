@@ -87,8 +87,19 @@
   //   spiral:   lengthM = диаметр лестницы, widthM = ширина ступени (от
   //             опоры до края); the turn per step follows the usual walking
   //             depth on the middle line.
+  // Марши («Лестницы»): a straight stair is one march, Г and П are two
+  // marches (the same number of steps in each) with a landing between them
+  // -- landings = marches - 1. `count` is every step of the stair.
   const MIN_TREAD_DEPTH_M = 0.05;
   const WINDER_PIVOT_M = 0.08;
+  // П: the two marches run side by side with this gap between them; the
+  // landing spans both marches and the gap.
+  const U_FLIGHT_GAP_M = 0.1;
+  const STAIR_MARCHES = { straight: 1, l: 2, u: 2, spiral: 0 };
+  // Радиусная ступень: how far the front arc bows out past the side edges,
+  // as a share of the step's full depth (the entered «Глубина ступени» is
+  // the deepest point, at the middle of the arc), at most 12% of its length.
+  const RADIUS_STEP_BULGE_SHARE = 0.35 / 1.35;
   function clampTurn(a) {
     return Math.min(Math.PI / 4.5, Math.max(Math.PI / 18, a));
   }
@@ -100,28 +111,119 @@
         const rIn = WINDER_PIVOT_M, rOut = rIn + lengthM;
         return { count: n, rIn, rOut, angle: clampTurn(widthM / ((rIn + rOut) / 2)), treadLengthM: lengthM, treadDepthM: widthM };
       }
-      return {
-        count: n, treadLengthM: lengthM, treadDepthM: widthM,
-        // Радиусная: the front edge bows out in the middle; its depth is the
-        // entered depth at both ends.
-        bulgeM: variant === 'radius' ? Math.min(widthM * 0.35, lengthM * 0.12) : 0,
-      };
+      // Радиусная: the front edge bows out in the middle; the entered depth
+      // is the deepest point, the sides are `bulgeM` shallower.
+      const bulgeM = variant === 'radius' ? Math.min(widthM * RADIUS_STEP_BULGE_SHARE, lengthM * 0.12) : 0;
+      return { count: n, treadLengthM: lengthM, treadDepthM: widthM, edgeDepthM: widthM - bulgeM, bulgeM };
     }
     if (variant === 'spiral') {
       const rOut = Math.max(0.3, lengthM / 2);
       const rIn = Math.min(rOut - 0.1, Math.max(0.08, rOut - widthM));
       const rMid = (rIn + rOut) / 2;
       const angle = clampTurn(VISUAL_STAIR_TREAD_DEPTH_M / rMid);
-      return { count: n, rIn, rOut, angle, treadLengthM: rOut - rIn, treadDepthM: angle * rMid };
+      return { count: n, marches: 0, rIn, rOut, angle, treadLengthM: rOut - rIn, treadDepthM: angle * rMid };
     }
     if (variant === 'l' || variant === 'u') {
       const n1 = Math.ceil(n / 2);
+      const landing = { lengthM: widthM, widthM: variant === 'u' ? 2 * widthM + U_FLIGHT_GAP_M : widthM };
       return {
-        count: n, flights: [n1, n - n1], landingM: widthM, treadLengthM: widthM,
+        count: n, marches: 2, flights: [n1, n - n1], landings: [landing], landingM: widthM, treadLengthM: widthM,
+        flightGapM: variant === 'u' ? U_FLIGHT_GAP_M : 0,
         treadDepthM: Math.max(MIN_TREAD_DEPTH_M, (lengthM - widthM) / n1),
       };
     }
-    return { count: n, flights: [n], treadLengthM: widthM, treadDepthM: lengthM / n };
+    return { count: n, marches: 1, flights: [n], landings: [], treadLengthM: widthM, treadDepthM: lengthM / n };
+  }
+
+  // ---- windowsills: the plan of each type, from the client's sizes ------
+  //
+  // Local frame (as the 3D): the window wall at x = -W/2, the room toward
+  // +X, the run along Z. W = «Глубина подоконника», L = its length along
+  // the window. Every other size is the client's own (sill params):
+  //   corner:      armLengthM -- the second arm along the second window,
+  //                measured from the inner corner of the window line;
+  //   bay:         bayDepthM (how far the bay goes out of the wall) and
+  //                bayFrontM (the front window of the bay; the two side
+  //                windows join it to the wall line);
+  //   bay-radius:  bayDepthM -- the rise of the arc over the opening L.
+  // Returns the outline, the window line and the stone parts the sill is
+  // cut as (a corner sill: the main run and the arm, joined with a seam).
+  function polygonArea(pts) {
+    let a = 0;
+    pts.forEach(([x1, z1], i) => { const [x2, z2] = pts[(i + 1) % pts.length]; a += x1 * z2 - x2 * z1; });
+    return Math.abs(a) / 2;
+  }
+
+  function sillPlan(variant, W, L, params) {
+    const p = params || {};
+    const xw = -W / 2;
+    if (variant === 'corner' && p.armLengthM > W) {
+      const reach = p.armLengthM;
+      const outline = [[xw, -L / 2], [W / 2, -L / 2], [W / 2, L / 2 - W], [xw + reach, L / 2 - W], [xw + reach, L / 2], [xw, L / 2]];
+      return {
+        outline, windowLine: [[xw, -L / 2], [xw, L / 2], [xw + reach, L / 2]], areaM2: polygonArea(outline),
+        pieces: [
+          { key: 'main', lengthM: L, widthM: W, areaM2: L * W },
+          { key: 'arm', lengthM: reach - W, widthM: W, areaM2: (reach - W) * W },
+        ],
+      };
+    }
+    if (variant === 'bay' && p.bayDepthM > 0 && p.bayFrontM > 0 && p.bayFrontM < L) {
+      const D = p.bayDepthM, F = p.bayFrontM;
+      const bay = [[xw, -L / 2], [xw - D, -F / 2], [xw - D, F / 2], [xw, L / 2]];
+      const outline = bay.concat([[W / 2, L / 2], [W / 2, -L / 2]]);
+      return {
+        outline, windowLine: bay, areaM2: polygonArea(outline),
+        sideM: Math.hypot((L - F) / 2, D),
+        pieces: [{ key: 'main', lengthM: L, widthM: W + D, areaM2: polygonArea(outline) }],
+      };
+    }
+    if (variant === 'bay-radius' && p.bayDepthM > 0 && p.bayDepthM <= L / 2) {
+      // A circular arc through both ends of the opening and D out at the middle.
+      const D = p.bayDepthM;
+      const R = (L * L / 4 + D * D) / (2 * D);
+      const half = Math.asin(Math.min(1, L / 2 / R));
+      const bay = [];
+      const n = 24;
+      for (let i = 0; i <= n; i++) {
+        const a = -half + 2 * half * (i / n);
+        bay.push([xw - (R * Math.cos(a) - (R - D)), R * Math.sin(a)]);
+      }
+      const outline = bay.concat([[W / 2, L / 2], [W / 2, -L / 2]]);
+      return {
+        outline, windowLine: bay, areaM2: polygonArea(outline), radiusM: R,
+        pieces: [{ key: 'main', lengthM: L, widthM: W + D, areaM2: polygonArea(outline) }],
+      };
+    }
+    if (variant === 'figured') {
+      // Фигурный: a shaped room-side edge -- fuller in the middle, drawn in
+      // at both ends -- against an ordinary straight window. The entered
+      // width is the sill's full depth; the slab piece is the L x W
+      // rectangle it is cut from.
+      const A = Math.min(W * 0.3, 0.1);
+      const front = [];
+      const n = 16;
+      for (let i = 0; i <= n; i++) {
+        const z = -L / 2 + L * (i / n);
+        front.push([W / 2 - A + A * Math.cos(Math.PI * 2 * z / L), z]);
+      }
+      const outline = [[xw, -L / 2]].concat(front, [[xw, L / 2]]);
+      return { outline, windowLine: null, areaM2: polygonArea(outline), pieces: [{ key: 'main', lengthM: L, widthM: W, areaM2: L * W }] };
+    }
+    return null;
+  }
+
+  // Радиусная стена: the wall's run is an arc of radius R, `arcM` long (the
+  // entered «Длина дуги»). Chord and rise (sag) follow from them.
+  function radiusWallPlan(radiusM, arcM) {
+    if (!(radiusM > 0) || !(arcM > 0) || arcM > 2 * Math.PI * radiusM) return null;
+    const angle = arcM / radiusM;
+    return {
+      radiusM, arcM, angle,
+      chordM: angle >= 2 * Math.PI - 1e-9 ? 0 : 2 * radiusM * Math.sin(angle / 2),
+      // How far the arc stands off its chord (past half a circle: more than R).
+      sagM: radiusM * (1 - Math.cos(angle / 2)),
+    };
   }
 
   function buildStairs(productKey, state) {
@@ -153,7 +255,19 @@
   function buildSurface(productKey, state) {
     if (!['pol', 'stena', 'fasad'].includes(productKey)) return null;
     const id = state.subcategory ? state.subcategory.id : null;
-    return SURFACE_LAYOUTS[id] || { pattern: null, moduleM: null };
+    const layout = SURFACE_LAYOUTS[id] || { pattern: null, moduleM: null };
+    if (layout.form !== 'radius') return layout;
+    // Радиусная стена: «Радиус стены» and the width field as «Длина дуги».
+    const stena = state.productConfig && state.productConfig.stena;
+    return Object.assign({}, layout, { arc: radiusWallPlan(stena ? stena.radiusM : 0, state.dimensions.widthM) });
+  }
+
+  // The windowsill type and the client's own sizes of its shape.
+  function buildSill(state) {
+    const cfg = (state.productConfig && state.productConfig.podokonnik) || {};
+    const variant = SILL_VARIANTS[typeId(state)] || 'straight';
+    const params = { armLengthM: cfg.armLengthM || 0, bayDepthM: cfg.bayDepthM || 0, bayFrontM: cfg.bayFrontM || 0 };
+    return { variant, params, plan: sillPlan(variant, state.dimensions.widthM, state.dimensions.lengthM, params) };
   }
 
   function typeId(state) {
@@ -229,11 +343,14 @@
       barCounter: resolveBarCounter(pickActiveVariant(state.barCounter.standard, state.barCounter.complex, ['standard', 'complex']), lengthM, wings),
       stairs: buildStairs(productKey, state),
       surface: buildSurface(productKey, state),
-      sill: productKey === 'podokonnik' ? { variant: SILL_VARIANTS[typeId(state)] || 'straight' } : null,
+      sill: productKey === 'podokonnik' ? buildSill(state) : null,
       panel: productKey === 'panno' ? { variant: PANEL_VARIANTS[typeId(state)] || 'plain' } : null,
       facade,
     };
   }
 
-  return { buildGeometryModel, stairPlan, STAIR_SHAPES, STEP_VARIANTS };
+  return {
+    buildGeometryModel, stairPlan, sillPlan, radiusWallPlan, polygonArea,
+    STAIR_SHAPES, STEP_VARIANTS, SILL_VARIANTS, STAIR_MARCHES, STAIR_WITH_RISERS, U_FLIGHT_GAP_M,
+  };
 });

@@ -19,7 +19,7 @@ function price(productType, widthM, lengthM, extra) {
   return Pricing.calculatePrice(Object.assign({
     stone: STONE, widthM, lengthM, productType,
     rates: ProductTypes.WORK_RATES.stoleshnitsa_kuhnya,
-    marginCm: ProductTypes.SAW_MARGIN_CM, wasteFactor: ProductTypes.AREA_WASTE_FACTOR,
+    marginCm: ProductTypes.SAW_MARGIN_CM, usageLimit: ProductTypes.SLAB_USAGE_LIMIT,
   }, extra || {}));
 }
 
@@ -72,8 +72,9 @@ test('normal, minimal and large-but-realistic sizes are priced as before', () =>
   assert.equal(floor.ok, true, 'a 48 m² floor');
   const facadeArea = price('B', 0, 0, { areaM2: 60 });
   assert.equal(facadeArea.ok, true);
-  // The same price as the Type B area path computes directly.
-  assert.equal(floor.subtotal, Pricing.computeTypeBResult(STONE.slabs, 8, 6, ProductTypes.AREA_WASTE_FACTOR).subtotal);
+  // The same stone as the surface path computes directly (35% reserve).
+  const surface = Pricing.planSurface(STONE.slabs, 48, ProductTypes.SLAB_USAGE_LIMIT);
+  assert.equal(floor.subtotal, surface.used.reduce((s, u) => s + u.slab.price_total_rub, 0));
 });
 
 test('minCostCover: an unreachable target returns «no cover» at once, without the DP arrays', () => {

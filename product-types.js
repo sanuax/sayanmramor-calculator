@@ -27,10 +27,9 @@
       label: "Столешницы в ванную", type: 'A',
       supportsEdgeWork: true,
       supportsCountertopExtras: true,
-      // supportsShapeSelection: НЕ ценообразующее поле -- разрешает выбор
-      // формы (прямая/Г-образная) в 3D-конструкторе. wing (второе крыло)
-      // сегодня НЕ учитывается в pricing.js -- см.
-      // docs/superpowers/specs/2026-09-21-3d-visualizer-design.md.
+      // supportsShapeSelection: выбор формы (прямая/Г/П). Крылья -- детали
+      // изделия: их площадь входит в площадь и цену, а раскрой идёт по
+      // реальным деталям со швом к основному сегменту (product-parts.js).
       supportsShapeSelection: true,
       // UX-аудит: "Вариант исполнения" (BATH-01..04) дублирует реальный шаг
       // "Форма" (Прямая/Г-образная) и дополнительно предлагает
@@ -83,8 +82,13 @@
     return !!(product && product.additionalWorks && product.additionalWorks[capability]);
   }
 
-  const SAW_MARGIN_CM = 4;       // запас на распил с каждого края
-  const AREA_WASTE_FACTOR = 1.3; // на подрезку/подгонку швов и брак (тип B)
+  const SAW_MARGIN_CM = 4;       // запас на распил с каждого края детали
+  // Запас материала 35%: изделие занимает не больше 65% площади каждого
+  // слэба, из которого его режут (утверждённое правило компании). Какие
+  // слэбы нужны, решает реальный раскрой деталей (pricing.js planMaterial),
+  // а не деление площади на 0.65; этот предел -- ограничение на каждый слэб.
+  // Заменяет прежний коэффициент отходов 1.3 для облицовки (тип B).
+  const SLAB_USAGE_LIMIT = 0.65;
 
   // Ставки работы ₽/м², заменяют старую формулу
   // subtotal × WORK_MULTIPLIER × HARDNESS_WORK_MULTIPLIER × complexityMultiplier.
@@ -150,6 +154,13 @@
     podokonnik: { fabricationRatePerM2: 30000, installationRatePerM2: 14000, polishRatePerM2: 14400 }  // × 0.8
   };
 
+  // Подступенок -- отдельная позиция со своей ставкой за м² (не ставка
+  // ступени). Ставок компании для него пока нет: null = "не задано",
+  // pricing.js не начисляет работу по такой ставке и сообщает, что она не
+  // учтена (computeGroupWork -> unpriced). Камень подступенков входит в
+  // раскрой вместе со ступенями. ТРЕБУЕТ ЗАПОЛНЕНИЯ.
+  const RISER_WORK_RATES = { fabricationRatePerM2: null, installationRatePerM2: null, polishRatePerM2: null };
+
   // "Прочее" (замер/доставка/расходники/разгрузка) — ни один из 7
   // разобранных КП не даёт эти суммы отдельно от камня и работы. Известно
   // только, что "прочее" — 15-25% от суммы КП и что оно неоднородно
@@ -181,8 +192,8 @@
   };
 
   return {
-    PRODUCTS, hasAdditionalWork, SAW_MARGIN_CM, AREA_WASTE_FACTOR,
-    WORK_RATES, MISC_FLAT_SUM, MISC_RATE_PER_M2, COMPLEX_SHAPE_MULTIPLIER,
+    PRODUCTS, hasAdditionalWork, SAW_MARGIN_CM, SLAB_USAGE_LIMIT,
+    WORK_RATES, RISER_WORK_RATES, MISC_FLAT_SUM, MISC_RATE_PER_M2, COMPLEX_SHAPE_MULTIPLIER,
     COUNTERTOP_EXTRAS_RATES
   };
 });

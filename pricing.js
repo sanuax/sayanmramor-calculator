@@ -15,6 +15,11 @@
     return typeof slab.price_total_rub === 'number' && Number.isFinite(slab.price_total_rub) && slab.price_total_rub > 0;
   }
 
+  // findBestTypeASlab / findTypeASegmentedResult / computeTypeBResult* below
+  // are the earlier single-product searches. calculatePrice no longer calls
+  // them -- every product goes through planMaterial (the slab layout with
+  // the 35% reserve); they stay as tested building blocks (slabCapacityForCross
+  // and minCostCover are the ones the layout reuses).
   function findBestTypeASlab(slabs, widthM, lengthM, marginCm) {
     const needW = widthM * 100 + 2 * marginCm;
     const needL = lengthM * 100 + 2 * marginCm;
@@ -174,6 +179,259 @@
     return { slabs: covered.chosen, subtotal: covered.cost };
   }
 
+  // ---- Раскрой: изделие как набор деталей на реальных слэбах --------------
+  //
+  // Every product is a job:
+  //   { pieces: [...] }      -- separate stone parts with real sizes (steps,
+  //                             risers, treads, landings, a countertop and its
+  //                             wings, sills, facade pieces), or
+  //   { surfaceAreaM2 }      -- a cladded surface (floor, wall, panel, a
+  //                             facade's wall/cornice/round column) that is
+  //                             cut into whatever pieces the slabs give.
+  // A piece: { key, group, lengthM, widthM (its bounding rectangle), areaM2
+  // (the real area of its shape), count, seam (may be split along its
+  // length and joined with a seam) }.
+  //
+  // The reserve rule: the stone of the product takes at most `usageLimit`
+  // (65%, i.e. 35% reserve -- ProductTypes.SLAB_USAGE_LIMIT) of every slab
+  // it is cut from. The slabs are chosen by the geometry of the real pieces,
+  // never by "area / 0.65": a slab counts only for the pieces that actually
+  // fit on it.
+
+  const PIECE_DP_UNIT_M2 = 0.01;
+
+  function slabArea(slab) {
+    return (slab.width_cm / 100) * (slab.length_cm / 100);
+  }
+
+  function fitsRect(slab, a, b) {
+    return (slab.width_cm >= a && slab.length_cm >= b) || (slab.width_cm >= b && slab.length_cm >= a);
+  }
+
+  // A piece in centimetres with its saw margin on every edge (SAW_MARGIN_CM,
+  // as for a single slab); `cross` is the short side, `run` the long one.
+  function footprintCm(lengthM, widthM, marginCm) {
+    const a = widthM * 100 + 2 * marginCm, b = lengthM * 100 + 2 * marginCm;
+    return { cross: Math.min(a, b), run: Math.max(a, b) };
+  }
+
+  // The pieces as they are cut: a piece that fits no slab whole (or would
+  // take more than the reserve allows of every slab it fits) is split along
+  // its length into the fewest equal segments that do -- if it may have a
+  // seam; otherwise the job cannot be cut. Same geometry as the segmented
+  // Type A path: the seam runs across the run, the cross must fit a slab.
+  function cutPieces(pieces, slabs, marginCm, usageLimit) {
+    const out = [];
+    let seams = 0;
+    for (let pi = 0; pi < pieces.length; pi++) {
+      const p = pieces[pi];
+      const count = Math.max(0, Math.round(p.count || 1));
+      if (!count) continue;
+      const cross = footprintCm(p.lengthM, p.widthM, marginCm).cross;
+      const longM = Math.max(p.lengthM, p.widthM);
+      // The fewest segments k for which some slab holds one segment, both
+      // geometrically and within the reserve.
+      const segmentsFor = slab => {
+        let best = Infinity;
+        [[slab.width_cm, slab.length_cm], [slab.length_cm, slab.width_cm]].forEach(([side, other]) => {
+          if (cross > side) return;
+          const usable = other - 2 * marginCm;
+          if (!(usable > 0)) return;
+          let k = Math.max(1, Math.ceil(longM * 100 / usable - 1e-9));
+          while (k <= 400 && p.areaM2 / k > usageLimit * slabArea(slab) + 1e-9) k++;
+          if (k <= 400) best = Math.min(best, k);
+        });
+        return best;
+      };
+      let k = Infinity;
+      for (const slab of slabs) k = Math.min(k, segmentsFor(slab));
+      if (k === Infinity) {
+        const fitsSomewhere = slabs.some(s => fitsRect(s, cross, footprintCm(p.lengthM, p.widthM, marginCm).run));
+        return { error: fitsSomewhere ? 'exceeds_usage_limit' : 'no_fitting_slab', piece: p };
+      }
+      if (k > 1 && !p.seam) {
+        const whole = footprintCm(p.lengthM, p.widthM, marginCm);
+        return { error: slabs.some(s => fitsRect(s, whole.cross, whole.run)) ? 'exceeds_usage_limit' : 'no_fitting_slab', piece: p };
+      }
+      const segRun = (longM / k) * 100 + 2 * marginCm;
+      for (let c = 0; c < count; c++) {
+        for (let j = 0; j < k; j++) {
+          out.push({ key: p.key, group: p.group || 'main', piece: pi, copy: c, segment: j, segments: k, cross, run: segRun, areaM2: p.areaM2 / k });
+        }
+      }
+      seams += count * (k - 1);
+    }
+    return { cut: out, seams };
+  }
+
+  // Shelf packing of the given cut pieces on one slab laid X by Y (cm): the
+  // pieces go in rows ("shelves"), each piece turned the preferred way where
+  // it fits (`longAlongX`: its long side along X, or across) and the other
+  // way where only that fits -- so a slab can take a row of pieces across it
+  // and then rows along it. A piece is skipped once the slab's reserve
+  // budget (usageLimit x slab area) would be passed. `order` lists the piece
+  // indices, largest first.
+  function shelfPack(X, Y, cut, order, budgetM2, longAlongX) {
+    const shelves = [];
+    let usedY = 0, area = 0;
+    const placed = [];
+    for (const idx of order) {
+      const p = cut[idx];
+      if (area + p.areaM2 > budgetM2 + 1e-9) continue;
+      const orients = longAlongX === false ? [[p.cross, p.run], [p.run, p.cross]] : [[p.run, p.cross], [p.cross, p.run]];
+      let spot = null;
+      for (const sh of shelves) {
+        const o = orients.find(([dx, dy]) => dy <= sh.h && sh.x + dx <= X);
+        if (o) { spot = { x: sh.x, y: sh.y, dx: o[0], dy: o[1] }; sh.x += o[0]; break; }
+      }
+      if (!spot) {
+        const o = orients.find(([dx, dy]) => dx <= X && usedY + dy <= Y);
+        if (o) {
+          spot = { x: 0, y: usedY, dx: o[0], dy: o[1] };
+          shelves.push({ y: usedY, h: o[1], x: o[0] });
+          usedY += o[1];
+        }
+      }
+      if (spot) {
+        area += p.areaM2;
+        placed.push(Object.assign({ index: idx }, spot));
+      }
+    }
+    return { placed, area };
+  }
+
+  // The most of the remaining pieces one slab holds: the slab both ways
+  // round, the pieces preferring either way -- the best of the four layouts.
+  function packSlab(slab, cut, remaining, usageLimit) {
+    const order = remaining.slice().sort((i, j) => (cut[j].cross - cut[i].cross) || (cut[j].run - cut[i].run));
+    const budget = usageLimit * slabArea(slab);
+    let best = null;
+    [[slab.width_cm, slab.length_cm], [slab.length_cm, slab.width_cm]].forEach(([X, Y]) => {
+      [true, false].forEach(longAlongX => {
+        const r = shelfPack(X, Y, cut, order, budget, longAlongX);
+        if (!best || r.area > best.area + 1e-9) best = r;
+      });
+    });
+    return best;
+  }
+
+  // Slabs for a set of pieces: each slab's yield is what it holds of the job
+  // (packSlab); minCostCover picks the cheapest slabs whose yields reach the
+  // job's area; then the pieces are really laid out on those slabs, and any
+  // piece left over (yields overlap) gets more slabs the same way.
+  function planPieces(slabs, pieces, marginCm, usageLimit) {
+    const priced = slabs.filter(hasValidPrice);
+    const cutResult = cutPieces(pieces, priced, marginCm, usageLimit);
+    if (cutResult.error) return { ok: false, reason: cutResult.error };
+    const cut = cutResult.cut;
+    let remaining = cut.map((_, i) => i);
+    const used = [];
+    const taken = new Set();
+    for (let round = 0; remaining.length && round < 50; round++) {
+      const yields = new Map();
+      const items = [];
+      priced.forEach((slab, si) => {
+        if (taken.has(si)) return;
+        const size = slab.width_cm + 'x' + slab.length_cm;
+        if (!yields.has(size)) yields.set(size, packSlab(slab, cut, remaining, usageLimit).area);
+        // Rounded up: a tiny piece still takes a slab (the layout below checks it).
+        const capacity = Math.ceil(yields.get(size) / PIECE_DP_UNIT_M2 - 1e-9);
+        if (capacity > 0) items.push({ capacity, cost: slab.price_total_rub, ref: si });
+      });
+      const need = remaining.reduce((s, i) => s + cut[i].areaM2, 0);
+      const cover = minCostCover(items, Math.max(1, Math.ceil(need / PIECE_DP_UNIT_M2 - 1e-9)));
+      if (!cover) return { ok: false, reason: 'insufficient_stock' };
+      const capacityOf = new Map(items.map(it => [it.ref, it.capacity]));
+      const chosen = cover.chosen.slice().sort((a, b) => capacityOf.get(b) - capacityOf.get(a));
+      let progress = false;
+      for (const si of chosen) {
+        if (!remaining.length) break;
+        const r = packSlab(priced[si], cut, remaining, usageLimit);
+        if (!r.placed.length) continue;
+        progress = true;
+        taken.add(si);
+        const placedSet = new Set(r.placed.map(p => p.index));
+        remaining = remaining.filter(i => !placedSet.has(i));
+        used.push({ slab: priced[si], placements: r.placed.map(p => Object.assign({}, p, { key: cut[p.index].key, group: cut[p.index].group })), usedAreaM2: r.area });
+      }
+      if (!progress) return { ok: false, reason: 'insufficient_stock' };
+    }
+    if (remaining.length) return { ok: false, reason: 'insufficient_stock' };
+    return { ok: true, used, seams: cutResult.seams, pieceCount: cut.length };
+  }
+
+  // A cladded surface: cut freely, so a slab holds up to the reserve budget
+  // of its own area -- the same covering DP as before, with the budget on
+  // the supply side (usageLimit x slab) instead of a waste factor on demand.
+  function planSurface(slabs, areaM2, usageLimit) {
+    const items = [];
+    for (const slab of slabs) {
+      if (!hasValidPrice(slab)) continue;
+      const capacity = Math.floor(usageLimit * slabArea(slab) / AREA_DP_UNIT_M2 + 1e-9);
+      if (capacity > 0) items.push({ capacity, cost: slab.price_total_rub, ref: slab });
+    }
+    if (!items.length) return { ok: false, reason: 'no_slabs_for_stone' };
+    const covered = minCostCover(items, Math.ceil(areaM2 / AREA_DP_UNIT_M2 - 1e-9));
+    if (!covered) return { ok: false, reason: 'insufficient_stock' };
+    // The area laid on each chosen slab, largest slab first, each up to its budget.
+    let left = areaM2;
+    const used = covered.chosen.slice().sort((a, b) => slabArea(b) - slabArea(a)).map(slab => {
+      const take = Math.max(0, Math.min(left, usageLimit * slabArea(slab)));
+      left -= take;
+      return { slab, placements: [], usedAreaM2: take };
+    });
+    return { ok: true, used, seams: 0, pieceCount: 0 };
+  }
+
+  function jobArea(job, group) {
+    if (job.pieces) {
+      return job.pieces.filter(p => !group || (p.group || 'main') === group)
+        .reduce((s, p) => s + p.areaM2 * Math.max(0, Math.round(p.count || 1)), 0);
+    }
+    return group && group !== 'main' ? 0 : job.surfaceAreaM2;
+  }
+
+  // The material of a job: which slabs, how much of them the product takes,
+  // the reserve that is left. `utilization` + `waste` = 1.
+  function planMaterial({ slabs, job, marginCm, usageLimit }) {
+    const plan = job.pieces
+      ? planPieces(slabs, job.pieces, marginCm, usageLimit)
+      : planSurface(slabs, job.surfaceAreaM2, usageLimit);
+    if (!plan.ok) return plan;
+    const slabAreaM2 = plan.used.reduce((s, u) => s + slabArea(u.slab), 0);
+    const usedAreaM2 = plan.used.reduce((s, u) => s + u.usedAreaM2, 0);
+    return {
+      ok: true, reason: null,
+      slabs: plan.used.map(u => u.slab),
+      layout: plan.used.map(u => ({ slab: u.slab, slabAreaM2: slabArea(u.slab), usedAreaM2: u.usedAreaM2, utilization: u.usedAreaM2 / slabArea(u.slab), placements: u.placements })),
+      nSlabs: plan.used.length,
+      subtotal: plan.used.reduce((s, u) => s + u.slab.price_total_rub, 0),
+      productAreaM2: jobArea(job), slabAreaM2, usedAreaM2,
+      utilization: usedAreaM2 / slabAreaM2, waste: 1 - usedAreaM2 / slabAreaM2,
+      seams: plan.seams, pieceCount: plan.pieceCount,
+    };
+  }
+
+  // Work for a part of the product that has its own rates (подступенки):
+  // a null rate is "no company rate yet" -- nothing is charged for it and
+  // the part is reported in `unpriced`, never silently priced at another
+  // part's rate.
+  function computeGroupWork(group, options) {
+    const r = group.rates || {};
+    const area = Math.max(0, group.areaM2 || 0);
+    const priced = rate => typeof rate === 'number' && Number.isFinite(rate);
+    const unpriced = [];
+    const line = (rate, on, name) => {
+      if (!on || !(area > 0)) return 0;
+      if (!priced(rate)) { unpriced.push(name); return 0; }
+      return rate * area;
+    };
+    const fabrication = line(r.fabricationRatePerM2, true, 'fabrication');
+    const installation = line(r.installationRatePerM2, options.installEnabled, 'installation');
+    const polish = line(r.polishRatePerM2, options.polishEnabled, 'polish');
+    return { key: group.key, areaM2: area, fabrication, installation, polish, work: fabrication + installation + polish, unpriced };
+  }
+
   function computeWorkAndTotal(subtotal, area, rates, options, extraDimensions, extraLineItems) {
     const { installEnabled, polishEnabled, complexEnabled } = options;
     const { bortikLengthM = 0, fartukAreaM2 = 0, ostrovAreaM2 = 0 } = extraDimensions || {};
@@ -216,28 +474,66 @@
     return !(widthM <= PRICING_LIMITS.maxSideM) || !(lengthM <= PRICING_LIMITS.maxSideM) || !(areaM2 <= PRICING_LIMITS.maxAreaM2);
   }
 
+  // The job of a plain width x length product when the caller gives none:
+  // Type A -- one piece (with a seam along its length if allowed), Type B --
+  // a cladded surface of that area (or of `areaM2`, a facade's surface).
+  function defaultJob(productType, widthM, lengthM, allowSeam, areaM2) {
+    if (productType === 'A') {
+      return { pieces: [{ key: 'main', group: 'main', lengthM, widthM, areaM2: widthM * lengthM, count: 1, seam: allowSeam }] };
+    }
+    return { surfaceAreaM2: areaM2 !== null && areaM2 !== undefined ? areaM2 : widthM * lengthM };
+  }
+
+  // A size that is not a finite number is "too large" (jobIsTooLarge), not
+  // invalid -- except a surface given as an explicit area (a facade's), which
+  // must be a real positive number.
+  function jobIsValid(job, explicitArea) {
+    if (job.pieces) {
+      return job.pieces.length > 0 && job.pieces.every(p => p.lengthM > 0 && p.widthM > 0 && p.areaM2 > 0 && p.count >= 1)
+        && job.pieces.some(p => (p.group || 'main') === 'main');
+    }
+    return job.surfaceAreaM2 > 0 && (!explicitArea || Number.isFinite(job.surfaceAreaM2));
+  }
+
+  function jobIsTooLarge(job) {
+    if (job.pieces) {
+      return job.pieces.some(p => isTooLarge(p.widthM, p.lengthM, 0)) || isTooLarge(0, 0, jobArea(job));
+    }
+    return isTooLarge(0, 0, job.surfaceAreaM2);
+  }
+
   function calculatePrice(params) {
     const {
-      stone, widthM, lengthM, productType, marginCm, wasteFactor,
+      stone, widthM, lengthM, productType, marginCm,
       rates, installEnabled = false, polishEnabled = false, complexEnabled = false,
       extraDimensions = {}, extraLineItems = [], allowSeam = true,
       // Optional, Type B only: the priced area when it is not width x length
       // (a facade's cladded surface -- see ConstructorState.buildPricingInputs).
-      areaM2 = null
+      areaM2 = null,
+      // The product as pieces or a surface (ProductParts.buildJob); without
+      // one, the plain width x length product (defaultJob).
+      job: givenJob = null,
+      // The share of every slab the product may take: 0.65 = 35% reserve
+      // (ProductTypes.SLAB_USAGE_LIMIT).
+      usageLimit = 0.65,
+      // Parts with their own rates (подступенки): [{ key, rates }].
+      groupRates = [],
     } = params;
-    const explicitArea = productType !== 'A' && areaM2 !== null && areaM2 !== undefined;
+    const explicitArea = !givenJob && productType !== 'A' && areaM2 !== null && areaM2 !== undefined;
+    const job = givenJob || defaultJob(productType, widthM, lengthM, allowSeam, explicitArea ? areaM2 : null);
 
     const empty = {
       subtotal: null, fabrication: null, installation: null, polish: null, misc: null, extras: null,
-      catalogExtras: null, work: null, total: null, nSlabs: 0, remainderM2: null, matchedSlab: null, matchedSlabs: []
+      catalogExtras: null, work: null, total: null, nSlabs: 0, remainderM2: null, matchedSlab: null, matchedSlabs: [],
+      material: null, groups: []
     };
 
-    if (explicitArea ? !(areaM2 > 0 && Number.isFinite(areaM2)) : (!(widthM > 0) || !(lengthM > 0))) {
+    if (!jobIsValid(job, explicitArea || (givenJob && !givenJob.pieces))) {
       return Object.assign({ ok: false, reason: 'invalid_dimensions' }, empty);
     }
     // Past the online limits (or not a finite size at all): a controlled
     // outcome the page explains, before any slab search.
-    if (explicitArea ? isTooLarge(0, 0, areaM2) : isTooLarge(widthM, lengthM, widthM * lengthM)) {
+    if (jobIsTooLarge(job)) {
       return Object.assign({ ok: false, reason: 'dimensions_too_large' }, empty);
     }
     if (!stone || !stone.slabs || stone.slabs.length === 0) {
@@ -252,61 +548,52 @@
       return Object.assign({ ok: false, reason: 'no_priced_slab' }, empty);
     }
 
-    const area = explicitArea ? areaM2 : widthM * lengthM;
+    const material = planMaterial({ slabs: stone.slabs, job, marginCm, usageLimit });
+    if (!material.ok) {
+      return Object.assign({ ok: false, reason: material.reason }, empty);
+    }
+
+    // The product's own work (изготовление, монтаж, полировка) is counted on
+    // its main parts; parts with their own rates are counted separately.
     const options = { installEnabled, polishEnabled, complexEnabled };
-
-    if (productType === 'A') {
-      const slab = findBestTypeASlab(stone.slabs, widthM, lengthM, marginCm);
-      if (slab) {
-        const subtotal = slab.price_total_rub;
-        const { fabrication, installation, polish, misc, extras, catalogExtras, work, total } = computeWorkAndTotal(subtotal, area, rates, options, extraDimensions, extraLineItems);
-        const remainderM2 = computeRemainderAreaM2(slab, widthM, lengthM);
-        return {
-          ok: true, reason: null, subtotal, fabrication, installation, polish, misc, extras, catalogExtras, work, total,
-          nSlabs: 1, remainderM2, matchedSlab: slab, matchedSlabs: [slab]
-        };
-      }
-
-      // Some Type A products (e.g. decorative panels) look wrong with a seam,
-      // so they skip the segmented fallback entirely and go straight to
-      // "ask a manager" when they don't fit a single slab.
-      if (!allowSeam) {
-        return Object.assign({ ok: false, reason: 'no_fitting_slab' }, empty);
-      }
-
-      const segmented = findTypeASegmentedResult(stone.slabs, widthM, lengthM, marginCm);
-      if (!segmented) {
-        return Object.assign({ ok: false, reason: 'no_fitting_slab' }, empty);
-      }
-      if (segmented.subtotal === null) {
-        return Object.assign({ ok: false, reason: 'insufficient_stock' }, empty);
-      }
-      const { fabrication, installation, polish, misc, extras, catalogExtras, work, total } = computeWorkAndTotal(segmented.subtotal, area, rates, options, extraDimensions, extraLineItems);
-      return {
-        ok: true, reason: null, subtotal: segmented.subtotal, fabrication, installation, polish, misc, extras, catalogExtras, work, total,
-        nSlabs: segmented.slabs.length, remainderM2: null,
-        matchedSlab: segmented.slabs[0], matchedSlabs: segmented.slabs
-      };
+    const mainArea = jobArea(job, 'main');
+    const groups = [];
+    if (job.pieces) {
+      const otherKeys = Array.from(new Set(job.pieces.map(p => p.group || 'main').filter(g => g !== 'main')));
+      // What the stone of these parts adds: the material with them minus
+      // the material of the main parts alone (0 when they come out of the
+      // same slabs' reserve-free room).
+      const mainOnly = otherKeys.length
+        ? planMaterial({ slabs: stone.slabs, job: { pieces: job.pieces.filter(p => (p.group || 'main') === 'main') }, marginCm, usageLimit })
+        : null;
+      otherKeys.forEach(key => {
+        const entry = groupRates.find(g => g.key === key) || { key, rates: null };
+        const work = computeGroupWork({ key, areaM2: jobArea(job, key), rates: entry.rates }, options);
+        work.stone = mainOnly && mainOnly.ok ? Math.max(0, material.subtotal - mainOnly.subtotal) : null;
+        groups.push(work);
+      });
     }
-
-    const typeBResult = computeTypeBResultForArea(stone.slabs, area, wasteFactor);
-    if (!typeBResult) {
-      return Object.assign({ ok: false, reason: 'no_slabs_for_stone' }, empty);
-    }
-    if (typeBResult.subtotal === null) {
-      return Object.assign({ ok: false, reason: 'insufficient_stock' }, empty);
-    }
-    const { fabrication, installation, polish, misc, extras, catalogExtras, work, total } = computeWorkAndTotal(typeBResult.subtotal, area, rates, options, extraDimensions, extraLineItems);
+    const subtotal = material.subtotal;
+    const base = computeWorkAndTotal(subtotal, mainArea, rates, options, extraDimensions, extraLineItems);
+    const groupWork = groups.reduce((s, g) => s + g.work, 0);
+    const work = base.work + groupWork;
+    // Only one slab, one uncut piece: how much of that slab is left.
+    const single = job.pieces && material.nSlabs === 1 && material.seams === 0 && job.pieces.length === 1 && job.pieces[0].count === 1;
     return {
-      ok: true, reason: null, subtotal: typeBResult.subtotal, fabrication, installation, polish, misc, extras, catalogExtras, work, total,
-      nSlabs: typeBResult.slabs.length, remainderM2: null,
-      matchedSlab: typeBResult.slabs[0], matchedSlabs: typeBResult.slabs
+      ok: true, reason: null, subtotal,
+      fabrication: base.fabrication, installation: base.installation, polish: base.polish, misc: base.misc,
+      extras: base.extras, catalogExtras: base.catalogExtras, groupWork, work, total: subtotal + work,
+      nSlabs: material.nSlabs,
+      remainderM2: single ? material.slabAreaM2 - material.productAreaM2 : null,
+      matchedSlab: material.slabs[0], matchedSlabs: material.slabs,
+      material, groups,
     };
   }
 
   return {
     findBestTypeASlab, slabCapacityForCross, minCostCover, findTypeASegmentedResult,
     computeRemainderAreaM2, computeTypeBResult, computeTypeBResultForArea, computeWorkAndTotal, calculatePrice,
+    cutPieces, shelfPack, packSlab, planPieces, planSurface, planMaterial, computeGroupWork, defaultJob,
     PRICING_LIMITS
   };
 });

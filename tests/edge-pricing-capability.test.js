@@ -29,7 +29,7 @@ function pricingFor(productKey, values, getAdditionalWorkRate) {
   const result = Pricing.calculatePrice({
     stone: STONE, widthM: state.dimensions.widthM, lengthM: state.dimensions.lengthM, productType: PRODUCTS[productKey].type,
     rates: inputs.rates, extraLineItems: inputs.extraLineItems, extraDimensions: inputs.extraDimensions,
-    marginCm: ProductTypes.SAW_MARGIN_CM, wasteFactor: ProductTypes.AREA_WASTE_FACTOR, allowSeam: PRODUCTS[productKey].allowSeam !== false,
+    marginCm: ProductTypes.SAW_MARGIN_CM, usageLimit: ProductTypes.SLAB_USAGE_LIMIT, allowSeam: PRODUCTS[productKey].allowSeam !== false,
   });
   return { inputs, result, state };
 }

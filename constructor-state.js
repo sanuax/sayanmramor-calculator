@@ -10,6 +10,11 @@
   const FacadeModel = (typeof module !== 'undefined' && module.exports)
     ? require('./facade-model.js')
     : (typeof window !== 'undefined' ? window : globalThis).FacadeModel;
+  // Loaded after this file in the page -- looked up when used.
+  const isNode = typeof module !== 'undefined' && module.exports;
+  const lazy = (file, name) => () => (isNode ? require(file) : (typeof window !== 'undefined' ? window : globalThis)[name]);
+  const Geometry = lazy('./visualizer/geometry-model.js', 'GeometryModel');
+  const Parts = lazy('./product-parts.js', 'ProductParts');
 
   function mmToM(mmValue) {
     return mmValue / 1000;
@@ -175,6 +180,23 @@
         }
       : { standard: { widthM: 0, lengthM: 0 }, complex: { widthM: 0, lengthM: 0 } };
 
+    const typeIdValue = d.getElementById('productSubcategory').value;
+    const enteredSteps = readStepCount(d, selectedProductKey, typeIdValue);
+    let stairConfig = null;
+    let stairTotal = enteredSteps;
+    if (selectedProductKey === 'lestnitsa') {
+      const G = Geometry();
+      const shape = G.STAIR_SHAPES[typeIdValue] || 'straight';
+      const marches = G.STAIR_MARCHES[shape];
+      const risers = G.STAIR_WITH_RISERS.includes(typeIdValue);
+      stairTotal = marches > 0 ? enteredSteps * marches : enteredSteps;
+      stairConfig = {
+        shape, marches, stepsPerMarch: marches > 0 ? enteredSteps : null,
+        landings: Math.max(0, marches - 1), totalSteps: stairTotal,
+        risers, riserHeightM: risers ? mmToM(numFromField(d, 'riser-height')) : 0,
+      };
+    }
+
     return {
       product: product ? {
         key: selectedProductKey, label: product.label, type: product.type, capabilities,
@@ -222,21 +244,38 @@
         // (productConfig.fasad) -- the generic "Количество, шт." is neither's source.
         qty: selectedProductKey === 'stupeni' || selectedProductKey === 'fasad' ? 0 : numFromField(d, 'subcategoryQty'),
       },
-      stepCount: readStepCount(d, selectedProductKey, d.getElementById('productSubcategory').value),
+      // Every step of the product. «Лестницы» with marches: the client enters
+      // the steps of ONE march -- the stair has marches x that (see
+      // productConfig.lestnitsa); a spiral stair and «Ступени»: the count itself.
+      stepCount: stairTotal,
       // Product-specific state that doesn't fit the shared fields above --
       // same "always the same shape, capability-zeroed when not this
       // product" convention as island/barCounter/etc. above, so the state
-      // contract never changes shape between products. Currently just
-      // stupeni's "с подступенками" toggle (see the 'riser' step in
-      // sayanmramor-calculator.html); a real, working control -- it is
-      // simply not consumed by pricing/geometry yet (see WORK_RATES/
-      // buildPricingInputs -- no per-tread-type rate exists today). Future
-      // product-specific fields (e.g. lestnitsa cladding, panno composition)
-      // belong here too, once a real UI/data source exists for them -- see
-      // docs comment on PRODUCT_SUBCATEGORIES in rate-catalog.js for why
-      // none exists yet.
+      // contract never changes shape between products. The sizes of each
+      // product's own shape live here: the risers of «Ступени» and of a stair
+      // (their parts and stone -- product-parts.js; their work has its own,
+      // not yet set, rates), a stair's marches, a sill's arm or bay, a
+      // radius wall's radius, a facade's type and sizes.
       productConfig: {
-        stupeni: { riser: selectedProductKey === 'stupeni' && !!d.getElementById('stupeni-riser').checked },
+        stupeni: {
+          riser: selectedProductKey === 'stupeni' && !!d.getElementById('stupeni-riser').checked,
+          // «Высота подступенка» -- the riser's own size (its area, its stone).
+          riserHeightM: selectedProductKey === 'stupeni' ? mmToM(numFromField(d, 'riser-height')) : 0,
+        },
+        // «Лестницы»: the shape's marches (straight 1, Г/П 2, spiral none),
+        // the steps in one march, landings = marches - 1, and the risers of
+        // a "+ подступенки" type with their height.
+        lestnitsa: stairConfig,
+        // «Подоконники»: the sizes of a shaped sill (GeometryModel.sillPlan).
+        podokonnik: selectedProductKey === 'podokonnik'
+          ? {
+              armLengthM: mmToM(numFromField(d, 'sill-arm-length')),
+              bayDepthM: mmToM(numFromField(d, 'sill-bay-depth')),
+              bayFrontM: mmToM(numFromField(d, 'sill-bay-front')),
+            }
+          : null,
+        // «Стены»: a radius wall's radius (its arc length is the width field).
+        stena: selectedProductKey === 'stena' ? { radiusM: mmToM(numFromField(d, 'wall-radius')) } : null,
         // «Фасады»: the type's form, its own physical sizes (m), quantity and
         // cladded area -- see facade-model.js. The generic width/length are
         // not a facade's sizes; null for every other product.
@@ -300,7 +339,12 @@
     const facade = state.productConfig && state.productConfig.fasad;
     const areaM2 = facade ? facade.areaM2 : null;
 
-    return { rates, extraLineItems, extraDimensions, areaM2 };
+    // The product as it is cut (product-parts.js): its pieces or surface,
+    // the sizes still missing, and the parts with their own rates.
+    const job = state.product ? Parts().buildJob(state) : null;
+    const groupRates = [{ key: 'riser', rates: config.riserRates || null }];
+
+    return { rates, extraLineItems, extraDimensions, areaM2, job, groupRates };
   }
 
   return { readConstructorState, buildPricingInputs, STEP_COUNT_RANGE, STEP_COUNT_DEFAULTS, stepCountRange, isValidStepCount };

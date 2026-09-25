@@ -31,7 +31,7 @@ test('every real WORK_RATES entry produces a finite, non-NaN price through calcu
       const r = Pricing.calculatePrice({
         stone, widthM: 1.0, lengthM: 0.6, productType: product.type,
         rates, installEnabled, polishEnabled, complexEnabled,
-        marginCm: ProductTypes.SAW_MARGIN_CM, wasteFactor: ProductTypes.AREA_WASTE_FACTOR
+        marginCm: ProductTypes.SAW_MARGIN_CM, usageLimit: ProductTypes.SLAB_USAGE_LIMIT
       });
       assert.equal(r.ok, true, `${type} (install=${installEnabled}, polish=${polishEnabled}, complex=${complexEnabled}) should succeed`);
       assert.ok(Number.isFinite(r.total), `${type}.total should be finite, got ${r.total}`);
@@ -61,7 +61,7 @@ test('calculatePrice: COUNTERTOP_EXTRAS_RATES fields, when non-null, flow throug
   const r = Pricing.calculatePrice({
     stone, widthM: 1.0, lengthM: 0.6, productType: product.type,
     rates, extraDimensions: { bortikLengthM: 3, fartukAreaM2: 1.5, ostrovAreaM2: 2 },
-    marginCm: ProductTypes.SAW_MARGIN_CM, wasteFactor: ProductTypes.AREA_WASTE_FACTOR
+    marginCm: ProductTypes.SAW_MARGIN_CM, usageLimit: ProductTypes.SLAB_USAGE_LIMIT
   });
   assert.equal(r.ok, true);
   assert.equal(r.extras, 3 * 4000 + 1.5 * 12000 + 2 * 45000);

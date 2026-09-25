@@ -189,53 +189,10 @@
 
   // ---- windowsill: the sill in a window opening ---------------------------
 
-  // Plan of each windowsill type, in the sill's local frame (window wall at
-  // x = -W/2, room toward +X, run along Z): the sill outline and the window
-  // line it sits against (walked so the outside is on its left).
-  function sillPlan(variant, W, L) {
-    const xw = -W / 2;
-    if (variant === 'corner') {
-      // Two windows meeting in a corner at the +Z end: the sill turns and
-      // runs along the second wall into the room.
-      const reach = Math.max(W + 0.3, L * 0.6);
-      return {
-        outline: [[xw, -L / 2], [W / 2, -L / 2], [W / 2, L / 2 - W], [xw + reach, L / 2 - W], [xw + reach, L / 2], [xw, L / 2]],
-        windowLine: [[xw, -L / 2], [xw, L / 2], [xw + reach, L / 2]],
-      };
-    }
-    if (variant === 'bay' || variant === 'bay-radius') {
-      // Эркер: the window bulges out of the wall; the sill fills the bay and
-      // keeps its depth into the room along the whole run.
-      const D = Math.min(0.45, L * 0.25);
-      let bay;
-      if (variant === 'bay') {
-        bay = [[xw, -L / 2], [xw - D, -L / 2 + D], [xw - D, L / 2 - D], [xw, L / 2]];
-      } else {
-        bay = [];
-        const n = 12;
-        for (let i = 0; i <= n; i++) {
-          const t = i / n;
-          bay.push([xw - D * Math.sin(Math.PI * t), -L / 2 + L * t]);
-        }
-      }
-      return { outline: bay.concat([[W / 2, L / 2], [W / 2, -L / 2]]), windowLine: bay };
-    }
-    if (variant === 'figured') {
-      // Фигурный: a shaped room-side edge -- fuller in the middle, drawn in
-      // at both ends -- against an ordinary straight window. The entered
-      // width is the sill's full depth (the slab it is cut from, the priced
-      // rectangle): the fullest point reaches it, the ends are drawn in.
-      const A = Math.min(W * 0.3, 0.1);
-      const front = [];
-      const n = 16;
-      for (let i = 0; i <= n; i++) {
-        const z = -L / 2 + L * (i / n);
-        front.push([W / 2 - A + A * Math.cos(Math.PI * 2 * z / L), z]);
-      }
-      return { outline: [[xw, -L / 2]].concat(front, [[xw, L / 2]]), windowLine: null };
-    }
-    return null;
-  }
+  // The sill's plan is the model's (GeometryModel.sillPlan): the outline
+  // from the client's own sizes, and the window line it sits against. A
+  // shaped sill whose sizes are not all entered yet is drawn straight --
+  // nothing the client did not enter is made up.
 
   // A window wall along a plan polyline: solid wall below the sill and above
   // the opening, glass in between, mullions at the turns, and a short solid
@@ -270,8 +227,7 @@
   }
 
   function windowsillParts(m) {
-    const variant = (m.sill && m.sill.variant) || 'straight';
-    const plan = sillPlan(variant, m.widthM, m.lengthM);
+    const plan = (m.sill && m.sill.plan) || null;
     if (plan && plan.windowLine) {
       const T = m.visualThicknessM;
       const parts = [prism('stone', plan.outline, -T / 2, T / 2, { edge: m.edge ? m.edge.type : null, name: 'main' })];
@@ -374,11 +330,22 @@
   }
 
   // Радиусная стена: the cladding follows an arc in plan, bowed toward the
-  // room, with its joints along the arc.
+  // room, with its joints along the arc. The arc is the client's: «Радиус
+  // стены» and «Длина дуги» (runM) -- until the radius is entered, a gentle
+  // arc over the run stands in for it.
   function radiusWallParts(m, runM, heightM, T) {
-    const sag = Math.min(runM * 0.18, 1.2);
-    const R = (runM * runM / 4 + sag * sag) / (2 * sag);
-    const cx = sag - R, half = Math.asin(Math.min(1, runM / 2 / R));
+    const arc = m.surface && m.surface.arc;
+    let R, half;
+    if (arc) {
+      R = arc.radiusM;
+      half = arc.angle / 2;
+    } else {
+      const s0 = Math.min(runM * 0.18, 1.2);
+      R = (runM * runM / 4 + s0 * s0) / (2 * s0);
+      half = Math.asin(Math.min(1, runM / 2 / R));
+    }
+    const sag = R * (1 - Math.cos(half));
+    const cx = sag - R;
     const n = 24, front = [], back = [];
     for (let i = 0; i <= n; i++) {
       const a = -half + 2 * half * (i / n);
@@ -827,7 +794,10 @@
       if (s.variant === 'winder') {
         fanFlight(parts, { rIn: p.rIn, rOut: p.rOut, count, angle: p.angle, risers: s.risers, T, edge, column: false, straightOuter: true, startAngle: VIEWER_ANGLE });
       } else {
-        straightFlight(parts, { origin: [0, 0], dir: up, across: side, width: p.treadLengthM, count, depth: p.treadDepthM, level: 0, risers: s.risers, bulge: p.bulgeM, T, edge });
+        // A radius step: the side edges at edgeDepthM, the arc bowing out to
+        // the full (entered) depth.
+        const edgeDepth = p.edgeDepthM !== undefined ? p.edgeDepthM : p.treadDepthM;
+        straightFlight(parts, { origin: [0, 0], dir: up, across: side, width: p.treadLengthM, count, depth: edgeDepth, level: 0, risers: s.risers, bulge: p.bulgeM, T, edge });
       }
       return { parts, floorY: 0 };
     }
@@ -850,7 +820,10 @@
       const landingTop = (n1 + 1) * RISE;
       // П: the return flight runs on the far side (-Z) of the first one, so
       // its high end never hides the first flight from the default camera.
-      const landingW = s.shape === 'u' ? 2 * width + 0.1 : width;
+      // The landing is the plan's own (the priced one): П spans both marches
+      // and the gap between them.
+      const gap = p.flightGapM || 0;
+      const landingW = p.landings && p.landings[0] ? p.landings[0].widthM : width;
       const landingZ0 = s.shape === 'u' ? width / 2 - landingW : -width / 2;
       const landing = rect(landingX0 - width, landingX0, landingZ0, landingZ0 + landingW);
       parts.push(prism('stone', landing, landingTop - T, landingTop, { edge, name: 'landing' }));
@@ -868,7 +841,7 @@
       if (s.shape === 'l') {
         straightFlight(parts, { origin: [landingX0 - width / 2, landingZ0], dir: [0, -1], across: [1, 0], width, count: n2, depth, level: n1 + 1, risers: s.risers, bulge: 0, T, edge });
       } else {
-        straightFlight(parts, { origin: [landingX0, -(width + 0.1)], dir: [1, 0], across: [0, 1], width, count: n2, depth, level: n1 + 1, risers: s.risers, bulge: 0, T, edge });
+        straightFlight(parts, { origin: [landingX0, -(width + gap)], dir: [1, 0], across: [0, 1], width, count: n2, depth, level: n1 + 1, risers: s.risers, bulge: 0, T, edge });
       }
       return { parts, floorY: 0 };
     }
