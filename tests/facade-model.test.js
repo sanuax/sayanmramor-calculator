@@ -66,6 +66,15 @@ function layoutOf(values) {
 
 const named = (layout, name) => layout.parts.filter(p => p.name === name);
 
+// A part's plan extent: its depth across (x) and its run (z0..z1).
+function extentOf(part) {
+  if (part.kind === 'box') {
+    return { x: part.size[0], z0: part.center[2] - part.size[2] / 2, z1: part.center[2] + part.size[2] / 2 };
+  }
+  const xs = part.outline.map(p => p[0]), zs = part.outline.map(p => p[1]);
+  return { x: Math.max(...xs) - Math.min(...xs), z0: Math.min(...zs), z1: Math.max(...zs) };
+}
+
 // ---- the catalogue of facade products -------------------------------------
 
 test('facade types: 8 real categories, each with its own sizes -- no type uses the generic «Длина / Ширина» pair', () => {
@@ -348,8 +357,8 @@ test('3D column reads as architecture: base, shaft, ring, top slab -- the shaft 
     assert.ok(radius(p) > 0.2 && radius(p) <= 0.2 * 1.45 + 1e-9, p.name + ' a little wider than the shaft');
     assert.ok(p.y1 - p.y0 < 0.1 * 3, p.name + ' short next to the shaft');
   });
-  // One column: no lintel.
-  assert.equal(one('lintel').length, 0);
+  // One column: no entablature.
+  assert.equal(one('entablature').length, 0);
 });
 
 test('3D column proportions: H stretches the shaft only; R / A scale base and top with the section; a small column never gets a huge base', () => {
@@ -379,14 +388,38 @@ test('3D column proportions: H stretches the shaft only; R / A scale base and to
   assert.ok(r(small.base) <= 0.05 * 1.45);
 });
 
-test('the lintel over a group of columns is a separate, visual-only element -- never in the columns\' area or price', () => {
+test('the entablature over a group of columns: the chosen stone, visual-only -- never in the columns\' area or price', () => {
   const sizes = { radius: 200, height: 3000 };
   const four = layoutOf(fields('FACADE-03', 'round', sizes, 4));
   assert.equal(named(four, 'column').length, 4, '4 columns as a group');
-  const lintel = named(four, 'lintel');
-  assert.equal(lintel.length, 1);
-  assert.equal(lintel[0].visualOnly, true);
-  assert.equal(lintel[0].role, 'context', 'drawn as the building, not as stone');
+  const tiers = named(four, 'entablature');
+  assert.equal(tiers.length, 3, 'architrave, step, top slab');
+  tiers.forEach(t => {
+    assert.equal(t.visualOnly, true);
+    assert.equal(t.role, 'stone', 'the chosen stone, same material pipeline as the columns');
+  });
+  // Stacked on the columns' slabs, each tier wider than the one below it.
+  const slabTop = Math.max(...named(four, 'column-slab').map(s => s.y1));
+  close(tiers[0].y0, slabTop);
+  close(tiers[1].y0, tiers[0].y1);
+  close(tiers[2].y0, tiers[1].y1);
+  const span = t => extentOf(t);
+  assert.ok(span(tiers[0]).x < span(tiers[1]).x && span(tiers[1]).x < span(tiers[2]).x, 'steps out upward');
+  // Spans exactly the columns drawn: from the first column's slab to the last's.
+  const slabs = named(four, 'column-slab').map(extentOf);
+  const zMin = Math.min(...slabs.map(e => e.z0)), zMax = Math.max(...slabs.map(e => e.z1));
+  close(extentOf(tiers[0]).z0, zMin); close(extentOf(tiers[0]).z1, zMax);
+  assert.ok(extentOf(tiers[2]).z0 < zMin && extentOf(tiers[2]).z1 > zMax, 'the top slab overhangs');
+  // Round columns: soft ends in plan; square: straight box steps.
+  assert.equal(tiers[0].kind, 'prism');
+  const squareTiers = named(layoutOf(fields('FACADE-03', 'square', { side: 400, height: 3000 }, 4)), 'entablature');
+  assert.equal(squareTiers.length, 3);
+  squareTiers.forEach(t => { assert.equal(t.kind, 'box'); assert.equal(t.role, 'stone'); assert.equal(t.visualOnly, true); });
+  // It follows the number of columns drawn and their section.
+  const two = named(layoutOf(fields('FACADE-03', 'round', sizes, 2)), 'entablature');
+  assert.ok(extentOf(two[0]).z1 - extentOf(two[0]).z0 < extentOf(tiers[0]).z1 - extentOf(tiers[0]).z0);
+  const thick = named(layoutOf(fields('FACADE-03', 'round', { radius: 400, height: 3000 }, 4)), 'entablature');
+  assert.ok(extentOf(thick[0]).x > extentOf(tiers[0]).x);
   // The priced area is the shafts' side surface only -- the same with or
   // without the lintel, base or top, and the price follows it alone.
   const f4 = facadeOf(fields('FACADE-03', 'round', sizes, 4));

@@ -431,16 +431,16 @@
   }
 
   // Колонны as architecture: base, shaft, a transition ring and a top slab,
-  // and -- over a group -- the lintel they carry.
+  // and -- over a group -- the entablature they carry.
   //
   // PRICED vs SHOWN: the SHAFT alone is the clad product -- a cylinder of
   // radius R (a square prism of side A), exactly H tall, i.e. the very
   // surface 2πRH / 4AH counts (facade-model.js). Everything else here is the
-  // architectural image and is marked `visualOnly: true`: the base, the ring
-  // and the slab (stone, so the column reads as one), and the lintel (the
-  // building's beam, drawn as context, not stone). No pricing code reads
-  // the scene; the flag is there so nobody ever sums these parts into the
-  // columns' area.
+  // architectural image and is marked `visualOnly: true`: the base, the ring,
+  // the slab and -- over a group -- the entablature, all in the chosen stone
+  // so the colonnade reads as one piece of architecture. No pricing code
+  // reads the scene; the flag is there so nobody ever sums these parts into
+  // the columns' area.
   //
   // Proportions follow the section and are bounded by the height, so the
   // shaft stays the main element: a taller column only stretches the shaft,
@@ -468,11 +468,39 @@
       parts.push(visual(piece(ringW, shaftTop, ringTop, z), 'column-ring'));
       parts.push(visual(piece(slabW, ringTop, top, z), 'column-slab'));
     });
-    if (n > 1) {
-      const lintelH = Math.min(0.4, Math.max(0.15, slabW * 0.6));
-      parts.push(visual(box('context', [0, top + lintelH / 2, 0], [slabW * 1.02, lintelH, run]), 'lintel'));
-    }
+    if (n > 1) entablatureParts(parts, { square, D, H, slabW, top, run }, visual);
     return { parts, floorY: 0, framePadding: 0.22 };
+  }
+
+  // The top of a colonnade, carried by the columns' slabs: a narrower
+  // architrave band, a small step, and the top slab overhanging it -- one
+  // calm stone composition, sized from the column section (bounded by the
+  // height, like the base) and running over exactly the columns drawn.
+  // Round columns get soft ends in plan, square ones straight steps.
+  //
+  // It is stone (role 'stone': the chosen stone, the same material and
+  // texture pipeline as the columns) but visualOnly: the architectural
+  // image, never part of the columns' area (2πRH / 4AH -- the shafts only)
+  // or of their price.
+  function entablatureParts(parts, o, visual) {
+    const { square, D, H, slabW, top, run } = o;
+    const archH = Math.min(0.06 * H, Math.max(0.08, 0.55 * D));
+    const stepH = Math.min(0.015 * H, Math.max(0.02, 0.08 * D));
+    const slabH = Math.min(0.05 * H, Math.max(0.06, 0.4 * D));
+    const tiers = [
+      // [depth across (x), height, length along the run (z)]
+      [slabW * 0.92, archH, run],
+      [slabW * 1.02, stepH, run + slabW * 0.1],
+      [slabW * 1.18, slabH, run + slabW * 0.36],
+    ];
+    let y = top;
+    tiers.forEach(([w, h, l]) => {
+      const part = square
+        ? box('stone', [0, y + h / 2, 0], [w, h, l])
+        : prism('stone', roundedRect(-w / 2, w / 2, -l / 2, l / 2, w / 2), y, y + h);
+      parts.push(visual(part, 'entablature'));
+      y += h;
+    });
   }
 
   function facadeParts(m) {
