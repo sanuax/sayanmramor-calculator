@@ -7,6 +7,10 @@
   }
 })(typeof window !== 'undefined' ? window : globalThis, function () {
 
+  const FacadeModel = (typeof module !== 'undefined' && module.exports)
+    ? require('./facade-model.js')
+    : (typeof window !== 'undefined' ? window : globalThis).FacadeModel;
+
   function mmToM(mmValue) {
     return mmValue / 1000;
   }
@@ -180,9 +184,12 @@
         cameraPreset: product.cameraPreset || null,
       } : null,
       stone: stone || null,
+      // A facade has no generic width/length (its sizes are in
+      // productConfig.fasad) -- a value left in these fields by another
+      // product must not reach it.
       dimensions: {
-        widthM: mmToM(numFromField(d, 'width')),
-        lengthM: mmToM(numFromField(d, 'length')),
+        widthM: selectedProductKey === 'fasad' ? 0 : mmToM(numFromField(d, 'width')),
+        lengthM: selectedProductKey === 'fasad' ? 0 : mmToM(numFromField(d, 'length')),
         thicknessM: null,
       },
       shape,
@@ -211,8 +218,9 @@
       subcategory: {
         id: d.getElementById('productSubcategory').value || null,
         // For «Ступени» the number of pieces IS the step count (stepCount
-        // below) -- the generic "Количество, шт." is not its source.
-        qty: selectedProductKey === 'stupeni' ? 0 : numFromField(d, 'subcategoryQty'),
+        // below), for «Фасады» it is the facade's own validated quantity
+        // (productConfig.fasad) -- the generic "Количество, шт." is neither's source.
+        qty: selectedProductKey === 'stupeni' || selectedProductKey === 'fasad' ? 0 : numFromField(d, 'subcategoryQty'),
       },
       stepCount: readStepCount(d, selectedProductKey, d.getElementById('productSubcategory').value),
       // Product-specific state that doesn't fit the shared fields above --
@@ -229,6 +237,12 @@
       // none exists yet.
       productConfig: {
         stupeni: { riser: selectedProductKey === 'stupeni' && !!d.getElementById('stupeni-riser').checked },
+        // «Фасады»: the type's form, its own physical sizes (m), quantity and
+        // cladded area -- see facade-model.js. The generic width/length are
+        // not a facade's sizes; null for every other product.
+        fasad: selectedProductKey === 'fasad'
+          ? FacadeModel.readFacadeConfig(d, d.getElementById('productSubcategory').value)
+          : null,
       },
     };
   }
@@ -281,7 +295,12 @@
       ostrovAreaM2: state.island.standard.widthM * state.island.standard.lengthM,
     };
 
-    return { rates, extraLineItems, extraDimensions };
+    // The priced area when it is not simply width x length: a facade's
+    // cladded surface (all pieces) from facade-model.js. null = width x length.
+    const facade = state.productConfig && state.productConfig.fasad;
+    const areaM2 = facade ? facade.areaM2 : null;
+
+    return { rates, extraLineItems, extraDimensions, areaM2 };
   }
 
   return { readConstructorState, buildPricingInputs, STEP_COUNT_RANGE, STEP_COUNT_DEFAULTS, stepCountRange, isValidStepCount };

@@ -3,8 +3,8 @@ const assert = require('node:assert/strict');
 const RateCatalog = require('../rate-catalog.js');
 const ProductTypes = require('../product-types.js');
 
-test('PRODUCT_SUBCATEGORIES has exactly 50 rows', () => {
-  assert.equal(RateCatalog.PRODUCT_SUBCATEGORIES.length, 50);
+test('PRODUCT_SUBCATEGORIES has exactly 53 rows', () => {
+  assert.equal(RateCatalog.PRODUCT_SUBCATEGORIES.length, 53);
 });
 
 test('PRODUCT_SUBCATEGORIES ids are all unique', () => {
@@ -29,7 +29,7 @@ test('PRODUCT_SUBCATEGORIES rows only use known units', () => {
 test('getSubcategoriesForProduct returns the right row count for every PRODUCTS category', () => {
   const expectedCounts = {
     'Лестницы': 13, 'Панно': 4, 'Подоконники': 5, 'Полы': 5, 'Стены': 5,
-    'Фасады': 5, 'Столешницы в ванную': 4, 'Столешницы на кухню': 5, 'Ступени': 4
+    'Фасады': 8, 'Столешницы в ванную': 4, 'Столешницы на кухню': 5, 'Ступени': 4
   };
   Object.values(ProductTypes.PRODUCTS).forEach(product => {
     const rows = RateCatalog.getSubcategoriesForProduct(product.label);

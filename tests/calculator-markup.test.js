@@ -45,7 +45,9 @@ test('cooktop: the row itself is the switch -- no nested single-option card', ()
 
 test('type cards: client-facing names only -- no rate-catalog suffixes or riser combinations', () => {
   const block = html.slice(html.indexOf('const TYPE_CARDS = {'), html.indexOf('const RISER_CARDS'));
-  const titles = [...block.matchAll(/title: '([^']+)'/g)].map(m => m[1]);
+  // Facade cards are built from facade-model.js (their one source of names).
+  const titles = [...block.matchAll(/title: '([^']+)'/g)].map(m => m[1])
+    .concat(require('../facade-model.js').FACADE_TYPES.map(t => t.title));
   assert.ok(titles.length >= 30, 'every product type has a card');
   titles.forEach(t => assert.doesNotMatch(t, /тандартн|—|подступен/i, t));
 });

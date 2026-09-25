@@ -66,6 +66,8 @@
         type: c.type,
         shape: c.shape,
         dimensions: c.dimensions,
+        // «Фасады»: type, form, sizes (mm), quantity and area -- null otherwise.
+        facade: c.facade || null,
         material: c.material,
         edge: c.edge,
         riser: c.riser,

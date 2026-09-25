@@ -552,6 +552,7 @@
   .dim-wrap { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px 16px; }
   .dim-diagram { display: flex; justify-content: center; margin-bottom: 16px; }
   .dim-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; max-width: 320px; margin: 0 auto; }
+  .dim-fields[hidden] { display: none; }
   .dim-note { font-size: var(--configurator-muted); color: var(--muted); text-align: center; margin-top: 12px; }
   /* Ступени/лестницы: a titled size block and the step count right under it,
      in the same centred column as the size fields. */
@@ -1169,7 +1170,8 @@
          drive the hidden #productSubcategory select that constructor-state.js
          reads, so the state still carries a real PRODUCT_SUBCATEGORIES id
          (the catalog itself is unchanged). Every type draws its own 3D (see
-         visualizer/geometry-model.js); it does not affect the price. For a
+         visualizer/geometry-model.js); it has no rate of its own (for a
+         facade it decides the sizes and so the cladded area -- facade-model.js). For a
          staircase the type is the flight's SHAPE only -- risers are their own
          question below (the hidden select then holds the catalog row for
          shape + risers). Kitchen/bath never get this step (their form choice
@@ -1182,6 +1184,14 @@
           <div class="choice-title" id="stairRiserTitle">Подступенки</div>
           <div class="card-grid" id="stairRiserGrid" role="radiogroup" aria-labelledby="stairRiserTitle"></div>
         </div>
+        <!-- «Фасады»: the chosen type's form (Круглая / Квадратная колонна,
+             Окно / Дверь) as visual cards -- shown only for a type with more
+             than one form (facade-model.js). -->
+        <div class="choice-group" id="facadeFormField" hidden>
+          <div class="choice-title" id="facadeFormTitle">Форма</div>
+          <div class="card-grid" id="facadeFormGrid" role="radiogroup" aria-labelledby="facadeFormTitle"></div>
+        </div>
+        <input type="hidden" id="facade-form" value="">
         <select id="productSubcategory" hidden></select>
         <input type="number" id="subcategoryQty" placeholder="Количество, шт." min="0" step="1" style="margin-top:14px;display:none">
       </div>
@@ -1233,6 +1243,8 @@
               <!-- Ступени/лестницы: a tread or a flight instead of the plain
                    rectangle (drawStairDiagram below). -->
               <g id="dimStairG"></g>
+              <!-- Фасады: the chosen form's own drawing (drawFacadeDiagram). -->
+              <g id="dimFacadeG" style="display:none"></g>
               <g id="dimRectG">
               <rect id="dimRect" x="117" y="27" width="36" height="126" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5" rx="3"></rect>
               <line id="dimLengthLine" x1="117" y1="162" x2="153" y2="162" stroke="var(--muted)" stroke-width="1.2" marker-start="url(#dimArrowStart)" marker-end="url(#dimArrowEnd)"></line>
@@ -1251,10 +1263,38 @@
             </svg>
           </div>
           <div class="dim-block-title" id="dimBlockTitle" hidden></div>
-          <div class="dim-fields">
+          <div class="dim-fields" id="dimGenericFields">
             <div class="field-unit"><span class="unit-label" id="dimLengthUnitLabel">Длина</span><input type="number" id="length" min="0" step="1" placeholder="2000"><span class="unit">мм</span></div>
             <div class="field-unit"><span class="unit-label" id="dimWidthUnitLabel">Ширина</span><input type="number" id="width" min="0" step="1" placeholder="600"><span class="unit">мм</span></div>
           </div>
+          <!-- «Фасады»: the chosen form's own sizes, each under its own name
+               (facade-model.js) -- only that form's fields are shown. -->
+          <div class="dim-fields" id="facadeFields" hidden>
+            <div class="field-unit" data-facade-param="length"><span class="unit-label"></span><input type="number" id="facade-length" min="1" step="1" inputmode="numeric"><span class="unit">мм</span></div>
+            <div class="field-unit" data-facade-param="height"><span class="unit-label"></span><input type="number" id="facade-height" min="1" step="1" inputmode="numeric"><span class="unit">мм</span></div>
+            <div class="field-unit" data-facade-param="width"><span class="unit-label"></span><input type="number" id="facade-width" min="1" step="1" inputmode="numeric"><span class="unit">мм</span></div>
+            <div class="field-unit" data-facade-param="radius"><span class="unit-label"></span><input type="number" id="facade-radius" min="1" step="1" inputmode="numeric"><span class="unit">мм</span></div>
+            <div class="field-unit" data-facade-param="side"><span class="unit-label"></span><input type="number" id="facade-side" min="1" step="1" inputmode="numeric"><span class="unit">мм</span></div>
+            <div class="field-unit" data-facade-param="projection"><span class="unit-label"></span><input type="number" id="facade-projection" min="1" step="1" inputmode="numeric"><span class="unit">мм</span></div>
+            <div class="field-unit" data-facade-param="openingWidth"><span class="unit-label"></span><input type="number" id="facade-opening-width" min="1" step="1" inputmode="numeric"><span class="unit">мм</span></div>
+            <div class="field-unit" data-facade-param="openingHeight"><span class="unit-label"></span><input type="number" id="facade-opening-height" min="1" step="1" inputmode="numeric"><span class="unit">мм</span></div>
+            <div class="field-unit" data-facade-param="frame"><span class="unit-label"></span><input type="number" id="facade-frame" min="1" step="1" inputmode="numeric"><span class="unit">мм</span></div>
+          </div>
+          <!-- What surface is clad, its formula, and the area it gives. -->
+          <div class="dim-note" id="facadeAreaNote" hidden></div>
+          <!-- Количество (штучные фасадные изделия): validated like
+               «Количество ступеней» -- only a whole number within the type's
+               limits (facade-model.js QUANTITY_LIMITS) reaches #facade-quantity. -->
+          <div class="dim-count" id="facadeQtyField" hidden>
+            <div class="dim-count-title" id="facadeQtyTitle">Количество</div>
+            <div class="field-unit">
+              <span class="unit-label">Количество</span>
+              <input type="number" id="facadeQtyInput" min="1" max="30" step="1" inputmode="numeric">
+              <span class="unit">шт.</span>
+            </div>
+            <div class="error" id="facadeQtyError">Введите целое число от 1 до 30</div>
+          </div>
+          <input type="hidden" id="facade-quantity" value="">
           <!-- Показывается только для lshape -- диаграмма не рисует крыло
                (не придумываем новую геометрию), только явно оговаривает,
                что это схема главного сегмента. -->
@@ -1754,6 +1794,7 @@
 <script src="material-picker.js"></script>
 <script src="product-types.js"></script>
 <script src="rate-catalog.js"></script>
+<script src="facade-model.js"></script>
 <script src="step-engine.js"></script>
 <script src="result-model.js"></script>
 <script src="lead-payload.js"></script>
@@ -1923,6 +1964,37 @@
   function typeIcon(inner) {
     return '<svg viewBox="0 0 64 40" aria-hidden="true">' + inner + '</svg>';
   }
+  // Фасады: the card icon of each facade type, and the cards of the forms a
+  // type offers (viewBox 64x40, like every type card). The form's own title,
+  // description and sizes come from facade-model.js.
+  const FACADE_TYPE_ICONS = {
+    'FACADE-01': '<rect x="14" y="6" width="36" height="30" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M14 16 H50 M14 26 H50 M23 6 V16 M41 6 V16 M32 16 V26 M23 26 V36 M41 26 V36" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/><rect x="19" y="10" width="7" height="9" fill="var(--card)" stroke="var(--stone-line)" stroke-width="1.1"/><rect x="38" y="10" width="7" height="9" fill="var(--card)" stroke="var(--stone-line)" stroke-width="1.1"/>',
+    'FACADE-04': '<rect x="10" y="4" width="44" height="22" fill="var(--wall)" stroke="var(--wall-line)" stroke-width="1.2"/><rect x="10" y="26" width="44" height="10" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M21 26 V36 M32 26 V36 M43 26 V36" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/>',
+    'FACADE-02': '<rect x="8" y="4" width="48" height="32" fill="var(--wall)" stroke="var(--wall-line)" stroke-width="1.2"/><rect x="22" y="7" width="20" height="26" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="26" y="11" width="12" height="18" fill="var(--card)" stroke="var(--stone-line)" stroke-width="1.1"/>',
+    'FACADE-03': '<path d="M8 36 H56" fill="none" stroke="var(--wall-line)" stroke-width="1.2"/><rect x="15" y="6" width="7" height="30" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="28.5" y="6" width="7" height="30" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="42" y="6" width="7" height="30" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/>',
+    'FACADE-06': '<rect x="8" y="4" width="48" height="32" fill="var(--wall)" stroke="var(--wall-line)" stroke-width="1.2"/><rect x="18" y="4" width="8" height="32" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="38" y="4" width="8" height="32" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M24.5 4 V36 M44.5 4 V36" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/>',
+    'FACADE-07': '<rect x="10" y="14" width="44" height="22" fill="var(--wall)" stroke="var(--wall-line)" stroke-width="1.2"/><rect x="8" y="4" width="48" height="4" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="10" y="8" width="44" height="3" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="12" y="11" width="40" height="3" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/>',
+    'FACADE-08': '<rect x="10" y="4" width="44" height="32" fill="var(--wall)" stroke="var(--wall-line)" stroke-width="1.2"/><rect x="8" y="17" width="48" height="5" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/>',
+    'FACADE-05': '<rect x="8" y="4" width="48" height="32" fill="var(--wall)" stroke="var(--wall-line)" stroke-width="1.2"/><rect x="24" y="8" width="16" height="24" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="27" y="11" width="10" height="18" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/>',
+  };
+  const FACADE_FORM_ICONS = {
+    window: '<rect x="8" y="4" width="48" height="32" fill="var(--wall)" stroke="var(--wall-line)" stroke-width="1.2"/><rect x="22" y="7" width="20" height="26" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="26" y="11" width="12" height="18" fill="var(--card)" stroke="var(--stone-line)" stroke-width="1.1"/>',
+    door: '<rect x="8" y="4" width="48" height="32" fill="var(--wall)" stroke="var(--wall-line)" stroke-width="1.2"/><rect x="22" y="6" width="20" height="30" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="26" y="10" width="12" height="26" fill="var(--card)" stroke="var(--stone-line)" stroke-width="1.1"/>',
+    round: '<circle cx="32" cy="20" r="14" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M32 20 H46" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/><circle cx="32" cy="20" r="1.6" fill="var(--stone-line)"/>',
+    square: '<rect x="18" y="6" width="28" height="28" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/>',
+  };
+  // The heading over a facade type's form cards.
+  const FACADE_FORM_TITLES = { column: 'Форма колонны', surround: 'Вид проёма' };
+  // The form picked, the last valid quantity and the entered sizes, per
+  // facade type -- all survive switching between types (like the step count
+  // per product), and a size entered for one type (a column's 3000 mm
+  // height) never silently becomes another's (a plinth's height). Within a
+  // type the forms share their fields: «Высота колонны» stays when the
+  // column turns square.
+  const facadeFormByType = {};
+  const facadeQtyByType = {};
+  const facadeSizesByType = {};
+  const facadeFieldsOwner = { typeId: null };
   const TYPE_CARDS = {
     lestnitsa: [
       { ids: ['STAIR-01', 'STAIR-02'], title: 'Прямая', desc: 'Один марш', icon: typeIcon('<rect x="24" y="5" width="16" height="30" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M24 10 H40 M24 15 H40 M24 20 H40 M24 25 H40 M24 30 H40" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/>') },
@@ -1957,13 +2029,10 @@
       { ids: ['WALL-04'], title: 'Радиусная', desc: 'Стена по дуге', icon: typeIcon('<path d="M10 9 Q32 3 54 9 V33 Q32 39 10 33 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M17 7.4 V34.6 M24.5 6.2 V35.8 M32 6 V36 M39.5 6.2 V35.8 M47 7.4 V34.6" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/>') },
       { ids: ['WALL-05'], title: 'С подсветкой', desc: 'Световые линии', icon: typeIcon('<rect x="10" y="7" width="44" height="26" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M32 7 V33 M10 20 H54" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/><path d="M11 4.5 H53 M11 35.5 H53" fill="none" stroke="#e3a77a" stroke-width="2" stroke-linecap="round"/>') },
     ],
-    fasad: [
-      { ids: ['FACADE-01'], title: 'Фасад здания', desc: 'Облицовка стены', icon: typeIcon('<rect x="14" y="6" width="36" height="30" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M14 16 H50 M14 26 H50 M23 6 V16 M41 6 V16 M32 16 V26 M23 26 V36 M41 26 V36" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/><rect x="19" y="10" width="7" height="9" fill="var(--card)" stroke="var(--stone-line)" stroke-width="1.1"/><rect x="38" y="10" width="7" height="9" fill="var(--card)" stroke="var(--stone-line)" stroke-width="1.1"/>') },
-      { ids: ['FACADE-02'], title: 'Фасадный элемент', desc: 'Наличник окна', icon: typeIcon('<rect x="8" y="4" width="48" height="32" fill="var(--wall)" stroke="var(--wall-line)" stroke-width="1.2"/><rect x="22" y="7" width="20" height="26" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="26" y="11" width="12" height="22" fill="var(--card)" stroke="var(--stone-line)" stroke-width="1.1"/><rect x="20" y="32" width="24" height="3" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/>') },
-      { ids: ['FACADE-03'], title: 'Колонны', desc: 'Облицовка колонн', icon: typeIcon('<rect x="11" y="4" width="42" height="4" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="13" y="8" width="10" height="3" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="27" y="8" width="10" height="3" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="41" y="8" width="10" height="3" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="15" y="11" width="6" height="22" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="29" y="11" width="6" height="22" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="43" y="11" width="6" height="22" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="13" y="33" width="10" height="3" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="27" y="33" width="10" height="3" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="41" y="33" width="10" height="3" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/>') },
-      { ids: ['FACADE-04'], title: 'Цоколь', desc: 'Нижний пояс стены', icon: typeIcon('<rect x="10" y="4" width="44" height="22" fill="var(--wall)" stroke="var(--wall-line)" stroke-width="1.2"/><rect x="10" y="26" width="44" height="10" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M21 26 V36 M32 26 V36 M43 26 V36" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/>') },
-      { ids: ['FACADE-05'], title: 'Декоративные элементы', desc: 'Карниз и пояса', icon: typeIcon('<rect x="10" y="14" width="44" height="22" fill="var(--wall)" stroke="var(--wall-line)" stroke-width="1.2"/><rect x="8" y="4" width="48" height="4" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="10" y="8" width="44" height="3" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="12" y="11" width="40" height="3" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/>') },
-    ],
+    // Фасады: one card per facade type of facade-model.js -- its title and
+    // description are the model's own (the one source of a facade type's
+    // name); only the icons live here.
+    fasad: FacadeModel.FACADE_TYPES.map(t => ({ ids: [t.id], title: t.title, desc: t.desc, icon: typeIcon(FACADE_TYPE_ICONS[t.id] || '') })),
     stupeni: [
       { ids: ['STEP-01'], title: 'Прямая', desc: 'Прямоугольная ступень', icon: typeIcon('<rect x="12" y="12" width="40" height="16" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M12 25 H52" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/>') },
       { ids: ['STEP-02'], title: 'Забежная', desc: 'Клиновидная, для поворота', icon: typeIcon('<path d="M12 16 L52 8 V32 L12 24 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M12 21.6 L52 28.4" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/>') },
@@ -2014,7 +2083,7 @@
     podokonnik: 'Тип подоконника',
     pol: 'Укладка пола',
     stena: 'Тип стены',
-    fasad: 'Тип объекта',
+    fasad: 'Тип фасадного изделия',
     stoleshnitsa_vannaya: 'Тип',
     stoleshnitsa_kuhnya: 'Тип',
     stupeni: 'Тип ступеней',
@@ -2100,6 +2169,15 @@
   function updateDimDiagram() {
     const l = parseFloat(lengthInput.value) || 0;
     const w = parseFloat(widthInput.value) || 0;
+    const facadeType = currentFacadeType();
+    document.getElementById('dimFacadeG').style.display = facadeType ? '' : 'none';
+    if (facadeType) {
+      dimRectG.style.display = 'none';
+      dimStairG.style.display = 'none';
+      dimHintEl.hidden = true;
+      drawFacadeDiagram(facadeType);
+      return;
+    }
     const stairs = selectedProductKey === 'stupeni' || selectedProductKey === 'lestnitsa';
     dimRectG.style.display = stairs ? 'none' : '';
     dimStairG.style.display = stairs ? '' : 'none';
@@ -2654,8 +2732,9 @@
 
   function updateSubcategoryQtyVisibility() {
     const row = currentSubcategoryRow();
-    // «Ступени»: the number of pieces is «Количество ступеней» itself.
-    subcategoryQtyInput.style.display = row && row.unit === 'шт.' && selectedProductKey !== 'stupeni' ? '' : 'none';
+    // «Ступени»: the number of pieces is «Количество ступеней» itself;
+    // «Фасады»: each piece product's own validated quantity (size step).
+    subcategoryQtyInput.style.display = row && row.unit === 'шт.' && selectedProductKey !== 'stupeni' && selectedProductKey !== 'fasad' ? '' : 'none';
   }
 
   // «Количество ступеней»: show for the two stair products with that
@@ -2726,6 +2805,7 @@
 
   function isCurrentStepDataValid(stepId) {
     if (stepId === 'dimensions') {
+      if (selectedProductKey === 'fasad') return facadeSizesComplete();
       return mmToM(parseFloat(widthInput.value) || 0) > 0 && mmToM(parseFloat(lengthInput.value) || 0) > 0;
     }
     if (stepId === 'material') {
@@ -2953,9 +3033,213 @@
     applyStepCountLimit();
     markSelected(typeCardGrid, typeCardIndex);
     if (!stairRiserField.hidden) markSelected(stairRiserGrid, stairRisers ? 1 : 0);
+    renderFacadeForms();
+    // The size fields/labels follow the new type BEFORE the change event
+    // recalculates, so the estimate never mixes the new type with the old
+    // type's sizes.
+    updateDimensionLabels(selectedProductKey);
     if (notify) productSubcategorySelect.dispatchEvent(new Event('change', { bubbles: true }));
     else updateSubcategoryQtyVisibility();
-    updateDimensionLabels(selectedProductKey);
+  }
+
+  // ===== «Фасады» (facade-model.js) =====
+  // The chosen facade type (null for any other product).
+  function currentFacadeType() {
+    return selectedProductKey === 'fasad' ? FacadeModel.getType(productSubcategorySelect.value) : null;
+  }
+
+  // Every size of the chosen facade form is entered (the Далее gate).
+  function facadeSizesComplete() {
+    const type = currentFacadeType();
+    return !!type && FacadeModel.readFacadeConfig(document, type.id).complete;
+  }
+
+  // The chosen type's form cards -- only for a type with several forms; the
+  // choice goes to #facade-form, which constructor-state.js reads.
+  function renderFacadeForms() {
+    const field = document.getElementById('facadeFormField');
+    const grid = document.getElementById('facadeFormGrid');
+    const formInput = document.getElementById('facade-form');
+    const type = currentFacadeType();
+    grid.innerHTML = '';
+    if (!type) {
+      field.hidden = true;
+      formInput.value = '';
+      return;
+    }
+    const formId = FacadeModel.getForm(type, facadeFormByType[type.id]).id;
+    formInput.value = formId;
+    field.hidden = type.forms.length < 2;
+    if (field.hidden) return;
+    document.getElementById('facadeFormTitle').textContent = FACADE_FORM_TITLES[type.key] || 'Форма';
+    type.forms.forEach((form, i) => {
+      grid.appendChild(choiceCard({ title: form.title, desc: form.desc, icon: typeIcon(FACADE_FORM_ICONS[form.id] || '') }, () => {
+        facadeFormByType[type.id] = form.id;
+        formInput.value = form.id;
+        markSelected(grid, i);
+        syncFacadeFields();
+        calculate();
+      }));
+    });
+    markSelected(grid, type.forms.findIndex(f => f.id === formId));
+  }
+
+  // The size step for a facade: the chosen form's own fields (named, in its
+  // order), its quantity (piece products only) and the area note; the generic
+  // «Длина / Ширина» are hidden. For any other product: the reverse.
+  function syncFacadeFields() {
+    const type = currentFacadeType();
+    const qtyField = document.getElementById('facadeQtyField');
+    const qtyHidden = document.getElementById('facade-quantity');
+    const qtyInput = document.getElementById('facadeQtyInput');
+    document.getElementById('dimGenericFields').hidden = !!type;
+    document.getElementById('facadeFields').hidden = !type;
+    document.getElementById('facadeAreaNote').hidden = !type;
+    document.getElementById('dimError').textContent = type ? 'Укажите все размеры больше нуля' : 'Укажите ширину и длину больше нуля';
+    if (!type) {
+      qtyField.hidden = true;
+      qtyHidden.value = '';
+      return;
+    }
+    // The size fields belong to one type at a time: keep the previous type's
+    // values, bring back this type's own.
+    if (facadeFieldsOwner.typeId !== type.id) {
+      const fieldIds = Object.values(FacadeModel.PARAM_FIELDS);
+      if (facadeFieldsOwner.typeId) {
+        const saved = {};
+        fieldIds.forEach(id => { saved[id] = document.getElementById(id).value; });
+        facadeSizesByType[facadeFieldsOwner.typeId] = saved;
+      }
+      const own = facadeSizesByType[type.id] || {};
+      fieldIds.forEach(id => { document.getElementById(id).value = own[id] || ''; });
+      facadeFieldsOwner.typeId = type.id;
+    }
+    const form = FacadeModel.getForm(type, document.getElementById('facade-form').value);
+    const container = document.getElementById('facadeFields');
+    container.querySelectorAll('[data-facade-param]').forEach(row => {
+      const param = form.params.find(p => p.key === row.dataset.facadeParam);
+      row.hidden = !param;
+      if (!param) return;
+      row.querySelector('.unit-label').textContent = param.label;
+      row.querySelector('input').placeholder = String(param.placeholderMm);
+    });
+    form.params.forEach(p => container.appendChild(container.querySelector('[data-facade-param="' + p.key + '"]')));
+    const range = FacadeModel.quantityRange(type);
+    qtyField.hidden = !range;
+    if (range) {
+      const q = facadeQtyByType[type.id] || range.min;
+      qtyHidden.value = String(q);
+      qtyInput.value = String(q);
+      qtyInput.min = String(range.min);
+      qtyInput.max = String(range.max);
+      document.getElementById('facadeQtyTitle').textContent = type.quantity.label;
+      const err = document.getElementById('facadeQtyError');
+      err.textContent = 'Введите целое число от ' + range.min + ' до ' + range.max;
+      err.style.visibility = 'hidden';
+    } else {
+      qtyHidden.value = '';
+    }
+    updateFacadeAreaNote();
+  }
+
+  // What is clad and how it is counted -- and, once every size is in, the
+  // area it gives (one piece x the quantity).
+  function updateFacadeAreaNote() {
+    const type = currentFacadeType();
+    if (!type) return;
+    const cfg = FacadeModel.readFacadeConfig(document, type.id);
+    const form = FacadeModel.getForm(type, cfg.form);
+    const surface = form.surface.charAt(0).toUpperCase() + form.surface.slice(1);
+    document.getElementById('facadeAreaNote').textContent = cfg.complete
+      ? 'Площадь облицовки: ' + decimal2(cfg.areaM2) + ' м²' +
+        (cfg.quantity > 1 ? ' (' + decimal2(cfg.pieceAreaM2) + ' м² × ' + cfg.quantity + ')' : '') +
+        '. ' + surface + ': ' + form.formula + '.'
+      : surface + ': ' + form.formula + '.';
+  }
+
+  // The size diagram for a facade: the chosen form drawn with the client's
+  // sizes (the field names while empty); rectangles keep the real
+  // proportions, like the plain size diagram.
+  function drawFacadeDiagram(type) {
+    const g = document.getElementById('dimFacadeG');
+    const form = FacadeModel.getForm(type, document.getElementById('facade-form').value);
+    const entered = key => parseFloat(document.getElementById(FacadeModel.PARAM_FIELDS[key]).value) || 0;
+    const size = key => entered(key) > 0 ? entered(key) : form.params.find(p => p.key === key).placeholderMm;
+    const label = key => entered(key) > 0 ? entered(key) + ' мм' : form.params.find(p => p.key === key).label;
+    const STONE = 'fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"';
+    const WALL = 'fill="var(--wall)" stroke="var(--wall-line)" stroke-width="1.2"';
+    const OPEN = 'fill="var(--card)" stroke="var(--stone-line)" stroke-width="1.1"';
+    const LINE = 'stroke="var(--muted)" stroke-width="1.2" marker-start="url(#dimArrowStart)" marker-end="url(#dimArrowEnd)"';
+    const TEXT = 'font-size="12" fill="var(--ink)" font-weight="700" text-anchor="middle"';
+    const rect = (x, y, w, h, style) => '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" ' + style + '/>';
+    const text = (x, y, t, extra) => '<text x="' + x + '" y="' + y + '" ' + TEXT + (extra || '') + '>' + t + '</text>';
+    const hDim = (x1, x2, y, t) => '<line x1="' + x1 + '" y1="' + y + '" x2="' + x2 + '" y2="' + y + '" ' + LINE + '/>' + text((x1 + x2) / 2, y + 16, t);
+    const vDim = (x, y1, y2, t, right) => {
+      const tx = right ? x + 12 : x - 10, ty = (y1 + y2) / 2;
+      return '<line x1="' + x + '" y1="' + y1 + '" x2="' + x + '" y2="' + y2 + '" ' + LINE + '/>' +
+        text(tx, ty, t, ' transform="rotate(-90 ' + tx + ' ' + ty + ')"');
+    };
+    // Real proportions of w x h inside maxW x maxH, each side at least min.
+    const fit = (w, h, maxW, maxH, min) => {
+      const s = Math.min(maxW / w, maxH / h);
+      return { w: Math.max(min, w * s), h: Math.max(min, h * s), s };
+    };
+    let svg = '';
+    if (type.key === 'wall' || type.key === 'plinth' || type.key === 'decor') {
+      const across = type.key === 'decor' ? 'width' : 'length';
+      const f = fit(size(across), size('height'), 150, type.key === 'plinth' ? 90 : 120, 20);
+      const x = 145 - f.w / 2, y = type.key === 'plinth' ? 148 - f.h : 80 - f.h / 2;
+      if (type.key === 'plinth') svg += rect(x, 24, f.w, y - 24, WALL);
+      svg += rect(x, y, f.w, f.h, STONE) + hDim(x, x + f.w, y + f.h + 12, label(across)) + vDim(x - 16, y, y + f.h, label('height'));
+    } else if (type.key === 'surround') {
+      const door = form.id === 'door';
+      const W = size('openingWidth'), H = size('openingHeight'), b = size('frame');
+      const f = fit(W + 2 * b, H + (door ? b : 2 * b), 150, 110, 30);
+      const bp = Math.max(5, b * f.s), wp = f.w - 2 * bp, hp = f.h - (door ? bp : 2 * bp);
+      const x = 145 - f.w / 2, y = 40;
+      svg += rect(x, y, f.w, f.h, STONE) + rect(x + bp, y + bp, wp, hp, OPEN) +
+        text(145, y - 10, 'Обрамление: ' + label('frame')) +
+        hDim(x + bp, x + bp + wp, y + f.h + 12, label('openingWidth')) + vDim(x - 16, y + bp, y + bp + hp, label('openingHeight'));
+    } else if (type.key === 'column' || type.key === 'pilaster') {
+      const square = form.id === 'square';
+      const across = type.key === 'pilaster' ? size('width') : (square ? size('side') : 2 * size('radius'));
+      const f = fit(across, size('height'), 60, 120, 12);
+      const x = 110 - f.w / 2, y = 84 - f.h / 2;
+      if (type.key === 'pilaster') svg += rect(x - 26, y - 6, f.w + 52, f.h + 6, WALL);
+      svg += rect(x, y, f.w, f.h, STONE) + vDim(x - 16, y, y + f.h, label('height'));
+      if (type.key === 'column' && !square) svg += '<path d="M' + (x + f.w * 0.3) + ' ' + y + ' V' + (y + f.h) + '" fill="none" stroke="var(--stone-line)" stroke-width="1" opacity="0.6"/>';
+      // The cross-section, on the right.
+      if (type.key === 'column' && !square) {
+        svg += '<circle cx="205" cy="70" r="24" ' + STONE + '/><path d="M205 70 H229" fill="none" stroke="var(--muted)" stroke-width="1.2" marker-end="url(#dimArrowEnd)"/>' +
+          text(205, 112, 'R = ' + label('radius'));
+      } else if (type.key === 'column') {
+        svg += rect(183, 48, 44, 44, STONE) + hDim(183, 227, 104, label('side'));
+      } else {
+        const pd = Math.min(28, Math.max(6, 40 * size('projection') / size('width')));
+        svg += '<path d="M168 88 H242" fill="none" stroke="var(--wall-line)" stroke-width="3"/>' + rect(185, 88 - pd, 40, pd, STONE) +
+          text(205, 112, 'Ширина: ' + label('width'), ' font-size="11"') + text(205, 128, 'Выступ: ' + label('projection'), ' font-size="11"');
+      }
+    } else {
+      // Карниз / пояс in section: the wall on the left, the profile out to the right.
+      const D = size('projection'), h = size('height');
+      const f = fit(D, h, 100, 80, 10);
+      const wx = 70, top = 40;
+      svg += rect(wx - 20, 24, 20, 130, WALL);
+      if (type.key === 'cornice') {
+        let y = top + f.h;
+        [[0.3, 0.4], [0.3, 0.7], [0.4, 1]].forEach(([hf, df]) => {
+          y -= f.h * hf;
+          svg += rect(wx, y, f.w * df, f.h * hf, STONE);
+        });
+      } else {
+        svg += rect(wx, top + 10, f.w, f.h, STONE);
+      }
+      const y0 = type.key === 'cornice' ? top : top + 10;
+      svg += vDim(wx + f.w + 14, y0, y0 + f.h, label('height'), true) + hDim(wx, wx + f.w, y0 + f.h + 12, label('projection')) +
+        text(130, 178, 'Длина: ' + label('length'));
+    }
+    g.innerHTML = svg;
+    document.getElementById('dimSvg').setAttribute('aria-label', 'Схема: ' + type.title.toLowerCase() + (form.title ? ', ' + form.title.toLowerCase() : ''));
   }
 
   // Ступени: «Подступенки» -- те же две карточки, что у лестницы; данные --
@@ -2996,6 +3280,7 @@
   }
 
   function updateDimensionLabels(productKey) {
+    syncFacadeFields();
     const isSpiral = productKey === 'lestnitsa' && GeometryModel.STAIR_SHAPES[productSubcategorySelect.value] === 'spiral';
     currentDimLabels = isSpiral ? SPIRAL_DIMENSION_LABELS : (DIMENSION_LABELS[productKey] || DEFAULT_DIMENSION_LABELS);
     dimLengthUnitLabelEl.textContent = currentDimLabels.length;
@@ -3082,7 +3367,9 @@
     warningOut.innerHTML = '';
     remainderOut.textContent = '';
 
-    if (width <= 0 || length <= 0) {
+    // A facade's sizes are its own (facade-model.js), not width x length.
+    const sizesReady = selectedProductKey === 'fasad' ? facadeSizesComplete() : (width > 0 && length > 0);
+    if (!sizesReady) {
       dimError.style.display = dimsTouched ? 'block' : 'none';
       setPriceHint(INCOMPLETE_HINT);
       breakdown.innerHTML = '';
@@ -3140,7 +3427,7 @@
     if (polishEnabled) optionLabels.push('полировка');
     if (installEnabled) optionLabels.push('монтаж');
 
-    const { rates, extraLineItems, extraDimensions } = ConstructorState.buildPricingInputs(constructorState, {
+    const { rates, extraLineItems, extraDimensions, areaM2 } = ConstructorState.buildPricingInputs(constructorState, {
       productRates: WORK_RATES[selectedProductKey],
       miscFlatSum: MISC_FLAT_SUM, miscRatePerM2: MISC_RATE_PER_M2,
       complexShapeMultiplier: COMPLEX_SHAPE_MULTIPLIER,
@@ -3191,7 +3478,9 @@
       extraLineItems,
       marginCm: SAW_MARGIN_CM,
       wasteFactor: AREA_WASTE_FACTOR,
-      allowSeam: product.allowSeam !== false
+      allowSeam: product.allowSeam !== false,
+      // A facade's cladded area (all pieces); null = width x length.
+      areaM2
     });
 
     if (!result.ok) {
@@ -3229,10 +3518,20 @@
     setPriceValue('≈ ' + formatRub(result.total));
 
     let html = '';
-    if (currentDimLabels.title) {
-      html += `${currentDimLabels.title}: <span>${Math.round(length * 1000)} × ${Math.round(width * 1000)} мм</span><br>`;
+    const facadeInfo = constructorState.productConfig.fasad ? FacadeModel.describeFacade(constructorState.productConfig.fasad) : null;
+    if (facadeInfo) {
+      // Фасад: the type, form, each size under its own name, quantity, area.
+      html += `Тип: <span>${escapeHtml(facadeInfo.typeLabel)}</span><br>`;
+      if (facadeInfo.formLabel) html += `Форма: <span>${escapeHtml(facadeInfo.formLabel)}</span><br>`;
+      facadeInfo.params.forEach(p => { html += `${escapeHtml(p.label)}: <span>${p.valueMm} мм</span><br>`; });
+      if (facadeInfo.quantity !== null) html += `Количество: <span>${facadeInfo.quantity} ${facadeInfo.unit}</span><br>`;
+      html += `Площадь облицовки: <span>${decimal2(facadeInfo.areaM2)} м²</span><br>`;
+    } else {
+      if (currentDimLabels.title) {
+        html += `${currentDimLabels.title}: <span>${Math.round(length * 1000)} × ${Math.round(width * 1000)} мм</span><br>`;
+      }
+      html += `${currentDimLabels.area || 'Площадь'}: <span>${decimal2(width * length)} м²</span><br>`;
     }
-    html += `${currentDimLabels.area || 'Площадь'}: <span>${decimal2(width * length)} м²</span><br>`;
     const stoneMetaParts = [];
     if (stone.category_label_ru) stoneMetaParts.push(stone.category_label_ru);
     const stoneCountry = stone.countries && stone.countries[0];
@@ -3245,7 +3544,7 @@
     html += `Материал: <span>${escapeHtml(stoneDisplay)}</span><br>`;
     html += `Изделие: <span>${product.label}</span>`;
     const subcategoryRow = currentSubcategoryRow();
-    if (subcategoryRow) {
+    if (subcategoryRow && !facadeInfo) {
       html += `<br>Вариант: <span>${escapeHtml(subcategoryLabel(subcategoryRow))}</span>`;
       const subcategoryQty = constructorState.subcategory.qty;
       if (subcategoryRow.unit === 'шт.' && subcategoryQty > 0) {
@@ -3420,6 +3719,38 @@
     stepCountError.style.visibility = 'hidden';
   });
   subcategoryQtyInput.addEventListener('input', calculate);
+
+  // «Фасады»: every size field redraws the diagram, the area note and the
+  // estimate; the quantity is validated like «Количество ступеней» -- only a
+  // whole number within the type's limits reaches #facade-quantity, and
+  // leaving the field puts the last valid quantity back into it.
+  Object.values(FacadeModel.PARAM_FIELDS).forEach(id => {
+    document.getElementById(id).addEventListener('input', () => {
+      dimsTouched = true;
+      updateFacadeAreaNote();
+      updateDimDiagram();
+      calculate();
+    });
+  });
+  const facadeQtyInput = document.getElementById('facadeQtyInput');
+  const facadeQtyHidden = document.getElementById('facade-quantity');
+  const facadeQtyError = document.getElementById('facadeQtyError');
+  facadeQtyInput.addEventListener('input', () => {
+    const type = currentFacadeType();
+    const raw = facadeQtyInput.value.trim();
+    const n = raw === '' ? NaN : Number(raw);
+    const valid = FacadeModel.isValidQuantity(n, FacadeModel.quantityRange(type));
+    facadeQtyError.style.visibility = valid ? 'hidden' : 'visible';
+    if (!valid) return;
+    facadeQtyByType[type.id] = n;
+    facadeQtyHidden.value = String(n);
+    updateFacadeAreaNote();
+    calculate();
+  });
+  facadeQtyInput.addEventListener('change', () => {
+    facadeQtyInput.value = facadeQtyHidden.value;
+    facadeQtyError.style.visibility = 'hidden';
+  });
   productShapeSelect.addEventListener('change', () => { updateWingVisibility(); calculate(); });
   ['wing-width', 'wing-length'].forEach(id => document.getElementById(id).addEventListener('input', calculate));
   shapeCornerSelect.addEventListener('change', calculate);

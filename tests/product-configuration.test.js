@@ -38,8 +38,11 @@ test('every one of the 9 products has a working state contract: dimensions, prod
     const state = readState(key, {});
     assert.deepEqual(Object.keys(state).sort(), expectedKeys.sort(), `"${key}" state shape drifted`);
     assert.equal(state.product.key, key);
-    assert.equal(state.dimensions.widthM, 1);
-    assert.equal(state.dimensions.lengthM, 2);
+    // A facade's sizes are its own (productConfig.fasad, facade-model.js);
+    // the generic width/length never reach it.
+    assert.equal(state.dimensions.widthM, key === 'fasad' ? 0 : 1);
+    assert.equal(state.dimensions.lengthM, key === 'fasad' ? 0 : 2);
+    if (key !== 'fasad') assert.equal(state.productConfig.fasad, null);
   });
 });
 

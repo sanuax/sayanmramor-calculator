@@ -376,7 +376,7 @@ const TYPE_IDS = {
   panno: ['PANEL-01', 'PANEL-02', 'PANEL-03', 'PANEL-04'],
   pol: ['FLOOR-01', 'FLOOR-02', 'FLOOR-03', 'FLOOR-04', 'FLOOR-05'],
   stena: ['WALL-01', 'WALL-02', 'WALL-03', 'WALL-04', 'WALL-05'],
-  fasad: ['FACADE-01', 'FACADE-02', 'FACADE-03', 'FACADE-04', 'FACADE-05'],
+  fasad: ['FACADE-01', 'FACADE-02', 'FACADE-03', 'FACADE-04', 'FACADE-05', 'FACADE-06', 'FACADE-07', 'FACADE-08'],
   stupeni: ['STEP-01', 'STEP-02', 'STEP-03'],
   lestnitsa: ['STAIR-01', 'STAIR-03', 'STAIR-05', 'STAIR-07'],
 };

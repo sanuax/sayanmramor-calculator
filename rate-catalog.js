@@ -6,7 +6,7 @@
   }
 })(typeof window !== 'undefined' ? window : globalThis, function () {
 
-  // The 50 rows below exist purely as UI/data structure for the subcategory
+  // The 53 rows below exist purely as UI/data structure for the subcategory
   // selector (product -> shape/variant dropdown); this is deliberately
   // display-only per the design spec, and no pricing code reads from this
   // array yet. Filling in a `rate` here has no effect on the displayed
@@ -55,6 +55,12 @@
     { id: 'FACADE-03', categoryLabel: 'Фасады', shape: 'Колонны', variant: 'Облицовка', unit: 'м²', rate: null, currency: null },
     { id: 'FACADE-04', categoryLabel: 'Фасады', shape: 'Цоколь', variant: 'Облицовка', unit: 'м²', rate: null, currency: null },
     { id: 'FACADE-05', categoryLabel: 'Фасады', shape: 'Декоративные элементы', variant: 'Изделие', unit: 'шт.', rate: null, currency: null },
+    // Facade products the client can now configure separately (see
+    // facade-model.js) -- catalog rows for their future rates, like every
+    // row above: no rate exists for them in the company's data yet.
+    { id: 'FACADE-06', categoryLabel: 'Фасады', shape: 'Пилястры', variant: 'Облицовка', unit: 'шт.', rate: null, currency: null },
+    { id: 'FACADE-07', categoryLabel: 'Фасады', shape: 'Карниз', variant: 'Облицовка', unit: 'м²', rate: null, currency: null },
+    { id: 'FACADE-08', categoryLabel: 'Фасады', shape: 'Фасадный пояс', variant: 'Облицовка', unit: 'м²', rate: null, currency: null },
 
     { id: 'BATH-01', categoryLabel: 'Столешницы в ванную', shape: 'Прямая', variant: '', unit: 'м²', rate: null, currency: null },
     { id: 'BATH-02', categoryLabel: 'Столешницы в ванную', shape: 'Угловая', variant: '', unit: 'м²', rate: null, currency: null },

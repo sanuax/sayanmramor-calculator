@@ -695,6 +695,7 @@ function update(geometryModel, materialDescriptor) {
 
   // Every update() adopts the current product's own default -- switching
   // products immediately changes what "Сбросить вид" returns to.
+  const previousPreset = cameraPresetTracker.getDefaultPreset();
   cameraPresetTracker.setDefaultFromGeometryModel(geometryModel);
 
   const action = window.CameraFraming.decideCameraAction({
@@ -703,6 +704,8 @@ function update(geometryModel, materialDescriptor) {
     nextProductKey: geometryModel.productKey,
     previousBounds: lastBounds,
     nextBounds: layout.bounds,
+    previousPreset,
+    nextPreset: cameraPresetTracker.getDefaultPreset(),
   });
   lastBounds = layout.bounds;
   framePadding = layout.framePadding;

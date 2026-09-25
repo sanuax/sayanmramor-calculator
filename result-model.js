@@ -15,6 +15,10 @@
   }
 })(typeof window !== 'undefined' ? window : globalThis, function () {
 
+  const FacadeModel = (typeof module !== 'undefined' && module.exports)
+    ? require('./facade-model.js')
+    : (typeof window !== 'undefined' ? window : globalThis).FacadeModel;
+
   const RESULT_TITLES = {
     lestnitsa: 'Ваша лестница',
     panno: 'Ваше панно',
@@ -142,13 +146,19 @@
       if (!edge.label) edge = null;
     }
 
+    // «Фасады»: the type, form, every size under its own name, quantity and
+    // cladded area (facade-model.js) -- instead of a generic width x length.
+    const facadeConfig = key === 'fasad' && state.productConfig ? state.productConfig.fasad : null;
+    const facade = facadeConfig ? FacadeModel.describeFacade(facadeConfig) : null;
+
     let typeInfo = null;
     if (subcategory && subcategory.id && subcategory.label) {
       const qty = state.subcategory && state.subcategory.qty;
       typeInfo = {
         id: subcategory.id,
         label: subcategory.label,
-        quantity: subcategory.unit === 'шт.' && qty > 0 ? qty : null,
+        // A facade's quantity is its own (facade.quantity).
+        quantity: !facade && subcategory.unit === 'шт.' && qty > 0 ? qty : null,
       };
     }
 
@@ -160,7 +170,7 @@
       product: { key, label: productLabel || product.label || null, title: resultTitle(key) },
       type: typeInfo,
       shape,
-      dimensions: {
+      dimensions: facade ? null : {
         lengthMm, widthMm,
         areaM2: Math.round(state.dimensions.lengthM * state.dimensions.widthM * 100) / 100,
         lengthLabel: labels.length, widthLabel: labels.width,
@@ -168,6 +178,7 @@
         // this pair of sizes (null: the generic "Размер").
         title: labels.title || null,
       },
+      facade,
       material: buildMaterial(state.stone),
       edge,
       riser: key === 'stupeni' ? !!(state.productConfig && state.productConfig.stupeni && state.productConfig.stupeni.riser) : null,
@@ -229,6 +240,20 @@
     return '';
   }
 
+  // A facade's rows: its form, each size, the quantity and the cladded area
+  // (for several pieces: one piece's area x the quantity).
+  function facadeSpecs(f) {
+    const specs = [];
+    if (f.formLabel) specs.push({ key: 'facade.form', label: 'Форма', value: f.formLabel, detail: '' });
+    f.params.forEach(p => specs.push({ key: 'facade.' + p.key, label: p.label, value: p.valueMm + ' мм', detail: '' }));
+    if (f.quantity !== null) specs.push({ key: 'facade.quantity', label: 'Количество', value: f.quantity + ' ' + f.unit, detail: '' });
+    specs.push({
+      key: 'facade.area', label: 'Площадь облицовки', value: formatArea(f.areaM2),
+      detail: (f.quantity > 1 ? formatArea(f.pieceAreaM2) + ' × ' + f.quantity + ' · ' : '') + f.formula,
+    });
+    return specs;
+  }
+
   // Display rows for the Result screen: only rows that apply to this
   // product and actually carry a value -- no empty/"—"/null lines.
   function buildResultView(configuration) {
@@ -241,11 +266,14 @@
       specs.push({ key: 'shape', label: 'Форма', value: c.shape.label, detail: c.shape.cornerLabel || '' });
     }
     const d = c.dimensions;
-    specs.push({
-      key: 'dimensions', label: d.title || 'Размер',
-      value: d.lengthMm + ' × ' + d.widthMm + ' мм',
-      detail: d.lengthLabel.toLowerCase() + ' × ' + d.widthLabel.toLowerCase() + ' · ' + formatArea(d.areaM2),
-    });
+    if (d) {
+      specs.push({
+        key: 'dimensions', label: d.title || 'Размер',
+        value: d.lengthMm + ' × ' + d.widthMm + ' мм',
+        detail: d.lengthLabel.toLowerCase() + ' × ' + d.widthLabel.toLowerCase() + ' · ' + formatArea(d.areaM2),
+      });
+    }
+    if (c.facade) facadeSpecs(c.facade).forEach(s => specs.push(s));
     if (c.steps) {
       specs.push({ key: 'steps', label: 'Количество ступеней', value: c.steps.count + ' шт.', detail: '' });
     }

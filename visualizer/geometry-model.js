@@ -19,6 +19,7 @@
   } = isNode ? require('./constants.js') : globalRoot.VisualizerConstants;
   const { resolveSinkCutout, resolveCooktopCutout, resolveHoles } = isNode ? require('./cutout-geometry.js') : globalRoot.CutoutGeometry;
   const { resolveBacksplash, resolveCurb, resolveWallPanel, resolveIsland, resolveBarCounter } = isNode ? require('./attachment-geometry.js') : globalRoot.AttachmentGeometry;
+  const FacadeModel = isNode ? require('../facade-model.js') : globalRoot.FacadeModel;
 
   // Остров/барная стойка each have two UI variants (rectangular/figured,
   // standard/complex) that are never meant to coexist -- see
@@ -34,8 +35,9 @@
   }
 
   // The selected 'type' row (rate-catalog.js PRODUCT_SUBCATEGORIES) decides
-  // HOW the stone is drawn for stairs/steps/floors/walls/facades -- it never
-  // affects price (that catalog is display-only), and ids not listed here
+  // HOW the stone is drawn for stairs/steps/floors/walls/facades -- it carries
+  // no rate (that catalog is display-only; a facade's area comes from its
+  // own sizes, facade-model.js), and ids not listed here
   // fall back to the plain shape rather than a guessed one.
   const STEP_VARIANTS = { 'STEP-02': 'winder', 'STEP-03': 'radius' };
   const STAIR_SHAPES = {
@@ -59,11 +61,10 @@
     'WALL-03': { pattern: 'grid', moduleM: VISUAL_LARGE_FORMAT_MODULE_M },
     'WALL-04': { pattern: 'grid', moduleM: VISUAL_LAYOUT_MODULE_M, form: 'radius' },
     'WALL-05': { pattern: 'grid', moduleM: VISUAL_LARGE_FORMAT_MODULE_M, light: true },
+    // Facades: the joint grid of a clad wall/plinth. The facade's own form
+    // and sizes are model.facade (buildFacade below), not a surface layout.
     'FACADE-01': { pattern: 'grid', moduleM: VISUAL_LAYOUT_MODULE_M },
-    'FACADE-02': { pattern: null, moduleM: null, form: 'surround' },
-    'FACADE-03': { pattern: null, moduleM: null, form: 'columns' },
-    'FACADE-04': { pattern: 'grid', moduleM: VISUAL_LAYOUT_MODULE_M, form: 'plinth' },
-    'FACADE-05': { pattern: null, moduleM: null, form: 'cornice' },
+    'FACADE-04': { pattern: 'grid', moduleM: VISUAL_LAYOUT_MODULE_M },
   };
   // Windowsill plan shapes and panel treatments, by the same 'type' row.
   const SILL_VARIANTS = { 'SILL-02': 'corner', 'SILL-03': 'bay', 'SILL-04': 'bay-radius', 'SILL-05': 'figured' };
@@ -159,6 +160,20 @@
     return state.subcategory ? state.subcategory.id : null;
   }
 
+  // «Фасады»: what the 3D draws is exactly the client's type, form, sizes
+  // and quantity (facade-model.js). Until every size is entered it shows the
+  // form's placeholder sizes -- the page only redraws the 3D once they are
+  // all in, so this is only a scene for a partial state, like the size
+  // diagram's placeholder.
+  function buildFacade(state) {
+    const cfg = state.productConfig ? state.productConfig.fasad : null;
+    const type = FacadeModel.getType(cfg ? cfg.typeId : typeId(state)) || FacadeModel.FACADE_TYPES[0];
+    const form = FacadeModel.getForm(type, cfg ? cfg.form : null);
+    const params = {};
+    form.params.forEach(p => { params[p.key] = cfg && cfg.complete ? cfg.params[p.key] : p.placeholderMm / 1000; });
+    return { type: type.key, form: form.id, params, quantity: cfg ? cfg.quantity : 1, cameraPreset: type.cameraPreset };
+  }
+
   function buildGeometryModel(state) {
     const { widthM, lengthM } = state.dimensions;
     const productKey = state.product ? state.product.key : null;
@@ -185,6 +200,7 @@
     // Edge fields are read for every product (constructor-state.js), but an
     // edge only exists on products that support edge work.
     const edgeSupported = !caps || caps.supportsEdgeWork;
+    const facade = productKey === 'fasad' ? buildFacade(state) : null;
 
     return {
       productKey,
@@ -197,7 +213,8 @@
       // in product-types.js. Falls back to 'iso' whenever a product hasn't set
       // one (or no product is selected yet), matching ThreeScene's own generic
       // fallback for an unrecognized preset name.
-      cameraPreset: (state.product && state.product.cameraPreset) || 'iso',
+      // A facade type declares its own angle (a column is read from an angle).
+      cameraPreset: (facade && facade.cameraPreset) || (state.product && state.product.cameraPreset) || 'iso',
       edge: edgeSupported ? { type: state.edge.type, lengthMm: state.edge.lengthMm } : { type: null, lengthMm: null },
       sink,
       cooktop,
@@ -214,6 +231,7 @@
       surface: buildSurface(productKey, state),
       sill: productKey === 'podokonnik' ? { variant: SILL_VARIANTS[typeId(state)] || 'straight' } : null,
       panel: productKey === 'panno' ? { variant: PANEL_VARIANTS[typeId(state)] || 'plain' } : null,
+      facade,
     };
   }
 

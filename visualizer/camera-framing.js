@@ -101,8 +101,12 @@
   //   'refit' -- same product, but the model's size/extent changed: keep the
   //              angle the client is looking from, reframe the distance;
   //   'keep'  -- nothing that affects framing changed (e.g. a hole added).
-  function decideCameraAction({ previousProductKey, nextProductKey, previousBounds, nextBounds, hasPrevious }) {
+  // A model that declares a different default angle than the last one
+  // (a facade column after a facade wall) also gets that angle: 'reset'.
+  // Presets not passed -> not compared (the behaviour before they existed).
+  function decideCameraAction({ previousProductKey, nextProductKey, previousBounds, nextBounds, hasPrevious, previousPreset, nextPreset }) {
     if (!hasPrevious || previousProductKey !== nextProductKey) return 'reset';
+    if (previousPreset && nextPreset && previousPreset !== nextPreset) return 'reset';
     return boundsChanged(previousBounds, nextBounds) ? 'refit' : 'keep';
   }
 

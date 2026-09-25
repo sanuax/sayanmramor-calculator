@@ -401,52 +401,134 @@
     return { parts, floorY: 0, framePadding: 0.14 };
   }
 
-  // Facade types other than a plain clad wall.
-  function facadeFormParts(form, runM, heightM, T) {
+  // ---- facades: every type at the client's own sizes (facade-model.js) ----
+  //
+  // X+ is the street side, the building's wall face is at x = 0 (context,
+  // behind), Y up, Z along the facade. Each type's stone parts are exactly
+  // the surface its area formula counts: a column is a cylinder of radius R
+  // (or a square prism of side A) and height H; a surround's four (window)
+  // or three (door) frame pieces add up to its formula; a cornice's stepped
+  // tiers have fronts that add up to its height and undersides that add up
+  // to its projection. Pieces ordered in quantity are drawn side by side,
+  // up to VISUAL_MAX_PIECES -- the count itself is in the summary and price.
+  const VISUAL_MAX_PIECES = 6;
+
+  function named(part, name) {
+    return Object.assign(part, { name });
+  }
+
+  // Centres along Z for n pieces of width w with gap g, centred on 0.
+  function rowCentres(n, w, g) {
+    const run = n * w + (n - 1) * g;
+    const out = [];
+    for (let i = 0; i < n; i++) out.push(-run / 2 + w / 2 + i * (w + g));
+    return { centres: out, run };
+  }
+
+  // The building's wall behind a facade product (context -- not framed).
+  function facadeWall(heightM, runM) {
+    return box('context', [-0.1, heightM / 2, 0], [0.2, heightM, runM]);
+  }
+
+  function facadeParts(m) {
+    const f = m.facade;
+    const p = f.params;
+    const T = m.visualThicknessM;
+    const n = Math.max(1, Math.min(VISUAL_MAX_PIECES, f.quantity || 1));
     const parts = [];
-    if (form === 'surround') {
-      // Фасадный элемент: a stone window surround on a plaster wall.
-      const base = 0.6, fw = Math.min(0.25, Math.max(0.08, Math.min(runM, heightM) * 0.14)), d = 0.08;
-      parts.push(box('stone', [d / 2, base + heightM - fw / 2, 0], [d, fw, runM]));
-      parts.push(box('stone', [d * 0.6, base + fw * 0.4, 0], [d * 1.2, fw * 0.8, runM + 0.06]));
-      parts.push(box('stone', [d / 2, base + heightM / 2, runM / 2 - fw / 2], [d, heightM - 1.8 * fw, fw]));
-      parts.push(box('stone', [d / 2, base + heightM / 2, -runM / 2 + fw / 2], [d, heightM - 1.8 * fw, fw]));
-      parts.push(box('context-glass', [0.005, base + heightM / 2, 0], [0.01, heightM - 1.8 * fw, runM - 2 * fw]));
-      parts.push(box('context', [-0.1, (base + heightM + 0.8) / 2, 0], [0.2, base + heightM + 0.8, runM + 2]));
-      return { parts, floorY: 0, framePadding: 0.25 };
-    }
-    if (form === 'columns') {
-      // Колонны: a row of round columns with bases, capitals and a beam.
-      const count = Math.min(6, Math.max(2, Math.round(runM / 1.4) + 1));
-      const d = Math.min(0.5, Math.max(0.2, runM / (count * 2.4)));
-      const capH = 0.14, beamH = 0.24;
-      const shaftTop = Math.max(0.6, heightM - capH - beamH);
-      for (let i = 0; i < count; i++) {
-        const z = -runM / 2 + d / 2 + (runM - d) * (count === 1 ? 0.5 : i / (count - 1));
-        parts.push(box('stone', [0, 0.06, z], [d * 1.3, 0.12, d * 1.3]));
-        parts.push(prism('stone', circlePoints(0, z, d / 2, 20), 0.12, shaftTop, { name: 'column' }));
-        parts.push(box('stone', [0, shaftTop + capH / 2, z], [d * 1.35, capH, d * 1.35]));
+
+    if (f.type === 'wall' || f.type === 'plinth') {
+      // One wall section (or plinth) at its length x height, with its joints.
+      const runM = p.length, heightM = p.height;
+      const wall = named(box('stone', [T / 2, heightM / 2, 0], [T, heightM, runM]), f.type);
+      if (m.surface && m.surface.pattern) {
+        wall.tiling = { plane: 'front', pattern: m.surface.pattern, moduleM: m.surface.moduleM, z0: -runM / 2, y0: 0 };
       }
-      parts.push(box('stone', [0, shaftTop + capH + beamH / 2, 0], [d * 1.4, beamH, runM + d * 0.4]));
-      parts.push(box('context', [-d - 0.6, (heightM + 0.6) / 2, 0], [0.2, heightM + 0.6, runM + 2]));
-      return { parts, floorY: 0, framePadding: 0.18 };
+      parts.push(wall);
+      const seams = faceSeams(T + 0.001, runM, heightM, 0, m.surface);
+      if (seams.length) parts.push({ kind: 'seams', role: 'seam', segments: seams });
+      if (f.type === 'plinth') {
+        // Цоколь: the stone band at the foot of the plaster wall.
+        parts.push(facadeWall(heightM + 2.2, runM));
+        return { parts, floorY: 0, framePadding: 0.45 };
+      }
+      return { parts, floorY: 0, framePadding: 0.14 };
     }
-    if (form === 'cornice') {
-      // Декоративные элементы: a stepped stone cornice crowning a wall.
-      const base = 2.2, h = heightM;
-      parts.push(box('stone', [0.05, base + h * 0.175, 0], [0.1, h * 0.35, runM]));
-      parts.push(box('stone', [0.09, base + h * 0.475, 0], [0.18, h * 0.25, runM + 0.08]));
-      parts.push(box('stone', [0.14, base + h * 0.8, 0], [0.28, h * 0.4, runM + 0.16]));
-      parts.push(box('context', [-0.1, base / 2, 0], [0.2, base, runM + 1.6]));
+
+    if (f.type === 'surround') {
+      // Window: frame on all four sides, 0.9 m above the ground; door: on
+      // three sides, from the ground. Frame pieces 60 mm proud of the wall.
+      const W = p.openingWidth, H = p.openingHeight, b = p.frame, d = 0.06;
+      const door = f.form === 'door';
+      const base = door ? 0 : 0.9;
+      const { centres, run } = rowCentres(n, W + 2 * b, Math.max(0.8, W * 0.6));
+      centres.forEach(z => {
+        parts.push(named(box('stone', [d / 2, base + H + b / 2, z], [d, b, W + 2 * b]), 'frame-top'));
+        if (!door) parts.push(named(box('stone', [d / 2, base - b / 2, z], [d, b, W + 2 * b]), 'frame-bottom'));
+        parts.push(named(box('stone', [d / 2, base + H / 2, z - W / 2 - b / 2], [d, H, b]), 'frame-side'));
+        parts.push(named(box('stone', [d / 2, base + H / 2, z + W / 2 + b / 2], [d, H, b]), 'frame-side'));
+        parts.push(box('context-glass', [0.005, base + H / 2, z], [0.01, H, W]));
+      });
+      parts.push(facadeWall(base + H + b + 0.8, run + 2));
+      return { parts, floorY: 0, framePadding: 0.2 };
+    }
+
+    if (f.type === 'column') {
+      // Free-standing columns, side by side: round = a cylinder of the
+      // entered radius, square = a prism of the entered side.
+      const size = f.form === 'square' ? p.side : 2 * p.radius;
+      const { centres } = rowCentres(n, size, Math.max(1, size * 1.5));
+      centres.forEach(z => {
+        if (f.form === 'square') parts.push(named(box('stone', [0, p.height / 2, z], [p.side, p.height, p.side]), 'column'));
+        else parts.push(prism('stone', circlePoints(0, z, p.radius, 40), 0, p.height, { name: 'column' }));
+      });
+      return { parts, floorY: 0, framePadding: 0.16 };
+    }
+
+    if (f.type === 'pilaster') {
+      // Flat columns standing out of the wall by their projection.
+      const { centres, run } = rowCentres(n, p.width, Math.max(1, p.width * 2));
+      centres.forEach(z => parts.push(named(box('stone', [p.projection / 2, p.height / 2, z], [p.projection, p.height, p.width]), 'pilaster')));
+      parts.push(facadeWall(p.height + 0.6, run + 2));
+      return { parts, floorY: 0, framePadding: 0.16 };
+    }
+
+    if (f.type === 'cornice') {
+      // Three tiers stepping out upward, crowning a 2.4 m wall: fronts
+      // 0.3 + 0.3 + 0.4 of the height, projections 0.4 / 0.7 / 1.0 of the
+      // cornice's -- so the undersides add up to its full projection.
+      const base = 2.4, h = p.height, D = p.projection, L = p.length;
+      const tiers = [[0.3, 0.4], [0.3, 0.7], [0.4, 1]];
+      let y = base;
+      tiers.forEach(([hf, df]) => {
+        parts.push(named(box('stone', [D * df / 2, y + h * hf / 2, 0], [D * df, h * hf, L]), 'cornice'));
+        y += h * hf;
+      });
+      parts.push(facadeWall(base + h, L + 1.6));
       return { parts, floorY: 0, framePadding: 0.3 };
     }
-    return null;
+
+    if (f.type === 'belt') {
+      // One flat band across the wall between floors, wall above and below.
+      const base = 1.6, h = p.height, L = p.length;
+      parts.push(named(box('stone', [p.projection / 2, base + h / 2, 0], [p.projection, h, L]), 'belt'));
+      parts.push(facadeWall(base + h + 1.6, L + 1.6));
+      return { parts, floorY: 0, framePadding: 0.3 };
+    }
+
+    // Декоративный элемент: flat stone pieces on the wall, 40 mm thick.
+    const base = 1;
+    const { centres, run } = rowCentres(n, p.width, Math.max(0.6, p.width * 0.5));
+    centres.forEach(z => parts.push(named(box('stone', [0.02, base + p.height / 2, z], [0.04, p.height, p.width]), 'decor')));
+    parts.push(facadeWall(base + p.height + 0.8, run + 2));
+    return { parts, floorY: 0, framePadding: 0.25 };
   }
 
   function verticalParts(m) {
     const T = m.visualThicknessM;
     const parts = [];
     let runM, heightM, y0;
+    if (m.productKey === 'fasad' && m.facade) return facadeParts(m);
     if (m.productKey === 'stena') {
       // "Высота стены" is the length field, "Ширина стены" the width field.
       heightM = m.lengthM; runM = m.widthM; y0 = 0;
@@ -456,10 +538,6 @@
     }
     const form = m.surface && m.surface.form;
     if (m.productKey === 'stena' && form === 'radius') return radiusWallParts(m, runM, heightM, T);
-    if (m.productKey === 'fasad' && form && form !== 'plinth') {
-      const facade = facadeFormParts(form, runM, heightM, T);
-      if (facade) return facade;
-    }
     const wall = box('stone', [0, y0 + heightM / 2, 0], [T, heightM, runM]);
     // The joints' grid on the room-side face, for the renderer to give each
     // piece its own stone (presentation only -- no geometry changes).
@@ -485,13 +563,6 @@
       // Стена с подсветкой: light lines along the top and the foot.
       parts.push(lightBox([T / 2 + 0.01, y0 + heightM - 0.01, 0], [0.012, 0.012, runM]));
       parts.push(lightBox([T / 2 + 0.01, y0 + 0.01, 0], [0.012, 0.012, runM]));
-    }
-    if (form === 'plinth') {
-      // Цоколь: the stone band at the foot of a plaster wall, capped by a
-      // projecting stone drip; framed with the wall above it in view.
-      parts.push(box('stone', [T / 2 + 0.02, heightM + 0.03, 0], [T + 0.04, 0.06, runM + 0.04]));
-      parts.push(box('context', [-0.03, heightM + 0.06 + 1.1, 0], [T, 2.2, runM]));
-      return { parts, floorY: 0, framePadding: 0.45 };
     }
     return { parts, floorY: 0, framePadding: 0.14 };
   }

@@ -145,6 +145,12 @@
   const AREA_DP_UNIT_M2 = 0.1;
 
   function computeTypeBResult(slabs, widthM, lengthM, wasteFactor) {
+    return computeTypeBResultForArea(slabs, widthM * lengthM, wasteFactor);
+  }
+
+  // Type B needs only an area: the stone is covered by area, whatever shape
+  // it clads (a facade's column or cornice gives its own area, not w x l).
+  function computeTypeBResultForArea(slabs, areaM2, wasteFactor) {
     const items = [];
     for (const slab of slabs) {
       if (!hasValidPrice(slab)) continue;
@@ -155,7 +161,7 @@
     }
     if (!items.length) return null;
 
-    const areaNeeded = widthM * lengthM * wasteFactor;
+    const areaNeeded = areaM2 * wasteFactor;
     const target = Math.ceil(areaNeeded / AREA_DP_UNIT_M2);
     const covered = minCostCover(items, target);
     if (!covered) return { slabs: null, subtotal: null }; // combined stock falls short of the needed area
@@ -198,15 +204,19 @@
     const {
       stone, widthM, lengthM, productType, marginCm, wasteFactor,
       rates, installEnabled = false, polishEnabled = false, complexEnabled = false,
-      extraDimensions = {}, extraLineItems = [], allowSeam = true
+      extraDimensions = {}, extraLineItems = [], allowSeam = true,
+      // Optional, Type B only: the priced area when it is not width x length
+      // (a facade's cladded surface -- see ConstructorState.buildPricingInputs).
+      areaM2 = null
     } = params;
+    const explicitArea = productType !== 'A' && areaM2 !== null && areaM2 !== undefined;
 
     const empty = {
       subtotal: null, fabrication: null, installation: null, polish: null, misc: null, extras: null,
       catalogExtras: null, work: null, total: null, nSlabs: 0, remainderM2: null, matchedSlab: null, matchedSlabs: []
     };
 
-    if (!(widthM > 0) || !(lengthM > 0)) {
+    if (explicitArea ? !(areaM2 > 0 && Number.isFinite(areaM2)) : (!(widthM > 0) || !(lengthM > 0))) {
       return Object.assign({ ok: false, reason: 'invalid_dimensions' }, empty);
     }
     if (!stone || !stone.slabs || stone.slabs.length === 0) {
@@ -221,7 +231,7 @@
       return Object.assign({ ok: false, reason: 'no_priced_slab' }, empty);
     }
 
-    const area = widthM * lengthM;
+    const area = explicitArea ? areaM2 : widthM * lengthM;
     const options = { installEnabled, polishEnabled, complexEnabled };
 
     if (productType === 'A') {
@@ -258,7 +268,7 @@
       };
     }
 
-    const typeBResult = computeTypeBResult(stone.slabs, widthM, lengthM, wasteFactor);
+    const typeBResult = computeTypeBResultForArea(stone.slabs, area, wasteFactor);
     if (!typeBResult) {
       return Object.assign({ ok: false, reason: 'no_slabs_for_stone' }, empty);
     }
@@ -275,6 +285,6 @@
 
   return {
     findBestTypeASlab, slabCapacityForCross, minCostCover, findTypeASegmentedResult,
-    computeRemainderAreaM2, computeTypeBResult, computeWorkAndTotal, calculatePrice
+    computeRemainderAreaM2, computeTypeBResult, computeTypeBResultForArea, computeWorkAndTotal, calculatePrice
   };
 });
