@@ -403,3 +403,10 @@ test('Result and lead name the sizes as the client entered them: «Размер 
   assert.equal(lead.configuration.dimensions.title, 'Размер лестницы');
   assert.deepEqual(lead.configuration.steps, { count: 10 });
 });
+
+test('«Забежные»: the limited count (max 10) is the one the Result and the lead get', () => {
+  const c = configFor('stupeni', { productSubcategory: { value: 'STEP-02' }, 'step-count': { value: '30' } });
+  assert.deepEqual(c.steps, { count: 10 });
+  assert.deepEqual(payloadFor('stupeni', { productSubcategory: { value: 'STEP-02' }, 'step-count': { value: '30' } }).configuration.steps, { count: 10 });
+  assert.deepEqual(configFor('stupeni', { productSubcategory: { value: 'STEP-01' }, 'step-count': { value: '30' } }).steps, { count: 30 });
+});

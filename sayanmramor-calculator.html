@@ -525,7 +525,8 @@
   .dim-block-title, .dim-count-title { max-width: 320px; margin: 0 auto 8px; font-size: var(--configurator-text); font-weight: 700; color: var(--ink); }
   .dim-count { max-width: 320px; margin: 18px auto 0; }
   .dim-count .field-unit { max-width: calc(50% - 6px); }
-  .dim-count .error { margin-bottom: 0; }
+  .dim-count .error { display: block; visibility: hidden; min-height: 1.5em; margin-bottom: 0; }
+  #dimHint { min-height: calc(2 * 1.45em); line-height: 1.45; }
 
   /* The picker's trigger deliberately keeps the same silhouette as the <select>
      and number inputs beside it -- it is one more field in the same form, and
@@ -2113,10 +2114,14 @@
   function diagramArrow(x1, y1, x2, y2) {
     return '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="var(--muted)" stroke-width="1.2" marker-start="url(#dimArrowStart)" marker-end="url(#dimArrowEnd)"/>';
   }
-  function diagramText(x, y, text, vertical) {
+  function diagramText(x, y, text, vertical, anchor) {
     const rot = vertical ? ' transform="rotate(-90 ' + x + ' ' + y + ')"' : '';
-    return '<text x="' + x + '" y="' + y + '" ' + DIAGRAM_TEXT + rot + '>' + escapeHtml(text) + '</text>';
+    const attrs = anchor ? DIAGRAM_TEXT.replace('text-anchor="middle"', 'text-anchor="' + anchor + '"') : DIAGRAM_TEXT;
+    return '<text x="' + x + '" y="' + y + '" ' + attrs + rot + '>' + escapeHtml(text) + '</text>';
   }
+  // Short words on the drawing while a field is empty -- the full field
+  // names are right under it, and a long name would run into the drawing.
+  const DIAGRAM_SHORT_LABELS = { steps: ['длина', 'глубина'], flight: ['длина', 'ширина'], spiral: ['диаметр', 'ширина'] };
   function mmOr(valueMm, label) {
     return valueMm > 0 ? Math.round(valueMm) + ' мм' : label;
   }
@@ -2126,33 +2131,35 @@
     const L = (lMm > 0 ? lMm : ph[0]) / 1000, W = (wMm > 0 ? wMm : ph[1]) / 1000;
     const info = currentStairPlan(L, W);
     const p = info.plan, n = p.count;
-    const lenText = mmOr(lMm, currentDimLabels.length), widText = mmOr(wMm, currentDimLabels.width);
+    const short = DIAGRAM_SHORT_LABELS[info.kind === 'steps' ? 'steps' : (info.variant === 'spiral' ? 'spiral' : 'flight')];
+    const lenText = mmOr(lMm, short[0]), widText = mmOr(wMm, short[1]);
     let svg = '';
     if (info.kind === 'steps') {
-      // One step from above, "× N" beside it.
-      const s = Math.min(140 / L, 90 / W);
-      const rw = Math.max(40, L * s), rh = Math.max(14, W * s);
-      const x0 = 120 - rw / 2, y0 = 78 - rh / 2, x1 = x0 + rw, y1 = y0 + rh;
+      // One step from above, "× N" beside it. The depth label is horizontal,
+      // left of its arrow, so it never runs across the step or the length.
+      const cx = 138, cy = 74;
+      const s = Math.min(120 / L, 80 / W);
+      const rw = Math.max(40, L * s), rh = Math.max(16, W * s);
+      const x0 = cx - rw / 2, y0 = cy - rh / 2, x1 = x0 + rw, y1 = y0 + rh;
       let bottom = y1;
       if (info.variant === 'winder') {
         const a = rh * 0.35, b = rh * 1.65;
-        svg += '<path d="M' + x0 + ' ' + (78 - a / 2) + ' L' + x1 + ' ' + (78 - b / 2) + ' L' + x1 + ' ' + (78 + b / 2) + ' L' + x0 + ' ' + (78 + a / 2) + ' Z" ' + DIAGRAM_STONE + '/>';
-        bottom = 78 + b / 2;
-        svg += diagramArrow(120, y0, 120, y1);
+        svg += '<path d="M' + x0 + ' ' + (cy - a / 2) + ' L' + x1 + ' ' + (cy - b / 2) + ' L' + x1 + ' ' + (cy + b / 2) + ' L' + x0 + ' ' + (cy + a / 2) + ' Z" ' + DIAGRAM_STONE + '/>';
+        bottom = cy + b / 2;
+        svg += diagramArrow(cx, y0, cx, y1); // the depth is taken at mid-length
       } else if (info.variant === 'radius') {
         const bulge = Math.max(4, p.bulgeM * s);
-        svg += '<path d="M' + x0 + ' ' + y0 + ' H' + x1 + ' V' + y1 + ' Q120 ' + (y1 + 2 * bulge) + ' ' + x0 + ' ' + y1 + ' Z" ' + DIAGRAM_STONE + '/>';
+        svg += '<path d="M' + x0 + ' ' + y0 + ' H' + x1 + ' V' + y1 + ' Q' + cx + ' ' + (y1 + 2 * bulge) + ' ' + x0 + ' ' + y1 + ' Z" ' + DIAGRAM_STONE + '/>';
         bottom = y1 + bulge;
-        svg += diagramArrow(x0 - 12, y0, x0 - 12, y1);
+        svg += diagramArrow(x0 - 10, y0, x0 - 10, y1);
       } else {
         svg += '<rect x="' + x0 + '" y="' + y0 + '" width="' + rw + '" height="' + rh + '" rx="2" ' + DIAGRAM_STONE + '/>';
-        svg += diagramArrow(x0 - 12, y0, x0 - 12, y1);
+        svg += diagramArrow(x0 - 10, y0, x0 - 10, y1);
       }
-      svg += diagramArrow(x0, bottom + 12, x1, bottom + 12) + diagramText(120, bottom + 30, lenText);
-      const dx = info.variant === 'winder' ? 108 : x0 - 22;
-      svg += diagramText(dx, 78, widText, true);
-      svg += '<text x="222" y="80" font-size="20" font-weight="800" fill="var(--accent-ink)" text-anchor="middle">× ' + n + '</text>';
-      svg += '<text x="222" y="97" font-size="11" fill="var(--muted)" text-anchor="middle">' + plural(n, 'ступень', 'ступени', 'ступеней') + '</text>';
+      svg += diagramArrow(x0, bottom + 12, x1, bottom + 12) + diagramText(cx, bottom + 30, lenText);
+      svg += diagramText(x0 - 16, cy + 4, widText, false, 'end');
+      svg += '<text x="226" y="80" font-size="20" font-weight="800" fill="var(--accent-ink)" text-anchor="middle">× ' + n + '</text>';
+      svg += '<text x="226" y="97" font-size="11" fill="var(--muted)" text-anchor="middle">' + plural(n, 'ступень', 'ступени', 'ступеней') + '</text>';
     } else if (info.variant === 'spiral') {
       // A circle: the diameter across, one step's width from the post out.
       const s = 120 / (2 * p.rOut), cx = 130, cy = 76, R = p.rOut * s, r = p.rIn * s;
@@ -2163,7 +2170,7 @@
       }
       svg += '<circle cx="' + cx + '" cy="' + cy + '" r="' + Math.max(3, r) + '" fill="var(--card)" stroke="var(--stone-line)" stroke-width="1.5"/>';
       svg += diagramArrow(cx - R, cy + R + 10, cx + R, cy + R + 10) + diagramText(cx, cy + R + 28, lenText);
-      svg += diagramArrow(cx + Math.max(3, r), cy, cx + R, cy) + diagramText(cx + (r + R) / 2, cy - 6, widText);
+      svg += diagramArrow(cx + Math.max(3, r), cy, cx + R, cy) + diagramText(cx + R + 8, cy + 4, widText, false, 'start');
     } else {
       // The flight(s) in plan, one line per step; the landing plain.
       const d = p.treadDepthM, n1 = p.flights[0], n2 = p.flights[1] || 0;
@@ -2594,10 +2601,26 @@
 
   // «Количество ступеней»: show for the two stair products with that
   // product's last valid count, in both the visible and the state field.
+  // The count's allowed range for the current product and type
+  // (ConstructorState.stepCountRange -- «Забежные» at most 10). Switching to
+  // a type with a lower limit brings a larger count down to it at once.
+  function applyStepCountLimit() {
+    if (!(selectedProductKey in stepCountByProduct)) return;
+    const range = ConstructorState.stepCountRange(selectedProductKey, productSubcategorySelect.value);
+    stepCountInput.max = String(range.max);
+    stepCountError.textContent = 'Введите целое число от ' + range.min + ' до ' + range.max;
+    if (Number(stepCountHidden.value) > range.max) {
+      stepCountByProduct[selectedProductKey] = range.max;
+      stepCountHidden.value = String(range.max);
+      stepCountInput.value = stepCountHidden.value;
+      stepCountError.style.visibility = 'hidden';
+    }
+  }
+
   function syncStepCountField() {
     const count = stepCountByProduct[selectedProductKey];
     stepCountField.hidden = count === undefined;
-    stepCountError.style.display = 'none';
+    stepCountError.style.visibility = 'hidden';
     stepCountHidden.value = count === undefined ? '' : String(count);
     stepCountInput.value = stepCountHidden.value;
   }
@@ -2840,6 +2863,7 @@
     const card = cards[typeCardIndex];
     if (!card) return;
     productSubcategorySelect.value = card.ids.length > 1 ? card.ids[stairRisers ? 1 : 0] : card.ids[0];
+    applyStepCountLimit();
     markSelected(typeCardGrid, typeCardIndex);
     if (!stairRiserField.hidden) markSelected(stairRiserGrid, stairRisers ? 1 : 0);
     if (notify) productSubcategorySelect.dispatchEvent(new Event('change', { bubbles: true }));
@@ -3296,8 +3320,8 @@
   stepCountInput.addEventListener('input', () => {
     const raw = stepCountInput.value.trim();
     const n = raw === '' ? NaN : Number(raw);
-    const valid = ConstructorState.isValidStepCount(n);
-    stepCountError.style.display = valid ? 'none' : 'block';
+    const valid = ConstructorState.isValidStepCount(n, ConstructorState.stepCountRange(selectedProductKey, productSubcategorySelect.value));
+    stepCountError.style.visibility = valid ? 'hidden' : 'visible';
     if (!valid) return;
     stepCountByProduct[selectedProductKey] = n;
     stepCountHidden.value = String(n);
@@ -3306,7 +3330,7 @@
   });
   stepCountInput.addEventListener('change', () => {
     stepCountInput.value = stepCountHidden.value;
-    stepCountError.style.display = 'none';
+    stepCountError.style.visibility = 'hidden';
   });
   subcategoryQtyInput.addEventListener('input', calculate);
   productShapeSelect.addEventListener('change', () => { updateWingVisibility(); calculate(); });

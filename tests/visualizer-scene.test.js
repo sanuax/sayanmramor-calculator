@@ -453,7 +453,9 @@ test('steps: N entered -> N treads, for every step type, and the type change kee
   ['STEP-01', 'STEP-02', 'STEP-03'].forEach(type => {
     [1, 2, 4, 8, 10, 30].forEach(n => {
       const layout = layoutFor('stupeni', { width: { value: '300' }, length: { value: '1200' }, 'step-count': { value: String(n) }, productSubcategory: { value: type } });
-      assert.equal(named(layout, 'tread').length, n, type + ' x ' + n);
+      // «Забежные» allow at most 10 (ConstructorState.stepCountRange).
+      const expected = type === 'STEP-02' ? Math.min(n, 10) : n;
+      assert.equal(named(layout, 'tread').length, expected, type + ' x ' + n);
     });
   });
   const winder = named(layoutFor('stupeni', { 'step-count': { value: '8' }, productSubcategory: { value: 'STEP-02' } }), 'tread');
@@ -561,4 +563,47 @@ test('«Лестницы» винтовая: диаметр and ширина с�
   assert.ok(radius(large) <= 1.2 + 1e-9, 'within the entered diameter');
   const post = l => extent(named(l, 'column')[0].outline);
   assert.ok(post(wide).x1 - post(wide).x0 < post(large).x1 - post(large).x0, 'wider steps leave a thinner centre post');
+});
+
+// ---- «Забежные» at most 10; the landing's riser at the turn of Г/П ----------
+
+test('step count range: «Забежные» 1..10, «Прямые»/«Радиусные» and stairs 1..30 -- enforced in state, so the 3D gets it', () => {
+  const { stepCountRange, isValidStepCount } = ConstructorState;
+  assert.deepEqual(stepCountRange('stupeni', 'STEP-02'), { min: 1, max: 10 });
+  assert.deepEqual(stepCountRange('stupeni', 'STEP-01'), { min: 1, max: 30 });
+  assert.deepEqual(stepCountRange('stupeni', 'STEP-03'), { min: 1, max: 30 });
+  assert.deepEqual(stepCountRange('lestnitsa', 'STAIR-01'), { min: 1, max: 30 });
+  assert.equal(isValidStepCount(10, stepCountRange('stupeni', 'STEP-02')), true);
+  assert.equal(isValidStepCount(11, stepCountRange('stupeni', 'STEP-02')), false);
+  assert.equal(isValidStepCount(30, stepCountRange('stupeni', 'STEP-01')), true);
+  const treads = (type, n) => named(layoutFor('stupeni', { 'step-count': { value: String(n) }, productSubcategory: { value: type } }), 'tread').length;
+  [1, 4, 10].forEach(n => assert.equal(treads('STEP-02', n), n));
+  assert.equal(treads('STEP-02', 11), 10, 'a count over the winder limit is brought down to 10');
+  assert.equal(treads('STEP-02', 30), 10, '30, then «Забежные» -> 10');
+  [1, 4, 10, 30].forEach(n => assert.equal(treads('STEP-01', n), n));
+  [1, 4, 30].forEach(n => assert.equal(treads('STEP-03', n), n));
+});
+
+test('Г/П «с подступенками»: the landing at the turn has its own stone riser; without risers nothing changes', () => {
+  const dims = { length: { value: '3000' }, width: { value: '1000' }, 'step-count': { value: '10' } };
+  [['STAIR-03', 'STAIR-04'], ['STAIR-05', 'STAIR-06']].forEach(([off, on]) => {
+    const plain = layoutFor('lestnitsa', Object.assign({ productSubcategory: { value: off } }, dims));
+    const withRisers = layoutFor('lestnitsa', Object.assign({ productSubcategory: { value: on } }, dims));
+    assert.equal(named(plain, 'riser').length, 0, off);
+    assert.equal(named(plain, 'tread').length, 10, off);
+    assert.equal(named(withRisers, 'tread').length, 10, on + ': the landing is still not a step');
+    assert.equal(named(withRisers, 'landing').length, 1, on);
+    const risers = named(withRisers, 'riser');
+    assert.equal(risers.length, 11, on + ': one riser per step plus the one under the landing edge');
+    const landingE = extent(named(withRisers, 'landing')[0].outline);
+    const firstFlightTop = 5 * require('../visualizer/constants.js').VISUAL_STAIR_RISE_M;
+    const turn = risers.find(r => Math.abs(extent(r.outline).x1 - landingE.x1) < 1e-9 && Math.abs(r.y0 - firstFlightTop) < 1e-9);
+    assert.ok(turn, on + ': a riser stands at the landing\'s front edge, from the first flight\'s top step up');
+    assert.ok(Math.abs(turn.y1 - named(withRisers, 'landing')[0].y0) < 1e-9, on + ': ...up to the landing slab');
+  });
+  // Straight and spiral stairs are unaffected.
+  const straight = layoutFor('lestnitsa', Object.assign({ productSubcategory: { value: 'STAIR-02' } }, dims));
+  assert.equal(named(straight, 'riser').length, 10);
+  const spiral = layoutFor('lestnitsa', Object.assign({ productSubcategory: { value: 'STAIR-08' } }, dims));
+  assert.equal(named(spiral, 'riser').length, 10);
 });

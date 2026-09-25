@@ -718,7 +718,17 @@
       const landingZ0 = s.shape === 'u' ? width / 2 - landingW : -width / 2;
       const landing = rect(landingX0 - width, landingX0, landingZ0, landingZ0 + landingW);
       parts.push(prism('stone', landing, landingTop - T, landingTop, { edge, name: 'landing' }));
-      parts.push(prism('body', landing, 0, landingTop - T, { name: 'body' }));
+      if (s.risers) {
+        // The turn: the landing is one rise above the first flight's top
+        // step, so its front edge is a step too and gets the same stone riser
+        // (without it the concrete body showed through at the turn). The body
+        // above the top step starts behind that riser, as under every step.
+        parts.push(prism('stone', rect(landingX0 - RISER_T, landingX0, -width / 2, width / 2), n1 * RISE, landingTop - T, { name: 'riser' }));
+        parts.push(prism('body', landing, 0, n1 * RISE, { name: 'body' }));
+        parts.push(prism('body', rect(landingX0 - width, landingX0 - RISER_T, landingZ0, landingZ0 + landingW), n1 * RISE, landingTop - T, { name: 'body' }));
+      } else {
+        parts.push(prism('body', landing, 0, landingTop - T, { name: 'body' }));
+      }
       if (s.shape === 'l') {
         straightFlight(parts, { origin: [landingX0 - width / 2, landingZ0], dir: [0, -1], across: [1, 0], width, count: n2, depth, level: n1 + 1, risers: s.risers, bulge: 0, T, edge });
       } else {

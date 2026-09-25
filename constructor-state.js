@@ -81,15 +81,30 @@
   const STEP_COUNT_RANGE = { min: 1, max: 30 };
   const STEP_COUNT_DEFAULTS = { lestnitsa: 12, stupeni: 4 };
 
-  function isValidStepCount(n) {
-    return Number.isInteger(n) && n >= STEP_COUNT_RANGE.min && n <= STEP_COUNT_RANGE.max;
+  // Забежные ступени (STEP-02) wind around one pivot: more than 10 of them
+  // wind past a full turn, so that type allows at most 10.
+  const STEP_COUNT_MAX_BY_TYPE = { 'STEP-02': 10 };
+
+  // The allowed count for this product and type (the UI validates against
+  // exactly this range).
+  function stepCountRange(productKey, typeId) {
+    const typeMax = productKey === 'stupeni' ? STEP_COUNT_MAX_BY_TYPE[typeId] : undefined;
+    return { min: STEP_COUNT_RANGE.min, max: typeMax || STEP_COUNT_RANGE.max };
   }
 
-  function readStepCount(doc, productKey) {
+  function isValidStepCount(n, range) {
+    const r = range || STEP_COUNT_RANGE;
+    return Number.isInteger(n) && n >= r.min && n <= r.max;
+  }
+
+  function readStepCount(doc, productKey, typeId) {
     if (!(productKey in STEP_COUNT_DEFAULTS)) return null;
     const raw = String(doc.getElementById('step-count').value).trim();
     const n = raw === '' ? NaN : Number(raw);
-    return isValidStepCount(n) ? n : STEP_COUNT_DEFAULTS[productKey];
+    const count = isValidStepCount(n) ? n : STEP_COUNT_DEFAULTS[productKey];
+    // A count entered for another type (e.g. 30, then «Забежные») is brought
+    // down to this type's limit -- the state never holds more.
+    return Math.min(count, stepCountRange(productKey, typeId).max);
   }
 
   function readConstructorState({ doc, selectedProductKey, product, stone, hasAdditionalWork }) {
@@ -199,7 +214,7 @@
         // below) -- the generic "Количество, шт." is not its source.
         qty: selectedProductKey === 'stupeni' ? 0 : numFromField(d, 'subcategoryQty'),
       },
-      stepCount: readStepCount(d, selectedProductKey),
+      stepCount: readStepCount(d, selectedProductKey, d.getElementById('productSubcategory').value),
       // Product-specific state that doesn't fit the shared fields above --
       // same "always the same shape, capability-zeroed when not this
       // product" convention as island/barCounter/etc. above, so the state
@@ -269,5 +284,5 @@
     return { rates, extraLineItems, extraDimensions };
   }
 
-  return { readConstructorState, buildPricingInputs, STEP_COUNT_RANGE, STEP_COUNT_DEFAULTS, isValidStepCount };
+  return { readConstructorState, buildPricingInputs, STEP_COUNT_RANGE, STEP_COUNT_DEFAULTS, stepCountRange, isValidStepCount };
 });
