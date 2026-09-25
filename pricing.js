@@ -67,6 +67,12 @@
   function minCostCover(items, target) {
     target = Math.max(0, Math.ceil(target));
     if (target === 0) return { chosen: [], cost: 0 };
+    // Even every item together cannot reach the target: the answer is "no
+    // cover" -- known before allocating the DP arrays below, whose size (x
+    // the number of items) grows with the target. The same answer the DP
+    // would give, without its memory.
+    const reachable = items.reduce((sum, item) => sum + Math.min(Math.max(0, item.capacity), target), 0);
+    if (!(reachable >= target)) return null;
 
     const n = items.length;
     const INF = Infinity;
@@ -200,6 +206,16 @@
     return { fabrication, installation, polish, misc, extras, catalogExtras, work, total };
   }
 
+  // The online estimate's limits: a product past them is a project for a
+  // manager, not a quick calculation -- and an absurd size (a mistyped
+  // 99 999 999 mm) must never reach the slab search, whose work grows with
+  // the size. One place to change them.
+  const PRICING_LIMITS = { maxSideM: 100, maxAreaM2: 10000 };
+
+  function isTooLarge(widthM, lengthM, areaM2) {
+    return !(widthM <= PRICING_LIMITS.maxSideM) || !(lengthM <= PRICING_LIMITS.maxSideM) || !(areaM2 <= PRICING_LIMITS.maxAreaM2);
+  }
+
   function calculatePrice(params) {
     const {
       stone, widthM, lengthM, productType, marginCm, wasteFactor,
@@ -218,6 +234,11 @@
 
     if (explicitArea ? !(areaM2 > 0 && Number.isFinite(areaM2)) : (!(widthM > 0) || !(lengthM > 0))) {
       return Object.assign({ ok: false, reason: 'invalid_dimensions' }, empty);
+    }
+    // Past the online limits (or not a finite size at all): a controlled
+    // outcome the page explains, before any slab search.
+    if (explicitArea ? isTooLarge(0, 0, areaM2) : isTooLarge(widthM, lengthM, widthM * lengthM)) {
+      return Object.assign({ ok: false, reason: 'dimensions_too_large' }, empty);
     }
     if (!stone || !stone.slabs || stone.slabs.length === 0) {
       return Object.assign({ ok: false, reason: 'no_slabs_for_stone' }, empty);
@@ -285,6 +306,7 @@
 
   return {
     findBestTypeASlab, slabCapacityForCross, minCostCover, findTypeASegmentedResult,
-    computeRemainderAreaM2, computeTypeBResult, computeTypeBResultForArea, computeWorkAndTotal, calculatePrice
+    computeRemainderAreaM2, computeTypeBResult, computeTypeBResultForArea, computeWorkAndTotal, calculatePrice,
+    PRICING_LIMITS
   };
 });

@@ -3497,6 +3497,12 @@
         // sizes here, that would wrongly read as "not enough stone".
         msg = 'Указанная ширина слишком большая для цельного изделия такого типа — шов возможен только по длине. ' +
           'Пришлите точные размеры менеджеру — подберём решение под ваш проект.';
+      } else if (result.reason === 'dimensions_too_large') {
+        // Past the online estimate's limits (Pricing.PRICING_LIMITS) -- most
+        // often a mistyped size; either way no slab search is attempted.
+        const limits = Pricing.PRICING_LIMITS;
+        msg = 'Размер больше, чем считает онлайн-калькулятор: до ' + limits.maxSideM + ' м по стороне и до ' +
+          limits.maxAreaM2.toLocaleString('ru-RU') + ' м² площади. Проверьте введённые значения или пришлите размеры менеджеру.';
       }
       warningOut.textContent = msg;
       warningOut.style.display = 'block';
