@@ -182,10 +182,23 @@
     return nextStep(productKey, currentStepId) !== null && isCurrentStepValid !== false;
   }
 
+  // Можно ли перейти на targetStepId прямо сейчас (клик по этапу в
+  // прогрессе) -- ровно то, до чего довели бы кнопки Назад/Далее: назад --
+  // всегда, вперёд -- только если каждый шаг ДО цели валиден (canAdvance
+  // по очереди на каждом). isStepValid(stepId) -- та же внешняя проверка
+  // данных шага, что и для canAdvance; без неё ни один шаг не блокирует.
+  function isReachable(productKey, currentStepId, targetStepId, isStepValid) {
+    const steps = getSteps(productKey);
+    const target = steps.indexOf(targetStepId);
+    if (target === -1) return false;
+    if (target <= steps.indexOf(currentStepId)) return true;
+    return steps.slice(0, target).every(id => !isStepValid || isStepValid(id) !== false);
+  }
+
   // Готовый к отрисовке список шагов с позицией (1-based, для номера-бэйджа)
-  // и флагами active/done -- UI просто маппит это в разметку, никакой
-  // логики прогресса в HTML не остаётся.
-  function buildProgress(productKey, currentStepId) {
+  // и флагами active/done/reachable -- UI просто маппит это в разметку,
+  // никакой логики прогресса в HTML не остаётся.
+  function buildProgress(productKey, currentStepId, isStepValid) {
     const steps = getSteps(productKey);
     const currentIndex = steps.indexOf(currentStepId);
     return steps.map((id, i) => ({
@@ -194,6 +207,7 @@
       position: i + 1,
       active: i === currentIndex,
       done: currentIndex !== -1 && i < currentIndex,
+      reachable: isReachable(productKey, currentStepId, id, isStepValid),
     }));
   }
 
@@ -201,6 +215,6 @@
     PRODUCT_STEPS, STEP_LABELS,
     getSteps, stepIndex, firstStep, lastStep,
     isFirstStep, isLastStep, nextStep, previousStep,
-    isValidStepId, resolveCurrentStep, canAdvance, buildProgress,
+    isValidStepId, resolveCurrentStep, canAdvance, isReachable, buildProgress,
   };
 });

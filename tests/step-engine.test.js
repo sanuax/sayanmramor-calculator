@@ -205,3 +205,40 @@ test('product-specific capabilities do not leak into unrelated products -- "addi
     assert.equal(steps.includes('additionalWorks'), isCountertop, `"${key}".includes('additionalWorks') should be ${isCountertop}`);
   });
 });
+
+// ---- The progress strip as navigation: reachable steps ---------------------
+
+test('isReachable: back always; forward only past steps whose data is valid -- exactly where Далее could get', () => {
+  const valid = { dimensions: true, material: true };
+  const isValid = id => (id in valid ? valid[id] : true);
+  const k = 'stoleshnitsa_kuhnya';
+  // Back from the Result to any earlier step.
+  ['shape', 'dimensions', 'material', 'edge', 'additionalWorks', 'options', 'review'].forEach(id =>
+    assert.equal(StepEngine.isReachable(k, 'review', id, isValid), true, id));
+  // All data in place: any step forward, including the Result.
+  assert.equal(StepEngine.isReachable(k, 'shape', 'review', isValid), true);
+  // No stone yet: up to «Материал» itself, nothing after it.
+  valid.material = false;
+  assert.equal(StepEngine.isReachable(k, 'shape', 'material', isValid), true);
+  assert.equal(StepEngine.isReachable(k, 'shape', 'edge', isValid), false);
+  assert.equal(StepEngine.isReachable(k, 'shape', 'review', isValid), false);
+  // No sizes: nothing past «Размеры», whatever else is filled in.
+  valid.material = true; valid.dimensions = false;
+  assert.equal(StepEngine.isReachable(k, 'shape', 'dimensions', isValid), true);
+  assert.equal(StepEngine.isReachable(k, 'shape', 'material', isValid), false);
+  // Steps of another product, or unknown ids, are never reachable.
+  assert.equal(StepEngine.isReachable('podokonnik', 'type', 'shape', isValid), false);
+  assert.equal(StepEngine.isReachable(k, 'shape', 'nope', isValid), false);
+});
+
+test('buildProgress marks every step reachable or not, for each product', () => {
+  const noStone = id => id !== 'material';
+  ALL_PRODUCT_KEYS.forEach(key => {
+    const steps = StepEngine.getSteps(key);
+    const progress = StepEngine.buildProgress(key, 'dimensions', noStone);
+    const m = steps.indexOf('material');
+    progress.forEach((p, i) => assert.equal(p.reachable, i <= m, key + ' ' + p.id));
+    // Without a validity check nothing blocks (as with canAdvance).
+    assert.ok(StepEngine.buildProgress(key, steps[0]).every(p => p.reachable), key);
+  });
+});

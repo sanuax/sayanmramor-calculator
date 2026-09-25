@@ -142,7 +142,7 @@
      изделия" and the progress strip are full-width children of
      .configurator (outside .configurator-columns below); only the current
      step + its 3D/price companion split into two columns. */
-  .step-progress { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 28px; }
+  .step-progress { margin: 0 0 28px; }
 
   /* Desktop two-column working area: left = current step + Back/Next
      (.configurator-main), right = the existing 3D/price/summary panel
@@ -183,20 +183,49 @@
   @media (prefers-reduced-motion: reduce) {
     .step-viewport .step { transition: none !important; }
   }
-  .step-progress-item {
-    display: flex; align-items: center; gap: 6px;
-    padding: 4px 10px 4px 4px; border-radius: 999px;
-    font-size: var(--configurator-text); color: var(--muted); background: var(--page);
-    border: 1px solid transparent;
+  /* Step navigation: one quiet line -- a small numbered circle and a short
+     label per step, joined by hairlines. The current step is the copper one;
+     passed steps are calm (soft circle, ink label); a step that cannot be
+     opened yet is faded and not a button to the pointer. */
+  .step-progress-list { list-style: none; display: flex; flex-wrap: wrap; align-items: center; row-gap: 4px; margin: 0; padding: 0; }
+  .step-progress-item { display: flex; align-items: center; flex: none; }
+  .step-progress-item + .step-progress-item::before {
+    content: ''; flex: none; width: 18px; height: 1px; margin: 0 6px; background: var(--line);
   }
+  .step-progress-item.done::before, .step-progress-item.active::before { background: var(--stone-line); }
+  .step-progress-btn {
+    display: inline-flex; align-items: center; gap: 7px; min-height: 32px; padding: 0 4px 0 2px;
+    border: 0; border-radius: 6px; background: none; font: inherit; font-size: var(--configurator-muted);
+    color: var(--muted); white-space: nowrap; cursor: pointer; transition: color 0.15s;
+  }
+  .step-progress-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   .step-progress-num {
-    width: 18px; height: 18px; border-radius: 999px; flex: none;
+    width: 20px; height: 20px; border-radius: 999px; flex: none;
     display: inline-flex; align-items: center; justify-content: center;
     font-size: 11px; font-weight: 700; background: var(--card); border: 1px solid var(--line); color: var(--muted);
+    transition: border-color 0.15s, color 0.15s;
   }
-  .step-progress-item.done .step-progress-num { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); }
-  .step-progress-item.active { background: var(--accent-soft); color: var(--accent-ink); border-color: var(--accent); }
+  @media (hover: hover) {
+    .step-progress-btn:not(:disabled):hover { color: var(--ink); }
+    .step-progress-btn:not(:disabled):hover .step-progress-num { border-color: var(--stone-line); color: var(--ink); }
+  }
+  .step-progress-item.done .step-progress-btn { color: var(--ink); }
+  .step-progress-item.done .step-progress-num { background: var(--accent-soft); border-color: transparent; color: var(--accent-ink); }
+  .step-progress-item.active .step-progress-btn { color: var(--accent-ink); font-weight: 700; cursor: default; }
   .step-progress-item.active .step-progress-num { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .step-progress-item.locked .step-progress-btn { opacity: 0.5; cursor: default; }
+  @media (max-width: 600px) {
+    /* A phone keeps the whole line on one row: every circle, the current
+       step's label, and hairlines that shrink to fit. The other labels stay
+       in the DOM for screen readers. */
+    .step-progress-list { flex-wrap: nowrap; }
+    .step-progress-item + .step-progress-item { flex: 1 1 auto; min-width: 0; }
+    .step-progress-item + .step-progress-item::before { flex: 1 1 18px; width: auto; min-width: 4px; margin: 0 4px; }
+    .step-progress-btn { min-height: 36px; padding: 0 2px; }
+    .step-progress-item:not(.active) .step-progress-label {
+      position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap;
+    }
+  }
 
   .step-nav { display: flex; align-items: center; max-width: 820px; margin: 28px 0 0; }
   /* Назад/Далее: одна геометрия (48px, радиус 6, стрелка SVG 18px с
@@ -595,6 +624,13 @@
     overflow-wrap: break-word;
   }
   .material-preview-meta { font-size: var(--configurator-muted); color: var(--muted); margin-top: 2px; }
+  /* A note, not a warning: no fill, no border, small text in a readable
+     warm grey, a stone-coloured "i". */
+  .stone-texture-note {
+    display: flex; gap: 10px; align-items: flex-start; max-width: 600px; margin: 16px 0 0;
+    font-size: var(--configurator-muted); line-height: 1.55; color: #5a5247;
+  }
+  .stone-texture-note svg { flex: none; margin-top: 2px; color: var(--stone-line); }
 
   /* ---- Material picker -------------------------------------------------
      A full-screen sample wall. The sheet is plain white so stone colour reads
@@ -1114,7 +1150,7 @@
          their position in this markup. "Тип изделия" above and
          "Вариант исполнения" stay outside this mechanism entirely, exactly
          as before. -->
-    <div class="step-progress" id="stepProgress" style="display:none"></div>
+    <nav class="step-progress" id="stepProgress" aria-label="Этапы расчёта" style="display:none"></nav>
 
     <!-- Two-column desktop layout: left = current step + Back/Next, right =
          the existing 3D/price/summary panel (moved here from being a
@@ -1178,6 +1214,13 @@
           <div class="material-preview-meta" id="materialPreviewMeta"></div>
         </div>
       </div>
+      <!-- Информационная заметка о рисунке камня -- под выбором материала
+           (и под фото выбранного камня, когда оно есть). Не ошибка и не
+           предупреждение: спокойный текст с маленьким значком «i». -->
+      <p class="stone-texture-note">
+        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="6.6" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M8 7.3v4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="4.9" r="0.9" fill="currentColor"/></svg>
+        <span>Текстура камня носит ориентированный характер. Точная раскладка и направление рисунка будут согласованы с дизайнером при разработке проекта.</span>
+      </p>
     </section>
 
     <section class="step" data-step-id="dimensions" style="display:none">
@@ -2694,19 +2737,47 @@
     return true;
   }
 
+  // The progress strip is also the step navigation: every step the
+  // Назад/Далее buttons could reach right now (StepEngine.isReachable) is a
+  // button that opens it through the same goToStep()/applyStep() path; a
+  // step past one still missing data is a disabled button. The state is the
+  // form's own, so nothing is reset by jumping around.
+  // The buttons are built once per step list and then only updated: every
+  // recalculation re-renders the progress (a size field's change fires on
+  // blur, i.e. on the very mousedown of a click here), and a rebuilt button
+  // would lose that click.
   function renderStepProgress(progress) {
-    stepProgressEl.innerHTML = '';
-    progress.forEach(step => {
-      const item = document.createElement('div');
-      item.className = 'step-progress-item' + (step.active ? ' active' : '') + (step.done ? ' done' : '');
-      const num = document.createElement('span');
-      num.className = 'step-progress-num';
-      num.textContent = String(step.position);
-      const label = document.createElement('span');
-      label.textContent = step.label;
-      item.appendChild(num);
-      item.appendChild(label);
-      stepProgressEl.appendChild(item);
+    const ids = progress.map(step => step.id).join(' ');
+    let list = stepProgressEl.querySelector('.step-progress-list');
+    if (!list || list.dataset.steps !== ids) {
+      list = document.createElement('ol');
+      list.className = 'step-progress-list';
+      list.dataset.steps = ids;
+      progress.forEach(step => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'step-progress-btn';
+        const num = document.createElement('span');
+        num.className = 'step-progress-num';
+        num.textContent = String(step.position);
+        const label = document.createElement('span');
+        label.className = 'step-progress-label';
+        label.textContent = step.label;
+        btn.append(num, label);
+        btn.addEventListener('click', () => goToStep(step.id));
+        const item = document.createElement('li');
+        item.appendChild(btn);
+        list.appendChild(item);
+      });
+      stepProgressEl.replaceChildren(list);
+    }
+    progress.forEach((step, i) => {
+      const item = list.children[i];
+      const btn = item.firstElementChild;
+      item.className = 'step-progress-item' + (step.active ? ' active' : '') + (step.done ? ' done' : '') + (step.reachable ? '' : ' locked');
+      btn.disabled = !step.reachable;
+      if (step.active) btn.setAttribute('aria-current', 'step');
+      else btn.removeAttribute('aria-current');
     });
   }
 
@@ -2735,7 +2806,7 @@
     const previousStepId = currentStepId;
     currentStepId = StepEngine.resolveCurrentStep(productKey, desiredStepId);
 
-    const progress = StepEngine.buildProgress(productKey, currentStepId);
+    const progress = StepEngine.buildProgress(productKey, currentStepId, isCurrentStepDataValid);
     stepProgressEl.style.display = '';
     renderStepProgress(progress);
 
@@ -3402,6 +3473,9 @@
 
   function goToStep(stepId) {
     if (stepTransitionInFlight || !selectedProductKey || stepId === currentStepId) return;
+    // Never further than Далее could get: a step past one still missing
+    // data stays closed, from the progress strip or anywhere else.
+    if (!StepEngine.isReachable(selectedProductKey, currentStepId, stepId, isCurrentStepDataValid)) return;
     const forward = StepEngine.stepIndex(selectedProductKey, stepId) > StepEngine.stepIndex(selectedProductKey, currentStepId);
     applyStep(selectedProductKey, stepId, forward ? 'forward' : 'backward');
   }
