@@ -2117,7 +2117,7 @@
   let typeCardIndex = 0;
   let stairRisers = false;
 
-  const { SAW_MARGIN_CM, SLAB_USAGE_LIMIT, WORK_RATES, RISER_WORK_RATES, MISC_FLAT_SUM, MISC_RATE_PER_M2, COMPLEX_SHAPE_MULTIPLIER, COUNTERTOP_EXTRAS_RATES } = ProductTypes;
+  const { SAW_MARGIN_CM, SLAB_USAGE_LIMIT, WORK_RATES, RISER_WORK_RATES, MISC_FLAT_SUM, MISC_RATE_PER_M2, COMPLEX_SHAPE_MULTIPLIER, COUNTERTOP_EXTRAS_RATES, COUNTERTOP_EXTRAS_INSTALL_RATES } = ProductTypes;
 
   const productGrid = document.getElementById('productGrid');
   let selectedProductKey = null;
@@ -3755,6 +3755,7 @@
       countertopExtrasRates: COUNTERTOP_EXTRAS_RATES,
       getAdditionalWorkRate,
       riserRates: RISER_WORK_RATES,
+      extrasInstallRates: COUNTERTOP_EXTRAS_INSTALL_RATES,
     });
 
     // Breakdown labels are UI text, not pricing -- built from the same

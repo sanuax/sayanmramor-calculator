@@ -191,9 +191,21 @@
     ostrovRatePerM2: null
   };
 
+  // Монтаж дополнительных каменных элементов столешницы -- своя ставка ₽/м²
+  // у каждого (решение компании): начисляется, только когда выбран «Монтаж»
+  // и ставка задана (ConstructorState.buildPricingInputs). Ставок пока нет:
+  // null -- в цену ничего не добавляется. Монтаж самой столешницы -- по
+  // WORK_RATES на её площадь, без этих элементов. ТРЕБУЕТ ЗАПОЛНЕНИЯ.
+  const COUNTERTOP_EXTRAS_INSTALL_RATES = {
+    backsplash: null, // фартук
+    wallPanel: null,  // стеновая панель
+    island: null,     // остров
+    barCounter: null  // барная стойка
+  };
+
   return {
     PRODUCTS, hasAdditionalWork, SAW_MARGIN_CM, SLAB_USAGE_LIMIT,
     WORK_RATES, RISER_WORK_RATES, MISC_FLAT_SUM, MISC_RATE_PER_M2, COMPLEX_SHAPE_MULTIPLIER,
-    COUNTERTOP_EXTRAS_RATES
+    COUNTERTOP_EXTRAS_RATES, COUNTERTOP_EXTRAS_INSTALL_RATES
   };
 });

@@ -346,6 +346,57 @@ test('each extra on its own: backsplash, wall panel, island, bar -- the configur
   assert.ok(!bath.includes('island') && !bath.includes('barCounter'));
 });
 
+// ---- the business decisions after the audit ----------------------------------------
+
+const RateCatalog = require('../rate-catalog.js');
+
+test('unset rates stay null: risers, the extras\' fabrication, the extras\' installation -- no made-up rate', () => {
+  assert.deepEqual(ProductTypes.RISER_WORK_RATES, { fabricationRatePerM2: null, installationRatePerM2: null, polishRatePerM2: null });
+  assert.equal(ProductTypes.COUNTERTOP_EXTRAS_RATES.fartukRatePerM2, null);
+  assert.equal(ProductTypes.COUNTERTOP_EXTRAS_RATES.ostrovRatePerM2, null);
+  ['EXTRA-03', 'EXTRA-05', 'EXTRA-06', 'EXTRA-07'].forEach(id => assert.equal(RateCatalog.getAdditionalWorkRate(id), null, id));
+  assert.deepEqual(ProductTypes.COUNTERTOP_EXTRAS_INSTALL_RATES, { backsplash: null, wallPanel: null, island: null, barCounter: null });
+});
+
+test('installation of the countertop extras: its own rate per element; null adds nothing, a set rate adds rate x area only with «Монтаж»', () => {
+  const values = Object.assign(dims(600, 2400), KITCHEN);
+  const inputsWith = (install, installRates) => {
+    const state = stateFor('stoleshnitsa_kuhnya', Object.assign({}, values, { 'opt-install': { checked: install } }));
+    return ConstructorState.buildPricingInputs(state, {
+      productRates: WORK_RATES.stoleshnitsa_kuhnya, miscFlatSum: null, miscRatePerM2: null, complexShapeMultiplier: 1.5,
+      countertopExtrasRates: ProductTypes.COUNTERTOP_EXTRAS_RATES, getAdditionalWorkRate: () => null,
+      riserRates: ProductTypes.RISER_WORK_RATES, extrasInstallRates: installRates,
+    });
+  };
+  // Today (null rates): «Монтаж» adds no line and nothing to the price.
+  const off = inputsWith(false, ProductTypes.COUNTERTOP_EXTRAS_INSTALL_RATES);
+  const on = inputsWith(true, ProductTypes.COUNTERTOP_EXTRAS_INSTALL_RATES);
+  assert.deepEqual(on.extraLineItems, off.extraLineItems);
+  assert.ok(!on.extraLineItems.some(i => i.install));
+  // The architecture: a rate the company sets (a test value here, not product
+  // data) is charged on that element's area, only with «Монтаж».
+  const rates = { backsplash: 1000, wallPanel: null, island: 2000, barCounter: null };
+  const priced = inputsWith(true, rates).extraLineItems.filter(i => i.install);
+  assert.deepEqual(priced.map(i => i.install), ['backsplash', 'island']);
+  close(priced[0].quantity, 0.6 * 2.4);
+  close(priced[1].quantity, 0.9 * 1.8);
+  assert.equal(inputsWith(false, rates).extraLineItems.filter(i => i.install).length, 0);
+  const r = Pricing.calculatePrice({ stone: { slabs: REAL.slabs }, productType: 'A', rates: ZERO, marginCm: MARGIN, usageLimit: LIMIT, extraLineItems: priced, job: on.job, groupRates: on.groupRates });
+  close(r.catalogExtras, 1000 * 1.44 + 2000 * 1.62);
+  // The page passes the rates in.
+  assert.match(html, /extrasInstallRates: COUNTERTOP_EXTRAS_INSTALL_RATES/);
+});
+
+test('an intermediate landing is one march width deep; the client has no landing-depth field', () => {
+  const W = 1.2;
+  const plan = GeometryModel.stairPlan('flight', 'straight', 3 * 5 * 0.3 + 2 * W, W, 15, 3);
+  plan.landings.forEach(l => {
+    close(l.alongM, W, 'deep as the march is wide');
+    close(l.lengthM * l.widthM, W * W);
+  });
+  assert.doesNotMatch(html, /id="(stair-landing|landing-depth)[^"]*"/);
+});
+
 // ---- 9. the stair note -----------------------------------------------------------------
 
 test('the stair note is the neutral one; the old "requires clarifying the count" text is gone', () => {

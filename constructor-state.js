@@ -351,6 +351,20 @@
     // extraLineItems), so here only their stone counts.
     const groupRates = [{ key: 'riser', rates: config.riserRates || null }, { key: 'extra', work: false }];
 
+    // Монтаж of each extra stone element at its own rate
+    // (ProductTypes.COUNTERTOP_EXTRAS_INSTALL_RATES), only when «Монтаж» is on
+    // and the company has set that rate: a null rate adds nothing -- no line,
+    // no 0 ₽ -- and never falls back to the countertop's installation rate.
+    const installRates = config.extrasInstallRates || {};
+    if (state.options && state.options.installEnabled && job && job.pieces) {
+      job.pieces.filter(p => p.group === 'extra').forEach(p => {
+        const rate = installRates[p.key];
+        if (typeof rate === 'number' && Number.isFinite(rate)) {
+          extraLineItems.push({ rate, quantity: p.areaM2 * p.count, install: p.key });
+        }
+      });
+    }
+
     return { rates, extraLineItems, extraDimensions, areaM2, job, groupRates };
   }
 
