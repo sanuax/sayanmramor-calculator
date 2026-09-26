@@ -87,15 +87,33 @@
   //   spiral:   lengthM = диаметр лестницы, widthM = ширина ступени (от
   //             опоры до края); the turn per step follows the usual walking
   //             depth on the middle line.
-  // Марши («Лестницы»): a straight stair is one march, Г and П are two
-  // marches (the same number of steps in each) with a landing between them
-  // -- landings = marches - 1. `count` is every step of the stair.
+  // Марши («Лестницы»): 1 to 6 marches of the same number of steps, joined
+  // by landings -- landings = marches - 1 -- into ONE continuous way up
+  // (stairPath): each landing is one rise above the last step of the march
+  // below it and the next march starts from it. How the marches run:
+  //   straight: all in one line, a landing (one march width deep) between;
+  //   Г:        the first half of the marches in one line, a square corner
+  //             landing turning 90°, the rest in the new direction;
+  //   П:        the first half forward, a landing across both runs turning
+  //             180°, the rest coming back beside them (U_FLIGHT_GAP_M apart).
+  // None of these ever puts one march over another in plan. `count` is every
+  // step of the stair; «Длина лестницы» is the whole first run, its
+  // landings (and the turning landing) included.
   const MIN_TREAD_DEPTH_M = 0.05;
   const WINDER_PIVOT_M = 0.08;
-  // П: the two marches run side by side with this gap between them; the
-  // landing spans both marches and the gap.
+  // П: the two runs go side by side with this gap between them; the turning
+  // landing spans both runs and the gap.
   const U_FLIGHT_GAP_M = 0.1;
+  // The default number of marches of each shape, and the numbers it can be
+  // built with (a turn needs a march on each side of it).
   const STAIR_MARCHES = { straight: 1, l: 2, u: 2, spiral: 0 };
+  const MARCH_RANGE = { straight: { min: 1, max: 6 }, l: { min: 2, max: 6 }, u: { min: 2, max: 6 } };
+  function marchesFor(shape, requested) {
+    const range = MARCH_RANGE[shape];
+    if (!range) return 0;
+    const n = Math.round(Number(requested));
+    return Number.isFinite(n) && n >= range.min && n <= range.max ? n : STAIR_MARCHES[shape];
+  }
   // Радиусная ступень: how far the front arc bows out past the side edges,
   // as a share of the step's full depth (the entered «Глубина ступени» is
   // the deepest point, at the middle of the arc), at most 12% of its length.
@@ -104,7 +122,62 @@
     return Math.min(Math.PI / 4.5, Math.max(Math.PI / 18, a));
   }
 
-  function stairPlan(kind, variant, lengthM, widthM, count) {
+  // An outline wound with a positive signed area (as rect() in scene-layout).
+  function ccw(pts) {
+    let s = 0;
+    pts.forEach(([x1, z1], i) => { const [x2, z2] = pts[(i + 1) % pts.length]; s += x1 * z2 - x2 * z1; });
+    return s < 0 ? pts.slice().reverse() : pts;
+  }
+
+  // The way up a flight stair, in the 3D's plan frame (the first march
+  // climbs toward X-, its width along Z, centred on z = 0): every march
+  // (origin of its centre line, direction of travel, across, steps, tread
+  // depth, `level` = rises below its first step) and every landing
+  // (outline, `top` = its level in rises, the march it comes from and the
+  // one it leads to, and its size). Levels are in rises: a march's k-th step
+  // tops at level + k + 1.
+  function stairPath(shape, flights, widthM, depthM) {
+    const W = widthM, M = flights.length;
+    const g1 = shape === 'straight' ? M : Math.ceil(M / 2);
+    const add = (p, v, s) => [p[0] + v[0] * s, p[1] + v[1] * s];
+    const neg = v => [-v[0], -v[1]];
+    // A rectangle from the point `e` along `d` for `len`, across `a` from t0
+    // to t1 -- wound the same way as every other outline of the scene.
+    const rectAt = (e, d, a, len, t0, t1) => ccw([add(add(e, a, t0), d, 0), add(add(e, a, t0), d, len), add(add(e, a, t1), d, len), add(add(e, a, t1), d, 0)]);
+    const marches = [], landings = [];
+    let p = [0, 0], d = [-1, 0], a = [0, 1], level = 0;
+    for (let i = 0; i < M; i++) {
+      const n = flights[i];
+      marches.push({ index: i, origin: p, dir: d, across: a, count: n, depth: depthM, level, width: W });
+      const e = add(p, d, n * depthM);
+      level += n;
+      if (i === M - 1) break;
+      const turn = shape !== 'straight' && i === g1 - 1 ? shape : 'straight';
+      const top = level + 1;
+      if (turn === 'u') {
+        const acrossMin = -(1.5 * W + U_FLIGHT_GAP_M);
+        landings.push({ index: i, from: i, to: i + 1, turn, top, edge: e, dir: d, across: a, alongM: W, acrossMin, acrossMax: W / 2,
+          outline: rectAt(e, d, a, W, acrossMin, W / 2), lengthM: W, widthM: 2 * W + U_FLIGHT_GAP_M });
+        p = add(e, a, -(W + U_FLIGHT_GAP_M));
+        d = neg(d);
+      } else {
+        landings.push({ index: i, from: i, to: i + 1, turn, top, edge: e, dir: d, across: a, alongM: W, acrossMin: -W / 2, acrossMax: W / 2,
+          outline: rectAt(e, d, a, W, -W / 2, W / 2), lengthM: W, widthM: W });
+        if (turn === 'l') {
+          const nd = neg(a);
+          p = add(add(e, d, W / 2), a, -W / 2);
+          a = d;
+          d = nd;
+        } else {
+          p = add(e, d, W);
+        }
+      }
+      level = top;
+    }
+    return { marches, landings, topLevel: level };
+  }
+
+  function stairPlan(kind, variant, lengthM, widthM, count, marchesRequested) {
     const n = Math.max(1, Math.round(count || 1));
     if (kind === 'steps') {
       if (variant === 'winder') {
@@ -123,16 +196,26 @@
       const angle = clampTurn(VISUAL_STAIR_TREAD_DEPTH_M / rMid);
       return { count: n, marches: 0, rIn, rOut, angle, treadLengthM: rOut - rIn, treadDepthM: angle * rMid };
     }
-    if (variant === 'l' || variant === 'u') {
-      const n1 = Math.ceil(n / 2);
-      const landing = { lengthM: widthM, widthM: variant === 'u' ? 2 * widthM + U_FLIGHT_GAP_M : widthM };
-      return {
-        count: n, marches: 2, flights: [n1, n - n1], landings: [landing], landingM: widthM, treadLengthM: widthM,
-        flightGapM: variant === 'u' ? U_FLIGHT_GAP_M : 0,
-        treadDepthM: Math.max(MIN_TREAD_DEPTH_M, (lengthM - widthM) / n1),
-      };
-    }
-    return { count: n, marches: 1, flights: [n], landings: [], treadLengthM: widthM, treadDepthM: lengthM / n };
+    // A flight stair: `count` steps in `marches` marches (the same number in
+    // each; an uneven remainder goes to the first ones).
+    const shape = MARCH_RANGE[variant] ? variant : 'straight';
+    const M = Math.min(n, marchesFor(shape, marchesRequested));
+    const flights = Array.from({ length: M }, (_, i) => Math.floor(n / M) + (i < n % M ? 1 : 0));
+    // The first run -- «Длина лестницы» -- holds its marches' steps and the
+    // landings along it (the turning landing included), each W deep.
+    const g1 = shape === 'straight' ? M : Math.ceil(M / 2);
+    const runSteps = flights.slice(0, g1).reduce((s, x) => s + x, 0);
+    const runLandings = shape === 'straight' ? M - 1 : g1;
+    const rawDepth = (lengthM - runLandings * widthM) / runSteps;
+    const depth = Math.max(MIN_TREAD_DEPTH_M, rawDepth);
+    const path = stairPath(shape, flights, widthM, depth);
+    return {
+      count: n, marches: M, flights, landings: path.landings, path,
+      landingM: widthM, treadLengthM: widthM, treadDepthM: depth,
+      flightGapM: shape === 'u' ? U_FLIGHT_GAP_M : 0,
+      // The entered length leaves room for every landing and a real tread.
+      fits: rawDepth >= MIN_TREAD_DEPTH_M,
+    };
   }
 
   // ---- windowsills: the plan of each type, from the client's sizes ------
@@ -244,9 +327,10 @@
     if (productKey === 'lestnitsa') {
       // Type B: the entered size is the cladded flight (width x run).
       const shape = STAIR_SHAPES[id] || 'straight';
+      const cfg = state.productConfig && state.productConfig.lestnitsa;
       return {
         kind: 'flight', shape, risers: STAIR_WITH_RISERS.includes(id), count: state.stepCount,
-        plan: stairPlan('flight', shape, state.dimensions.lengthM, state.dimensions.widthM, state.stepCount),
+        plan: stairPlan('flight', shape, state.dimensions.lengthM, state.dimensions.widthM, state.stepCount, cfg ? cfg.marches : undefined),
       };
     }
     return null;
@@ -350,7 +434,7 @@
   }
 
   return {
-    buildGeometryModel, stairPlan, sillPlan, radiusWallPlan, polygonArea,
-    STAIR_SHAPES, STEP_VARIANTS, SILL_VARIANTS, STAIR_MARCHES, STAIR_WITH_RISERS, U_FLIGHT_GAP_M,
+    buildGeometryModel, stairPlan, stairPath, marchesFor, sillPlan, radiusWallPlan, polygonArea,
+    STAIR_SHAPES, STEP_VARIANTS, SILL_VARIANTS, STAIR_MARCHES, MARCH_RANGE, STAIR_WITH_RISERS, U_FLIGHT_GAP_M, MIN_TREAD_DEPTH_M,
   };
 });

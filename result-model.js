@@ -112,6 +112,14 @@
     };
   }
 
+  // 1 марш, 2 марша, 5 маршей.
+  function plural(n, one, few, many) {
+    const m10 = n % 10, m100 = n % 100;
+    if (m10 === 1 && m100 !== 11) return one;
+    if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+    return many;
+  }
+
   // The area of the product as it is cut and priced (its main parts).
   function productAreaOf(state) {
     if (!state.product) return state.dimensions.lengthM * state.dimensions.widthM;
@@ -350,7 +358,8 @@
       const m = c.steps.marches;
       specs.push({
         key: 'steps', label: 'Количество ступеней', value: c.steps.count + ' шт.',
-        detail: m > 1 ? m + ' марша × ' + c.steps.perMarch + ' ступ. · ' + c.steps.landings + ' ' + (c.steps.landings === 1 ? 'площадка' : 'площадки') : '',
+        detail: m > 1 ? m + ' ' + plural(m, 'марш', 'марша', 'маршей') + ' × ' + c.steps.perMarch + ' ступ. · ' +
+          c.steps.landings + ' ' + plural(c.steps.landings, 'площадка', 'площадки', 'площадок') : '',
       });
     }
     (c.shapeSizes || []).forEach(s => specs.push({ key: 'shape.' + s.key, label: s.label, value: s.valueMm + ' мм', detail: '' }));

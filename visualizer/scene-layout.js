@@ -811,41 +811,39 @@
       fanFlight(parts, { rIn: p.rIn, rOut: p.rOut, count: n, angle: p.angle, risers: s.risers, T, edge, column: true, startAngle: VIEWER_ANGLE });
       return { parts, floorY: 0 };
     }
-    if (s.shape === 'l' || s.shape === 'u') {
-      // The landing (one flight width deep) is part of the stair's length,
-      // not a step.
-      const n1 = p.flights[0], n2 = p.flights[1];
-      straightFlight(parts, { origin: [0, 0], dir: up, across: side, width, count: n1, depth, level: 0, risers: s.risers, bulge: 0, T, edge });
-      const landingX0 = -n1 * depth;
-      const landingTop = (n1 + 1) * RISE;
-      // П: the return flight runs on the far side (-Z) of the first one, so
-      // its high end never hides the first flight from the default camera.
-      // The landing is the plan's own (the priced one): П spans both marches
-      // and the gap between them.
-      const gap = p.flightGapM || 0;
-      const landingW = p.landings && p.landings[0] ? p.landings[0].widthM : width;
-      const landingZ0 = s.shape === 'u' ? width / 2 - landingW : -width / 2;
-      const landing = rect(landingX0 - width, landingX0, landingZ0, landingZ0 + landingW);
-      parts.push(prism('stone', landing, landingTop - T, landingTop, { edge, name: 'landing' }));
-      if (s.risers) {
-        // The turn: the landing is one rise above the first flight's top
-        // step, so its front edge is a step too and gets the same stone riser
-        // (without it the concrete body showed through at the turn). The body
-        // above the top step starts behind that riser, as under every step.
-        parts.push(prism('stone', rect(landingX0 - RISER_T, landingX0, -width / 2, width / 2), n1 * RISE, landingTop - T, { name: 'riser' }));
-        parts.push(prism('body', landing, 0, n1 * RISE, { name: 'body' }));
-        parts.push(prism('body', rect(landingX0 - width, landingX0 - RISER_T, landingZ0, landingZ0 + landingW), n1 * RISE, landingTop - T, { name: 'body' }));
-      } else {
-        parts.push(prism('body', landing, 0, landingTop - T, { name: 'body' }));
-      }
-      if (s.shape === 'l') {
-        straightFlight(parts, { origin: [landingX0 - width / 2, landingZ0], dir: [0, -1], across: [1, 0], width, count: n2, depth, level: n1 + 1, risers: s.risers, bulge: 0, T, edge });
-      } else {
-        straightFlight(parts, { origin: [landingX0, -(width + gap)], dir: [1, 0], across: [0, 1], width, count: n2, depth, level: n1 + 1, risers: s.risers, bulge: 0, T, edge });
-      }
+    // Every march and landing of the way up (GeometryModel.stairPath): the
+    // marches as flights of treads, each landing one rise above the last
+    // step of the march below it. A landing's front edge is a step too: with
+    // risers it gets its own stone riser, and the body above the top step
+    // starts behind it, as under every step.
+    const path = p.path;
+    if (!path) {
+      straightFlight(parts, { origin: [0, 0], dir: up, across: side, width, count: n, depth, level: 0, risers: s.risers, bulge: 0, T, edge });
       return { parts, floorY: 0 };
     }
-    straightFlight(parts, { origin: [0, 0], dir: up, across: side, width, count: n, depth, level: 0, risers: s.risers, bulge: 0, T, edge });
+    path.marches.forEach(m => {
+      straightFlight(parts, { origin: m.origin, dir: m.dir, across: m.across, width, count: m.count, depth: m.depth, level: m.level, risers: s.risers, bulge: 0, T, edge });
+    });
+    const at = (l, along, t) => [l.edge[0] + l.dir[0] * along + l.across[0] * t, l.edge[1] + l.dir[1] * along + l.across[1] * t];
+    const wound = pts => {
+      let a = 0;
+      pts.forEach(([x1, z1], i) => { const [x2, z2] = pts[(i + 1) % pts.length]; a += x1 * z2 - x2 * z1; });
+      return a < 0 ? pts.slice().reverse() : pts;
+    };
+    const band = (l, a0, a1) => wound([at(l, a0, l.acrossMin), at(l, a1, l.acrossMin), at(l, a1, l.acrossMax), at(l, a0, l.acrossMax)]);
+    path.landings.forEach(l => {
+      const topY = l.top * RISE, belowY = (l.top - 1) * RISE;
+      parts.push(prism('stone', l.outline, topY - T, topY, { edge, name: 'landing', index: l.index }));
+      if (s.risers) {
+        // The riser across the width of the march that arrives here.
+        const front = wound([at(l, 0, -width / 2), at(l, RISER_T, -width / 2), at(l, RISER_T, width / 2), at(l, 0, width / 2)]);
+        parts.push(prism('stone', front, belowY, topY - T, { name: 'riser', landing: l.index }));
+        parts.push(prism('body', l.outline, 0, belowY, { name: 'body' }));
+        parts.push(prism('body', band(l, RISER_T, l.alongM), belowY, topY - T, { name: 'body' }));
+      } else {
+        parts.push(prism('body', l.outline, 0, topY - T, { name: 'body' }));
+      }
+    });
     return { parts, floorY: 0 };
   }
 

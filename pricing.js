@@ -319,7 +319,56 @@
   // (packSlab); minCostCover picks the cheapest slabs whose yields reach the
   // job's area; then the pieces are really laid out on those slabs, and any
   // piece left over (yields overlap) gets more slabs the same way.
+  // The cheapest of a few layouts of the same pieces: all of them together,
+  // then by part (the product, its risers, a countertop's extra elements),
+  // then by kind of piece. A partitioned layout takes the stock in turn --
+  // a slab used for one part is out of the pool for the next -- so no slab
+  // is ever counted twice. The yield-based cover is a good guess, not an
+  // optimum; this keeps "all together" from ever costing more than cutting
+  // the parts on their own.
   function planPieces(slabs, pieces, marginCm, usageLimit) {
+    const partitions = [
+      [pieces],
+      groupBy(pieces, p => p.group || 'main'),
+      groupBy(pieces, p => (p.group || 'main') + '/' + p.key),
+    ];
+    let best = null, firstFailure = null;
+    const seen = new Set();
+    partitions.forEach(parts => {
+      const signature = parts.map(part => part.length).join(',');
+      if (parts.length > 1 && seen.has(signature)) return;
+      seen.add(signature);
+      const plan = planPartsInTurn(slabs, parts, marginCm, usageLimit);
+      if (!plan.ok) { if (!firstFailure) firstFailure = plan; return; }
+      const cost = plan.used.reduce((s, u) => s + u.slab.price_total_rub, 0);
+      if (!best || cost < best.cost - 1e-9 || (Math.abs(cost - best.cost) < 1e-9 && plan.used.length < best.plan.used.length)) best = { plan, cost };
+    });
+    return best ? best.plan : firstFailure;
+  }
+
+  function groupBy(items, keyOf) {
+    const map = new Map();
+    items.forEach(it => { const k = keyOf(it); if (!map.has(k)) map.set(k, []); map.get(k).push(it); });
+    // The largest part first: it gets the pick of the stock.
+    return Array.from(map.values()).sort((a, b) => b.reduce((s, p) => s + p.areaM2 * p.count, 0) - a.reduce((s, p) => s + p.areaM2 * p.count, 0));
+  }
+
+  function planPartsInTurn(slabs, parts, marginCm, usageLimit) {
+    let pool = slabs;
+    const merged = { ok: true, used: [], seams: 0, pieceCount: 0 };
+    for (const part of parts) {
+      const plan = planPiecesOnce(pool, part, marginCm, usageLimit);
+      if (!plan.ok) return plan;
+      merged.used = merged.used.concat(plan.used);
+      merged.seams += plan.seams;
+      merged.pieceCount += plan.pieceCount;
+      const taken = new Set(plan.used.map(u => u.slab));
+      pool = pool.filter(s => !taken.has(s));
+    }
+    return merged;
+  }
+
+  function planPiecesOnce(slabs, pieces, marginCm, usageLimit) {
     const priced = slabs.filter(hasValidPrice);
     const cutResult = cutPieces(pieces, priced, marginCm, usageLimit);
     if (cutResult.error) return { ok: false, reason: cutResult.error };
@@ -568,7 +617,11 @@
         : null;
       otherKeys.forEach(key => {
         const entry = groupRates.find(g => g.key === key) || { key, rates: null };
-        const work = computeGroupWork({ key, areaM2: jobArea(job, key), rates: entry.rates }, options);
+        // work: false -- the part's work is priced elsewhere (a countertop's
+        // extra elements: the additional works); only its stone counts here.
+        const work = entry.work === false
+          ? { key, areaM2: jobArea(job, key), fabrication: 0, installation: 0, polish: 0, work: 0, unpriced: [], workElsewhere: true }
+          : computeGroupWork({ key, areaM2: jobArea(job, key), rates: entry.rates }, options);
         work.stone = mainOnly && mainOnly.ok ? Math.max(0, material.subtotal - mainOnly.subtotal) : null;
         groups.push(work);
       });

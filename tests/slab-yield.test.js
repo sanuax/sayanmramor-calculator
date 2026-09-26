@@ -212,8 +212,9 @@ test('the size diagram and its tread-depth hint use the same stair as the 3D: ma
   const html = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'sayanmramor-calculator.html'), 'utf8');
   const start = html.indexOf('function currentStairPlan');
   const fn = html.slice(start, html.indexOf('\n  }\n', start));
-  assert.match(fn, /const total = count \* Math\.max\(1, GeometryModel\.STAIR_MARCHES\[variant\] \|\| 1\);/);
-  assert.match(fn, /stairPlan\('flight', variant, lengthM, widthM, total\)/);
+  assert.match(fn, /const marches = currentMarches\(\);/);
+  assert.match(fn, /const total = count \* Math\.max\(1, marches\);/);
+  assert.match(fn, /stairPlan\('flight', variant, lengthM, widthM, total, marches\)/);
   // The same depth as the 3D's plan for 6 steps in each of 2 marches.
   const state = stateFor('lestnitsa', dims(1000, 3000, Object.assign(type('STAIR-03'), cnt(6))));
   close(GeometryModel.buildGeometryModel(state).stairs.plan.treadDepthM, (3 - 1) / 6, 'the 3D tread depth');

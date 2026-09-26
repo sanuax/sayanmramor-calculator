@@ -104,9 +104,11 @@
     const G = Geometry();
     const cfg = state.productConfig.lestnitsa;
     const shape = cfg.shape;
-    const plan = G.stairPlan('flight', shape, state.dimensions.lengthM, state.dimensions.widthM, state.stepCount);
+    const plan = G.stairPlan('flight', shape, state.dimensions.lengthM, state.dimensions.widthM, state.stepCount, cfg.marches);
     const riserH = cfg.risers ? cfg.riserHeightM : 0;
     if (cfg.risers && !(riserH > 0)) missing.push('riserHeight');
+    // The entered length must hold every landing of the first run and a real tread.
+    if (shape !== 'spiral' && !plan.fits) missing.push('stairLength');
     if (shape === 'spiral') {
       const pieces = wedgePieces(plan, true, plan.count, 'Ступень').pieces;
       if (riserH > 0) pieces.push(piece('riser', 'Подступенок', plan.rOut - plan.rIn, riserH, (plan.rOut - plan.rIn) * riserH, plan.count, { group: 'riser' }));
@@ -149,6 +151,12 @@
 
   // Г/П: the main run and its wing(s) are one product (one area, one price);
   // each wing is its own stone part joined to the run with a seam.
+  // The countertop's additional stone elements -- фартук, стеновая панель,
+  // остров, барная стойка -- are stone parts of the same layout (group
+  // 'extra'): their stone is on the same slabs as the countertop's, their
+  // work keeps its own rates (the additional works). An island or a bar
+  // counter is the one variant the client configured (the same pick as the
+  // 3D: the rectangular / standard one first).
   function countertopJob(state) {
     const { widthM, lengthM } = state.dimensions;
     const pieces = [piece('main', 'Основной сегмент', lengthM, widthM, lengthM * widthM, 1)];
@@ -156,6 +164,15 @@
     if (wings && state.wing.widthM > 0 && state.wing.lengthM > 0) {
       pieces.push(piece('wing', 'Крыло', state.wing.lengthM, state.wing.widthM, state.wing.lengthM * state.wing.widthM, wings));
     }
+    const has = part => part && part.widthM > 0 && part.lengthM > 0;
+    const pick = (a, b) => (has(a) ? a : (has(b) ? b : null));
+    const extra = (key, label, part) => {
+      if (has(part)) pieces.push(piece(key, label, part.lengthM, part.widthM, part.lengthM * part.widthM, 1, { group: 'extra' }));
+    };
+    extra('backsplash', 'Фартук', state.backsplash);
+    extra('wallPanel', 'Стеновая панель', state.wallPanel);
+    extra('island', 'Остров', pick(state.island.standard, state.island.figured));
+    extra('barCounter', 'Барная стойка', pick(state.barCounter.standard, state.barCounter.complex));
     return { pieces };
   }
 
@@ -237,10 +254,14 @@
       }
       job = { surfaceAreaM2: state.dimensions.widthM * state.dimensions.lengthM };
     }
+    // A seam only where the product allows one (PRODUCTS[key].allowSeam --
+    // every product today, as before): otherwise a piece must stay whole.
+    const seamAllowed = !(state.product && state.product.allowSeam === false);
+    if (job.pieces) job.pieces.forEach(p => { p.seam = p.seam && seamAllowed; });
     const areaOf = group => (job.pieces
       ? job.pieces.filter(p => p.group === group).reduce((s, p) => s + p.areaM2 * p.count, 0)
       : (group === 'main' ? job.surfaceAreaM2 : 0));
-    return Object.assign(job, { mainAreaM2: areaOf('main'), riserAreaM2: areaOf('riser'), missing });
+    return Object.assign(job, { mainAreaM2: areaOf('main'), riserAreaM2: areaOf('riser'), extraAreaM2: areaOf('extra'), missing });
   }
 
   function isRadiusWall(state) {

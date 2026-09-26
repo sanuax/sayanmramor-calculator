@@ -187,7 +187,9 @@
     if (selectedProductKey === 'lestnitsa') {
       const G = Geometry();
       const shape = G.STAIR_SHAPES[typeIdValue] || 'straight';
-      const marches = G.STAIR_MARCHES[shape];
+      // «Количество маршей»: only a number this shape can be built with
+      // (GeometryModel.MARCH_RANGE), otherwise the shape's default.
+      const marches = G.marchesFor(shape, d.getElementById('stair-marches').value);
       const risers = G.STAIR_WITH_RISERS.includes(typeIdValue);
       stairTotal = marches > 0 ? enteredSteps * marches : enteredSteps;
       stairConfig = {
@@ -200,6 +202,8 @@
     return {
       product: product ? {
         key: selectedProductKey, label: product.label, type: product.type, capabilities,
+        // A piece of this product may be split with a seam (PRODUCTS[key].allowSeam).
+        allowSeam: product.allowSeam !== false,
         // Non-pricing metadata for the 3D layer's default camera angle --
         // see visualizer/geometry-model.js, which applies the ultimate
         // 'iso' fallback if a product defines none.
@@ -342,7 +346,10 @@
     // The product as it is cut (product-parts.js): its pieces or surface,
     // the sizes still missing, and the parts with their own rates.
     const job = state.product ? Parts().buildJob(state) : null;
-    const groupRates = [{ key: 'riser', rates: config.riserRates || null }];
+    // Подступенки: their own rates. A countertop's extra stone elements: their
+    // work is already the additional works above (extraDimensions /
+    // extraLineItems), so here only their stone counts.
+    const groupRates = [{ key: 'riser', rates: config.riserRates || null }, { key: 'extra', work: false }];
 
     return { rates, extraLineItems, extraDimensions, areaM2, job, groupRates };
   }

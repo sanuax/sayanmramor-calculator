@@ -139,7 +139,14 @@ SCENARIOS.forEach(({ name, productKey, values }) => {
       installEnabled: state.options.installEnabled, polishEnabled: state.options.polishEnabled, complexEnabled: state.options.complexEnabled,
     };
     const legacyResult = Pricing.calculatePrice(Object.assign({}, priceParams, legacy));
-    const freshResult = Pricing.calculatePrice(Object.assign({}, priceParams, fresh));
+    // The work inputs are the legacy ones exactly...
+    const { job, groupRates, ...workInputs } = fresh;
+    const freshResult = Pricing.calculatePrice(Object.assign({}, priceParams, workInputs));
     assert.deepEqual(freshResult, legacyResult);
+    // ...and the product's own parts (product-parts.js) change only the stone:
+    // a countertop's backsplash / island / bar is now cut from the slabs too.
+    const withParts = Pricing.calculatePrice(Object.assign({}, priceParams, fresh));
+    assert.equal(withParts.work, legacyResult.work);
+    assert.ok(withParts.subtotal >= legacyResult.subtotal);
   });
 });

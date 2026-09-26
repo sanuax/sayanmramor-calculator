@@ -571,6 +571,9 @@
   .dim-count .step-count-note { text-align: left; margin-top: 4px; line-height: 1.45; }
   #shapeFieldsNote { max-width: 360px; margin: 12px auto 0; line-height: 1.45; }
   #riserHeightField { margin-top: 18px; }
+  /* «Количество маршей»: as wide as the count field under it. */
+  .dim-count .march-select { width: auto; max-width: 100%; font-size: var(--configurator-text); background: var(--page); border-radius: 8px; }
+  .dim-count .march-select + .step-count-note { margin-top: 6px; }
   .field #riserHeightField { max-width: 320px; }
   #dimHint { min-height: calc(2 * 1.45em); line-height: 1.45; }
 
@@ -1334,6 +1337,14 @@
                the visible field is validated as the client types; only a valid
                whole number reaches #step-count, which constructor-state.js
                reads -- so the 3D, the summary and the Result always agree. -->
+          <!-- «Лестницы»: how many marches -- only the numbers the chosen
+               shape is built with (GeometryModel.MARCH_RANGE); landings =
+               marches - 1. constructor-state.js reads #stair-marches. -->
+          <div class="dim-count" id="marchCountField" hidden>
+            <div class="dim-count-title" id="marchCountTitle">Количество маршей</div>
+            <select id="stair-marches" class="march-select" aria-labelledby="marchCountTitle"></select>
+            <div class="dim-note step-count-note">Марш — один участок лестницы между площадками или уровнями.</div>
+          </div>
           <div class="dim-count" id="stepCountField" hidden>
             <div class="dim-count-title" id="stepCountTitle">Количество ступеней</div>
             <div class="field-unit">
@@ -2201,6 +2212,7 @@
   // What each still-missing size of a shape needs from the client.
   const MISSING_SIZE_HINTS = {
     riserHeight: 'Укажите высоту подступенка, чтобы рассчитать стоимость',
+    stairLength: 'Длины лестницы не хватает на все площадки и ступени — увеличьте длину или уменьшите число маршей',
     wallRadius: 'Укажите радиус стены, чтобы рассчитать стоимость',
     wallArc: 'Длина дуги больше целой окружности такого радиуса — проверьте радиус и длину дуги',
     sillArm: 'Укажите длину второго плеча — она больше глубины подоконника',
@@ -2225,6 +2237,8 @@
   const stupeniRiserBox = document.getElementById('stupeni-riser');
   const stepCountTitleEl = document.getElementById('stepCountTitle');
   const stepCountNoteEl = document.getElementById('stepCountNote');
+  const marchCountField = document.getElementById('marchCountField');
+  const marchSelect = document.getElementById('stair-marches');
   const materialField = document.getElementById('materialField');
   const materialFieldThumb = document.getElementById('materialFieldThumb');
   const materialFieldThumbImg = materialFieldThumb.querySelector('img');
@@ -2376,34 +2390,37 @@
       svg += dimSvg(DimensionDiagram.horizontal({ x1: cx - R, x2: cx + R, edgeY: cy + R, text: lenText }));
       svg += dimSvg(DimensionDiagram.horizontal({ x1: cx + Math.max(3, r), x2: cx + R, lineY: cy, text: widText, label: 'after' }));
     } else {
-      // The flight(s) in plan, one line per step; the landing plain.
-      const d = p.treadDepthM, n1 = p.flights[0], n2 = p.flights[1] || 0;
-      const u = info.variant === 'u', l = info.variant === 'l';
-      // П: the two flights run side by side -- the gap between them is drawn
-      // wider than its real 100 mm so they never read as one block.
-      const extentY = u ? 2.3 * W : (l ? W + n2 * d : W);
-      const s = Math.min(196 / L, 118 / extentY);
-      const gapPx = u ? Math.max(8, 0.3 * W * s) : 0;
-      const x0 = 130 - (L * s) / 2, yb = 20 + (118 + extentY * s) / 2;
-      const w = W * s, run1 = n1 * d * s;
-      svg += '<rect x="' + x0 + '" y="' + (yb - w) + '" width="' + run1 + '" height="' + w + '" ' + DIAGRAM_STONE + '/>';
-      for (let k = 1; k < n1; k++) svg += '<line x1="' + (x0 + k * d * s) + '" y1="' + (yb - w) + '" x2="' + (x0 + k * d * s) + '" y2="' + yb + '" ' + DIAGRAM_JOINT + '/>';
-      if (l || u) {
-        const lx = x0 + run1, lh = u ? 2 * w + gapPx : w;
-        svg += '<rect x="' + lx + '" y="' + (yb - lh) + '" width="' + w + '" height="' + lh + '" ' + DIAGRAM_STONE + '/>';
-        if (l && n2 > 0) {
-          const top = yb - w - n2 * d * s;
-          svg += '<rect x="' + lx + '" y="' + top + '" width="' + w + '" height="' + (n2 * d * s) + '" ' + DIAGRAM_STONE + '/>';
-          for (let k = 1; k < n2; k++) svg += '<line x1="' + lx + '" y1="' + (yb - w - k * d * s) + '" x2="' + (lx + w) + '" y2="' + (yb - w - k * d * s) + '" ' + DIAGRAM_JOINT + '/>';
+      // The whole way up in plan (GeometryModel.stairPath -- what the 3D
+      // builds): every march with a line per step, every landing plain. The
+      // first march climbs to the right, a Г turns up, a П comes back above.
+      const path = p.path;
+      const add = (q, v, k) => [q[0] + v[0] * k, q[1] + v[1] * k];
+      const marchRect = m => {
+        const e = add(m.origin, m.dir, m.count * m.depth);
+        return [add(m.origin, m.across, -W / 2), add(e, m.across, -W / 2), add(e, m.across, W / 2), add(m.origin, m.across, W / 2)];
+      };
+      const shapes = path.marches.map(marchRect).concat(path.landings.map(l => l.outline));
+      const all = [].concat(...shapes);
+      const xs = all.map(q => -q[0]), zs = all.map(q => q[1]);
+      const minX = Math.min(...xs), maxX = Math.max(...xs), minZ = Math.min(...zs), maxZ = Math.max(...zs);
+      const s = Math.min(196 / Math.max(1e-6, maxX - minX), 118 / Math.max(1e-6, maxZ - minZ));
+      const ox = 130 - (minX + maxX) / 2 * s, oy = 79 - (minZ + maxZ) / 2 * s;
+      const P = q => [ox - q[0] * s, oy + q[1] * s];
+      const poly = pts => '<polygon points="' + pts.map(P).map(v => v[0].toFixed(1) + ',' + v[1].toFixed(1)).join(' ') + '" ' + DIAGRAM_STONE + '/>';
+      path.landings.forEach(l => { svg += poly(l.outline); });
+      path.marches.forEach(m => {
+        svg += poly(marchRect(m));
+        for (let k = 1; k < m.count; k++) {
+          const c = add(m.origin, m.dir, k * m.depth);
+          const a = P(add(c, m.across, -W / 2)), b = P(add(c, m.across, W / 2));
+          svg += '<line x1="' + a[0].toFixed(1) + '" y1="' + a[1].toFixed(1) + '" x2="' + b[0].toFixed(1) + '" y2="' + b[1].toFixed(1) + '" ' + DIAGRAM_JOINT + '/>';
         }
-        if (u && n2 > 0) {
-          const ty = yb - lh, run2 = n2 * d * s;
-          svg += '<rect x="' + (lx - run2) + '" y="' + ty + '" width="' + run2 + '" height="' + w + '" ' + DIAGRAM_STONE + '/>';
-          for (let k = 1; k < n2; k++) svg += '<line x1="' + (lx - k * d * s) + '" y1="' + ty + '" x2="' + (lx - k * d * s) + '" y2="' + (ty + w) + '" ' + DIAGRAM_JOINT + '/>';
-        }
-      }
-      svg += dimSvg(DimensionDiagram.horizontal({ x1: x0, x2: x0 + L * s, edgeY: yb, text: lenText }));
-      svg += dimSvg(DimensionDiagram.vertical({ y1: yb - w, y2: yb, edgeX: x0, text: widText }));
+      });
+      // «Длина лестницы»: the whole first run, its landings included; the
+      // march width at the start.
+      const start = P([0, W / 2]), end = P([-L, W / 2]), top = P([0, -W / 2]);
+      svg += dimSvg(DimensionDiagram.horizontal({ x1: start[0], x2: end[0], edgeY: start[1], text: lenText }));
+      svg += dimSvg(DimensionDiagram.vertical({ y1: top[1], y2: start[1], edgeX: start[0], text: widText }));
     }
     dimStairG.innerHTML = svg;
     document.getElementById('dimSvg').setAttribute('aria-label', 'Схема: ' + currentDimLabels.length.toLowerCase() + ', ' + currentDimLabels.width.toLowerCase() + ', ' + n + ' ' + plural(n, 'ступень', 'ступени', 'ступеней'));
@@ -2519,8 +2536,14 @@
       text = known
         ? 'Ступени идут по кругу вокруг опоры Ø ' + Math.round(p.rIn * 2000) + ' мм, глубина ступени по середине — ' + depthMm + ' мм.'
         : 'Диаметр — вся лестница в плане, ширина ступени — от опоры до края.';
-    } else if (info.variant === 'l' || info.variant === 'u') {
-      text = 'Длина включает площадку поворота. ' + (known ? 'Глубина одной ступени: ' + depthMm + ' мм.' : 'Глубина одной ступени рассчитывается автоматически.');
+    } else if (known && p.fits === false) {
+      text = 'Длины не хватает на все площадки и ступени первого участка — увеличьте длину или уменьшите число маршей или ступеней.';
+    } else if (info.variant === 'l' || info.variant === 'u' || p.marches > 1) {
+      // The first run holds its marches, the landings between them and the
+      // turning landing.
+      const turn = info.variant === 'l' || info.variant === 'u';
+      text = 'Длина — весь первый участок лестницы' + (turn ? ' до поворота, с площадкой поворота' : ' со всеми площадками') + '. ' +
+        (known ? 'Глубина одной ступени: ' + depthMm + ' мм.' : 'Глубина одной ступени рассчитывается автоматически.');
     } else {
       text = known ? 'Глубина одной ступени: ' + depthMm + ' мм (длина ÷ количество ступеней).' : 'Глубина одной ступени рассчитывается автоматически: длина ÷ количество ступеней.';
     }
@@ -3476,10 +3499,42 @@
       // The field is ONE march's steps: the stair has marches x that (as
       // ConstructorState's stepCount, which the 3D draws).
       const variant = GeometryModel.STAIR_SHAPES[id] || 'straight';
-      const total = count * Math.max(1, GeometryModel.STAIR_MARCHES[variant] || 1);
-      return { kind: 'flight', variant, plan: GeometryModel.stairPlan('flight', variant, lengthM, widthM, total) };
+      const marches = currentMarches();
+      const total = count * Math.max(1, marches);
+      return { kind: 'flight', variant, plan: GeometryModel.stairPlan('flight', variant, lengthM, widthM, total, marches) };
     }
     return null;
+  }
+
+  // The stair's shape and its number of marches (0: no marches -- spiral,
+  // or not a stair).
+  function currentStairShape() {
+    return selectedProductKey === 'lestnitsa' ? (GeometryModel.STAIR_SHAPES[productSubcategorySelect.value] || 'straight') : null;
+  }
+  function currentMarches() {
+    const shape = currentStairShape();
+    return shape ? GeometryModel.marchesFor(shape, marchSelect.value) : 0;
+  }
+
+  // «Количество маршей»: the numbers this shape is built with; the chosen
+  // one kept while it still fits, otherwise the shape's default.
+  function syncMarchField() {
+    const shape = currentStairShape();
+    const range = shape ? GeometryModel.MARCH_RANGE[shape] : null;
+    marchCountField.hidden = !range;
+    if (!range) return;
+    const keep = GeometryModel.marchesFor(shape, marchSelect.value);
+    const values = [];
+    for (let m = range.min; m <= range.max; m++) values.push(m);
+    if (marchSelect.options.length !== values.length || Number(marchSelect.options[0].value) !== range.min) {
+      marchSelect.replaceChildren(...values.map(m => {
+        const o = document.createElement('option');
+        o.value = String(m);
+        o.textContent = m + ' ' + plural(m, 'марш', 'марша', 'маршей') + (m > 1 ? ' · ' + (m - 1) + ' ' + plural(m - 1, 'площадка', 'площадки', 'площадок') : '');
+        return o;
+      }));
+    }
+    marchSelect.value = String(keep);
   }
 
   // The chosen type's extra shape sizes (#shapeFields) and what they mean.
@@ -3515,19 +3570,16 @@
   // «Лестницы» with marches: the count is ONE march's steps; what a march
   // is and the whole stair it gives, right under it.
   function updateStepCountTexts() {
-    const shape = selectedProductKey === 'lestnitsa' ? (GeometryModel.STAIR_SHAPES[productSubcategorySelect.value] || 'straight') : null;
-    const marches = shape ? GeometryModel.STAIR_MARCHES[shape] : 0;
+    syncMarchField();
+    const marches = currentMarches();
     stepCountTitleEl.textContent = marches > 0 ? 'Количество ступеней в одном марше' : 'Количество ступеней';
-    stepCountNoteEl.hidden = !(marches > 0);
-    if (marches > 0) {
+    // The whole stair the count gives: marches x steps, landings.
+    stepCountNoteEl.hidden = !(marches > 1);
+    if (marches > 1) {
       const n = Number(stepCountHidden.value) || 0;
       const landings = marches - 1;
-      let text = 'Марш — один прямой участок лестницы между площадками или уровнями.';
-      if (marches > 1) {
-        text += ' У этой лестницы ' + marches + ' ' + plural(marches, 'марш', 'марша', 'маршей') + ' и ' + landings + ' ' + plural(landings, 'площадка', 'площадки', 'площадок') +
-          (n > 0 ? ': всего ' + (n * marches) + ' ' + plural(n * marches, 'ступень', 'ступени', 'ступеней') + ' (' + marches + ' × ' + n + ').' : '.');
-      }
-      stepCountNoteEl.textContent = text;
+      stepCountNoteEl.textContent = 'У этой лестницы ' + marches + ' ' + plural(marches, 'марш', 'марша', 'маршей') + ' и ' + landings + ' ' + plural(landings, 'площадка', 'площадки', 'площадок') +
+        (n > 0 ? ': всего ' + (n * marches) + ' ' + plural(n * marches, 'ступень', 'ступени', 'ступеней') + ' (' + marches + ' × ' + n + ').' : '.');
     }
   }
 
@@ -3874,13 +3926,31 @@
       const WORK_NAMES = { fabrication: 'изготовление', installation: 'монтаж', polish: 'полировка' };
       const works = Array.from(new Set(unpricedGroups.flatMap(g => g.unpriced))).map(k => WORK_NAMES[k]);
       const list = works.length > 1 ? works.slice(0, -1).join(', ') + ' и ' + works[works.length - 1] : works[0];
-      const note = 'Камень подступенков учтён; ' + list + ' подступенков пока не ' + (works.length > 1 ? 'входят' : 'входит') + ' в стоимость — их рассчитает менеджер.';
+      const note = 'Камень подступенков учтён в цене; стоимость работ по подступенкам (' + list + ') уточнит менеджер.';
       warningOut.textContent = warningOut.textContent ? warningOut.textContent + ' ' + note : note;
       warningOut.style.display = 'block';
     }
+    // A countertop's extra stone elements: their stone is in the layout;
+    // their work is priced by their own rates -- where the company has none
+    // yet, say that the manager prices it.
+    const extraPieces = job.pieces ? job.pieces.filter(p => p.group === 'extra') : [];
+    if (extraPieces.length) {
+      const EXTRA_RATES = {
+        backsplash: COUNTERTOP_EXTRAS_RATES.fartukRatePerM2,
+        wallPanel: getAdditionalWorkRate('EXTRA-03'),
+        island: constructorState.island.standard.widthM > 0 && constructorState.island.standard.lengthM > 0 ? COUNTERTOP_EXTRAS_RATES.ostrovRatePerM2 : getAdditionalWorkRate('EXTRA-05'),
+        barCounter: getAdditionalWorkRate(constructorState.barCounter.standard.widthM > 0 && constructorState.barCounter.standard.lengthM > 0 ? 'EXTRA-06' : 'EXTRA-07'),
+      };
+      const unrated = extraPieces.filter(p => EXTRA_RATES[p.key] === null || EXTRA_RATES[p.key] === undefined).map(p => p.label.toLowerCase());
+      if (unrated.length) {
+        const note = 'Камень дополнительных элементов учтён в цене; стоимость работ по ним (' + unrated.join(', ') + ') уточнит менеджер.';
+        warningOut.textContent = warningOut.textContent ? warningOut.textContent + ' ' + note : note;
+        warningOut.style.display = 'block';
+      }
+    }
 
     if (selectedProductKey === 'lestnitsa') {
-      const note = 'Точный расчёт лестницы требует уточнения количества и размера ступеней у менеджера — цена ориентировочная.';
+      const note = 'Предварительная стоимость. Финальный расчёт подтверждает менеджер после проверки проекта.';
       warningOut.textContent = warningOut.textContent ? warningOut.textContent + ' ' + note : note;
       warningOut.style.display = 'block';
     }
@@ -4036,6 +4106,8 @@
   });
   // Risers chosen or not: the height field shows with them.
   stupeniRiserBox.addEventListener('change', placeRiserHeightField);
+  // «Количество маршей»: the drawing, the whole-stair note, the 3D and the price.
+  marchSelect.addEventListener('change', () => { updateDimDiagram(); calculate(); });
   subcategoryQtyInput.addEventListener('input', calculate);
 
   // «Фасады»: every size field redraws the diagram, the area note and the
