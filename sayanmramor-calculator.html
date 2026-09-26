@@ -647,6 +647,7 @@
     font-size: var(--configurator-muted); line-height: 1.55; color: #5a5247;
   }
   .stone-texture-note svg { flex: none; margin-top: 2px; color: var(--stone-line); }
+  .result-texture-note { margin-top: 14px; }
 
   /* ---- Material picker -------------------------------------------------
      A full-screen sample wall. The sheet is plain white so stone colour reads
@@ -881,7 +882,19 @@
   .picker-reset-btn[hidden] { display: none; }
   /* "124 материала" -- a real, computed count, not decoration; sits between
      the filter row and the sort control, quiet secondary text. */
-  .picker-meta { padding: 0 20px 10px; font-size: 12.5px; color: var(--pick-muted); }
+  .picker-meta-row {
+    display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
+    gap: 4px 20px; padding: 0 20px 10px;
+  }
+  .picker-meta { font-size: 12.5px; color: var(--pick-muted); }
+  /* Where the collection's stone comes from: a quiet line opposite the
+     count, not a banner. */
+  .picker-supplier { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--pick-muted); }
+  .picker-supplier a {
+    color: var(--pick-ink); text-decoration: underline; text-underline-offset: 2px;
+    text-decoration-color: var(--pick-line); transition: text-decoration-color 0.15s;
+  }
+  .picker-supplier a:hover { text-decoration-color: currentColor; }
   .picker-sentinel { height: 1px; }
   .picker-sentinel[hidden] { display: none; }
 
@@ -917,6 +930,8 @@
     .filter-dropdown-btn { padding: 7px 12px; font-size: 13px; }
     .filter-dropdown-panel { min-width: 0; width: min(240px, calc(100vw - 28px)); }
     .picker-sort { margin: 0 14px 12px; }
+    .picker-meta-row { padding: 0 14px 10px; }
+    .picker-supplier { font-size: 12px; }
     .picker-results { padding: 16px 14px 48px; }
     .picker-grid { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 16px 10px; }
     .stone-card-name { font-size: 12px; margin-top: 8px; }
@@ -1244,7 +1259,7 @@
            предупреждение: спокойный текст с маленьким значком «i». -->
       <p class="stone-texture-note">
         <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="6.6" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M8 7.3v4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="4.9" r="0.9" fill="currentColor"/></svg>
-        <span>Текстура камня носит ориентированный характер. Точная раскладка и направление рисунка будут согласованы с дизайнером при разработке проекта.</span>
+        <span>Текстура камня на изделии носит ориентированный характер. Точная раскладка и направление рисунка будут согласованы с дизайнером при разработке проекта.</span>
       </p>
     </section>
 
@@ -1699,6 +1714,13 @@
              «…за одну ступень.», «…за основной сегмент…») -- right under the
              sizes it is counted from (ResultModel.buildResultView note). -->
         <p class="result-note" id="resultScopeNote" hidden></p>
+        <!-- The same note as under the material choice, word for word, so the
+             client sees it once more next to the chosen stone before sending
+             the request. -->
+        <p class="stone-texture-note result-texture-note">
+          <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="6.6" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M8 7.3v4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="4.9" r="0.9" fill="currentColor"/></svg>
+          <span>Текстура камня на изделии носит ориентированный характер. Точная раскладка и направление рисунка будут согласованы с дизайнером при разработке проекта.</span>
+        </p>
 
         <div class="result-pricing">
           <div class="result-block-title">Предварительная стоимость</div>
@@ -1829,7 +1851,10 @@
     </div>
     <button type="button" id="pickerResetFilters" class="picker-reset-btn" hidden>Сбросить</button>
   </div>
-  <div class="picker-meta" id="pickerMeta"></div>
+  <div class="picker-meta-row">
+    <div class="picker-meta" id="pickerMeta"></div>
+    <p class="picker-supplier">Камень в нашей коллекции закупается у Venezia Stone. <a href="https://veneziastone.com/" target="_blank" rel="noopener">Подробнее о коллекции и материалах — на сайте Venezia Stone</a></p>
+  </div>
   <div class="picker-sort" id="pickerSort">
     <button type="button" class="sort-btn active" data-sort-field="name" data-sort-dir="asc">A-Z</button>
     <button type="button" class="sort-btn" data-sort-field="price" data-sort-dir="asc">Цена ↑</button>

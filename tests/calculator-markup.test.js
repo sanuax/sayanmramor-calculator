@@ -63,3 +63,32 @@ test('step count sits with the sizes (dimensions step), not on the type step', (
   const type = html.slice(html.indexOf('data-step-id="type"'), html.indexOf('data-step-id="material"'));
   assert.doesNotMatch(type, /stepCountInput/);
 });
+
+const TEXTURE_NOTE = 'Текстура камня на изделии носит ориентированный характер. Точная раскладка и направление рисунка будут согласованы с дизайнером при разработке проекта.';
+const sectionOf = stepId => {
+  const start = html.indexOf('data-step-id="' + stepId + '"');
+  return html.slice(start, html.indexOf('</section>', start));
+};
+
+test('the stone texture note: one wording, under the material choice and once on the result screen', () => {
+  assert.doesNotMatch(html, /Текстура камня носит ориентированный характер/, 'the old wording is gone');
+  assert.equal(html.split(TEXTURE_NOTE).length - 1, 2, 'exactly two places, no variant');
+  assert.equal(sectionOf('material').split(TEXTURE_NOTE).length - 1, 1);
+  const review = sectionOf('review');
+  assert.equal(review.split(TEXTURE_NOTE).length - 1, 1);
+  // Next to the chosen stone (the specs list), before the price and the request form.
+  const at = review.indexOf(TEXTURE_NOTE);
+  assert.ok(review.indexOf('id="resultSpecs"') < at && at < review.indexOf('class="result-pricing"') && at < review.indexOf('id="leadArea"'));
+});
+
+test('the stone gallery names the supplier once, with a link to Venezia Stone in a new tab', () => {
+  const overlay = html.slice(html.indexOf('id="pickerOverlay"'), html.indexOf('id="lightboxOverlay"'));
+  assert.equal(overlay.split('Камень в нашей коллекции закупается у Venezia Stone').length - 1, 1);
+  const links = overlay.match(/<a [^>]*href="https:\/\/veneziastone\.com\/"[^>]*>([^<]*)<\/a>/g) || [];
+  assert.equal(links.length, 1);
+  assert.match(links[0], /target="_blank"/);
+  assert.match(links[0], /rel="noopener"/);
+  assert.match(links[0], />Подробнее о коллекции и материалах — на сайте Venezia Stone</);
+  assert.equal(html.split('veneziastone.com').length - 1, 1, 'nowhere else in the calculator');
+  assert.doesNotMatch(html, /взят с сайта/);
+});
