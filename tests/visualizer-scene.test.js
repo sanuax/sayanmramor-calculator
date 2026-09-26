@@ -412,6 +412,43 @@ test('countertop shapes: straight = one slab, Г = one wing, П = a wing at each
   assert.ok(u.bounds.max[0] - u.bounds.min[0] > straight.bounds.max[0] - straight.bounds.min[0]);
 });
 
+test('«Подгиб камнем» is the main run\'s alone: the apron runs along its open front edge, never under a wing; wings keep a plain edge', () => {
+  const wingDims = { 'wing-width': { value: '600' }, 'wing-length': { value: '1400' } };
+  const base = { width: { value: '600' }, length: { value: '2400' } };
+  const at = (shape, edgeType) => layoutFor('stoleshnitsa_kuhnya', Object.assign({ productShape: { value: shape }, 'edge-type': { value: edgeType } }, base, wingDims));
+  const zSpan = p => (p.kind === 'box' ? [p.center[2] - p.size[2] / 2, p.center[2] + p.size[2] / 2] : [extent(p.outline).z0, extent(p.outline).z1]);
+  const len = spans => spans.reduce((s, [a, b]) => s + (b - a), 0);
+  // Straight: one apron the whole length of the main run.
+  const straight = at('straight', 'stone-wrap');
+  const straightWrap = named(straight, 'wrap');
+  assert.equal(straightWrap.length, 1);
+  assert.ok(Math.abs(len(straightWrap.map(zSpan)) - 2.4) < 1e-9);
+  [['lshape', 1], ['ushape', 2]].forEach(([shape, wings]) => {
+    const layout = at(shape, 'stone-wrap');
+    const wrap = named(layout, 'wrap').map(zSpan);
+    const wingParts = named(layout, 'wing');
+    assert.equal(wingParts.length, wings, shape);
+    assert.ok(wrap.length > 0, shape + ': the main run keeps its apron');
+    // Along the main run only where no wing joins it: 2.4 m minus 0.6 per wing.
+    assert.ok(Math.abs(len(wrap) - (2.4 - 0.6 * wings)) < 1e-9, shape + ': apron length');
+    wingParts.forEach(w => {
+      const [a, b] = zSpan(w);
+      wrap.forEach(([s, e]) => assert.ok(e <= a + 1e-9 || s >= b - 1e-9, shape + ': no apron under a wing'));
+      assert.notEqual(w.edge, 'stone-wrap', shape + ': the wing\'s edge is plain');
+    });
+    assert.equal(named(layout, 'main')[0].edge, 'stone-wrap', shape + ': the main run keeps the profile');
+  });
+  // The other four profiles: unchanged -- the wings share them, no apron anywhere.
+  ['straight', 'rounding', 'bevel', 'figured'].forEach(edgeType => {
+    ['straight', 'lshape', 'ushape'].forEach(shape => {
+      const layout = at(shape, edgeType);
+      assert.equal(named(layout, 'wrap').length, 0, edgeType + ' ' + shape);
+      assert.equal(named(layout, 'main')[0].edge, edgeType);
+      named(layout, 'wing').forEach(w => assert.equal(w.edge, edgeType, edgeType + ' ' + shape + ': the wing shares the profile'));
+    });
+  });
+});
+
 test('П-shape + island: the island stands clear of both wings', () => {
   const u = layoutFor('stoleshnitsa_kuhnya', Object.assign({ productShape: { value: 'ushape' }, 'wing-width': { value: '600' }, 'wing-length': { value: '1400' } }, ISLAND));
   const island = extent(named(u, 'island')[0].outline);

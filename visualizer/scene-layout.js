@@ -108,17 +108,32 @@
     });
     parts.push(prism('stone', rect(-W / 2, W / 2, -L / 2, L / 2), bottom, top, { holes, edge, name: 'main' }));
 
-    if (edge === 'stone-wrap') {
-      // "Подгиб камнем": the front edge reads thicker -- a stone apron under
-      // the room-side edge of the main run.
-      parts.push(box('stone', [W / 2 - 0.01, bottom - T / 2, 0], [0.02, T, L]));
-    }
-
     // Г: one wing at the chosen end of the run; П: one at each end.
     const wings = m.wings && m.wings.length ? m.wings : (m.wing ? [m.wing] : []);
-    wings.forEach(({ widthM: ww, lengthM: wl, corner }) => {
+    const wingSpans = wings.map(({ widthM: ww, corner }) => {
       const z0 = corner === 'left' ? L / 2 - ww : -L / 2;
-      parts.push(prism('stone', rect(W / 2, W / 2 + wl, z0, z0 + ww), bottom, top, { edge, name: 'wing' }));
+      return [z0, z0 + ww];
+    });
+
+    if (edge === 'stone-wrap') {
+      // "Подгиб камнем" belongs to the main run only: a stone apron under its
+      // room-side edge -- along the part of that edge left open, not where a
+      // wing joins it (the wing's own edges stay plain).
+      let open = [[-L / 2, L / 2]];
+      wingSpans.forEach(([a, b]) => {
+        open = [].concat(...open.map(([s, e]) => [[s, Math.min(e, a)], [Math.max(s, b), e]].filter(([x0, x1]) => x1 - x0 > 1e-6)));
+      });
+      open.forEach(([s, e]) => {
+        parts.push(Object.assign(box('stone', [W / 2 - 0.01, bottom - T / 2, (s + e) / 2], [0.02, T, e - s]), { name: 'wrap' }));
+      });
+    }
+
+    // The wings take the product's edge profile -- except the stone wrap,
+    // which is the main run's alone.
+    const wingEdge = edge === 'stone-wrap' ? null : edge;
+    wings.forEach(({ lengthM: wl }, i) => {
+      const [z0, z1] = wingSpans[i];
+      parts.push(prism('stone', rect(W / 2, W / 2 + wl, z0, z1), bottom, top, { edge: wingEdge, name: 'wing' }));
     });
 
     if (m.sink) {
