@@ -27,6 +27,7 @@
   const isNode = typeof module !== 'undefined' && module.exports;
   // Loaded after this file in the page -- looked up when used.
   const Geometry = () => (isNode ? require('./visualizer/geometry-model.js') : globalRoot.GeometryModel);
+  const Fireplace = () => (isNode ? require('./fireplace-model.js') : globalRoot.FireplaceModel);
 
   function piece(key, label, lengthM, widthM, areaM2, count, extra) {
     return Object.assign({ key, label, group: 'main', lengthM, widthM, areaM2, count, seam: true }, extra || {});
@@ -230,6 +231,31 @@
     return { surfaceAreaM2: f.areaM2 };
   }
 
+  // ---- fireplaces -----------------------------------------------------------------
+
+  // «Камины»: the stone plates of the one fireplace plan (GeometryModel.
+  // fireplacePlan -- sizes checked by fireplace-model.js), each a cut piece
+  // with the face the plan priced; nothing is measured again here. Sizes not
+  // all in, or not a real fireplace: no pieces at all, and `missing` says
+  // what («fireplace:<size>» for a size to enter, «fireplace:<rule>» for a
+  // rule the sizes break, «fireplace:type» with no fireplace type).
+  function fireplaceJob(state, missing) {
+    const F = Fireplace();
+    const cfg = state.productConfig ? state.productConfig.kaminy : null;
+    const type = cfg ? F.getType(cfg.typeId) : null;
+    if (!type) {
+      missing.push('fireplace:type');
+      return { pieces: [] };
+    }
+    const plan = Geometry().fireplacePlan(type, F.getForm(type, cfg.form), cfg.params || {});
+    if (!plan.ok) {
+      plan.missing.forEach(k => missing.push('fireplace:' + k));
+      plan.violations.forEach(v => { if (!missing.includes('fireplace:' + v.rule)) missing.push('fireplace:' + v.rule); });
+      return { pieces: [] };
+    }
+    return { pieces: plan.plates.map(p => piece(p.key, p.label, p.lengthM, p.widthM, p.areaM2, p.count)) };
+  }
+
   // ---- the job ----------------------------------------------------------------
 
   // { pieces | surfaceAreaM2, mainAreaM2, riserAreaM2, missing: [...], stairs }
@@ -244,6 +270,7 @@
     else if (key === 'stoleshnitsa_kuhnya' || key === 'stoleshnitsa_vannaya') job = countertopJob(state);
     else if (key === 'podokonnik') job = sillJob(state, missing);
     else if (key === 'fasad') job = facadeJob(state);
+    else if (key === 'kaminy') job = fireplaceJob(state, missing);
     else {
       // Полы, стены, панно: a surface. A radius wall is its arc (the width
       // field is «Длина дуги») x its height -- the radius shapes the arc.

@@ -9,13 +9,19 @@ test('WORK_RATES has an entry for every product type in PRODUCTS', () => {
   assert.deepEqual(rateKeys.sort(), productKeys.sort());
 });
 
-test('every WORK_RATES entry has positive numeric fabrication/installation/polish rates', () => {
+// A rate is either the company's positive number or explicitly null («не
+// задано» -- pricing.js then leaves that work to the manager, never 0).
+// Only «Камины» has no rates yet; the nine products keep theirs.
+test('every WORK_RATES entry is a set positive rate or an explicit null (not set), never 0 or missing', () => {
   for (const [type, rates] of Object.entries(ProductTypes.WORK_RATES)) {
-    assert.equal(typeof rates.fabricationRatePerM2, 'number', `${type}.fabricationRatePerM2`);
-    assert.equal(typeof rates.installationRatePerM2, 'number', `${type}.installationRatePerM2`);
-    assert.equal(typeof rates.polishRatePerM2, 'number', `${type}.polishRatePerM2`);
-    assert.ok(rates.fabricationRatePerM2 > 0, `${type}.fabricationRatePerM2 > 0`);
+    ['fabricationRatePerM2', 'installationRatePerM2', 'polishRatePerM2'].forEach(k => {
+      assert.ok(k in rates, `${type}.${k} is declared`);
+      const v = rates[k];
+      assert.ok(v === null || (typeof v === 'number' && v > 0), `${type}.${k}: ${v}`);
+    });
   }
+  const unset = Object.entries(ProductTypes.WORK_RATES).filter(([, r]) => r.fabricationRatePerM2 === null).map(([k]) => k);
+  assert.deepEqual(unset, ['kaminy']);
 });
 
 test('MISC_FLAT_SUM and MISC_RATE_PER_M2 are explicitly null until real data is available', () => {

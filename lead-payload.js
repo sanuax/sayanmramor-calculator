@@ -68,6 +68,8 @@
         dimensions: c.dimensions,
         // «Фасады»: type, form, sizes (mm), quantity and area -- null otherwise.
         facade: c.facade || null,
+        // «Камины»: type, form, sizes (mm) and stone area -- null otherwise.
+        fireplace: c.fireplace || null,
         material: c.material,
         edge: c.edge,
         riser: c.riser,

@@ -5,7 +5,7 @@ const StepEngine = require('../step-engine.js');
 
 const ALL_PRODUCT_KEYS = [
   'lestnitsa', 'panno', 'podokonnik', 'pol', 'stena', 'fasad',
-  'stoleshnitsa_vannaya', 'stoleshnitsa_kuhnya', 'stupeni',
+  'stoleshnitsa_vannaya', 'stoleshnitsa_kuhnya', 'stupeni', 'kaminy',
 ];
 
 const KNOWN_STEP_IDS = ['type', 'shape', 'dimensions', 'material', 'riser', 'edge', 'additionalWorks', 'options', 'review'];
@@ -30,7 +30,7 @@ test('every product in PRODUCT_STEPS ends with "review" -- it is always the last
 
 // ---- Block 2 (Product Scenario Engine) requirements, §18 ----
 
-test('all 9 product keys exist in PRODUCT_STEPS', () => {
+test('all 10 product keys (the 9 + «Камины») exist in PRODUCT_STEPS', () => {
   ALL_PRODUCT_KEYS.forEach(key => {
     assert.ok(StepEngine.PRODUCT_STEPS[key], `missing product key "${key}"`);
   });
@@ -55,9 +55,15 @@ test('every product\'s first step is correct for its real capabilities', () => {
   // Everything else: no real shape/geometry capability today -- 'type' (the
   // existing, now-surfaced subcategory picker) leads instead of a fabricated
   // shape step. See step-engine.js's own comment on 'type' vs 'shape'.
-  ['lestnitsa', 'panno', 'podokonnik', 'pol', 'stena', 'fasad', 'stupeni'].forEach(key => {
+  ['lestnitsa', 'panno', 'podokonnik', 'pol', 'stena', 'fasad', 'stupeni', 'kaminy'].forEach(key => {
     assert.equal(StepEngine.firstStep(key), 'type', `"${key}" should start at 'type'`);
   });
+});
+
+test('«Камины»: type, sizes, stone, result -- no shape, edge, additional works or options of other products', () => {
+  const steps = StepEngine.getSteps('kaminy');
+  assert.deepEqual(steps, ['type', 'dimensions', 'material', 'review']);
+  ['shape', 'edge', 'additionalWorks', 'options', 'riser'].forEach(id => assert.equal(steps.includes(id), false, id));
 });
 
 test('a product missing a capability skips that step entirely -- e.g. podokonnik has no "shape" or "additionalWorks"', () => {

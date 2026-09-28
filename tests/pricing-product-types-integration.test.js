@@ -10,8 +10,13 @@ const stone = {
   ]
 };
 
-test('every real WORK_RATES entry produces a finite, non-NaN price through calculatePrice', () => {
-  for (const [type, workRates] of Object.entries(ProductTypes.WORK_RATES)) {
+// Products whose rates the company has set; a product with a null rate
+// («Камины») is covered in tests/fireplace-product.test.js (no false total).
+const PRICED = Object.entries(ProductTypes.WORK_RATES).filter(([, r]) => r.fabricationRatePerM2 !== null);
+
+test('every WORK_RATES entry with set rates produces a finite, non-NaN price through calculatePrice', () => {
+  assert.equal(PRICED.length, 9);
+  for (const [type, workRates] of PRICED) {
     const product = ProductTypes.PRODUCTS[type];
     const rates = {
       fabricationRatePerM2: workRates.fabricationRatePerM2,
@@ -37,6 +42,8 @@ test('every real WORK_RATES entry produces a finite, non-NaN price through calcu
       assert.ok(Number.isFinite(r.total), `${type}.total should be finite, got ${r.total}`);
       assert.ok(Number.isFinite(r.fabrication), `${type}.fabrication should be finite`);
       assert.ok(Number.isFinite(r.work), `${type}.work should be finite`);
+      assert.deepEqual(r.unpriced, [], `${type}: nothing left unpriced`);
+      assert.equal(r.workNote, null, `${type}: no «уточнит менеджер» note`);
     }
   }
 });

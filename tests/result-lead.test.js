@@ -69,11 +69,11 @@ function payloadFor(productKey, values) {
 
 // --- 1. title ---------------------------------------------------------------
 
-test('resultTitle gives a grammatical "Ваш/Ваша/Ваше/Ваши" title for every one of the 9 products', () => {
+test('resultTitle gives a grammatical "Ваш/Ваша/Ваше/Ваши" title for every product', () => {
   const expected = {
     lestnitsa: 'Ваша лестница', panno: 'Ваше панно', podokonnik: 'Ваш подоконник', pol: 'Ваш пол',
     stena: 'Ваша стена', fasad: 'Ваш фасад', stoleshnitsa_vannaya: 'Ваша столешница',
-    stoleshnitsa_kuhnya: 'Ваша столешница', stupeni: 'Ваши ступени',
+    stoleshnitsa_kuhnya: 'Ваша столешница', stupeni: 'Ваши ступени', kaminy: 'Ваш камин',
   };
   assert.deepEqual(Object.keys(expected).sort(), Object.keys(PRODUCTS).sort());
   Object.entries(expected).forEach(([key, title]) => assert.equal(ResultModel.resultTitle(key), title));

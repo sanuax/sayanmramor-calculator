@@ -33,7 +33,8 @@
 
   function buildShowroomUrl(productKey, stoneId, products, stonesById) {
     const product = resolveInitialProductKey(productKey, products);
-    if (!product) return null;
+    // A product the showroom does not have (PRODUCTS[key].showroom === false).
+    if (!product || products[product].showroom === false) return null;
     let url = SHOWROOM_PATH + '?product=' + encodeURIComponent(product);
     const stone = resolveInitialStoneId(stoneId, stonesById || {});
     if (stone) url += '&stone=' + encodeURIComponent(stone);

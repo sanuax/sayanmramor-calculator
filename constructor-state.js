@@ -15,6 +15,12 @@
   const lazy = (file, name) => () => (isNode ? require(file) : (typeof window !== 'undefined' ? window : globalThis)[name]);
   const Geometry = lazy('./visualizer/geometry-model.js', 'GeometryModel');
   const Parts = lazy('./product-parts.js', 'ProductParts');
+  const Fireplace = lazy('./fireplace-model.js', 'FireplaceModel');
+
+  // Products whose sizes are their own named fields (facade-model.js,
+  // fireplace-model.js), not the generic width x length -- a value left in
+  // those fields by another product must never reach them.
+  const OWN_SIZE_PRODUCTS = ['fasad', 'kaminy'];
 
   function mmToM(mmValue) {
     return mmValue / 1000;
@@ -180,6 +186,11 @@
         }
       : { standard: { widthM: 0, lengthM: 0 }, complex: { widthM: 0, lengthM: 0 } };
 
+    const ownSizes = OWN_SIZE_PRODUCTS.includes(selectedProductKey);
+    // «Опции» (сложная форма / полировка / монтаж) exist only where the
+    // product offers them (PRODUCTS[key].supportsOptions !== false); a box
+    // left ticked for another product never reaches one without them.
+    const optionsSupported = !(product && product.supportsOptions === false);
     const typeIdValue = d.getElementById('productSubcategory').value;
     const enteredSteps = readStepCount(d, selectedProductKey, typeIdValue);
     let stairConfig = null;
@@ -210,12 +221,12 @@
         cameraPreset: product.cameraPreset || null,
       } : null,
       stone: stone || null,
-      // A facade has no generic width/length (its sizes are in
-      // productConfig.fasad) -- a value left in these fields by another
-      // product must not reach it.
+      // A facade or a fireplace has no generic width/length (its sizes are
+      // in productConfig.fasad / .kaminy) -- a value left in these fields by
+      // another product must not reach it.
       dimensions: {
-        widthM: selectedProductKey === 'fasad' ? 0 : mmToM(numFromField(d, 'width')),
-        lengthM: selectedProductKey === 'fasad' ? 0 : mmToM(numFromField(d, 'length')),
+        widthM: ownSizes ? 0 : mmToM(numFromField(d, 'width')),
+        lengthM: ownSizes ? 0 : mmToM(numFromField(d, 'length')),
         thicknessM: null,
       },
       shape,
@@ -237,16 +248,17 @@
       },
       bookmatchMode: 'none',
       options: {
-        complexEnabled: d.getElementById('opt-complex').checked,
-        polishEnabled: d.getElementById('opt-polish').checked,
-        installEnabled: d.getElementById('opt-install').checked,
+        complexEnabled: optionsSupported && d.getElementById('opt-complex').checked,
+        polishEnabled: optionsSupported && d.getElementById('opt-polish').checked,
+        installEnabled: optionsSupported && d.getElementById('opt-install').checked,
       },
       subcategory: {
         id: d.getElementById('productSubcategory').value || null,
         // For «Ступени» the number of pieces IS the step count (stepCount
         // below), for «Фасады» it is the facade's own validated quantity
-        // (productConfig.fasad) -- the generic "Количество, шт." is neither's source.
-        qty: selectedProductKey === 'stupeni' || selectedProductKey === 'fasad' ? 0 : numFromField(d, 'subcategoryQty'),
+        // (productConfig.fasad), a fireplace is always one -- the generic
+        // "Количество, шт." is none of theirs.
+        qty: selectedProductKey === 'stupeni' || ownSizes ? 0 : numFromField(d, 'subcategoryQty'),
       },
       // Every step of the product. «Лестницы» with marches: the client enters
       // the steps of ONE march -- the stair has marches x that (see
@@ -285,6 +297,12 @@
         // not a facade's sizes; null for every other product.
         fasad: selectedProductKey === 'fasad'
           ? FacadeModel.readFacadeConfig(d, d.getElementById('productSubcategory').value)
+          : null,
+        // «Камины»: the type, the portal's form and the type's own sizes (m)
+        // -- see fireplace-model.js (its area, its rules). One fireplace, no
+        // quantity; null for every other product.
+        kaminy: selectedProductKey === 'kaminy'
+          ? Fireplace().readFireplaceConfig(d, typeIdValue)
           : null,
       },
     };

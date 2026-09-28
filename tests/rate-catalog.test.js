@@ -3,8 +3,8 @@ const assert = require('node:assert/strict');
 const RateCatalog = require('../rate-catalog.js');
 const ProductTypes = require('../product-types.js');
 
-test('PRODUCT_SUBCATEGORIES has exactly 53 rows', () => {
-  assert.equal(RateCatalog.PRODUCT_SUBCATEGORIES.length, 53);
+test('PRODUCT_SUBCATEGORIES has exactly 56 rows (53 + the three «Камины» types)', () => {
+  assert.equal(RateCatalog.PRODUCT_SUBCATEGORIES.length, 56);
 });
 
 test('PRODUCT_SUBCATEGORIES ids are all unique', () => {
@@ -29,7 +29,7 @@ test('PRODUCT_SUBCATEGORIES rows only use known units', () => {
 test('getSubcategoriesForProduct returns the right row count for every PRODUCTS category', () => {
   const expectedCounts = {
     'Лестницы': 13, 'Панно': 4, 'Подоконники': 5, 'Полы': 5, 'Стены': 5,
-    'Фасады': 8, 'Столешницы в ванную': 4, 'Столешницы на кухню': 5, 'Ступени': 4
+    'Фасады': 8, 'Столешницы в ванную': 4, 'Столешницы на кухню': 5, 'Ступени': 4, 'Камины': 3
   };
   Object.values(ProductTypes.PRODUCTS).forEach(product => {
     const rows = RateCatalog.getSubcategoriesForProduct(product.label);
@@ -73,8 +73,9 @@ test('getAdditionalWorkRate returns null for an unknown id', () => {
   assert.equal(RateCatalog.getAdditionalWorkRate('NOPE-99'), null);
 });
 
-test('INSTALLATION_RATES has exactly 9 rows', () => {
-  assert.equal(RateCatalog.INSTALLATION_RATES.length, 9);
+test('INSTALLATION_RATES has exactly one row per product category (10 with «Камины»)', () => {
+  assert.equal(RateCatalog.INSTALLATION_RATES.length, 10);
+  assert.equal(RateCatalog.INSTALLATION_RATES.length, Object.keys(ProductTypes.PRODUCTS).length);
 });
 
 test('INSTALLATION_RATES ids are all unique and start with INST-', () => {

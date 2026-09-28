@@ -555,8 +555,8 @@
   .dim-fields[hidden] { display: none; }
   /* «Фасады»: the area, its breakdown, the formula and what the price
      covers -- one line each, the total first. */
-  #facadeAreaNote { display: grid; gap: 2px; max-width: 360px; margin: 14px auto 0; line-height: 1.45; }
-  #facadeAreaNote[hidden] { display: none; }
+  #facadeAreaNote, #fireplaceAreaNote { display: grid; gap: 2px; max-width: 360px; margin: 14px auto 0; line-height: 1.45; }
+  #facadeAreaNote[hidden], #fireplaceAreaNote[hidden] { display: none; }
   .facade-area-total { color: var(--ink); font-size: var(--configurator-text); font-weight: 700; }
   .facade-area-scope { margin-top: 6px; color: #5a5247; }
   .dim-note { font-size: var(--configurator-muted); color: var(--muted); text-align: center; margin-top: 12px; }
@@ -1222,6 +1222,14 @@
           <div class="card-grid" id="facadeFormGrid" role="radiogroup" aria-labelledby="facadeFormTitle"></div>
         </div>
         <input type="hidden" id="facade-form" value="">
+        <!-- «Камины»: a portal's form (С полкой / Без полки) as visual cards
+             -- shown only for a type with more than one form
+             (fireplace-model.js); the choice goes to #fireplace-form. -->
+        <div class="choice-group" id="fireplaceFormField" hidden>
+          <div class="choice-title" id="fireplaceFormTitle">Вид портала</div>
+          <div class="card-grid" id="fireplaceFormGrid" role="radiogroup" aria-labelledby="fireplaceFormTitle"></div>
+        </div>
+        <input type="hidden" id="fireplace-form" value="">
         <select id="productSubcategory" hidden></select>
         <input type="number" id="subcategoryQty" placeholder="Количество, шт." min="0" step="1" style="margin-top:14px;display:none">
       </div>
@@ -1265,10 +1273,11 @@
 
     <section class="step" data-step-id="dimensions" style="display:none">
       <div class="step-head"><span class="step-num">4</span><h2 class="step-title">Размеры</h2></div>
-      <p class="step-sub">Схема реагирует на введённые размеры.</p>
+      <p class="step-sub" id="dimStepSub">Схема реагирует на введённые размеры.</p>
       <div class="field">
         <div class="dim-wrap">
-          <div class="dim-diagram">
+          <!-- «Камины» have no size diagram: the 3D shows their sizes. -->
+          <div class="dim-diagram" id="dimDiagram">
             <svg id="dimSvg" viewBox="0 0 260 190" width="260" height="190" role="img" aria-label="Схема изделия с размерами длины и ширины">
               <!-- Ступени/лестницы: a tread or a flight instead of the plain
                    rectangle (drawStairDiagram below). -->
@@ -1328,6 +1337,26 @@
           <div class="dim-note" id="shapeFieldsNote" hidden></div>
           <!-- What surface is clad, its formula, and the area it gives. -->
           <div class="dim-note" id="facadeAreaNote" hidden></div>
+          <!-- «Камины»: the chosen form's own sizes, each under its own name
+               (fireplace-model.js) -- only that form's fields are shown. -->
+          <div class="dim-fields" id="fireplaceFields" hidden>
+            <div class="field-unit" data-fireplace-param="openingWidth"><span class="unit-label"></span><input type="number" id="fireplace-opening-width" min="1" step="1" inputmode="numeric"><span class="unit">мм</span></div>
+            <div class="field-unit" data-fireplace-param="openingHeight"><span class="unit-label"></span><input type="number" id="fireplace-opening-height" min="1" step="1" inputmode="numeric"><span class="unit">мм</span></div>
+            <div class="field-unit" data-fireplace-param="pierWidth"><span class="unit-label"></span><input type="number" id="fireplace-pier-width" min="1" step="1" inputmode="numeric"><span class="unit">мм</span></div>
+            <div class="field-unit" data-fireplace-param="lintelHeight"><span class="unit-label"></span><input type="number" id="fireplace-lintel-height" min="1" step="1" inputmode="numeric"><span class="unit">мм</span></div>
+            <div class="field-unit" data-fireplace-param="depth"><span class="unit-label"></span><input type="number" id="fireplace-depth" min="1" step="1" inputmode="numeric"><span class="unit">мм</span></div>
+            <div class="field-unit" data-fireplace-param="shelfProjection"><span class="unit-label"></span><input type="number" id="fireplace-shelf-projection" min="1" step="1" inputmode="numeric"><span class="unit">мм</span></div>
+            <div class="field-unit" data-fireplace-param="claddingWidth"><span class="unit-label"></span><input type="number" id="fireplace-cladding-width" min="1" step="1" inputmode="numeric"><span class="unit">мм</span></div>
+            <div class="field-unit" data-fireplace-param="claddingHeight"><span class="unit-label"></span><input type="number" id="fireplace-cladding-height" min="1" step="1" inputmode="numeric"><span class="unit">мм</span></div>
+            <div class="field-unit" data-fireplace-param="fireboxWidth"><span class="unit-label"></span><input type="number" id="fireplace-firebox-width" min="1" step="1" inputmode="numeric"><span class="unit">мм</span></div>
+            <div class="field-unit" data-fireplace-param="fireboxHeight"><span class="unit-label"></span><input type="number" id="fireplace-firebox-height" min="1" step="1" inputmode="numeric"><span class="unit">мм</span></div>
+            <div class="field-unit" data-fireplace-param="fireboxBottom"><span class="unit-label"></span><input type="number" id="fireplace-firebox-bottom" min="0" step="1" inputmode="numeric"><span class="unit">мм</span></div>
+            <div class="field-unit" data-fireplace-param="length"><span class="unit-label"></span><input type="number" id="fireplace-length" min="1" step="1" inputmode="numeric"><span class="unit">мм</span></div>
+            <div class="field-unit" data-fireplace-param="height"><span class="unit-label"></span><input type="number" id="fireplace-height" min="1" step="1" inputmode="numeric"><span class="unit">мм</span></div>
+          </div>
+          <!-- What stone a fireplace is made of, its formula and -- once every
+               size is right -- the area it gives (fireplace-model.js). -->
+          <div class="dim-note" id="fireplaceAreaNote" hidden></div>
           <!-- Количество (штучные фасадные изделия): validated like
                «Количество ступеней» -- only a whole number within the type's
                limits (facade-model.js QUANTITY_LIMITS) reaches #facade-quantity. -->
@@ -1879,6 +1908,7 @@
 <script src="product-types.js"></script>
 <script src="rate-catalog.js"></script>
 <script src="facade-model.js"></script>
+<script src="fireplace-model.js"></script>
 <script src="dimension-diagram.js"></script>
 <script src="step-engine.js"></script>
 <script src="result-model.js"></script>
@@ -2030,6 +2060,19 @@
       '<path class="ps-stone" d="M31.21 23.94L88.79 23.94L88.79 31.52L31.21 31.52Z"/>' +
       '<path class="ps-top" d="M31.21 23.94L88.79 23.94L85.68 19.19L34.32 19.19Z"/>' +
       '<path class="ps-joint" d="M32.39 23.28H87.61M32.69 22.8H87.31"/>',
+    // Камины: каминный портал спереди -- две опоры, перемычка, полка
+    // и тёмная топка с отблеском огня.
+    kaminy: SCENE_FLOOR +
+      '<path class="ps-side" d="M90 26L96 22.5V64.5L90 68Z"/>' +
+      '<path class="ps-stone" d="M30 26H90V68H76V40H44V68H30Z"/>' +
+      '<rect class="ps-dark" x="44" y="40" width="32" height="28"/>' +
+      '<path class="ps-glow" d="M52 68C52 61 57 58 56 52C61 56 60 60 62 62C64 58 66 57 66 54C70 59 69 64 68 68Z"/>' +
+      '<path class="ps-vein" d="M30 36C40 31 52 37 62 32S80 30 90 36"/>' +
+      '<path class="ps-joint" d="M30 40H44M76 40H90"/>' +
+      '<path class="ps-shadow" d="M30 26H90V27.5H30Z"/>' +
+      '<path class="ps-top" d="M26 21H94L100 17.5H32Z"/>' +
+      '<path class="ps-side" d="M94 21L100 17.5V22.5L94 26Z"/>' +
+      '<rect class="ps-stone" x="26" y="21" width="68" height="5"/>',
   };
   // Короткая вторая строка -- только там, где она действительно помогает
   // различить изделия (две столешницы); отражает их реальные доп. работы.
@@ -2077,6 +2120,25 @@
   // height) never silently becomes another's (a plinth's height). Within a
   // type the forms share their fields: «Высота колонны» stays when the
   // column turns square.
+  // Камины: the card icon of each fireplace type and of a portal's two forms
+  // (viewBox 64x40); titles and descriptions come from fireplace-model.js.
+  const FIREPLACE_WALL = '<rect x="8" y="4" width="48" height="32" fill="var(--wall)" stroke="var(--wall-line)" stroke-width="1.2"/>';
+  const FIREPLACE_PORTAL = FIREPLACE_WALL + '<path d="M17 13 H47 V36 H39 V21 H25 V36 H17 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="25" y="21" width="14" height="15" fill="var(--card)" stroke="var(--stone-line)" stroke-width="1.1"/>';
+  const FIREPLACE_SHELF = '<rect x="14" y="10" width="36" height="3" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/>';
+  const FIREPLACE_TYPE_ICONS = {
+    'FIREPLACE-01': FIREPLACE_PORTAL + FIREPLACE_SHELF,
+    'FIREPLACE-02': FIREPLACE_WALL + '<rect x="20" y="4" width="24" height="32" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="25" y="20" width="14" height="10" fill="var(--card)" stroke="var(--stone-line)" stroke-width="1.1"/>',
+    'FIREPLACE-03': FIREPLACE_WALL + '<rect x="22" y="12" width="20" height="16" fill="none" stroke="var(--wall-line)" stroke-width="1.1" stroke-dasharray="2 2"/><rect x="12" y="28" width="40" height="8" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/>',
+  };
+  const FIREPLACE_FORM_ICONS = {
+    'with-shelf': FIREPLACE_PORTAL + FIREPLACE_SHELF,
+    'without-shelf': FIREPLACE_PORTAL,
+  };
+  // The form picked and the entered sizes, per fireplace type -- both survive
+  // switching between types (like a facade's).
+  const fireplaceFormByType = {};
+  const fireplaceSizesByType = {};
+  const fireplaceFieldsOwner = { typeId: null };
   const facadeFormByType = {};
   const facadeQtyByType = {};
   const facadeSizesByType = {};
@@ -2119,6 +2181,8 @@
     // description are the model's own (the one source of a facade type's
     // name); only the icons live here.
     fasad: FacadeModel.FACADE_TYPES.map(t => ({ ids: [t.id], title: t.title, desc: t.desc, icon: typeIcon(FACADE_TYPE_ICONS[t.id] || '') })),
+    // Камины: the same, from fireplace-model.js.
+    kaminy: FireplaceModel.FIREPLACE_TYPES.map(t => ({ ids: [t.id], title: t.title, desc: t.desc, icon: typeIcon(FIREPLACE_TYPE_ICONS[t.id] || '') })),
     stupeni: [
       { ids: ['STEP-01'], title: 'Прямая', desc: 'Прямоугольная ступень', icon: typeIcon('<rect x="12" y="12" width="40" height="16" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M12 25 H52" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/>') },
       { ids: ['STEP-02'], title: 'Забежная', desc: 'Клиновидная, для поворота', icon: typeIcon('<path d="M12 16 L52 8 V32 L12 24 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M12 21.6 L52 28.4" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/>') },
@@ -2174,6 +2238,7 @@
     stoleshnitsa_kuhnya: 'Тип',
     stupeni: 'Тип ступеней',
     panno: 'Тип панно',
+    kaminy: 'Тип камина',
   };
   // Result/summary heading ("Ваш/Ваша/Ваше <изделие>") lives in
   // result-model.js (ResultModel.resultTitle) -- one helper for the summary
@@ -2780,7 +2845,10 @@
   // finish before it fires) and simple:
   document.addEventListener('DOMContentLoaded', mountViewerIfSupported);
 
-  Object.entries(PRODUCTS).forEach(([key, val]) => {
+  // A product not yet offered here (PRODUCTS[key].configuratorHidden) gets
+  // no card -- and so no ?product= entry either (the bootstrap below picks a
+  // product by its card).
+  Object.entries(PRODUCTS).filter(([, val]) => !val.configuratorHidden).forEach(([key, val]) => {
     const card = document.createElement('label');
     card.className = 'product-card';
 
@@ -3035,6 +3103,7 @@
   function isCurrentStepDataValid(stepId) {
     if (stepId === 'dimensions') {
       if (selectedProductKey === 'fasad') return facadeSizesComplete();
+      if (selectedProductKey === 'kaminy') return fireplaceSizesComplete();
       if (!(mmToM(parseFloat(widthInput.value) || 0) > 0 && mmToM(parseFloat(lengthInput.value) || 0) > 0)) return false;
       // This step's own shape sizes; «Ступени» ask the riser height on the
       // «Подступенок» step.
@@ -3210,6 +3279,8 @@
     typeCardGrid.innerHTML = '';
     stairRiserField.hidden = true;
     syncStepCountField();
+    // A product with no type step keeps no fireplace form.
+    renderFireplaceForms();
     if (product.hideVariantStep) return;
     const rows = getSubcategoriesForProduct(product.label);
     const cards = TYPE_CARDS[productKey] || [];
@@ -3269,6 +3340,7 @@
     markSelected(typeCardGrid, typeCardIndex);
     if (!stairRiserField.hidden) markSelected(stairRiserGrid, stairRisers ? 1 : 0);
     renderFacadeForms();
+    renderFireplaceForms();
     // The size fields/labels follow the new type BEFORE the change event
     // recalculates, so the estimate never mixes the new type with the old
     // type's sizes.
@@ -3317,6 +3389,132 @@
       }));
     });
     markSelected(grid, type.forms.findIndex(f => f.id === formId));
+  }
+
+  // ===== «Камины» (fireplace-model.js) =====
+  // The chosen fireplace type (null for any other product).
+  function currentFireplaceType() {
+    return selectedProductKey === 'kaminy' ? FireplaceModel.getType(productSubcategorySelect.value) : null;
+  }
+
+  // Every size of the chosen fireplace form is entered (the Далее gate) --
+  // never yet: the page has no fireplace size fields so far.
+  function fireplaceSizesComplete() {
+    const type = currentFireplaceType();
+    return !!type && FireplaceModel.readFireplaceConfig(document, type.id).complete;
+  }
+
+  // The chosen type's form cards -- only for a type with several forms (the
+  // portal: С полкой / Без полки); the choice goes to #fireplace-form, which
+  // constructor-state.js reads.
+  function renderFireplaceForms() {
+    const field = document.getElementById('fireplaceFormField');
+    const grid = document.getElementById('fireplaceFormGrid');
+    const formInput = document.getElementById(FireplaceModel.FORM_FIELD);
+    const type = currentFireplaceType();
+    grid.innerHTML = '';
+    if (!type) {
+      field.hidden = true;
+      formInput.value = '';
+      return;
+    }
+    const formId = FireplaceModel.getForm(type, fireplaceFormByType[type.id]).id;
+    formInput.value = formId;
+    field.hidden = type.forms.length < 2;
+    if (field.hidden) return;
+    type.forms.forEach((form, i) => {
+      grid.appendChild(choiceCard({ title: form.title, desc: form.desc, icon: typeIcon(FIREPLACE_FORM_ICONS[form.id] || '') }, () => {
+        fireplaceFormByType[type.id] = form.id;
+        formInput.value = form.id;
+        markSelected(grid, i);
+        syncFireplaceFields();
+        calculate();
+      }));
+    });
+    markSelected(grid, type.forms.findIndex(f => f.id === formId));
+  }
+
+  // The size step for a fireplace: the chosen form's own fields (named, in
+  // its order, from fireplace-model.js) and the area note; the generic
+  // «Длина / Ширина» and their diagram are hidden (the 3D shows the sizes).
+  // For any other product: the reverse.
+  function syncFireplaceFields() {
+    const type = currentFireplaceType();
+    const fireplace = selectedProductKey === 'kaminy';
+    const container = document.getElementById('fireplaceFields');
+    container.hidden = !type;
+    document.getElementById('fireplaceAreaNote').hidden = !type;
+    document.getElementById('dimDiagram').style.display = fireplace ? 'none' : '';
+    document.getElementById('dimStepSub').style.display = fireplace ? 'none' : '';
+    if (fireplace) document.getElementById('dimGenericFields').hidden = true;
+    if (!type) return;
+    // The size fields belong to one type at a time: keep the previous type's
+    // values, bring back this type's own (a portal's depth never becomes a
+    // podium's). Within a type the forms share their fields: «Вылет полки»
+    // stays for when the shelf comes back.
+    if (fireplaceFieldsOwner.typeId !== type.id) {
+      const fieldIds = Object.values(FireplaceModel.PARAM_FIELDS);
+      if (fireplaceFieldsOwner.typeId) {
+        const saved = {};
+        fieldIds.forEach(id => { saved[id] = document.getElementById(id).value; });
+        fireplaceSizesByType[fireplaceFieldsOwner.typeId] = saved;
+      }
+      const own = fireplaceSizesByType[type.id] || {};
+      fieldIds.forEach(id => { document.getElementById(id).value = own[id] || ''; });
+      fireplaceFieldsOwner.typeId = type.id;
+    }
+    const form = FireplaceModel.getForm(type, document.getElementById(FireplaceModel.FORM_FIELD).value);
+    container.querySelectorAll('[data-fireplace-param]').forEach(row => {
+      const param = form.params.find(p => p.key === row.dataset.fireplaceParam);
+      row.hidden = !param;
+      if (!param) return;
+      row.querySelector('.unit-label').textContent = param.label;
+      row.querySelector('input').placeholder = String(param.placeholderMm);
+    });
+    form.params.forEach(p => container.appendChild(container.querySelector('[data-fireplace-param="' + p.key + '"]')));
+    updateFireplaceAreaNote();
+  }
+
+  // What is wrong with the entered sizes, in the model's own words: the
+  // sizes not entered yet, then every broken rule (fireplace-model.js
+  // checkConstraints). The fields a rule names are marked invalid.
+  function fireplaceSizeError() {
+    const type = currentFireplaceType();
+    if (!type) return '';
+    const cfg = FireplaceModel.readFireplaceConfig(document, type.id);
+    const form = FireplaceModel.getForm(type, cfg.form);
+    const bad = new Set(cfg.violations.flatMap(v => v.params));
+    Object.entries(FireplaceModel.PARAM_FIELDS).forEach(([key, id]) => {
+      document.getElementById(id).setAttribute('aria-invalid', bad.has(key) ? 'true' : 'false');
+    });
+    const parts = [];
+    if (cfg.missing.length === form.params.length) parts.push('Укажите размеры камина в миллиметрах.');
+    else if (cfg.missing.length) parts.push('Укажите: ' + cfg.missing.map(k => '«' + form.params.find(p => p.key === k).label + '»').join(', ') + '.');
+    Array.from(new Set(cfg.violations.map(v => v.message))).forEach(m => parts.push(m));
+    return parts.join(' ');
+  }
+
+  // What stone the fireplace is made of, its formula and what the price
+  // covers -- and, once every size is right, the area it gives:
+  //   Площадь камня портала: 1,94 м²
+  //   Формула: … (fireplace-model.js)
+  //   Стоимость указана за каменный портал.
+  function updateFireplaceAreaNote() {
+    const type = currentFireplaceType();
+    if (!type) return;
+    const cfg = FireplaceModel.readFireplaceConfig(document, type.id);
+    const form = FireplaceModel.getForm(type, cfg.form);
+    const line = (cls, text) => {
+      const el = document.createElement('span');
+      el.className = cls;
+      el.textContent = text;
+      return el;
+    };
+    const lines = [];
+    if (cfg.complete) lines.push(line('facade-area-total', type.areaTitle + ': ' + decimal2(cfg.areaM2) + ' м²'));
+    lines.push(line('facade-area-line', 'Формула: ' + form.formula + '.'));
+    lines.push(line('facade-area-scope', FireplaceModel.priceNote(type)));
+    document.getElementById('fireplaceAreaNote').replaceChildren(...lines);
   }
 
   // The size step for a facade: the chosen form's own fields (named, in its
@@ -3610,6 +3808,7 @@
 
   function updateDimensionLabels(productKey) {
     syncFacadeFields();
+    syncFireplaceFields();
     const typeId = productSubcategorySelect.value;
     const isSpiral = productKey === 'lestnitsa' && GeometryModel.STAIR_SHAPES[typeId] === 'spiral';
     const typeLabels = (productKey === 'stena' || productKey === 'podokonnik') ? TYPE_DIMENSION_LABELS[typeId] : null;
@@ -3701,9 +3900,16 @@
     warningOut.innerHTML = '';
     remainderOut.textContent = '';
 
-    // A facade's sizes are its own (facade-model.js), not width x length.
-    const sizesReady = selectedProductKey === 'fasad' ? facadeSizesComplete() : (width > 0 && length > 0);
+    // A facade's or a fireplace's sizes are its own (facade-model.js,
+    // fireplace-model.js), not width x length.
+    const sizesReady = selectedProductKey === 'fasad' ? facadeSizesComplete()
+      : selectedProductKey === 'kaminy' ? fireplaceSizesComplete()
+      : (width > 0 && length > 0);
+    // A fireplace names what is missing or wrong (fireplace-model.js) -- and
+    // clears its marked fields once the sizes are right.
+    const fireplaceError = selectedProductKey === 'kaminy' ? fireplaceSizeError() : '';
     if (!sizesReady) {
+      if (selectedProductKey === 'kaminy') dimError.textContent = fireplaceError;
       dimError.style.display = dimsTouched ? 'block' : 'none';
       setPriceHint(INCOMPLETE_HINT);
       breakdown.innerHTML = '';
@@ -3876,11 +4082,18 @@
 
     infoBlock.style.display = '';
 
-    setPriceValue('≈ ' + formatRub(result.total));
+    setPriceValue(result.total === null ? 'Нужно уточнить у менеджера' : '≈ ' + formatRub(result.total));
 
     let html = '';
     const facadeInfo = constructorState.productConfig.fasad ? FacadeModel.describeFacade(constructorState.productConfig.fasad) : null;
-    if (facadeInfo) {
+    const fireplaceInfo = constructorState.productConfig.kaminy ? FireplaceModel.describeFireplace(constructorState.productConfig.kaminy) : null;
+    if (fireplaceInfo) {
+      // Камин: the type, a portal's form, each size under its own name, area.
+      html += `Тип: <span>${escapeHtml(fireplaceInfo.typeLabel)}</span><br>`;
+      if (fireplaceInfo.formLabel) html += `Вид: <span>${escapeHtml(fireplaceInfo.formLabel)}</span><br>`;
+      fireplaceInfo.params.forEach(p => { html += `${escapeHtml(p.label)}: <span>${p.valueMm} мм</span><br>`; });
+      html += `${escapeHtml(fireplaceInfo.areaTitle)}: <span>${decimal2(fireplaceInfo.areaM2)} м²</span><br>`;
+    } else if (facadeInfo) {
       // Фасад: the type, form, each size under its own name, quantity, area.
       html += `Тип: <span>${escapeHtml(facadeInfo.typeLabel)}</span><br>`;
       if (facadeInfo.formLabel) html += `Форма: <span>${escapeHtml(facadeInfo.formLabel)}</span><br>`;
@@ -3913,7 +4126,7 @@
     html += `Материал: <span>${escapeHtml(stoneDisplay)}</span><br>`;
     html += `Изделие: <span>${product.label}</span>`;
     const subcategoryRow = currentSubcategoryRow();
-    if (subcategoryRow && !facadeInfo) {
+    if (subcategoryRow && !facadeInfo && !fireplaceInfo) {
       html += `<br>Вариант: <span>${escapeHtml(subcategoryLabel(subcategoryRow))}</span>`;
       const subcategoryQty = constructorState.subcategory.qty;
       if (subcategoryRow.unit === 'шт.' && subcategoryQty > 0) {
@@ -3982,6 +4195,15 @@
     }
 
     updatedAtOut.textContent = 'Расчёт по ценам на ' + formatDate(UPDATED_AT) + ', точная цена подтверждается менеджером.';
+    // No company rate for the product's work yet (pricing.js `unpriced`):
+    // the stone is priced, the work and the total are the manager's -- a
+    // manual estimate, never «0 ₽».
+    if (result.total === null) {
+      const note = 'Камень: ≈ ' + formatRub(result.subtotal) + '. ' + result.workNote;
+      warningOut.textContent = warningOut.textContent ? warningOut.textContent + ' ' + note : note;
+      warningOut.style.display = 'block';
+      return { state: constructorState, outcome: { kind: 'manual', reason: 'unpriced_work', message: warningOut.textContent } };
+    }
     const message = warningOut.textContent || null;
     return { state: constructorState, outcome: { kind: 'ok', result, message } };
   }
@@ -4145,6 +4367,15 @@
       dimsTouched = true;
       updateFacadeAreaNote();
       updateDimDiagram();
+      calculate();
+    });
+  });
+  // «Камины»: every size field updates the area note, the error, the 3D and
+  // the estimate (calculate()).
+  Object.values(FireplaceModel.PARAM_FIELDS).forEach(id => {
+    document.getElementById(id).addEventListener('input', () => {
+      dimsTouched = true;
+      updateFireplaceAreaNote();
       calculate();
     });
   });

@@ -481,13 +481,36 @@
     return { key: group.key, areaM2: area, fabrication, installation, polish, work: fabrication + installation + polish, unpriced };
   }
 
+  // A work rate the company has set: a finite number. null (or none) is
+  // «не задано» -- never 0.
+  function isRateSet(rate) {
+    return typeof rate === 'number' && Number.isFinite(rate);
+  }
+
+  // What the client reads when some of the product's own work has no rate:
+  // «Стоимость изготовления уточнит менеджер.»
+  const UNPRICED_WORK_NAMES = { fabrication: 'изготовления', installation: 'монтажа', polish: 'полировки' };
+  function unpricedWorkNote(unpriced) {
+    const names = (unpriced || []).map(k => UNPRICED_WORK_NAMES[k]).filter(Boolean);
+    if (!names.length) return null;
+    const list = names.length > 1 ? names.slice(0, -1).join(', ') + ' и ' + names[names.length - 1] : names[0];
+    return 'Стоимость ' + list + ' уточнит менеджер.';
+  }
+
   function computeWorkAndTotal(subtotal, area, rates, options, extraDimensions, extraLineItems) {
     const { installEnabled, polishEnabled, complexEnabled } = options;
     const { bortikLengthM = 0, fartukAreaM2 = 0, ostrovAreaM2 = 0 } = extraDimensions || {};
-    const fabricationRate = rates.fabricationRatePerM2 * (complexEnabled ? rates.complexShapeMultiplier : 1);
-    const fabrication = fabricationRate * area;
-    const installation = installEnabled ? rates.installationRatePerM2 * area : 0;
-    const polish = polishEnabled ? rates.polishRatePerM2 * area : 0;
+    // The product's own work that is asked for but has no rate yet: it is
+    // not free -- its line, the work and the total stay unknown (null) and
+    // `unpriced` names it; the stone (subtotal) is still what it is.
+    const unpriced = [];
+    if (!isRateSet(rates.fabricationRatePerM2)) unpriced.push('fabrication');
+    if (installEnabled && !isRateSet(rates.installationRatePerM2)) unpriced.push('installation');
+    if (polishEnabled && !isRateSet(rates.polishRatePerM2)) unpriced.push('polish');
+    const fabrication = unpriced.includes('fabrication') ? null
+      : rates.fabricationRatePerM2 * (complexEnabled ? rates.complexShapeMultiplier : 1) * area;
+    const installation = !installEnabled ? 0 : (unpriced.includes('installation') ? null : rates.installationRatePerM2 * area);
+    const polish = !polishEnabled ? 0 : (unpriced.includes('polish') ? null : rates.polishRatePerM2 * area);
     // miscFlatSum/miscRatePerM2/bortikRatePerM/fartukRatePerM2/ostrovRatePerM2
     // are `null` in product-types.js until real КП data is available for
     // each -- treat that as "not charged yet", not NaN.
@@ -508,9 +531,9 @@
       (sum, item) => sum + Math.max(0, item.quantity) * (item.rate || 0),
       0
     );
-    const work = fabrication + installation + polish + misc + extras + catalogExtras;
-    const total = subtotal + work;
-    return { fabrication, installation, polish, misc, extras, catalogExtras, work, total };
+    const work = unpriced.length ? null : fabrication + installation + polish + misc + extras + catalogExtras;
+    const total = work === null ? null : subtotal + work;
+    return { fabrication, installation, polish, misc, extras, catalogExtras, work, total, unpriced };
   }
 
   // The online estimate's limits: a product past them is a project for a
@@ -574,7 +597,7 @@
     const empty = {
       subtotal: null, fabrication: null, installation: null, polish: null, misc: null, extras: null,
       catalogExtras: null, work: null, total: null, nSlabs: 0, remainderM2: null, matchedSlab: null, matchedSlabs: [],
-      material: null, groups: []
+      material: null, groups: [], unpriced: [], workNote: null
     };
 
     if (!jobIsValid(job, explicitArea || (givenJob && !givenJob.pieces))) {
@@ -629,13 +652,17 @@
     const subtotal = material.subtotal;
     const base = computeWorkAndTotal(subtotal, mainArea, rates, options, extraDimensions, extraLineItems);
     const groupWork = groups.reduce((s, g) => s + g.work, 0);
-    const work = base.work + groupWork;
+    // The product's own work without a rate (base.unpriced): the stone is
+    // priced, the work and the total are left to the manager -- never a
+    // total that looks final (see computeWorkAndTotal).
+    const work = base.work === null ? null : base.work + groupWork;
     // Only one slab, one uncut piece: how much of that slab is left.
     const single = job.pieces && material.nSlabs === 1 && material.seams === 0 && job.pieces.length === 1 && job.pieces[0].count === 1;
     return {
       ok: true, reason: null, subtotal,
       fabrication: base.fabrication, installation: base.installation, polish: base.polish, misc: base.misc,
-      extras: base.extras, catalogExtras: base.catalogExtras, groupWork, work, total: subtotal + work,
+      extras: base.extras, catalogExtras: base.catalogExtras, groupWork, work, total: work === null ? null : subtotal + work,
+      unpriced: base.unpriced, workNote: unpricedWorkNote(base.unpriced),
       nSlabs: material.nSlabs,
       remainderM2: single ? material.slabAreaM2 - material.productAreaM2 : null,
       matchedSlab: material.slabs[0], matchedSlabs: material.slabs,
@@ -646,6 +673,7 @@
   return {
     findBestTypeASlab, slabCapacityForCross, minCostCover, findTypeASegmentedResult,
     computeRemainderAreaM2, computeTypeBResult, computeTypeBResultForArea, computeWorkAndTotal, calculatePrice,
+    isRateSet, unpricedWorkNote,
     cutPieces, shelfPack, packSlab, planPieces, planSurface, planMaterial, computeGroupWork, defaultJob,
     PRICING_LIMITS
   };

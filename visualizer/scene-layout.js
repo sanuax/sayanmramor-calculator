@@ -571,6 +571,36 @@
     return { parts, floorY: 0, framePadding: 0.25 };
   }
 
+  // «Камины»: the plan (GeometryModel.fireplacePlan) already holds every
+  // stone plate and the firebox -- this only turns them into parts, never
+  // measures anything itself. Stone plates keep their plan key as the part
+  // name. The firebox and its glass are the image of a fireplace, not stone
+  // (`visualOnly`). The wall behind is context: a portal's firebox is set
+  // into it, so there the wall is built around the opening.
+  function fireplaceParts(m) {
+    const plan = m.fireplace && m.fireplace.plan;
+    const parts = [];
+    if (!plan || !plan.ok) return { parts, floorY: 0, framePadding: 0.2 };
+    plan.plates.forEach(p => parts.push(named(box('stone', p.center, p.size), p.key)));
+    plan.visual.forEach(v => parts.push(Object.assign(named(box(v.role, v.center, v.size), v.key), { visualOnly: true })));
+    const wallH = plan.extent.heightM + 0.8, run = plan.extent.widthM + 1.6;
+    if (plan.wallOpening) wallAround(plan.wallOpening, wallH, run).forEach(w => parts.push(named(w, 'fireplace-wall')));
+    else parts.push(named(facadeWall(wallH, run), 'fireplace-wall'));
+    return { parts, floorY: 0, framePadding: 0.2 };
+  }
+
+  // A wall with an opening from the floor (the portal's firebox is set into
+  // it): the parts left of, right of and above the opening, as deep as it.
+  function wallAround(o, heightM, runM) {
+    const cx = -o.depthM / 2, sx = o.depthM;
+    const left = o.zMin + runM / 2, right = runM / 2 - o.zMax;
+    return [
+      box('context', [cx, heightM / 2, (-runM / 2 + o.zMin) / 2], [sx, heightM, left]),
+      box('context', [cx, heightM / 2, (o.zMax + runM / 2) / 2], [sx, heightM, right]),
+      box('context', [cx, (o.yMax + heightM) / 2, (o.zMin + o.zMax) / 2], [sx, heightM - o.yMax, o.zMax - o.zMin]),
+    ];
+  }
+
   function verticalParts(m) {
     const T = m.visualThicknessM;
     const parts = [];
@@ -907,6 +937,10 @@
     let result;
     if (model.stairs) {
       result = stairParts(model);
+    } else if (model.productKey === 'kaminy') {
+      // Its own parts -- a fireplace must never fall through to the
+      // countertop slab below.
+      result = fireplaceParts(model);
     } else if (model.productKey === 'pol') {
       result = floorParts(model);
     } else if (['panno', 'stena', 'fasad'].includes(model.productKey)) {

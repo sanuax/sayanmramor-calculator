@@ -71,7 +71,15 @@
         island: true, barCounter: true
       }
     },
-    stupeni:              { label: "Ступени", type: 'A', supportsEdgeWork: true, cameraPreset: 'iso-side-high' }
+    stupeni:              { label: "Ступени", type: 'A', supportsEdgeWork: true, cameraPreset: 'iso-side-high' },
+    // «Камины» (fireplace-model.js): портал (с полкой / без полки), облицовка
+    // каминного короба, подиум -- each with its own sizes, always one piece;
+    // cut as the stone plates of GeometryModel.fireplacePlan (product-parts.js).
+    // No edge work, no countertop extras and no «Опции» step (supportsOptions:
+    // false -- a «Монтаж» ticked for another product never reaches it).
+    // showroom: false -- the site's 3D showroom has no fireplace, so there
+    // is no «в шоурум» link for one (url-bootstrap.js).
+    kaminy:               { label: "Камины", type: 'A', cameraPreset: 'front', supportsOptions: false, showroom: false }
   };
 
   // Единая точка чтения additionalWorks -- отсутствие объекта или неизвестный
@@ -151,7 +159,14 @@
     lestnitsa:  { fabricationRatePerM2: 67500, installationRatePerM2: 31500, polishRatePerM2: 32400 }, // × 1.8
     fasad:      { fabricationRatePerM2: 48750, installationRatePerM2: 22750, polishRatePerM2: 23400 }, // × 1.3
     stupeni:    { fabricationRatePerM2: 52500, installationRatePerM2: 24500, polishRatePerM2: 25200 }, // × 1.4
-    podokonnik: { fabricationRatePerM2: 30000, installationRatePerM2: 14000, polishRatePerM2: 14400 }  // × 0.8
+    podokonnik: { fabricationRatePerM2: 30000, installationRatePerM2: 14000, polishRatePerM2: 14400 }, // × 0.8
+
+    // «Камины»: изготовление ₽/м² площади камня (граней плит портала,
+    // облицовки или подиума). Ставки компании нет -- null = «не задано», не 0
+    // и не ставка другого изделия: pricing.js считает камень, а стоимость
+    // работы и итог оставляет менеджеру (computeWorkAndTotal -> unpriced).
+    // Монтаж и полировка камина в MVP не предлагаются. ТРЕБУЕТ ЗАПОЛНЕНИЯ.
+    kaminy: { fabricationRatePerM2: null, installationRatePerM2: null, polishRatePerM2: null }
   };
 
   // Подступенок -- отдельная позиция со своей ставкой за м² (не ставка

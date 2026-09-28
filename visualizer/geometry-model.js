@@ -372,6 +372,172 @@
     return { type: type.key, form: form.id, params, quantity: cfg ? cfg.quantity : 1, cameraPreset: type.cameraPreset };
   }
 
+  // ---- «Камины»: one plan of stone plates for the 3D, the area and the cut --
+  //
+  // fireplace-model.js says what the client measures; this is where those
+  // sizes become plates. Every stone part is a flat rectangular plate:
+  //   face   -- the surface it covers, the priced area (face[0] x face[1]);
+  //   box    -- the solid the 3D draws (center/size, metres).
+  // Where two plates meet at a corner, one stops T short behind the other,
+  // so no two faces ever share a plane (no flicker); its face is still the
+  // full surface of that side, because the other plate's edge fills the
+  // corner -- so the faces add up to exactly the model's formula and to the
+  // stone the 3D shows. Frame as the facade's: the wall face at x = 0, the
+  // fireplace standing out toward X+, its width along Z centred on 0, the
+  // floor at y = 0. Sizes in metres (the model's own), no conversion.
+  //
+  // Loaded after this file in the page (if at all) -- looked up when used.
+  // The plate thickness T is the model's (FireplaceModel.PLATE_THICKNESS_M):
+  // one number for whether sizes fit and for how the plates are drawn.
+  const Fireplace = () => (isNode ? require('../fireplace-model.js') : globalRoot.FireplaceModel);
+  // How deep the dark firebox goes behind the fireplace's front.
+  const FIREBOX_DEPTH_M = 0.3;
+  // The glass of a closed firebox (облицовка короба).
+  const FIREBOX_GLASS_M = 0.01;
+
+  // A plate from its priced face and its solid (x0..x1, y0..y1, z0..z1).
+  // `normal`: the axis the plate is thin along.
+  function plate(key, label, face, normal, [x0, x1], [y0, y1], [z0, z1]) {
+    return {
+      key, label, count: 1,
+      lengthM: Math.max(face[0], face[1]), widthM: Math.min(face[0], face[1]), areaM2: face[0] * face[1],
+      normal, center: [(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2], size: [x1 - x0, y1 - y0, z1 - z0],
+    };
+  }
+
+  function visualBox(key, role, [x0, x1], [y0, y1], [z0, z1]) {
+    return { key, role, center: [(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2], size: [x1 - x0, y1 - y0, z1 - z0] };
+  }
+
+  // Портал: piers (стойки) b wide either side of the W x H opening, the
+  // lintel (перемычка) h high over them, all d deep. The opening's reveals
+  // and the lintel's underside are stone. With a shelf, a plate (Wo + 2o) x
+  // (d + o) lies on top; without one, the lintel's top is a Wo x d plate that
+  // covers the lintel's front and sides from above. The dark firebox is set
+  // into the wall behind the opening (the wall is open there -- see
+  // scene-layout.js), so every reveal is seen whole.
+  function portalPlates(form, p, T) {
+    const W = p.openingWidth, H = p.openingHeight, b = p.pierWidth, h = p.lintelHeight, d = p.depth;
+    const zR = W / 2, zO = W / 2 + b, top = H + h;
+    const shelf = form.id === 'with-shelf';
+    const cap = shelf ? 0 : T;            // the top plate covers the lintel's upper edge
+    const front = [d - T, d], back = [0, d - T];
+    const plates = [
+      plate('portal-pier-left', 'Лицевая стойка', [H, b], 'x', front, [0, H], [-zO, -zR]),
+      plate('portal-pier-right', 'Лицевая стойка', [H, b], 'x', front, [0, H], [zR, zO]),
+      plate('portal-pier-side-left', 'Боковина стойки', [H, d], 'z', back, [0, H], [-zO, -zO + T]),
+      plate('portal-pier-side-right', 'Боковина стойки', [H, d], 'z', back, [0, H], [zO - T, zO]),
+      plate('portal-opening-left', 'Откос проёма', [H, d], 'z', back, [0, H], [-zR - T, -zR]),
+      plate('portal-opening-right', 'Откос проёма', [H, d], 'z', back, [0, H], [zR, zR + T]),
+      plate('portal-lintel-front', 'Лицевая перемычка', [W + 2 * b, h], 'x', front, [H, top - cap], [-zO, zO]),
+      plate('portal-lintel-side-left', 'Боковина перемычки', [h, d], 'z', back, [H, top - cap], [-zO, -zO + T]),
+      plate('portal-lintel-side-right', 'Боковина перемычки', [h, d], 'z', back, [H, top - cap], [zO - T, zO]),
+      plate('portal-lintel-bottom', 'Низ перемычки', [W, d], 'y', back, [H, H + T], [-zR, zR]),
+    ];
+    if (shelf) {
+      const o = p.shelfProjection;
+      plates.push(plate('portal-shelf', 'Полка', [W + 2 * b + 2 * o, d + o], 'y', [0, d + o], [top, top + T], [-zO - o, zO + o]));
+    } else {
+      plates.push(plate('portal-lintel-top', 'Верх перемычки', [W + 2 * b, d], 'y', [0, d], [top - T, top], [-zO, zO]));
+    }
+    return {
+      plates,
+      visual: [visualBox('firebox', 'metal', [-FIREBOX_DEPTH_M, 0], [0, H], [-zR, zR])],
+      // The wall is open behind the opening, for the firebox set into it.
+      wallOpening: { zMin: -zR, zMax: zR, yMin: 0, yMax: H, depthM: FIREBOX_DEPTH_M },
+      extent: { widthM: W + 2 * b + (shelf ? 2 * p.shelfProjection : 0), heightM: top + (shelf ? T : 0), depthM: d + (shelf ? p.shelfProjection : 0) },
+    };
+  }
+
+  // Облицовка короба: a front around the centred firebox (left, right, above
+  // and -- when it does not start at the floor -- below) and two sides Db
+  // deep; the box's top is not clad. The firebox sits behind the front,
+  // glazed; its reveals are not stone.
+  function claddingPlates(p, T) {
+    const Wb = p.claddingWidth, Hb = p.claddingHeight, D = p.depth;
+    const W = p.fireboxWidth, H = p.fireboxHeight, e = p.fireboxBottom;
+    const zF = W / 2, zB = Wb / 2, front = [D - T, D], back = [0, D - T];
+    const plates = [
+      plate('cladding-front-left', 'Лицевая панель слева от топки', [Hb, (Wb - W) / 2], 'x', front, [0, Hb], [-zB, -zF]),
+      plate('cladding-front-right', 'Лицевая панель справа от топки', [Hb, (Wb - W) / 2], 'x', front, [0, Hb], [zF, zB]),
+      plate('cladding-front-top', 'Лицевая панель над топкой', [W, Hb - e - H], 'x', front, [e + H, Hb], [-zF, zF]),
+    ];
+    // A firebox from the floor has no panel under it -- never a zero-high plate.
+    if (e > 0) plates.push(plate('cladding-front-bottom', 'Лицевая панель под топкой', [W, e], 'x', front, [0, e], [-zF, zF]));
+    plates.push(
+      plate('cladding-side-left', 'Боковина короба', [Hb, D], 'z', back, [0, Hb], [-zB, -zB + T]),
+      plate('cladding-side-right', 'Боковина короба', [Hb, D], 'z', back, [0, Hb], [zB - T, zB]),
+    );
+    const fireboxBack = Math.max(0, D - T - FIREBOX_DEPTH_M);
+    return {
+      plates,
+      visual: [
+        visualBox('firebox', 'metal', [fireboxBack, D - T], [e, e + H], [-zF, zF]),
+        visualBox('firebox-glass', 'glass', [D - T, D - T + FIREBOX_GLASS_M], [e, e + H], [-zF, zF]),
+      ],
+      wallOpening: null,
+      extent: { widthM: Wb, heightM: Hb, depthM: D },
+    };
+  }
+
+  // Подиум: the top covers the front and sides from above; the front covers
+  // the sides' front edges. The back stands against the wall.
+  function podiumPlates(p, T) {
+    const L = p.length, D = p.depth, Hp = p.height, z = L / 2;
+    return {
+      plates: [
+        plate('podium-top', 'Верх подиума', [L, D], 'y', [0, D], [Hp - T, Hp], [-z, z]),
+        plate('podium-front', 'Лицевая грань подиума', [L, Hp], 'x', [D - T, D], [0, Hp - T], [-z, z]),
+        plate('podium-side-left', 'Боковина подиума', [D, Hp], 'z', [0, D - T], [0, Hp - T], [-z, -z + T]),
+        plate('podium-side-right', 'Боковина подиума', [D, Hp], 'z', [0, D - T], [0, Hp - T], [z - T, z]),
+      ],
+      visual: [],
+      wallOpening: null,
+      extent: { widthM: L, heightM: Hp, depthM: D },
+    };
+  }
+
+  // { ok, type, form, plates, visual, areaM2, missing, violations, ... } --
+  // fireplace-model.js alone decides whether the sizes make a fireplace,
+  // plates included (its `plateRules`); a fireplace it rejects gets no
+  // plates at all, never a clipped or impossible shape.
+  function fireplacePlan(type, form, params) {
+    const F = Fireplace();
+    const T = F.PLATE_THICKNESS_M;
+    const check = F.checkConstraints(type, form, params);
+    if (!check.ok) {
+      return {
+        ok: false, type: type ? type.key : null, form: form ? form.id : null, thicknessM: T,
+        plates: [], visual: [], areaM2: 0, wallOpening: null, extent: null,
+        missing: check.missing, violations: check.violations,
+      };
+    }
+    const built = type.key === 'portal' ? portalPlates(form, params, T)
+      : type.key === 'cladding' ? claddingPlates(params, T)
+        : podiumPlates(params, T);
+    const areaM2 = built.plates.reduce((s, pl) => s + pl.areaM2 * pl.count, 0);
+    return Object.assign({ ok: true, type: type.key, form: form.id, thicknessM: T, areaM2, missing: [], violations: [] }, built);
+  }
+
+  // «Камины» for the 3D: exactly the client's type, form and sizes once
+  // they are all in and form a real fireplace; until then the form's
+  // placeholder sizes (as a facade does) -- never a half-built one.
+  function buildFireplace(state) {
+    const F = Fireplace();
+    const cfg = state.productConfig ? state.productConfig.kaminy : null;
+    const type = F.getType(cfg ? cfg.typeId : typeId(state)) || F.FIREPLACE_TYPES[0];
+    const form = F.getForm(type, cfg ? cfg.form : null);
+    const own = cfg && cfg.complete ? fireplacePlan(type, form, cfg.params) : null;
+    const placeholder = {};
+    form.params.forEach(p => { placeholder[p.key] = p.placeholderMm / 1000; });
+    const useOwn = !!(own && own.ok);
+    return {
+      type: type.key, form: form.id, params: useOwn ? cfg.params : placeholder,
+      plan: useOwn ? own : fireplacePlan(type, form, placeholder),
+      placeholder: !useOwn, cameraPreset: type.cameraPreset,
+    };
+  }
+
   function buildGeometryModel(state) {
     const { widthM, lengthM } = state.dimensions;
     const productKey = state.product ? state.product.key : null;
@@ -399,6 +565,7 @@
     // edge only exists on products that support edge work.
     const edgeSupported = !caps || caps.supportsEdgeWork;
     const facade = productKey === 'fasad' ? buildFacade(state) : null;
+    const fireplace = productKey === 'kaminy' ? buildFireplace(state) : null;
 
     return {
       productKey,
@@ -412,7 +579,7 @@
       // one (or no product is selected yet), matching ThreeScene's own generic
       // fallback for an unrecognized preset name.
       // A facade type declares its own angle (a column is read from an angle).
-      cameraPreset: (facade && facade.cameraPreset) || (state.product && state.product.cameraPreset) || 'iso',
+      cameraPreset: (facade && facade.cameraPreset) || (fireplace && fireplace.cameraPreset) || (state.product && state.product.cameraPreset) || 'iso',
       edge: edgeSupported ? { type: state.edge.type, lengthMm: state.edge.lengthMm } : { type: null, lengthMm: null },
       sink,
       cooktop,
@@ -430,11 +597,13 @@
       sill: productKey === 'podokonnik' ? buildSill(state) : null,
       panel: productKey === 'panno' ? { variant: PANEL_VARIANTS[typeId(state)] || 'plain' } : null,
       facade,
+      fireplace,
     };
   }
 
   return {
     buildGeometryModel, stairPlan, stairPath, marchesFor, sillPlan, radiusWallPlan, polygonArea,
+    fireplacePlan, FIREBOX_DEPTH_M,
     STAIR_SHAPES, STEP_VARIANTS, SILL_VARIANTS, STAIR_MARCHES, MARCH_RANGE, STAIR_WITH_RISERS, U_FLIGHT_GAP_M, MIN_TREAD_DEPTH_M,
   };
 });

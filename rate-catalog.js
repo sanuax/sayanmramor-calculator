@@ -6,7 +6,7 @@
   }
 })(typeof window !== 'undefined' ? window : globalThis, function () {
 
-  // The 53 rows below exist purely as UI/data structure for the subcategory
+  // The 56 rows below exist purely as UI/data structure for the subcategory
   // selector (product -> shape/variant dropdown); this is deliberately
   // display-only per the design spec, and no pricing code reads from this
   // array yet. Filling in a `rate` here has no effect on the displayed
@@ -77,6 +77,13 @@
     { id: 'STEP-02', categoryLabel: 'Ступени', shape: 'Ступень', variant: 'Забежная', unit: 'шт.', rate: null, currency: null },
     { id: 'STEP-03', categoryLabel: 'Ступени', shape: 'Ступень', variant: 'Радиусная', unit: 'шт.', rate: null, currency: null },
     { id: 'STEP-04', categoryLabel: 'Ступени', shape: 'Подступенок', variant: 'Стандартный', unit: 'шт.', rate: null, currency: null },
+
+    // «Камины» (fireplace-model.js FIREPLACE_TYPES): the three MVP types; the
+    // unit is the stone area of the fireplace's plates, as it is priced
+    // (WORK_RATES.kaminy, ₽/м²). No company rate yet.
+    { id: 'FIREPLACE-01', categoryLabel: 'Камины', shape: 'Каминный портал', variant: 'С полкой / без полки', unit: 'м²', rate: null, currency: null },
+    { id: 'FIREPLACE-02', categoryLabel: 'Камины', shape: 'Облицовка каминного короба', variant: '', unit: 'м²', rate: null, currency: null },
+    { id: 'FIREPLACE-03', categoryLabel: 'Камины', shape: 'Подиум камина', variant: '', unit: 'м²', rate: null, currency: null },
   ];
 
   const ADDITIONAL_WORKS = [
@@ -118,7 +125,7 @@
     { id: 'EXTRA-07', group: 'Дополнительно', operation: 'Барная стойка', variant: 'Сложная / радиусная', unit: 'м²', rate: null, currency: null },
   ];
 
-  // The 9 INST-* rows from «Ставки изделий» -- kept as their own array, in
+  // The INST-* rows from «Ставки изделий» (plus «Камины») -- kept as their own array, in
   // the same row shape as PRODUCT_SUBCATEGORIES, because there is exactly
   // one per product category (not several shape/variant options) and it is
   // a distinct pricing concept that already has a live UI+field (the
@@ -135,6 +142,9 @@
     { id: 'INST-106', categoryLabel: 'Столешницы в ванную', shape: 'Монтаж', variant: 'Монтаж на объекте', unit: 'м²', rate: null, currency: null },
     { id: 'INST-107', categoryLabel: 'Столешницы на кухню', shape: 'Монтаж', variant: 'Монтаж на объекте', unit: 'м²', rate: null, currency: null },
     { id: 'INST-108', categoryLabel: 'Ступени', shape: 'Монтаж', variant: 'Монтаж на объекте', unit: 'м²', rate: null, currency: null },
+    // One row per product category (the catalog's contract); the fireplace
+    // MVP offers no «Монтаж», so this row is only the future rate's place.
+    { id: 'INST-109', categoryLabel: 'Камины', shape: 'Монтаж', variant: 'Монтаж на объекте', unit: 'м²', rate: null, currency: null },
   ];
 
   function getSubcategoriesForProduct(categoryLabel) {

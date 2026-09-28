@@ -18,6 +18,9 @@
   const FacadeModel = (typeof module !== 'undefined' && module.exports)
     ? require('./facade-model.js')
     : (typeof window !== 'undefined' ? window : globalThis).FacadeModel;
+  const FireplaceModel = (typeof module !== 'undefined' && module.exports)
+    ? require('./fireplace-model.js')
+    : (typeof window !== 'undefined' ? window : globalThis).FireplaceModel;
   // Loaded after this file in the page -- looked up when used.
   const Parts = () => ((typeof module !== 'undefined' && module.exports)
     ? require('./product-parts.js')
@@ -33,6 +36,7 @@
     stoleshnitsa_vannaya: 'Ваша столешница',
     stoleshnitsa_kuhnya: 'Ваша столешница',
     stupeni: 'Ваши ступени',
+    kaminy: 'Ваш камин',
   };
 
   function resultTitle(productKey) {
@@ -204,6 +208,10 @@
     // cladded area (facade-model.js) -- instead of a generic width x length.
     const facadeConfig = key === 'fasad' && state.productConfig ? state.productConfig.fasad : null;
     const facade = facadeConfig ? FacadeModel.describeFacade(facadeConfig) : null;
+    // «Камины»: the same -- the type, a portal's form, every size and the
+    // stone area (fireplace-model.js).
+    const fireplaceConfig = key === 'kaminy' && state.productConfig ? state.productConfig.kaminy : null;
+    const fireplace = fireplaceConfig ? FireplaceModel.describeFireplace(fireplaceConfig) : null;
 
     let typeInfo = null;
     if (subcategory && subcategory.id && subcategory.label) {
@@ -224,7 +232,7 @@
       product: { key, label: productLabel || product.label || null, title: resultTitle(key) },
       type: typeInfo,
       shape,
-      dimensions: facade ? null : {
+      dimensions: facade || fireplace ? null : {
         lengthMm, widthMm,
         // The product's own area as it is priced (product-parts.js): every
         // step, the wings, the landings, a shaped sill -- not just length x
@@ -238,6 +246,7 @@
         title: labels.title || null,
       },
       facade,
+      fireplace,
       material: buildMaterial(state.stone),
       edge,
       riser: key === 'stupeni' ? !!(state.productConfig && state.productConfig.stupeni && state.productConfig.stupeni.riser) : null,
@@ -318,6 +327,15 @@
     return specs;
   }
 
+  // A fireplace's rows: a portal's form, each size and the stone area.
+  function fireplaceSpecs(f) {
+    const specs = [];
+    if (f.formLabel) specs.push({ key: 'fireplace.form', label: 'Вид', value: f.formLabel, detail: '' });
+    f.params.forEach(p => specs.push({ key: 'fireplace.' + p.key, label: p.label, value: p.valueMm + ' мм', detail: '' }));
+    specs.push({ key: 'fireplace.area', label: f.areaTitle, value: formatArea(f.areaM2), detail: '' });
+    return specs;
+  }
+
   // What a facade's price covers (and what the 3D shows only as the image),
   // shown with its sizes: «Стоимость указана за облицовку колонн.»
   function facadeNote(f) {
@@ -353,6 +371,7 @@
       if (!plain) areaSpec = { key: 'area', label: d.areaLabel || 'Площадь', value: formatArea(d.areaM2), detail: '' };
     }
     if (c.facade) facadeSpecs(c.facade).forEach(s => specs.push(s));
+    if (c.fireplace) fireplaceSpecs(c.fireplace).forEach(s => specs.push(s));
     if (c.steps) {
       // A stair with marches: every step, as marches x steps in one march.
       const m = c.steps.marches;
@@ -387,7 +406,7 @@
       ? c.additionalWorks.map(w => ({ key: w.key, label: w.label, detail: formatWorkDetail(w) }))
       : null;
 
-    return { title: c.product.title, specs, works, note: c.facade ? facadeNote(c.facade) : null };
+    return { title: c.product.title, specs, works, note: c.facade ? facadeNote(c.facade) : (c.fireplace ? c.fireplace.priceNote : null) };
   }
 
   // Edit shortcuts: every real step of this product except the Result

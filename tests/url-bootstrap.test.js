@@ -64,9 +64,16 @@ test('buildShowroomUrl carries only the two stable ids -- nothing of the configu
   assert.deepEqual([...url.searchParams.keys()], ['product', 'stone']);
 });
 
-test('buildShowroomUrl works for all 9 real product keys', () => {
+test('buildShowroomUrl works for the 9 real product keys the showroom has', () => {
   const { PRODUCTS: REAL } = require('../product-types.js');
-  const keys = Object.keys(REAL);
+  const keys = Object.keys(REAL).filter(k => REAL[k].showroom !== false);
   assert.equal(keys.length, 9);
   keys.forEach(k => assert.equal(buildShowroomUrl(k, null, REAL, {}), '/sayanmramor-site/showroom.html?product=' + k));
+});
+
+test('buildShowroomUrl gives no link for «Камины» -- the site\'s showroom has no fireplace', () => {
+  const { PRODUCTS: REAL } = require('../product-types.js');
+  assert.equal(REAL.kaminy.showroom, false);
+  assert.equal(buildShowroomUrl('kaminy', null, REAL, {}), null);
+  assert.equal(buildShowroomUrl('kaminy', 'delicato-brown', REAL, STONES_BY_ID), null);
 });
