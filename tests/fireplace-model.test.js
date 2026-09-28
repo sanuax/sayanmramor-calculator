@@ -98,7 +98,7 @@ test('B. every size has a label, a formula symbol, mm and a placeholder, and its
     assert.ok(p.placeholderMm > 0, where);
     assert.ok(PARAM_FIELDS[p.key], where + ' has a field');
   })));
-  // Only «Высота от пола до топки» may be zero.
+  // Only «От пола до топки» may be zero.
   const zeroable = [];
   FIREPLACE_TYPES.forEach(t => t.forms.forEach(f => f.params.forEach(p => { if (p.allowZero) zeroable.push(p.key); })));
   assert.deepEqual(zeroable, ['fireboxBottom']);

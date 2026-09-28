@@ -12,7 +12,7 @@
 // out exactly these plates, so the area, the cut pieces and the stone shown
 // in 3D are one number. A fireplace is always ordered as one piece.
 //
-// Missing sizes are `null`, not 0: «Высота от пола до топки» may truly be 0
+// Missing sizes are `null`, not 0: «От пола до топки» may truly be 0
 // (the firebox starts at the floor), so an empty field and a zero are
 // different things here.
 (function (root, factory) {
@@ -151,7 +151,7 @@
           param('depth', 'Глубина короба', 'Db', 500),
           param('fireboxWidth', 'Ширина топки', 'W', 900),
           param('fireboxHeight', 'Высота топки', 'H', 600),
-          param('fireboxBottom', 'Высота от пола до топки', 'e', 400, true),
+          param('fireboxBottom', 'От пола до топки', 'e', 400, true),
         ],
         surface: 'лицевая панель вокруг топки и две боковины короба (верх короба и откосы топки не облицовываются)',
         formula: 'Wb × Hb − W × H + 2 × Hb × Db',

@@ -75,11 +75,11 @@
     // «Камины» (fireplace-model.js): портал (с полкой / без полки), облицовка
     // каминного короба, подиум -- each with its own sizes, always one piece;
     // cut as the stone plates of GeometryModel.fireplacePlan (product-parts.js).
-    // No edge work, no countertop extras and no «Опции» step (supportsOptions:
-    // false -- a «Монтаж» ticked for another product never reaches it).
+    // No edge work and no countertop extras; the «Опции» step is the one every
+    // product has (сложная форма, доп. полировка, монтаж -- WORK_RATES below).
     // showroom: false -- the site's 3D showroom has no fireplace, so there
     // is no «в шоурум» link for one (url-bootstrap.js).
-    kaminy:               { label: "Камины", type: 'A', cameraPreset: 'front', supportsOptions: false, showroom: false }
+    kaminy:               { label: "Камины", type: 'A', cameraPreset: 'front', showroom: false }
   };
 
   // Единая точка чтения additionalWorks -- отсутствие объекта или неизвестный
@@ -165,7 +165,8 @@
     // облицовки или подиума). Ставки компании нет -- null = «не задано», не 0
     // и не ставка другого изделия: pricing.js считает камень, а стоимость
     // работы и итог оставляет менеджеру (computeWorkAndTotal -> unpriced).
-    // Монтаж и полировка камина в MVP не предлагаются. ТРЕБУЕТ ЗАПОЛНЕНИЯ.
+    // Так же монтаж и доп. полировка из «Опций»: выбраны -- их стоимость
+    // уточнит менеджер, никогда не 0 ₽. ТРЕБУЕТ ЗАПОЛНЕНИЯ.
     kaminy: { fabricationRatePerM2: null, installationRatePerM2: null, polishRatePerM2: null }
   };
 

@@ -36,9 +36,9 @@
   // 'options' (существующий шаг "Опции" -- сложная форма/доп.полировка/
   // монтаж) включён для всех продуктов, у которых эти три чекбокса что-то
   // значат (см. sayanmramor-calculator.html, ConstructorState.buildPricingInputs).
-  // Это не "универсальный шаг по умолчанию": у «Каминов» опций нет
-  // (PRODUCTS.kaminy.supportsOptions === false, ConstructorState обнуляет
-  // их), и 'options' в их список не попадает.
+  // Это не "универсальный шаг по умолчанию": продукт без опций
+  // (PRODUCTS[key].supportsOptions === false -- ConstructorState обнуляет их)
+  // не должен получать 'options' в свой список.
   //
   // 'type' vs 'shape' -- two DIFFERENT step ids, deliberately not merged:
   //   - 'shape' is real, geometry-connected form selection (straight/
@@ -82,8 +82,8 @@
     fasad: ['type', 'dimensions', 'material', 'options', 'review'],
     // Камины: 'type' -- тип камина (портал / облицовка короба / подиум,
     // FIREPLACE-* каталога, форма портала -- там же), размеры этого типа
-    // (fireplace-model.js), камень, итог. Ни кромки, ни доп.позиций, ни опций.
-    kaminy: ['type', 'dimensions', 'material', 'review'],
+    // (fireplace-model.js), камень, общие опции, итог. Ни кромки, ни доп.позиций.
+    kaminy: ['type', 'dimensions', 'material', 'options', 'review'],
   };
 
   // Человекочитаемые подписи для прогресса -- UI не должен сам решать, как

@@ -60,10 +60,10 @@ test('every product\'s first step is correct for its real capabilities', () => {
   });
 });
 
-test('«Камины»: type, sizes, stone, result -- no shape, edge, additional works or options of other products', () => {
+test('«Камины»: type, sizes, stone, the shared options, result -- no shape, edge or additional works of other products', () => {
   const steps = StepEngine.getSteps('kaminy');
-  assert.deepEqual(steps, ['type', 'dimensions', 'material', 'review']);
-  ['shape', 'edge', 'additionalWorks', 'options', 'riser'].forEach(id => assert.equal(steps.includes(id), false, id));
+  assert.deepEqual(steps, ['type', 'dimensions', 'material', 'options', 'review']);
+  ['shape', 'edge', 'additionalWorks', 'riser'].forEach(id => assert.equal(steps.includes(id), false, id));
 });
 
 test('a product missing a capability skips that step entirely -- e.g. podokonnik has no "shape" or "additionalWorks"', () => {

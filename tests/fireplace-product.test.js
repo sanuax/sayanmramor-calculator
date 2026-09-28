@@ -50,6 +50,8 @@ function stateFor(key, values) {
   return ConstructorState.readConstructorState({ doc, selectedProductKey: key, product: PRODUCTS[key], stone: null, hasAdditionalWork });
 }
 
+// None of the shared option boxes ticked.
+const NO_OPTIONS = { 'opt-complex': { checked: false }, 'opt-polish': { checked: false }, 'opt-install': { checked: false } };
 const portalState = extra => stateFor('kaminy', Object.assign({}, LEFTOVERS, fireplaceFields(portal, 'with-shelf', PORTAL), extra || {}));
 
 function inputsFor(state) {
@@ -99,15 +101,14 @@ test('«Камины» are the three approved types: портал (с полко
   assert.deepEqual(RateCatalog.getSubcategoriesForProduct(PRODUCTS.kaminy.label).map(r => r.id), ['FIREPLACE-01', 'FIREPLACE-02', 'FIREPLACE-03']);
 });
 
-test('«Камины» get none of another product\'s capabilities: no edge, countertop extras, shape or options', () => {
+test('«Камины» get none of another product\'s capabilities: no edge, countertop extras or shape -- but the shared options', () => {
   const k = PRODUCTS.kaminy;
   ['supportsEdgeWork', 'supportsCountertopExtras', 'supportsShapeSelection'].forEach(f => assert.ok(!k[f], f));
   assert.equal(k.additionalWorks, undefined);
   ['sinkCutout', 'cooktopCutout', 'holes', 'curb', 'backsplash', 'wallPanel', 'island', 'barCounter']
     .forEach(c => assert.equal(hasAdditionalWork(k, c), false, c));
-  assert.equal(k.supportsOptions, false);
-  // Every other product keeps its options.
-  Object.entries(PRODUCTS).filter(([key]) => key !== 'kaminy').forEach(([key, p]) => assert.notEqual(p.supportsOptions, false, key));
+  // The options every product has (stage 7.3): no product opts out of them.
+  Object.entries(PRODUCTS).forEach(([key, p]) => assert.notEqual(p.supportsOptions, false, key));
 });
 
 test('no quantity for a fireplace: always one piece, no field for it', () => {
@@ -192,13 +193,12 @@ test('no quantity and no countertop extras on a fireplace\'s steps', () => {
   // The generic «Количество, шт.» shows only for a piece row -- a fireplace's rows are м².
   assert.match(html, /subcategoryQtyInput\.style\.display = row && row\.unit === 'шт\.'/);
   RateCatalog.getSubcategoriesForProduct(PRODUCTS.kaminy.label).forEach(r => assert.notEqual(r.unit, 'шт.', r.id));
-  // No shape (island, bar counter), edge, extras (sink, cooktop, curb,
-  // backsplash, bookmatch) or options step.
+  // No shape (island, bar counter), edge or extras (sink, cooktop, curb,
+  // backsplash, bookmatch) step.
   const steps = StepEngine.PRODUCT_STEPS.kaminy;
-  ['shape', 'edge', 'additionalWorks', 'options', 'riser'].forEach(s => assert.ok(!steps.includes(s), s));
+  ['shape', 'edge', 'additionalWorks', 'riser'].forEach(s => assert.ok(!steps.includes(s), s));
   const state = stateFor('kaminy', Object.assign({}, LEFTOVERS, { productSubcategory: { value: portal.id } }));
   assert.equal(state.subcategory.qty, 0);
-  assert.equal(state.options.installEnabled, false);
 });
 
 // ---- the size step (stage 7.2) ------------------------------------------------------
@@ -238,7 +238,7 @@ test('the size fields: one «мм» number field per model size, named and order
   const labels = v => FireplaceModel.getForm(v.type, v.form).params.map(p => p.label);
   assert.deepEqual(labels(VARIANTS[0]), ['Ширина проёма', 'Высота проёма', 'Ширина простенка', 'Высота перемычки', 'Глубина портала', 'Вылет полки']);
   assert.deepEqual(labels(VARIANTS[1]), ['Ширина проёма', 'Высота проёма', 'Ширина простенка', 'Высота перемычки', 'Глубина портала']);
-  assert.deepEqual(labels(VARIANTS[2]), ['Ширина короба', 'Высота короба', 'Глубина короба', 'Ширина топки', 'Высота топки', 'Высота от пола до топки']);
+  assert.deepEqual(labels(VARIANTS[2]), ['Ширина короба', 'Высота короба', 'Глубина короба', 'Ширина топки', 'Высота топки', 'От пола до топки']);
   assert.deepEqual(labels(VARIANTS[3]), ['Длина подиума', 'Глубина подиума', 'Высота подиума']);
   // The generic «Длина / Ширина» and their diagram give way to these.
   assert.match(fireplaceUi(), /if \(fireplace\) document\.getElementById\('dimGenericFields'\)\.hidden = true;/);
@@ -289,7 +289,7 @@ test('incomplete or wrong sizes: missing, not a number, zero, negative -- from t
   assert.deepEqual(cfgOf(VARIANTS[0], { [PARAM_FIELDS.openingWidth]: { value: 'abc' } }).missing, ['openingWidth'], 'not a number = not entered');
   assert.deepEqual(cfgOf(VARIANTS[0], { [PARAM_FIELDS.openingWidth]: { value: '0' } }).violations.map(x => x.rule), ['positive']);
   assert.deepEqual(cfgOf(VARIANTS[0], { [PARAM_FIELDS.openingWidth]: { value: '-900' } }).violations.map(x => x.rule), ['positive']);
-  // «Высота от пола до топки» may be 0 -- not below.
+  // «От пола до топки» may be 0 -- not below.
   assert.equal(cfgOf(VARIANTS[2], { [PARAM_FIELDS.fireboxBottom]: { value: '0' } }).complete, true);
   assert.deepEqual(cfgOf(VARIANTS[2], { [PARAM_FIELDS.fireboxBottom]: { value: '-1' } }).violations.map(x => x.rule), ['nonNegative']);
   // An incomplete fireplace is cut as nothing (product-parts.js says what is missing).
@@ -417,8 +417,12 @@ test('the other 9 products: no fireplace in their configuration, their sizes as 
 
 // ---- steps --------------------------------------------------------------------------
 
-test('PRODUCT_STEPS.kaminy: type, sizes, stone, result', () => {
-  assert.deepEqual(StepEngine.PRODUCT_STEPS.kaminy, ['type', 'dimensions', 'material', 'review']);
+test('PRODUCT_STEPS.kaminy: type, sizes, stone, the shared options, result', () => {
+  assert.deepEqual(StepEngine.PRODUCT_STEPS.kaminy, ['type', 'dimensions', 'material', 'options', 'review']);
+  assert.equal(StepEngine.nextStep('kaminy', 'material'), 'options');
+  assert.equal(StepEngine.nextStep('kaminy', 'options'), 'review');
+  assert.equal(StepEngine.previousStep('kaminy', 'review'), 'options');
+  assert.equal(StepEngine.previousStep('kaminy', 'options'), 'material');
   assert.equal(StepEngine.firstStep('kaminy'), 'type');
   assert.equal(StepEngine.lastStep('kaminy'), 'review');
 });
@@ -475,7 +479,7 @@ test('ConstructorState reads a fireplace through fireplace-model: type, form, si
   assert.deepEqual([bare.form, 'shelfProjection' in bare.params], ['without-shelf', false]);
 });
 
-test('nothing another product left on the page reaches a fireplace: sizes, quantity, shape, extras, edges, options', () => {
+test('nothing another product left on the page reaches a fireplace: sizes, quantity, shape, extras, edges', () => {
   const state = portalState();
   assert.deepEqual([state.dimensions.widthM, state.dimensions.lengthM], [0, 0]);
   assert.equal(state.subcategory.qty, 0);
@@ -485,7 +489,8 @@ test('nothing another product left on the page reaches a fireplace: sizes, quant
   assert.deepEqual(state.backsplash, { widthM: 0, lengthM: 0 });
   assert.equal(state.cooktopCount, 0);
   assert.deepEqual(state.holeCounts, { mixer: 0, socket: 0, dispenser: 0 });
-  assert.deepEqual(state.options, { complexEnabled: false, polishEnabled: false, installEnabled: false });
+  // The options are the shared checkboxes -- read as for every product.
+  assert.deepEqual(state.options, { complexEnabled: true, polishEnabled: true, installEnabled: true });
   const { extraLineItems, extraDimensions } = inputsFor(state);
   assert.deepEqual(extraLineItems, [], 'no edge, cut or extra is priced');
   assert.deepEqual(extraDimensions, { bortikLengthM: 0, fartukAreaM2: 0, ostrovAreaM2: 0 });
@@ -498,7 +503,7 @@ test('switching products: the fireplace is only in a fireplace\'s state, and the
   assert.deepEqual([countertop.dimensions.widthM, countertop.dimensions.lengthM], [0.65, 2.4], 'its own sizes, as before');
   assert.equal(countertop.options.installEnabled, true, 'its options, as before');
   const fireplace = stateFor('kaminy', values);
-  assert.deepEqual([fireplace.dimensions.widthM, fireplace.options.installEnabled], [0, false]);
+  assert.deepEqual([fireplace.dimensions.widthM, fireplace.options.installEnabled], [0, true], 'the shared options, as for every product');
   Object.keys(PRODUCTS).filter(k => k !== 'kaminy').forEach(k => assert.equal(stateFor(k, values).productConfig.kaminy, null, k));
 });
 
@@ -515,7 +520,7 @@ test('buildPricingInputs for a fireplace: its null rates, its plates as the job,
 // ---- pricing with no rate ---------------------------------------------------------------------
 
 test('a fireplace with no rate: the stone is priced; the work and the total are left to the manager', () => {
-  const r = priceOf(portalState());
+  const r = priceOf(portalState(NO_OPTIONS));
   assert.equal(r.ok, true);
   // The stone: laid out, priced.
   assert.ok(Number.isFinite(r.subtotal) && r.subtotal > 0);
@@ -600,4 +605,128 @@ test('a product with set rates is priced exactly as before', () => {
   assert.equal(r.workNote, null);
   close(r.fabrication, WORK_RATES.stoleshnitsa_kuhnya.fabricationRatePerM2 * 0.6 * 2.4);
   close(r.total, r.subtotal + r.work);
+});
+
+// ---- the «Опции» step (stage 7.3) --------------------------------------------------
+
+const OPTION_BOXES = { complex: 'opt-complex', polish: 'opt-polish', install: 'opt-install' };
+const ticked = (...keys) => {
+  const v = {};
+  Object.entries(OPTION_BOXES).forEach(([k, id]) => { v[id] = { checked: keys.includes(k) }; });
+  return v;
+};
+const portalWith = (...keys) => variantState(VARIANTS[0], null, ticked(...keys));
+
+// The same fireplace priced with the rates given (a company's future rates).
+function priceWithRates(state, productRates) {
+  const { rates, extraLineItems, extraDimensions, job, groupRates } = ConstructorState.buildPricingInputs(state, {
+    productRates, miscFlatSum: ProductTypes.MISC_FLAT_SUM, miscRatePerM2: ProductTypes.MISC_RATE_PER_M2,
+    complexShapeMultiplier: ProductTypes.COMPLEX_SHAPE_MULTIPLIER, countertopExtrasRates: ProductTypes.COUNTERTOP_EXTRAS_RATES,
+    getAdditionalWorkRate: RateCatalog.getAdditionalWorkRate, riserRates: ProductTypes.RISER_WORK_RATES,
+    extrasInstallRates: ProductTypes.COUNTERTOP_EXTRAS_INSTALL_RATES,
+  });
+  return Pricing.calculatePrice({
+    stone: STONE, widthM: state.dimensions.widthM, lengthM: state.dimensions.lengthM,
+    productType: state.product.type, rates, extraLineItems, extraDimensions, job, groupRates,
+    installEnabled: state.options.installEnabled, polishEnabled: state.options.polishEnabled, complexEnabled: state.options.complexEnabled,
+    marginCm: ProductTypes.SAW_MARGIN_CM, usageLimit: ProductTypes.SLAB_USAGE_LIMIT,
+  });
+}
+
+test('«Опции»: the one shared step -- its three boxes, in their order, for a fireplace too', () => {
+  assert.equal(PRODUCTS.kaminy.supportsOptions, undefined, 'no opt-out: the default every product has');
+  assert.ok(StepEngine.getSteps('kaminy').includes('options'));
+  const step = htmlBetween('data-step-id="options"', '</section>');
+  const boxes = [...step.matchAll(/<input type="checkbox" id="([^"]+)"> ([^\n]+)/g)].map(m => [m[1], m[2].trim()]);
+  assert.deepEqual(boxes, [
+    ['opt-complex', 'Сложная форма / фигурный рез'],
+    ['opt-polish', 'Дополнительная полировка'],
+    ['opt-install', 'Монтаж на объекте'],
+  ]);
+  // No fireplace list of its own anywhere on the page or in the state.
+  assert.doesNotMatch(step, /kaminy|fireplace/i);
+  assert.doesNotMatch(html, /fireplaceOptions/);
+});
+
+test('a ticked option is in the fireplace\'s state, as for every product; step navigation never clears a box', () => {
+  assert.deepEqual(portalWith().options, { complexEnabled: false, polishEnabled: false, installEnabled: false });
+  assert.deepEqual(portalWith('complex').options, { complexEnabled: true, polishEnabled: false, installEnabled: false });
+  assert.deepEqual(portalWith('polish').options, { complexEnabled: false, polishEnabled: true, installEnabled: false });
+  assert.deepEqual(portalWith('install').options, { complexEnabled: false, polishEnabled: false, installEnabled: true });
+  // Назад / Далее / the progress strip only switch the step shown.
+  const nav = htmlBetween('function updateStepUI(productKey)', 'function renderSubcategoryOptions');
+  assert.doesNotMatch(nav, /opt-(complex|polish|install)|\.checked\s*=/);
+});
+
+test('no company rate: a ticked option is the manager\'s too -- never «0 ₽», never counted twice', () => {
+  const none = priceOf(portalWith());
+  const all = priceOf(portalWith('complex', 'polish', 'install'));
+  assert.deepEqual([all.fabrication, all.installation, all.polish, all.work, all.total], [null, null, null, null, null]);
+  assert.deepEqual(all.unpriced, ['fabrication', 'installation', 'polish']);
+  assert.equal(all.workNote, 'Стоимость изготовления, монтажа и полировки уточнит менеджер.');
+  assert.equal(priceOf(portalWith('install')).workNote, 'Стоимость изготовления и монтажа уточнит менеджер.');
+  // The stone is the same with or without options -- they are work, not stone.
+  assert.equal(all.subtotal, none.subtotal);
+  // Монтаж is only the option: no additional work, no «INST-109» line, no extra piece.
+  const { extraLineItems } = inputsFor(portalWith('install'));
+  assert.deepEqual(extraLineItems, []);
+  assert.deepEqual(ProductParts.buildJob(portalWith('install')).pieces.filter(p => p.group !== 'main').map(p => p.group), []);
+});
+
+test('with a rate set, each option is priced once, by the shared rule', () => {
+  const RATES = { fabricationRatePerM2: 40000, installationRatePerM2: 20000, polishRatePerM2: 10000 };
+  const area = 1.9352;
+  const plain = priceWithRates(portalWith(), RATES);
+  close(plain.fabrication, 40000 * area, 'fabrication');
+  assert.deepEqual([plain.installation, plain.polish], [0, 0]);
+  const install = priceWithRates(portalWith('install'), RATES);
+  close(install.installation, 20000 * area, 'installation once');
+  close(install.work - plain.work, 20000 * area, 'the work grows by the installation only');
+  const polish = priceWithRates(portalWith('polish'), RATES);
+  close(polish.polish, 10000 * area, 'polish');
+  const complex = priceWithRates(portalWith('complex'), RATES);
+  close(complex.fabrication, 40000 * ProductTypes.COMPLEX_SHAPE_MULTIPLIER * area, 'complex shape');
+  const all = priceWithRates(portalWith('complex', 'polish', 'install'), RATES);
+  assert.deepEqual(all.unpriced, []);
+  close(all.total, all.subtotal + all.work);
+});
+
+test('the options reach the Result and the request, as for every product', () => {
+  const state = portalWith('complex', 'install');
+  const configuration = ResultModel.buildConfiguration({ state, productLabel: PRODUCTS.kaminy.label, subcategory: { id: portal.id, label: portal.title, unit: 'м²' }, edgeTitles: {} });
+  assert.deepEqual(configuration.options, [
+    { key: 'complex', label: 'Сложная форма / фигурный рез' },
+    { key: 'install', label: 'Монтаж на объекте' },
+  ]);
+  const view = ResultModel.buildResultView(configuration);
+  assert.deepEqual(view.specs.find(s => s.key === 'options'), { key: 'options', label: 'Опции', value: 'Сложная форма / фигурный рез, Монтаж на объекте', detail: '' });
+  // The fireplace rows stay as they were, the options after the material.
+  assert.deepEqual(view.specs.map(s => s.key).slice(-1), ['options']);
+  const lead = LeadPayload.buildLeadPayload({ configuration, pricing: ResultModel.summarizePricing({ kind: 'manual', reason: 'unpriced_work', message: 'x' }, null), contact: { name: 'Имя', phone: '+7', comment: '' }, createdAt: null });
+  assert.deepEqual(lead.configuration.options, configuration.options);
+  assert.equal(lead.configuration.fireplace.typeId, portal.id);
+  assert.deepEqual([lead.pricing.status, lead.pricing.total], ['manual', null]);
+});
+
+test('the options change no geometry: the same plates with or without them', () => {
+  VARIANTS.forEach(v => {
+    const plain = GeometryModel.buildGeometryModel(variantState(v, null, ticked()));
+    const all = GeometryModel.buildGeometryModel(variantState(v, null, ticked('complex', 'polish', 'install')));
+    assert.deepEqual(all.fireplace, plain.fireplace, v.name);
+    assert.deepEqual(SceneLayout.buildSceneLayout(all).parts, SceneLayout.buildSceneLayout(plain).parts, v.name);
+  });
+});
+
+test('the other 9 products keep their steps', () => {
+  assert.deepEqual(Object.fromEntries(Object.keys(PRODUCTS).filter(k => k !== 'kaminy').map(k => [k, StepEngine.getSteps(k)])), {
+    lestnitsa: ['type', 'dimensions', 'material', 'edge', 'options', 'review'],
+    panno: ['type', 'dimensions', 'material', 'options', 'review'],
+    podokonnik: ['type', 'dimensions', 'material', 'edge', 'options', 'review'],
+    pol: ['type', 'dimensions', 'material', 'options', 'review'],
+    stena: ['type', 'dimensions', 'material', 'options', 'review'],
+    fasad: ['type', 'dimensions', 'material', 'options', 'review'],
+    stoleshnitsa_vannaya: ['shape', 'dimensions', 'material', 'edge', 'additionalWorks', 'options', 'review'],
+    stoleshnitsa_kuhnya: ['shape', 'dimensions', 'material', 'edge', 'additionalWorks', 'options', 'review'],
+    stupeni: ['type', 'dimensions', 'material', 'riser', 'edge', 'options', 'review'],
+  });
 });
