@@ -241,6 +241,22 @@ test('buildLeadPayload has product, full configuration, pricing and contact', ()
   assert.deepEqual(p.contact, CONTACT);
 });
 
+test('the request carries the price message the client read -- for every product, manual or not', () => {
+  const MSG = 'Камень: ≈ 41 224 ₽. Стоимость изготовления уточнит менеджер.';
+  Object.keys(PRODUCTS).forEach(key => {
+    const configuration = configFor(key, {});
+    const pricing = ResultModel.summarizePricing({ kind: 'manual', reason: 'unpriced_work', message: MSG }, null);
+    const p = LeadPayload.buildLeadPayload({ configuration, pricing, contact: CONTACT, createdAt: null });
+    assert.deepEqual([p.pricing.status, p.pricing.total, p.pricing.reason, p.pricing.message], ['manual', null, 'unpriced_work', MSG], key);
+  });
+  // An automatic estimate: its fields as before, no message.
+  const ok = payloadFor('stoleshnitsa_kuhnya', {});
+  assert.equal(ok.pricing.status, 'ok');
+  assert.ok(ok.pricing.total > 0);
+  assert.equal(ok.pricing.message, null);
+  assert.deepEqual(Object.keys(ok.pricing), ['status', 'currency', 'total', 'breakdown', 'nSlabs', 'reason', 'message', 'pricesUpdatedAt', 'preliminary']);
+});
+
 test('payload survives a JSON round trip unchanged (fully serialisable)', () => {
   const p = payloadFor('stoleshnitsa_kuhnya', { 'hole-mixer': { value: '1' }, productShape: { value: 'lshape' }, 'wing-width': { value: '600' }, 'wing-length': { value: '1200' } });
   assert.deepEqual(JSON.parse(JSON.stringify(p)), p);

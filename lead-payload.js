@@ -87,6 +87,9 @@
         breakdown: pricing.lines,
         nSlabs: pricing.nSlabs,
         reason: pricing.reason,
+        // What the client read beside the price («Камень: ≈ … ₽. Стоимость
+        // изготовления уточнит менеджер.») -- null when there was nothing.
+        message: pricing.message,
         pricesUpdatedAt: pricing.pricesUpdatedAt,
         preliminary: true,
       },
