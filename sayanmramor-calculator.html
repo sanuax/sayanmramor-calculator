@@ -92,6 +92,9 @@
     --font-display: 'Unbounded', 'Montserrat', Arial, sans-serif;
   }
 
+  /* Buttons and fields take the page's type too (browsers give them the
+     system font by default). */
+  button, input, select, textarea { font-family: inherit; }
   body {
     font-family: var(--font);
     background: var(--page);
