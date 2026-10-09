@@ -92,3 +92,11 @@ test('the stone gallery names the supplier once, with a link to Venezia Stone in
   assert.equal(html.split('veneziastone.com').length - 1, 1, 'nowhere else in the calculator');
   assert.doesNotMatch(html, /взят с сайта/);
 });
+
+test('the 3D/price panel waits for a product: hidden until the first choice, shown by the product change handler', () => {
+  assert.match(html, /\.configurator-columns:not\(\.has-product\) \.configurator-side \{ display: none; \}/);
+  const handler = html.slice(html.indexOf("input.addEventListener('change', () => {\n      selectedProductKey = key;"));
+  assert.match(handler.slice(0, 400), /classList\.add\('has-product'\)/);
+  // The markup itself does not pre-set it: with no product the panel is hidden.
+  assert.doesNotMatch(html, /class="configurator-columns has-product"/);
+});

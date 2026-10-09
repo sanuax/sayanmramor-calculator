@@ -184,6 +184,12 @@
   }
   .configurator-main { min-width: 0; }
   .configurator-side { position: sticky; top: 24px; }
+  /* Until a product is chosen there is nothing to show or price: the
+     3D/price panel waits, and the product cards are the one thing to do.
+     It appears with the first choice (a card, or ?product= from the site).
+     Hidden, the 3D canvas has no size; three-scene.js's ResizeObserver sizes
+     it the moment the panel appears. */
+  .configurator-columns:not(.has-product) .configurator-side { display: none; }
   @media (max-width: 980px) {
     /* Below this, two columns no longer have room to breathe -- summary
        drops below the step, same stacked order as before this task. */
@@ -2766,6 +2772,8 @@
     input.value = key;
     input.addEventListener('change', () => {
       selectedProductKey = key;
+      // The 3D/price panel appears with the first choice (see CSS .has-product).
+      document.querySelector('.configurator-columns').classList.add('has-product');
       // Reset to the new product's FIRST step (§6 of the task) -- reuses
       // this same existing product-change handler/calculate() pipeline
       // rather than a second reset mechanism. updateStepUI() (called from
