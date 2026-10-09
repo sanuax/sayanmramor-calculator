@@ -7,6 +7,17 @@
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
+  /* The site's type (sayanmramor-site, css/site.css): Montserrat for text,
+     Unbounded for the h1/h2 headings and the name. Same files, kept here
+     (vendor/fonts/, SIL OFL 1.1, see SOURCES.md there). The browser only
+     downloads a file when the page has characters of its range
+     (latin-ext: the rouble sign in prices). */
+  @font-face { font-family: 'Montserrat'; font-style: normal; font-display: swap; font-weight: 100 900; src: url(vendor/fonts/montserrat-cyrillic-wght-normal.woff2) format('woff2-variations'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+  @font-face { font-family: 'Montserrat'; font-style: normal; font-display: swap; font-weight: 100 900; src: url(vendor/fonts/montserrat-latin-wght-normal.woff2) format('woff2-variations'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+  @font-face { font-family: 'Montserrat'; font-style: normal; font-display: swap; font-weight: 100 900; src: url(vendor/fonts/montserrat-latin-ext-wght-normal.woff2) format('woff2-variations'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+  @font-face { font-family: 'Unbounded'; font-style: normal; font-display: swap; font-weight: 200 900; src: url(vendor/fonts/unbounded-cyrillic-wght-normal.woff2) format('woff2-variations'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+  @font-face { font-family: 'Unbounded'; font-style: normal; font-display: swap; font-weight: 200 900; src: url(vendor/fonts/unbounded-latin-wght-normal.woff2) format('woff2-variations'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+
   /* Material picker palette. Neutrals are deliberately warm: the catalogue is
      full of beige/tan/cream stone, and a cold grey chrome fights it. The only
      saturated colour in the picker is the page accent, spent on one thing --
@@ -75,10 +86,14 @@
     --configurator-heading: 18px;
     --configurator-title: 20px;
     --configurator-price: 32px;
+
+    /* Type, as on the site: text, and headings with the name. */
+    --font: 'Montserrat', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    --font-display: 'Unbounded', 'Montserrat', Arial, sans-serif;
   }
 
   body {
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-family: var(--font);
     background: var(--page);
     -webkit-font-smoothing: antialiased;
     color: var(--ink);
@@ -91,13 +106,15 @@
      breathing room and a wider working area, not stretched-out inputs. */
   .wrap { max-width: 1600px; margin: 0 auto; }
   .brand-mark {
-    display: inline-block; margin-bottom: 28px; font-size: 15px; font-weight: 800;
+    display: inline-block; margin-bottom: 28px; font-family: var(--font-display); font-size: 15px; font-weight: 800;
     letter-spacing: 0.12em; text-transform: uppercase; text-decoration: none; color: var(--ink);
   }
   .brand-mark:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  /* Headings in the site's display face and weight (css/site.css: h1, h2). */
+  h1, h2 { font-family: var(--font-display); }
   h1 {
     font-size: 34px;
-    font-weight: 700;
+    font-weight: 600;
     letter-spacing: -0.02em;
     line-height: 1.12;
     margin-bottom: 8px;
@@ -124,7 +141,7 @@
     border: 1px solid var(--line); border-radius: 999px;
     width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; flex: none;
   }
-  .step-title { font-size: var(--configurator-heading); font-weight: 700; margin: 0; color: var(--ink); }
+  .step-title { font-size: var(--configurator-heading); font-weight: 600; margin: 0; color: var(--ink); }
   .step-sub { color: var(--muted); font-size: var(--configurator-muted); margin: 0 0 18px; padding-left: 30px; line-height: 1.5; }
   .field { margin-bottom: 20px; }
   /* .step-title (h2) is now the visible heading for each section -- these
@@ -265,7 +282,7 @@
     padding: 28px;
   }
   .summary-title {
-    font-size: var(--configurator-title); font-weight: 700; margin: 0 0 24px;
+    font-size: var(--configurator-title); font-weight: 600; margin: 0 0 24px;
     text-align: center; letter-spacing: -0.2px;
   }
   .summary-grid { display: grid; grid-template-columns: 1fr; gap: 24px; align-items: start; }
@@ -1044,7 +1061,7 @@
   .configurator-columns.is-result .summary-info { display: none; }
   .configurator-columns.is-result .summary-grid { gap: 0; }
   .configurator-columns.is-result .summary-title {
-    font-size: var(--configurator-price); font-weight: 700; text-align: left; letter-spacing: -0.02em; margin-bottom: 20px;
+    font-size: var(--configurator-price); font-weight: 600; text-align: left; letter-spacing: -0.02em; margin-bottom: 20px;
   }
   .step-nav-next.is-hidden { display: none; }
 
