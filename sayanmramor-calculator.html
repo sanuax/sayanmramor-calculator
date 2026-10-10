@@ -777,6 +777,50 @@
     font-size: 13.5px; color: var(--pick-ink); cursor: pointer;
   }
   .filter-option:hover { background: var(--pick-fill); }
+
+  /* «Цена»: «от» and «до» fields over a two-handled slider (price-filter.js), by the
+     stone's lowest price per m2 -- the «от … ₽/м²» on its card. The scale is
+     logarithmic: most stones are under 50 000 ₽/м², a few agates near 730 000. */
+  .filter-price-panel { width: 320px; max-height: none; overflow: visible; padding: 14px 14px 6px; }
+  .filter-price-panel .pf-fields { display: flex; gap: 8px; }
+  .filter-price-panel .pf-field {
+    flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; height: 40px; padding: 0 12px;
+    border: 1px solid var(--pick-line); border-radius: 10px; background: #fff; cursor: text;
+  }
+  .filter-price-panel .pf-field:focus-within { border-color: var(--pick-accent); }
+  .filter-price-panel .pf-cap { flex: none; font-size: 12.5px; color: var(--pick-muted); }
+  .filter-price-panel .pf-input {
+    flex: 1; min-width: 0; height: 100%; border: 0; background: none; outline: none;
+    font: inherit; font-size: 14px; color: var(--pick-ink); font-variant-numeric: tabular-nums;
+  }
+  .filter-price-panel .pf-input::placeholder { color: var(--pick-muted); opacity: 0.8; }
+  .pf-slider { position: relative; height: 50px; margin-top: 10px; }
+  .pf-track { position: absolute; left: 10px; right: 10px; top: 12px; height: 4px; border-radius: 2px; background: var(--pick-line); }
+  .pf-fill { position: absolute; top: 0; bottom: 0; border-radius: 2px; background: var(--pick-accent); }
+  .pf-thumb {
+    position: absolute; left: 0; top: 0; width: 100%; height: 28px; margin: 0; padding: 0;
+    background: none; pointer-events: none; -webkit-appearance: none; appearance: none;
+  }
+  .pf-thumb:focus { outline: none; }
+  .pf-thumb::-webkit-slider-runnable-track { height: 28px; background: none; border: 0; }
+  .pf-thumb::-moz-range-track { height: 28px; background: none; border: 0; }
+  .pf-thumb::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none; pointer-events: auto; cursor: grab;
+    width: 20px; height: 20px; margin-top: 4px; border-radius: 50%;
+    background: #fff; border: 2px solid var(--pick-accent); box-shadow: 0 1px 3px rgba(26, 24, 22, 0.25);
+  }
+  .pf-thumb::-moz-range-thumb {
+    pointer-events: auto; cursor: grab; width: 16px; height: 16px; border-radius: 50%;
+    background: #fff; border: 2px solid var(--pick-accent); box-shadow: 0 1px 3px rgba(26, 24, 22, 0.25);
+  }
+  .pf-thumb:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--pick-accent); outline-offset: 2px; }
+  .pf-thumb:focus-visible::-moz-range-thumb { outline: 2px solid var(--pick-accent); outline-offset: 2px; }
+  .pf-thumb + .pf-thumb { z-index: 1; }
+  .pf-from-on-top .pf-thumb:first-of-type { z-index: 2; }
+  .pf-ticks { position: absolute; left: 10px; right: 10px; top: 30px; }
+  .pf-tick { position: absolute; transform: translateX(-50%); font-size: 11px; color: var(--pick-muted); white-space: nowrap; }
+  .pf-tick:first-child { transform: none; }
+  .pf-tick:last-child { transform: translateX(-100%); }
   .filter-option input {
     width: 16px; height: 16px; accent-color: var(--pick-accent); cursor: pointer;
   }
@@ -955,6 +999,10 @@
     .picker-filters { padding: 0 14px; gap: 6px; }
     .filter-dropdown-btn { padding: 7px 12px; font-size: 13px; }
     .filter-dropdown-panel { min-width: 0; width: min(240px, calc(100vw - 28px)); }
+    /* The price panel across the whole filter row, under it -- wherever the «Цена» pill wraps to. */
+    .picker-filters { position: relative; }
+    .filter-dropdown[data-filter="price"] { position: static; }
+    .filter-dropdown-panel.filter-price-panel { left: 14px; right: 14px; width: auto; }
     .picker-sort { margin: 0 14px 12px; }
     .picker-meta-row { padding: 0 14px 10px; }
     .picker-supplier { font-size: 12px; }
@@ -1904,6 +1952,10 @@
       <button type="button" class="filter-dropdown-btn" aria-haspopup="true" aria-expanded="false"></button>
       <div class="filter-dropdown-panel" hidden></div>
     </div>
+    <div class="filter-dropdown" data-filter="price">
+      <button type="button" class="filter-dropdown-btn" aria-haspopup="true" aria-expanded="false"></button>
+      <div class="filter-dropdown-panel filter-price-panel" hidden></div>
+    </div>
     <button type="button" id="pickerResetFilters" class="picker-reset-btn" hidden>Сбросить</button>
   </div>
   <div class="picker-meta-row">
@@ -1930,6 +1982,7 @@
 </div>
 
 <script src="pricing.js"></script>
+<script src="price-filter.js"></script>
 <script src="material-picker.js"></script>
 <script src="product-types.js"></script>
 <script src="rate-catalog.js"></script>

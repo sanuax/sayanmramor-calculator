@@ -1,10 +1,10 @@
 (function (root, factory) {
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = factory();
+    module.exports = factory(require('./price-filter.js'));
   } else {
-    root.MaterialPicker = factory();
+    root.MaterialPicker = factory(root.PriceFilter);
   }
-})(typeof window !== 'undefined' ? window : globalThis, function () {
+})(typeof window !== 'undefined' ? window : globalThis, function (PriceFilter) {
 
   function minPricePerM2(stone) {
     const prices = (stone.slabs || [])
@@ -27,6 +27,18 @@
   function matchesCategoryFilter(stone, selected) {
     if (!selected || selected.length === 0) return true;
     return selected.includes(stone.category);
+  }
+
+  // The price a stone's card shows as «от … ₽/м²»: its lowest price per m2 -- none for a
+  // stone out of stock (its card shows no price).
+  function shownPrice(stone) {
+    return stone.available !== false ? minPricePerM2(stone) : null;
+  }
+
+  // The price filter ({ from, to }, either end open) by that shown price; a stone
+  // without one only while the filter is unset.
+  function matchesPriceFilter(stone, range) {
+    return PriceFilter.inRange(shownPrice(stone), range);
   }
 
   function matchesColorFilter(stone, selected) {
@@ -57,12 +69,13 @@
     return copy;
   }
 
-  function filterAndSort(stones, { query, countries, categories, colors, sortKey }) {
+  function filterAndSort(stones, { query, countries, categories, colors, price, sortKey }) {
     const filtered = stones.filter(s =>
       matchesSearch(s, query)
       && matchesCountryFilter(s, countries)
       && matchesCategoryFilter(s, categories)
       && matchesColorFilter(s, colors)
+      && matchesPriceFilter(s, price)
     );
     return sortStones(filtered, sortKey);
   }
@@ -71,11 +84,12 @@
   // action) should be shown/enabled -- true the moment any search text or
   // any filter selection exists, regardless of whether it actually excludes
   // anything yet.
-  function hasActiveFilters({ query, countries, categories, colors }) {
+  function hasActiveFilters({ query, countries, categories, colors, price }) {
     return !!query
       || (countries && countries.length > 0)
       || (categories && categories.length > 0)
-      || (colors && colors.length > 0);
+      || (colors && colors.length > 0)
+      || PriceFilter.isActive(price);
   }
 
   const BATCH_SIZE = 40;
@@ -189,6 +203,7 @@
     let currentCountries = [];
     let currentCategories = [];
     let currentColors = [];
+    let currentPrice = null;
     let currentSortKey = 'name-asc';
     let filteredList = [];
     let renderedCount = 0;
@@ -238,6 +253,45 @@
       registerCloser,
     });
 
+    // «Цена»: the same pill as the three above, its panel holding the «от» / «до»
+    // fields and the slider instead of checkboxes; the pill names the chosen range.
+    const priceDropdown = (function () {
+      const dropdownEl = document.querySelector('[data-filter="price"]');
+      const ends = PriceFilter.bounds(stones.map(shownPrice));
+      if (!dropdownEl || !ends) { if (dropdownEl) dropdownEl.hidden = true; return { reset() {} }; }
+      const btn = dropdownEl.querySelector('.filter-dropdown-btn');
+      const panel = dropdownEl.querySelector('.filter-dropdown-panel');
+      const labelSpan = document.createElement('span');
+      labelSpan.className = 'filter-dropdown-label';
+      const caret = document.createElement('span');
+      caret.className = 'caret';
+      caret.setAttribute('aria-hidden', 'true');
+      caret.textContent = '▾';
+      btn.append(labelSpan, caret);
+      function updateLabel() {
+        const text = PriceFilter.summary(currentPrice);
+        labelSpan.textContent = text ? 'Цена: ' + text : 'Цена';
+        btn.classList.toggle('active', !!text);
+      }
+      const control = PriceFilter.mount(panel, {
+        min: ends.min, max: ends.max, label: 'Цена камня, ₽/м²',
+        onChange: (value) => { currentPrice = value; updateLabel(); resetAndRender(); },
+      });
+      updateLabel();
+      function closePanel() { panel.hidden = true; btn.setAttribute('aria-expanded', 'false'); }
+      registerCloser(closePanel);
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const wasOpen = !panel.hidden;
+        registerCloser.closeAll();
+        if (!wasOpen) { panel.hidden = false; btn.setAttribute('aria-expanded', 'true'); }
+      });
+      panel.addEventListener('click', (e) => e.stopPropagation());
+      return {
+        reset() { control.reset(); currentPrice = null; updateLabel(); closePanel(); },
+      };
+    })();
+
     function buildCard(stone) {
       const card = document.createElement('div');
       card.className = 'stone-card';
@@ -282,7 +336,7 @@
         card.appendChild(type);
       }
 
-      const price = stone.available !== false ? minPricePerM2(stone) : null;
+      const price = shownPrice(stone);
       if (price !== null) {
         const priceEl = document.createElement('div');
         priceEl.className = 'stone-card-price';
@@ -313,6 +367,7 @@
       currentCountries = []; countryDropdown.reset();
       currentCategories = []; categoryDropdown.reset();
       currentColors = []; colorDropdown.reset();
+      priceDropdown.reset();
       resetAndRender();
     }
 
@@ -320,7 +375,7 @@
       filteredList = filterAndSort(stones, {
         query: currentQuery, countries: currentCountries,
         categories: currentCategories, colors: currentColors,
-        sortKey: currentSortKey,
+        price: currentPrice, sortKey: currentSortKey,
       });
       grid.innerHTML = '';
       renderedCount = 0;
@@ -332,6 +387,7 @@
       metaEl.textContent = filteredList.length > 0 ? pluralizeMaterials(filteredList.length) : '';
       resetFiltersBtn.hidden = !hasActiveFilters({
         query: currentQuery, countries: currentCountries, categories: currentCategories, colors: currentColors,
+        price: currentPrice,
       });
       results.scrollTop = 0;
       renderNextBatch();
@@ -414,6 +470,7 @@
       countryDropdown.reset();
       categoryDropdown.reset();
       colorDropdown.reset();
+      priceDropdown.reset();
       sortButtons.forEach(b => {
         b.dataset.sortDir = 'asc';
         b.classList.toggle('active', b.dataset.sortField === 'name');
@@ -428,7 +485,7 @@
   }
 
   return {
-    minPricePerM2, matchesSearch, matchesCountryFilter, matchesCategoryFilter, matchesColorFilter,
+    minPricePerM2, matchesSearch, matchesCountryFilter, matchesCategoryFilter, matchesColorFilter, matchesPriceFilter,
     sortStones, filterAndSort, hasActiveFilters, pluralizeMaterials, init,
   };
 });

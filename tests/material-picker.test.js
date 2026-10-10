@@ -26,6 +26,31 @@ test('minPricePerM2 ignores null prices among the slabs', () => {
   assert.equal(MaterialPicker.minPricePerM2(stone), 3000);
 });
 
+test('matchesPriceFilter: the stone\'s lowest price per m2 (its card\'s «от») inside { from, to }, either end open', () => {
+  assert.equal(MaterialPicker.matchesPriceFilter(stones[0], null), true);
+  assert.equal(MaterialPicker.matchesPriceFilter(stones[0], { from: null, to: null }), true);
+  assert.equal(MaterialPicker.matchesPriceFilter(stones[0], { from: 4000, to: 4500 }), true, 'by 4 000, not by 5 000');
+  assert.equal(MaterialPicker.matchesPriceFilter(stones[0], { from: 4500, to: null }), false);
+  assert.equal(MaterialPicker.matchesPriceFilter(stones[1], { from: null, to: 8999 }), false);
+  assert.equal(MaterialPicker.matchesPriceFilter(stones[3], { from: null, to: null }), true, 'no price: kept while the filter is unset');
+  assert.equal(MaterialPicker.matchesPriceFilter(stones[3], { from: 1, to: null }), false, 'no price: out once it is set');
+});
+
+test('filterAndSort applies the price filter with the others; it counts as an active filter', () => {
+  const ids = list => list.map(s => s.id);
+  assert.deepEqual(ids(MaterialPicker.filterAndSort(stones, { price: { from: 5000, to: null }, sortKey: 'price-asc' })), ['b'], 'c is out of stock: its card shows no price');
+  assert.deepEqual(ids(MaterialPicker.filterAndSort(stones, { countries: ['italy'], price: { from: null, to: 4000 } })), ['a']);
+  assert.equal(MaterialPicker.hasActiveFilters({ price: { from: null, to: 9000 } }), true);
+  assert.equal(MaterialPicker.hasActiveFilters({ price: { from: null, to: null } }), false);
+});
+
+test('the picker has the «Цена» dropdown and loads price-filter.js before material-picker.js', () => {
+  const html = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'sayanmramor-calculator.html'), 'utf8');
+  assert.match(html, /<div class="filter-dropdown" data-filter="price">/);
+  const a = html.indexOf('<script src="price-filter.js"></script>'), b = html.indexOf('<script src="material-picker.js"></script>');
+  assert.ok(a > 0 && a < b);
+});
+
 test('matchesSearch is case-insensitive substring match', () => {
   assert.equal(MaterialPicker.matchesSearch(stones[0], 'carra'), true);
   assert.equal(MaterialPicker.matchesSearch(stones[0], 'CARRARA'), true);

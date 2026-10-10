@@ -19,12 +19,15 @@ def sample():
         'updated_at': '2026-09-15T23:53:23+03:00',
         'stones': [
             {'id': 'nero-marquina', 'name': 'Nero Marquina', 'category': 'marble', 'category_label_ru': 'Мрамор',
-             'colors': ['black'], 'countries': [{'code': 'es'}], 'image': 'images/nero-marquina.webp',
-             'slabs': [{'article': 'M1', 'width_cm': 300}], 'available': True},
+             'colors': [{'label_ru': 'Черный', 'segment': 'black'}, {'segment': 'nolabel'}],
+             'countries': [{'label_ru': 'Испания', 'segment': 'spain'}], 'image': 'images/nero-marquina.webp',
+             'slabs': [{'article': 'M1', 'width_cm': 300, 'price_per_m2_rub': 12500.6},
+                       {'article': 'M2', 'price_per_m2_rub': 9800.4},
+                       {'article': 'M3', 'price_per_m2_rub': None}], 'available': True},
             {'id': 'sold-out', 'name': 'Sold Out', 'category_label_ru': 'Мрамор', 'image': 'images/sold-out.webp',
              'available': False},
             {'id': 'absolute-black', 'name': 'Absolute Black', 'category_label_ru': 'Гранит',
-             'image': 'images/absolute-black.webp'},
+             'image': 'images/absolute-black.webp', 'slabs': [{'price_per_m2_rub': 7000}, {'price_per_m2_rub': 0}]},
             {'id': 'no-type', 'name': 'No Type', 'category_label_ru': None, 'image': None, 'available': True},
         ],
     }
@@ -42,13 +45,26 @@ class BuildStoneIndexTests(unittest.TestCase):
         index = bsi.build_stone_index(sample())
         self.assertEqual([s['id'] for s in index['stones']], ['nero-marquina', 'absolute-black', 'no-type'])
 
-    def test_each_stone_has_exactly_the_four_fields(self):
+    def test_each_stone_has_exactly_the_seven_fields(self):
         for stone in bsi.build_stone_index(sample())['stones']:
-            self.assertEqual(list(stone.keys()), ['id', 'name', 'category_label_ru', 'image'])
+            self.assertEqual(list(stone.keys()), ['id', 'name', 'category_label_ru', 'image', 'price_from', 'countries', 'colors'])
+
+    def test_countries_and_colors_keep_only_their_russian_labels(self):
+        stones = {s['id']: s for s in bsi.build_stone_index(sample())['stones']}
+        self.assertEqual(stones['nero-marquina']['countries'], [{'label_ru': 'Испания'}])
+        self.assertEqual(stones['nero-marquina']['colors'], [{'label_ru': 'Черный'}])
+        self.assertEqual((stones['no-type']['countries'], stones['no-type']['colors']), ([], []))
+
+    def test_price_from_is_the_lowest_positive_price_per_m2_rounded(self):
+        stones = {s['id']: s for s in bsi.build_stone_index(sample())['stones']}
+        self.assertEqual(stones['nero-marquina']['price_from'], 9800)
+        self.assertEqual(stones['absolute-black']['price_from'], 7000)
+        self.assertIsNone(stones['no-type']['price_from'])
 
     def test_missing_type_and_image_become_empty_strings(self):
         stone = bsi.build_stone_index(sample())['stones'][-1]
-        self.assertEqual(stone, {'id': 'no-type', 'name': 'No Type', 'category_label_ru': '', 'image': ''})
+        self.assertEqual(stone, {'id': 'no-type', 'name': 'No Type', 'category_label_ru': '', 'image': '', 'price_from': None,
+                                 'countries': [], 'colors': []})
 
     def test_updated_at_is_carried_over(self):
         self.assertEqual(bsi.build_stone_index(sample())['updated_at'], '2026-09-15T23:53:23+03:00')

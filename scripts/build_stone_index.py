@@ -1,12 +1,19 @@
 """Build the site's light stone index from data/slabs.json.
 
 data/slabs.json stays the one source of truth: the calculator reads all of
-it (slabs, prices, colours, ...). The site's category pages need only four
+it (slabs, prices, colours, ...). The site's category pages need only a few
 fields of each stone that can still be ordered, so this writes just those,
 in the source's order, as data/stone-index.json:
 
     {"updated_at": "<copied from slabs.json>",
-     "stones": [{"id": ..., "name": ..., "category_label_ru": ..., "image": ...}, ...]}
+     "stones": [{"id": ..., "name": ..., "category_label_ru": ..., "image": ..., "price_from": ...,
+                 "countries": [{"label_ru": ...}], "colors": [{"label_ru": ...}]}, ...]}
+
+price_from: the stone's lowest price per m2 among its slabs, whole roubles
+(null when no slab has a price) -- the price the stone galleries filter by
+(«Цена от … до …») and the configurator's card shows as «от … ₽/м²».
+countries / colors: as in slabs.json, each item with its Russian label only --
+the galleries' «Страна» and «Цвет» filters (an empty list when the stone has none).
 
 Stones with `available` set to False are left out; every other stone must
 have an id (unique) and a name. The input is validated before anything is
@@ -26,7 +33,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_INPUT_PATH = PROJECT_ROOT / 'data' / 'slabs.json'
 DEFAULT_OUTPUT_PATH = PROJECT_ROOT / 'data' / 'stone-index.json'
-FIELDS = ('id', 'name', 'category_label_ru', 'image')
+FIELDS = ('id', 'name', 'category_label_ru', 'image', 'price_from', 'countries', 'colors')
 
 
 class StoneIndexError(ValueError):
@@ -35,6 +42,26 @@ class StoneIndexError(ValueError):
 
 def _text(value):
     return '' if value is None else str(value)
+
+
+def _labels(items):
+    """[{'label_ru': ..., ...}, ...] -> [{'label_ru': ...}, ...]: the Russian labels only, in order, without blanks or repeats."""
+    out = []
+    for item in items or []:
+        label = item.get('label_ru') if isinstance(item, dict) else None
+        if isinstance(label, str) and label.strip() and {'label_ru': label} not in out:
+            out.append({'label_ru': label})
+    return out
+
+
+def _price_from(stone):
+    """The lowest positive price per m2 among the stone's slabs, rounded to whole roubles, or None."""
+    prices = []
+    for slab in stone.get('slabs') or []:
+        price = slab.get('price_per_m2_rub') if isinstance(slab, dict) else None
+        if isinstance(price, (int, float)) and not isinstance(price, bool) and 0 < price < float('inf'):
+            prices.append(price)
+    return round(min(prices)) if prices else None
 
 
 def build_stone_index(data):
@@ -65,6 +92,9 @@ def build_stone_index(data):
             'name': name,
             'category_label_ru': _text(stone.get('category_label_ru')),
             'image': _text(stone.get('image')),
+            'price_from': _price_from(stone),
+            'countries': _labels(stone.get('countries')),
+            'colors': _labels(stone.get('colors')),
         })
     return {'updated_at': data.get('updated_at'), 'stones': index}
 
