@@ -424,18 +424,30 @@ function addMesh(group, geometry, material, position, cast) {
 // planes, as the steel basins are, the walls faced outward and vanished
 // when looking into the bowl.) The cavity is flush with the opening, which
 // the slab's own extrusion bevel insets by bevelFor(slab).size.
+//
+// No seam (2026-10-10): the slab's bevel rounds its opening at the bottom
+// too, and a bowl that began at the slab's underside left that rounding as
+// a groove all round the bowl -- a line where the bowl met the slab. So the
+// walls rise inside the opening up to where its top rounding begins, a
+// hair inside it (STONE_BOWL_OVERLAP_M) so they alone are seen: from the
+// countertop, the stone turns over the softened rim straight down into the
+// bowl. (The bowl also takes the slab's own piece of stone -- see
+// buildProductGroup -- so the veins run on into it.)
 const STONE_BOWL_WALL_M = 0.02;
+const STONE_BOWL_OVERLAP_M = 0.0005;
 function buildStoneBowl(group, part, materials) {
   const [cx, top, cz] = part.center;
   const [sx, depth, sz] = part.size;
-  const inset = bevelFor({ role: 'stone', y0: 0, y1: part.slabThicknessM || 0, edge: part.edge }).size;
-  const w = sx / 2 - inset, l = sz / 2 - inset, t = STONE_BOWL_WALL_M;
+  const slabM = part.slabThicknessM || 0;
+  const inset = bevelFor({ role: 'stone', y0: 0, y1: slabM, edge: part.edge }).size;
+  const rise = Math.max(0, slabM - inset);   // from the slab's underside to where its top rounding begins
+  const w = sx / 2 - inset - STONE_BOWL_OVERLAP_M, l = sz / 2 - inset - STONE_BOWL_OVERLAP_M, t = STONE_BOWL_WALL_M;
   const shape = new THREE.Shape();
   shape.moveTo(-w - t, -l - t); shape.lineTo(w + t, -l - t); shape.lineTo(w + t, l + t); shape.lineTo(-w - t, l + t); shape.closePath();
   const cavity = new THREE.Path();
   cavity.moveTo(-w, -l); cavity.lineTo(-w, l); cavity.lineTo(w, l); cavity.lineTo(w, -l); cavity.closePath();
   shape.holes.push(cavity);
-  const walls = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false });
+  const walls = new THREE.ExtrudeGeometry(shape, { depth: depth + rise, bevelEnabled: false });
   walls.rotateX(-Math.PI / 2);
   addMesh(group, walls, materials.stone, [cx, top - depth, cz]);
   addMesh(group, new THREE.BoxGeometry(2 * (w + t), t, 2 * (l + t)), materials.stone, [cx, top - depth - t / 2, cz]);
@@ -519,13 +531,18 @@ function buildProductGroup(layout, materialDescriptor) {
   group.userData.materials = materials;
   group.userData.stoneMeshes = [];
   let stoneIndex = 0;
+  let mainStone = null;   // the countertop's own slab: { part, index }
   layout.parts.forEach(part => {
     const before = group.children.length;
     buildPart(group, part, materials);
     if (part.role === 'stone') {
       const index = stoneIndex++;
+      if (part.name === 'main' && !mainStone) mainStone = { part, index };
+      // An integrated sink is the countertop's own stone, not a piece of its own:
+      // the bowl takes the slab's projection, so the veins run on into it unbroken.
+      const own = part.kind === 'basin' && mainStone ? mainStone : { part, index };
       group.children.slice(before).forEach(mesh => {
-        if (mesh.isMesh) group.userData.stoneMeshes.push(captureStoneMesh(mesh, part, index));
+        if (mesh.isMesh) group.userData.stoneMeshes.push(captureStoneMesh(mesh, own.part, own.index));
       });
     }
   });
