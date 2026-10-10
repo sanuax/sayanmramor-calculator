@@ -18,17 +18,18 @@
   @font-face { font-family: 'Unbounded'; font-style: normal; font-display: swap; font-weight: 200 900; src: url(vendor/fonts/unbounded-cyrillic-wght-normal.woff2) format('woff2-variations'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
   @font-face { font-family: 'Unbounded'; font-style: normal; font-display: swap; font-weight: 200 900; src: url(vendor/fonts/unbounded-latin-wght-normal.woff2) format('woff2-variations'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
 
-  /* Material picker palette. Neutrals are deliberately warm: the catalogue is
-     full of beige/tan/cream stone, and a cold grey chrome fights it. The only
-     saturated colour in the picker is the page accent, spent on one thing --
-     the active filter. */
+  /* The site's palette (sayanmramor-site, css/site.css: «basalt and serpentine»,
+     2026-10-10, the owner's request): a light limestone page, basalt type, a deep
+     green-graphite for the dark panel, and one muted verde -- the colour of
+     serpentine marble -- as the only accent: the action, the chosen state.
+     Material picker: the accent spent on one thing -- the active filter. */
   :root {
-    --pick-ink: #1e1a16;
-    --pick-accent: #b4562b;
-    --pick-muted: #6e6a65;
-    --pick-line: #e7e2d9;
-    --pick-fill: #f2f0ed;
-    --pick-tile: #edeae6;
+    --pick-ink: #1c1d1b;
+    --pick-accent: #2a5446;
+    --pick-muted: #63645b;
+    --pick-line: #dcd8cf;
+    --pick-fill: #ecebe6;
+    --pick-tile: #e4e1d9;
     --pick-ease: cubic-bezier(0.22, 0.68, 0.24, 1);
 
     /* Токены согласованного V2-конструктора (visual reference:
@@ -37,24 +38,24 @@
        светлый известняк, тёплый графит, дерево, дымчатое стекло), но
        СТРУКТУРА токенов и их роли не менялись, только сами значения --
        ниже везде тот же набор переменных, что и был. */
-    --ink: #1e1a16;
-    --muted: #736c60;
-    --line: #e7e2d9;
-    --page: #f6f3ee;
-    --card: #fffdfa;
-    --card-hover: #faf6f0;
-    --accent: #b4562b;
-    --accent-hover: #9b4824;
-    --accent-ink: #7a341a;
-    --accent-soft: #fbece0;
-    --stone: #d9d0c0;
-    --stone-line: #ad9f8a;
+    --ink: #1c1d1b;          /* basalt */
+    --muted: #63645b;        /* >= 4.5:1 on the page and the cards */
+    --line: #dcd8cf;
+    --page: #efede8;         /* limestone */
+    --card: #f8f7f4;         /* milk-white paper */
+    --card-hover: #f2f1ec;
+    --accent: #2a5446;       /* serpentine verde (white on it 8.5:1) */
+    --accent-hover: #1f4036;
+    --accent-ink: #183329;
+    --accent-soft: #e2ebe6;
+    --stone: #d6d1c6;
+    --stone-line: #a39d91;
     /* "Стена"/облицовка в иконках доп.работ (бортик/фартук/стеновая
        панель/остров) -- дымчато-тёплый серый, отличимый от --stone (тон
        камня столешницы), но не холодный синеватый, как в исходном
        референсе иконок. */
-    --wall: #d4cec4;
-    --wall-line: #948a78;
+    --wall: #d0cec7;
+    --wall-line: #8a8a80;
 
     /* Тёмная панель "Ваша столешница" (3D/цена/summary) -- уже была тёмной
        и premium; здесь она получает тот же архитектурный цветокор (тёплый
@@ -62,14 +63,14 @@
        чистого #fff, приглушённый тёплый amber-акцент вместо яркого
        #ff7a3d). Раньше все эти цвета были захардкожены по месту -- теперь
        один источник для всей тёмной панели. */
-    --dark-bg: #201b16;
-    --dark-bg-2: #2a241c;
-    --dark-border: #3d362a;
-    --dark-text: #f1ece2;
-    --dark-text-muted: #ac9f8d;
-    --dark-text-dim: #8a8074;
-    --dark-accent: #d9906a;
-    --dark-accent-soft: #3a2a1a;
+    --dark-bg: #1e2320;          /* the site's green-graphite */
+    --dark-bg-2: #262c28;
+    --dark-border: #343b36;
+    --dark-text: #e9e7e1;
+    --dark-text-muted: #a3a89f;
+    --dark-text-dim: #858a82;
+    --dark-accent: #7fa698;      /* the verde, lightened for the dark (5.9:1) */
+    --dark-accent-soft: #22302a;
     /* Приглушённая природная зелень -- "остаток слэба" (позитивный
        индикатор), было ярко-мятное #8fd19e. */
     --sage: #96b083;
@@ -266,7 +267,7 @@
   }
   .step-nav-arrow { flex: none; width: 18px; height: 18px; transition: transform 0.2s var(--pick-ease); }
   .step-nav-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .step-nav-back { padding-left: 16px; border-color: #cfc6b8; }
+  .step-nav-back { padding-left: 16px; border-color: #b6b0a4; }
   .step-nav-back:hover { background: var(--card-hover); border-color: var(--stone-line); }
   .step-nav-back:hover .step-nav-arrow { transform: translateX(-3px); }
   .step-nav-back:active { background: var(--page); }
@@ -370,11 +371,11 @@
     position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none;
   }
   .product-card-scene {
-    --ps-bg: #27211b; --ps-wall: #302922; --ps-wall-side: #221d17; --ps-floor: #3a3129;
-    --ps-stone: #d3c8b6; --ps-top: #e9e2d4; --ps-side: #a4957c;
-    --ps-joint: rgba(96, 82, 62, 0.45); --ps-vein: rgba(128, 110, 86, 0.6);
-    --ps-metal: #9a8f82; --ps-glass: #394541; --ps-light: #f0c795;
-    --ps-wood: #74553c; --ps-cab: #3d352c; --ps-dark: #1a1612;
+    --ps-bg: #1e2320; --ps-wall: #262c28; --ps-wall-side: #1b201d; --ps-floor: #2e3531;
+    --ps-stone: #d6d1c6; --ps-top: #ebe8e1; --ps-side: #a39d91;
+    --ps-joint: rgba(80, 84, 76, 0.45); --ps-vein: rgba(110, 112, 104, 0.6);
+    --ps-metal: #9a9c96; --ps-glass: #394541; --ps-light: #f0c795;
+    --ps-wood: #74553c; --ps-cab: #343a36; --ps-dark: #151917;
     position: relative; display: block; overflow: hidden;
     aspect-ratio: 3 / 2; border-radius: 8px; background: var(--ps-bg);
   }
@@ -428,15 +429,15 @@
   .ps-stone { fill: var(--ps-stone); }
   .ps-top { fill: var(--ps-top); }
   .ps-side { fill: var(--ps-side); }
-  .ps-core { fill: #4a4137; }
-  .ps-core-top { fill: #5b5146; }
+  .ps-core { fill: #3f4541; }
+  .ps-core-top { fill: #4f5551; }
   .ps-glass { fill: var(--ps-glass); }
   .ps-wood { fill: var(--ps-wood); }
   .ps-cab { fill: var(--ps-cab); }
-  .ps-cab-side { fill: #2e2720; }
+  .ps-cab-side { fill: #282e2a; }
   .ps-dark { fill: var(--ps-dark); }
-  .ps-bowl { fill: #f4f0e9; }
-  .ps-bowl-in { fill: #c9bfaf; }
+  .ps-bowl { fill: #f3f2ee; }
+  .ps-bowl-in { fill: #c6c2b8; }
   .ps-metal-f { fill: var(--ps-metal); }
   .ps-glow { fill: var(--ps-light); opacity: 0.22; }
   .ps-wash { fill: var(--ps-light); opacity: 0.08; }
@@ -451,9 +452,9 @@
   .ps-guide { stroke: var(--ps-light); stroke-width: 0.7; stroke-dasharray: 1.4 1.6; opacity: 0.75; }
   .ps-halo { stroke: var(--ps-light); stroke-width: 3; opacity: 0.2; }
   .ps-rim { stroke: var(--ps-light); stroke-width: 0.8; opacity: 0.85; }
-  .ps-ring { stroke: #5f564c; stroke-width: 0.7; }
+  .ps-ring { stroke: #565b56; stroke-width: 0.7; }
   .ps-ring-hot { stroke: var(--ps-light); stroke-width: 0.8; }
-  .ps-cab-line { stroke: #231e18; stroke-width: 0.8; }
+  .ps-cab-line { stroke: #1c211e; stroke-width: 0.8; }
   .ps-handle { stroke: #c2a98e; stroke-width: 0.9; }
 
   /* Кромка/форма: перенесено буквально из согласованного V2-конструктора
@@ -584,7 +585,7 @@
   #facadeAreaNote, #fireplaceAreaNote { display: grid; gap: 2px; max-width: 360px; margin: 14px auto 0; line-height: 1.45; }
   #facadeAreaNote[hidden], #fireplaceAreaNote[hidden] { display: none; }
   .facade-area-total { color: var(--ink); font-size: var(--configurator-text); font-weight: 700; }
-  .facade-area-scope { margin-top: 6px; color: #5a5247; }
+  .facade-area-scope { margin-top: 6px; color: #474944; }
   .dim-note { font-size: var(--configurator-muted); color: var(--muted); text-align: center; margin-top: 12px; }
   /* Ступени/лестницы: a titled size block and the step count right under it,
      in the same centred column as the size fields. */
@@ -635,7 +636,7 @@
   .material-field-thumb[hidden] { display: none; }
   .material-field-thumb img {
     width: 30px; height: 30px; object-fit: cover; border-radius: 5px; display: block;
-    box-shadow: inset 0 0 0 1px rgba(26, 24, 22, 0.1);
+    box-shadow: inset 0 0 0 1px rgba(28, 29, 27, 0.1);
   }
   .material-field-text { flex: 1; }
   .material-field-chevron { color: var(--muted); font-size: 12px; }
@@ -670,7 +671,7 @@
      warm grey, a stone-coloured "i". */
   .stone-texture-note {
     display: flex; gap: 10px; align-items: flex-start; max-width: 600px; margin: 16px 0 0;
-    font-size: var(--configurator-muted); line-height: 1.55; color: #5a5247;
+    font-size: var(--configurator-muted); line-height: 1.55; color: #474944;
   }
   .stone-texture-note svg { flex: none; margin-top: 2px; color: var(--stone-line); }
   .result-texture-note { margin-top: 14px; }
@@ -719,7 +720,7 @@
   #pickerSearch:focus {
     outline: none; background-color: #fff;
     border-color: var(--pick-accent);
-    box-shadow: 0 0 0 3px rgba(180, 86, 43, 0.18);
+    box-shadow: 0 0 0 3px rgba(42, 84, 70, 0.18);
   }
   #pickerClose {
     margin-left: auto; flex: none;
@@ -743,10 +744,10 @@
     display: inline-flex; align-items: center; gap: 6px;
     padding: 8px 14px; border: 1px solid var(--pick-line); border-radius: 999px;
     background: #fff; font-size: 13.5px; font-family: inherit; font-weight: 500;
-    color: #45413d; cursor: pointer;
+    color: #474944; cursor: pointer;
     transition: background-color 0.15s, border-color 0.15s, color 0.15s;
   }
-  .filter-dropdown-btn:hover { border-color: #cdc8c2; }
+  .filter-dropdown-btn:hover { border-color: #b6b0a4; }
   .filter-dropdown-btn .caret {
     font-size: 10px; opacity: 0.65; transition: transform 0.15s var(--pick-ease);
   }
@@ -763,7 +764,7 @@
     position: absolute; top: calc(100% + 8px); left: 0; z-index: 5;
     min-width: 208px; max-height: 280px; overflow-y: auto;
     background: #fff; border: 1px solid var(--pick-line); border-radius: 14px;
-    box-shadow: 0 10px 28px rgba(26, 24, 22, 0.14);
+    box-shadow: 0 10px 28px rgba(28, 29, 27, 0.14);
     padding: 8px; animation: picker-panel-in 140ms var(--pick-ease);
   }
   .filter-dropdown-panel[hidden] { display: none; }
@@ -782,8 +783,8 @@
      stone's lowest price per m2 -- the «от … ₽/м²» on its card. The scale is
      logarithmic: most stones are under 50 000 ₽/м², a few agates near 730 000. */
   .filter-price-panel { width: 340px; max-height: none; overflow: visible; padding: 14px 14px 8px; }
-  /* The configurator's colours for the slider: its copper, a light tint of it, its line. */
-  .filter-price-panel .pf { --pf-accent: var(--pick-accent); --pf-accent-soft: #dfa784; --pf-line: var(--pick-line); --pf-ink: var(--pick-ink); --pf-muted: var(--pick-muted); }
+  /* The slider in the configurator's colours -- the site's verde, a light tint of it, the line. */
+  .filter-price-panel .pf { --pf-accent: var(--pick-accent); --pf-accent-soft: #8fb2a5; --pf-line: var(--pick-line); --pf-ink: var(--pick-ink); --pf-muted: var(--pick-muted); }
   .filter-price-panel .pf-fields { display: flex; gap: 8px; }
   .filter-price-panel .pf-field {
     flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; height: 40px; padding: 0 12px;
@@ -896,7 +897,7 @@
   /* Same reason as .filter-dropdown-btn.active -- a bold label would resize the track. */
   .sort-btn.active {
     background: #fff; color: var(--pick-ink);
-    box-shadow: 0 1px 2px rgba(26, 24, 22, 0.14);
+    box-shadow: 0 1px 2px rgba(28, 29, 27, 0.14);
   }
 
   .picker-overlay :focus-visible {
@@ -929,7 +930,7 @@
     position: relative; aspect-ratio: 1; border-radius: 10px;
     overflow: hidden; background: var(--pick-tile);
     /* A pale marble on a white ground needs an edge to sit against. */
-    box-shadow: inset 0 0 0 1px rgba(26, 24, 22, 0.09);
+    box-shadow: inset 0 0 0 1px rgba(28, 29, 27, 0.09);
   }
   .stone-card-image img {
     width: 100%; height: 100%; object-fit: cover; display: block;
@@ -941,12 +942,12 @@
     content: '';
     position: absolute; left: 50%; top: 50%;
     width: 22px; height: 1.5px; margin: -1px 0 0 -11px;
-    background: #b3ada5; border-radius: 1px;
+    background: #a8a69e; border-radius: 1px;
   }
 
   .badge-oos {
     position: absolute; bottom: 8px; left: 8px; right: auto;
-    background: rgba(20, 19, 18, 0.86);
+    background: rgba(20, 24, 22, 0.86);
     -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
     color: #fff; font-size: 10.5px; font-weight: 700; letter-spacing: 0.1px;
     text-align: left; padding: 4px 9px; border-radius: 999px;
@@ -1012,7 +1013,7 @@
   .picker-sentinel[hidden] { display: none; }
 
   .lightbox-overlay {
-    position: fixed; inset: 0; background: rgba(14, 13, 12, 0.94); z-index: 1100;
+    position: fixed; inset: 0; background: rgba(14, 17, 15, 0.94); z-index: 1100;
     display: flex; align-items: center; justify-content: center; padding: 24px;
     animation: lightbox-in 160ms var(--pick-ease);
   }
@@ -1121,9 +1122,9 @@
     display: none;
   }
   .warning-box {
-    background: var(--dark-accent-soft);
-    border: 1px solid var(--dark-accent);
-    color: #f0c8a3;
+    background: rgba(240, 199, 149, 0.1);
+    border: 1px solid rgba(240, 199, 149, 0.45);
+    color: #f0c795;
     padding: 10px 12px;
     border-radius: 3px;
     font-size: var(--configurator-muted);
@@ -1245,7 +1246,7 @@
 
   .result-showroom-link {
     display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px;
-    margin-top: -12px; padding: 12px 18px; border: 1px solid var(--line-strong, #cfc6b8); border-radius: 6px;
+    margin-top: -12px; padding: 12px 18px; border: 1px solid var(--line-strong, #b6b0a4); border-radius: 6px;
     background: transparent; font-size: var(--configurator-text); font-weight: 700;
     color: var(--ink); text-decoration: none; transition: border-color 0.15s, background-color 0.15s;
   }

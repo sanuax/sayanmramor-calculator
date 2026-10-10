@@ -22,11 +22,11 @@ let textures = null;
 
 const FOV_DEG = 32;
 let framePadding = 0.1;
-const BACKGROUND_TOP = '#3a332b';
-const BACKGROUND_BOTTOM = '#1c1814';
+const BACKGROUND_TOP = '#2f3632';      // the site's green-graphite, lit from above (2026-10-10)
+const BACKGROUND_BOTTOM = '#161a18';
 // Lighter than the studio behind it, so even a near-black stone has a
 // silhouette against the floor it stands on.
-const FLOOR_COLOR = '#4a4138';
+const FLOOR_COLOR = '#3e4540';
 
 // ---- procedural textures (no external assets) ----------------------------
 
