@@ -110,13 +110,15 @@ test('kitchen end-to-end: every additional work selected at once reaches the geo
   assert.ok(model.wallPanel && model.wallPanel.heightM > 0);
   assert.ok(model.island && model.island.widthM > 0);
   assert.ok(model.barCounter && model.barCounter.widthM > 0);
-  // Island faces the LENGTH run (offset along width, zero offset along
-  // length); bar counter extends past one length-end (offset along length,
-  // zero offset along width) -- the two can never collide.
+  // Island faces the run across a walkway (+X); the bar counter is a
+  // peninsula out into the room from the run's free end (+X too) -- the
+  // island keeps a walkway from it, so the two never stand on the same floor.
   assert.ok(model.island.offsetXM > 0);
-  assert.equal(model.island.offsetZM, 0);
-  assert.equal(model.barCounter.offsetXM, 0);
-  assert.ok(model.barCounter.offsetZM > 0);
+  assert.ok(model.barCounter.x0M >= model.widthM / 2 - 1e-9);
+  const isl = { x0: model.island.offsetXM - model.island.widthM / 2, x1: model.island.offsetXM + model.island.widthM / 2,
+    z0: model.island.offsetZM - model.island.lengthM / 2, z1: model.island.offsetZM + model.island.lengthM / 2 };
+  const bar = model.barCounter;
+  assert.ok(isl.x1 <= bar.x0M || bar.x1M <= isl.x0 || isl.z1 <= bar.z0M || bar.z1M <= isl.z0, 'island and bar apart');
 });
 
 test('bathroom end-to-end: every bathroom-supported additional work reaches the geometry model, cooktop/island/barCounter stay null (no capability)', () => {

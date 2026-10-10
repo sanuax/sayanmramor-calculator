@@ -103,10 +103,12 @@ test('buildGeometryModel.wallPanel/barCounter delegate to attachment-geometry', 
   }));
   assert.equal(model.wallPanel.heightM, 0.9);
   assert.equal(model.barCounter.widthM, 0.6);
-  // bar counter offset is relative to the MAIN segment's own lengthM (0.6),
-  // extending past one LENGTH-end -- independent of the island's WIDTH axis.
-  assert.ok(model.barCounter.offsetZM > 0.6);
-  assert.equal(model.barCounter.offsetXM, 0);
+  // A peninsula out into the room from the main segment's front edge (X),
+  // flush with its free end, the longer side along it.
+  assert.equal(model.barCounter.runM, 1.5);
+  assert.equal(model.barCounter.depthM, 0.6);
+  assert.ok(Math.abs(model.barCounter.x0M - model.widthM / 2) < 1e-9);
+  assert.ok(Math.abs(model.barCounter.z1M - model.lengthM / 2) < 1e-9);
 });
 
 test('buildGeometryModel.island/barCounter only ever build ONE variant, even if both are filled in at once', () => {

@@ -566,6 +566,8 @@
     const edgeSupported = !caps || caps.supportsEdgeWork;
     const facade = productKey === 'fasad' ? buildFacade(state) : null;
     const fireplace = productKey === 'kaminy' ? buildFireplace(state) : null;
+    // The bar counter first: the island keeps a walkway from it.
+    const barCounter = resolveBarCounter(pickActiveVariant(state.barCounter.standard, state.barCounter.complex, ['standard', 'complex']), widthM, lengthM, wings);
 
     return {
       productKey,
@@ -590,8 +592,8 @@
       // Island faces the main segment's own LENGTH run, offset along WIDTH
       // -- see attachment-geometry.js. Bar counter extends past one
       // LENGTH-end instead, so the two can never occupy the same space.
-      island: resolveIsland(pickActiveVariant(state.island.standard, state.island.figured, ['standard', 'figured']), widthM, lengthM, wings),
-      barCounter: resolveBarCounter(pickActiveVariant(state.barCounter.standard, state.barCounter.complex, ['standard', 'complex']), lengthM, wings),
+      island: resolveIsland(pickActiveVariant(state.island.standard, state.island.figured, ['standard', 'figured']), widthM, lengthM, wings, barCounter),
+      barCounter,
       stairs: buildStairs(productKey, state),
       surface: buildSurface(productKey, state),
       sill: productKey === 'podokonnik' ? buildSill(state) : null,

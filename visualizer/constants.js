@@ -40,9 +40,10 @@
   // fallback here -- both its dimensions are real (see attachment-geometry.js).
   const VISUAL_FALLBACK_CURB_HEIGHT_M = 0.03;
   const VISUAL_FALLBACK_ISLAND_GAP_M = 0.9;
-  // The bar counter continues the main run -- only a visible joint, not a
-  // walkway, separates them.
-  const VISUAL_FALLBACK_BAR_COUNTER_GAP_M = 0.01;
+  // The bar counter stands a step above the worktop (a bar top is some
+  // 15 cm higher than a kitchen worktop) -- the cue that it is a bar, not
+  // more countertop. No real height input: a visual fallback.
+  const VISUAL_FALLBACK_BAR_COUNTER_RAISE_M = 0.15;
   // Floors render as a thin flat surface, not a full-thickness slab like a
   // countertop -- purely visual, same "no real thickness input" caveat as
   // VISUAL_FALLBACK_THICKNESS_M above.
@@ -79,7 +80,7 @@
     VISUAL_FALLBACK_FAUCET_GAP_M, VISUAL_FALLBACK_DISPENSER_OFFSET_M, VISUAL_FALLBACK_HOLE_EDGE_MARGIN_M,
     VISUAL_FALLBACK_SINK_CUTOUT_SIZE_M, VISUAL_FALLBACK_COOKTOP_CUTOUT_SIZE_M, VISUAL_FALLBACK_HOLE_RADIUS_M,
     VISUAL_FALLBACK_CUTOUT_GAP_M, VISUAL_FALLBACK_CUTOUT_FRONT_MARGIN_M,
-    VISUAL_FALLBACK_CURB_HEIGHT_M, VISUAL_FALLBACK_ISLAND_GAP_M, VISUAL_FALLBACK_BAR_COUNTER_GAP_M,
+    VISUAL_FALLBACK_CURB_HEIGHT_M, VISUAL_FALLBACK_ISLAND_GAP_M, VISUAL_FALLBACK_BAR_COUNTER_RAISE_M,
     VISUAL_FALLBACK_FLOOR_THICKNESS_M,
     VISUAL_STAIR_RISE_M, VISUAL_STAIR_TREAD_DEPTH_M, VISUAL_RISER_THICKNESS_M,
     VISUAL_LAYOUT_MODULE_M, VISUAL_LARGE_FORMAT_MODULE_M,

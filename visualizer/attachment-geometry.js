@@ -16,7 +16,7 @@
   // function does not close over the outer IIFE's `root` parameter.
   const globalRoot = typeof window !== 'undefined' ? window : globalThis;
   const {
-    VISUAL_FALLBACK_CURB_HEIGHT_M, VISUAL_FALLBACK_ISLAND_GAP_M, VISUAL_FALLBACK_BAR_COUNTER_GAP_M,
+    VISUAL_FALLBACK_CURB_HEIGHT_M, VISUAL_FALLBACK_ISLAND_GAP_M, VISUAL_FALLBACK_BAR_COUNTER_RAISE_M,
   } = (typeof module !== 'undefined' && module.exports) ? require('./constants.js') : globalRoot.VisualizerConstants;
 
   function resolveBacksplash(backsplash) {
@@ -92,38 +92,79 @@
     return Math.max(0, islandLengthM / 2 - clearFromWing);
   }
 
-  function resolveIsland(island, mainWidthM, mainLengthM, wings) {
+  // With a bar counter too (resolveBarCounter's result, passed in), the island
+  // keeps a walkway from it as well: first where it would stand anyway; if that
+  // is on the bar's floor, slid along the run away from the bar; if that runs
+  // into a wing, out into the room past the bar and the wings, on its own line.
+  function wingRects(list, mainWidthM, mainLengthM) {
+    return list.map(w => {
+      const z0 = w.corner === 'left' ? mainLengthM / 2 - w.widthM : -mainLengthM / 2;
+      return { x0: mainWidthM / 2, x1: mainWidthM / 2 + w.lengthM, z0, z1: z0 + w.widthM };
+    });
+  }
+  function clearOf(r, others, gap) {
+    return others.every(o => r.x1 <= o.x0 - gap + 1e-9 || o.x1 <= r.x0 - gap + 1e-9 || r.z1 <= o.z0 - gap + 1e-9 || o.z1 <= r.z0 - gap + 1e-9);
+  }
+
+  function resolveIsland(island, mainWidthM, mainLengthM, wings, bar) {
     if (!island || island.widthM <= 0 || island.lengthM <= 0) return null;
     const list = wingList(wings);
+    const gap = VISUAL_FALLBACK_ISLAND_GAP_M;
     // A П-shape closes the room side at both ends: the island stands past
     // the ends of its wings instead, centred on the run.
     const reach = list.length === 2 ? Math.max(list[0].lengthM, list[1].lengthM) : 0;
+    let offsetXM = mainWidthM / 2 + reach + gap + island.widthM / 2;
+    let offsetZM = list.length === 2 ? 0 : islandRunCenter(island.lengthM, mainLengthM, list[0] || null);
+    if (bar) {
+      const rectAt = (x, z) => ({ x0: x - island.widthM / 2, x1: x + island.widthM / 2, z0: z - island.lengthM / 2, z1: z + island.lengthM / 2 });
+      const barRect = { x0: bar.x0M, x1: bar.x1M, z0: bar.z0M, z1: bar.z1M };
+      const wingsAt = wingRects(list, mainWidthM, mainLengthM);
+      const fits = r => clearOf(r, [barRect], gap) && clearOf(r, wingsAt, 0);
+      if (!fits(rectAt(offsetXM, offsetZM))) {
+        const barAtPlusZ = (bar.z0M + bar.z1M) / 2 > 0;
+        const slid = barAtPlusZ
+          ? Math.min(offsetZM, bar.z0M - gap - island.lengthM / 2)
+          : Math.max(offsetZM, bar.z1M + gap + island.lengthM / 2);
+        if (fits(rectAt(offsetXM, slid))) offsetZM = slid;
+        else offsetXM = Math.max(bar.x1M, ...wingsAt.map(w => w.x1)) + gap + island.widthM / 2;
+      }
+    }
     return {
       widthM: island.widthM, lengthM: island.lengthM,
       variant: island.variant || 'standard',
-      offsetXM: mainWidthM / 2 + reach + VISUAL_FALLBACK_ISLAND_GAP_M + island.widthM / 2,
-      offsetZM: list.length === 2 ? 0 : islandRunCenter(island.lengthM, mainLengthM, list[0] || null),
+      offsetXM, offsetZM,
       source: 'fallback-offset', // width/length are real; the gap from the main countertop is a guess
     };
   }
 
-  // Барная стойка: a peninsula-style continuation past one LENGTH-end of the
-  // main segment (the axis the island no longer uses, so the two attachments
-  // can never collide even if both are present at once). Same offset math as
-  // the island, just extending mainLengthM instead of mainWidthM.
-  // It continues the run from the FREE end: with an L-shape whose wing sits
-  // at the +Z end ('left' corner), the bar goes to the -Z end instead of
-  // crowding the corner.
-  function resolveBarCounter(barCounter, mainLengthM, wings) {
+  // Барная стойка (2026-10-11, the owner's choice: concept A): a peninsula.
+  // It leaves the run at its FREE end and goes out into the room (+X) from the
+  // front edge -- never behind the wall -- flush with that end; the longer of
+  // the two entered sizes runs into the room, the shorter is its depth, so it
+  // does not matter which field the client typed which in. It stands a step
+  // above the worktop (raiseM; scene-layout puts a stone panel under each end).
+  //   straight: the +Z end; Г: the end the wing does not use ('left' wing =
+  //   +Z end, so the bar takes -Z); П: the run has no free end -- the bar
+  //   carries on from the tip of the +Z ('left') wing.
+  // x0M..x1M / z0M..z1M: its plan, in the main segment's frame (centre 0,0).
+  function resolveBarCounter(barCounter, mainWidthM, mainLengthM, wings) {
     if (!barCounter || barCounter.widthM <= 0 || barCounter.lengthM <= 0) return null;
     const list = wingList(wings);
+    const runM = Math.max(barCounter.widthM, barCounter.lengthM);
+    const depthM = Math.min(barCounter.widthM, barCounter.lengthM);
+    const plusWing = list.length === 2 ? list.find(w => w.corner === 'left') || list[0] : null;
     const side = list.length === 1 && list[0].corner === 'left' ? -1 : 1;
+    const x0M = mainWidthM / 2 + (plusWing ? plusWing.lengthM : 0);
+    const endZ = side * mainLengthM / 2;
+    const z0M = side > 0 ? endZ - depthM : endZ;
     return {
       widthM: barCounter.widthM, lengthM: barCounter.lengthM,
+      runM, depthM,
+      x0M, x1M: x0M + runM, z0M, z1M: z0M + depthM,
+      offsetXM: x0M + runM / 2, offsetZM: z0M + depthM / 2,
+      raiseM: VISUAL_FALLBACK_BAR_COUNTER_RAISE_M,
       variant: barCounter.variant || 'standard',
-      offsetXM: 0,
-      offsetZM: side * (mainLengthM / 2 + VISUAL_FALLBACK_BAR_COUNTER_GAP_M + barCounter.lengthM / 2),
-      source: 'fallback-offset',
+      source: 'fallback-offset', // sizes are real; where it stands and how high is a guess
     };
   }
 

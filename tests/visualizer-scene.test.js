@@ -82,17 +82,73 @@ test('island is included in the bounds, sits across a walkway on the room side, 
   assert.ok(!(overlapX && overlapZ), 'island and wing must not occupy the same floor');
 });
 
-test('bar counter is included in the bounds and continues the run from the end the L wing does NOT use', () => {
-  const straight = named(layoutFor('stoleshnitsa_kuhnya', BAR), 'bar')[0];
-  assert.ok(extent(straight.outline).z0 >= 1.2, 'no wing: past the +Z end');
+// The bar counter (2026-10-11, the owner's choice: concept A): a peninsula
+// that leaves the run at its free end and goes out into the room (+X), never
+// behind the wall; a step higher than the worktop, on a stone panel at each
+// end down to the floor -- so it reads as a bar, not as more countertop.
+const U_SHAPE = { productShape: { value: 'ushape' }, 'wing-width': { value: '600' }, 'wing-length': { value: '1400' } };
+const overlaps = (a, b) => a.x0 < b.x1 - 1e-9 && b.x0 < a.x1 - 1e-9 && a.z0 < b.z1 - 1e-9 && b.z0 < a.z1 - 1e-9;
+
+test('bar counter: a raised peninsula into the room at the free end of the run, on a stone panel at each end; never behind the wall', () => {
+  const main = layout => extent(named(layout, 'main')[0].outline);
+  const check = (layout, label) => {
+    const barPart = named(layout, 'bar')[0];
+    const bar = extent(barPart.outline);
+    const m = main(layout);
+    assert.ok(bar.x0 >= m.x1 - 1e-9, label + ': out from the front edge, never behind the wall');
+    assert.ok(Math.abs((bar.x1 - bar.x0) - 1.2) < 1e-9 && Math.abs((bar.z1 - bar.z0) - 0.5) < 1e-9, label + ': runs 1.2 m into the room, 0.5 m deep');
+    const worktop = named(layout, 'main')[0].y1;
+    assert.ok(barPart.y0 > worktop + 0.1, label + ': a step above the worktop');
+    const legs = layout.parts.filter(p => p.name === 'bar-leg');
+    assert.equal(legs.length, 2, label + ': a stone panel at each end');
+    legs.forEach(leg => {
+      assert.ok(Math.abs((leg.center[1] - leg.size[1] / 2) - named(layout, 'main')[0].y0) < 1e-9, label + ': down to the floor');
+      assert.ok(Math.abs((leg.center[1] + leg.size[1] / 2) - barPart.y0) < 1e-9, label + ': up to the bar');
+    });
+    assert.ok(contains(layout.bounds, barPart), label + ': in the frame');
+    return bar;
+  };
+  const straight = check(layoutFor('stoleshnitsa_kuhnya', BAR), 'straight');
+  assert.ok(Math.abs(straight.z1 - 1.2) < 1e-9, 'straight: flush with the +Z end');
   ['left', 'right'].forEach(corner => {
     const layout = layoutFor('stoleshnitsa_kuhnya', Object.assign({ 'shape-corner': { value: corner } }, L_SHAPE, BAR));
-    const bar = extent(named(layout, 'bar')[0].outline);
+    const bar = check(layout, 'Г ' + corner);
     const wing = extent(named(layout, 'wing')[0].outline);
-    assert.ok(contains(layout.bounds, named(layout, 'bar')[0]));
-    const wingAtPlusZ = wing.z1 > 0;
-    assert.ok(wingAtPlusZ ? bar.z1 <= -1.2 : bar.z0 >= 1.2, corner + ': bar at the free end');
+    assert.ok(wing.z1 > 0 ? Math.abs(bar.z0 + 1.2) < 1e-9 : Math.abs(bar.z1 - 1.2) < 1e-9, corner + ': at the end the wing does not use');
   });
+  // П: no free end on the run -- the bar carries on from the tip of the +Z wing.
+  const u = layoutFor('stoleshnitsa_kuhnya', Object.assign({}, U_SHAPE, BAR));
+  const bar = extent(named(u, 'bar')[0].outline);
+  const plusWing = named(u, 'wing').map(w => extent(w.outline)).find(w => w.z1 > 0);
+  assert.ok(Math.abs(bar.x0 - plusWing.x1) < 1e-9 && Math.abs(bar.z1 - plusWing.z1) < 1e-9, 'П: from the tip of the +Z wing');
+});
+
+test('bar counter: the longer side runs into the room whichever field it was typed in', () => {
+  const swapped = { 'extra-bar-standard-width': { value: '1200' }, 'extra-bar-standard-length': { value: '500' } };
+  assert.deepEqual(extent(named(layoutFor('stoleshnitsa_kuhnya', swapped), 'bar')[0].outline), extent(named(layoutFor('stoleshnitsa_kuhnya', BAR), 'bar')[0].outline));
+});
+
+test('bar counter «Сложная»: the room-side end is a half-round', () => {
+  const layout = layoutFor('stoleshnitsa_kuhnya', { 'extra-bar-complex-width': { value: '500' }, 'extra-bar-complex-length': { value: '1200' } });
+  const bar = named(layout, 'bar')[0];
+  const e = extent(bar.outline);
+  const far = bar.outline.filter(p => p[0] > e.x1 - 0.25 + 1e-9);
+  assert.ok(far.length > 4, 'many points on the far end: it is round');
+  assert.ok(bar.outline.every(p => p[0] >= e.x0 - 1e-9));
+});
+
+test('bar counter + island: they never stand on the same floor, whatever the shape', () => {
+  [['straight', {}], ['Г left', Object.assign({ 'shape-corner': { value: 'left' } }, L_SHAPE)], ['Г right', Object.assign({ 'shape-corner': { value: 'right' } }, L_SHAPE)], ['П', U_SHAPE]].forEach(([label, shape]) => {
+    const layout = layoutFor('stoleshnitsa_kuhnya', Object.assign({}, shape, ISLAND, BAR));
+    const island = extent(named(layout, 'island')[0].outline);
+    const bar = extent(named(layout, 'bar')[0].outline);
+    assert.ok(!overlaps(island, bar), label + ': island clear of the bar');
+    named(layout, 'wing').forEach(w => assert.ok(!overlaps(island, extent(w.outline)), label + ': island clear of the wing'));
+    assert.ok(contains(layout.bounds, named(layout, 'island')[0]), label + ': island in the frame');
+  });
+  // Without a bar the island stands where it always did.
+  const alone = extent(named(layoutFor('stoleshnitsa_kuhnya', ISLAND), 'island')[0].outline);
+  assert.ok(Math.abs((alone.z0 + alone.z1) / 2) < 1e-9);
 });
 
 test('wall panel is real geometry on the wall side, included in the bounds; with a backsplash it stands behind it (no z-fighting)', () => {
@@ -412,7 +468,7 @@ test('countertop shapes: straight = one slab, Г = one wing, П = a wing at each
   assert.ok(u.bounds.max[0] - u.bounds.min[0] > straight.bounds.max[0] - straight.bounds.min[0]);
 });
 
-test('«Подгиб камнем» is the main run\'s alone: the apron runs along its open front edge, never under a wing; wings keep a plain edge', () => {
+test('«Подгиб камнем» on the main run and on every wing (2026-10-11): the main run\'s apron along its open front edge, each wing\'s along its own front edge (the side facing the kitchen)', () => {
   const wingDims = { 'wing-width': { value: '600' }, 'wing-length': { value: '1400' } };
   const base = { width: { value: '600' }, length: { value: '2400' } };
   const at = (shape, edgeType) => layoutFor('stoleshnitsa_kuhnya', Object.assign({ productShape: { value: shape }, 'edge-type': { value: edgeType } }, base, wingDims));
@@ -433,8 +489,20 @@ test('«Подгиб камнем» is the main run\'s alone: the apron runs alo
     assert.ok(Math.abs(len(wrap) - (2.4 - 0.6 * wings)) < 1e-9, shape + ': apron length');
     wingParts.forEach(w => {
       const [a, b] = zSpan(w);
-      wrap.forEach(([s, e]) => assert.ok(e <= a + 1e-9 || s >= b - 1e-9, shape + ': no apron under a wing'));
-      assert.notEqual(w.edge, 'stone-wrap', shape + ': the wing\'s edge is plain');
+      wrap.forEach(([s, e]) => assert.ok(e <= a + 1e-9 || s >= b - 1e-9, shape + ': the main run\'s apron stops where the wing joins'));
+    });
+    // Each wing: one apron under its front edge -- the long side facing the
+    // other end of the run -- the wing's whole length, right under the slab.
+    const wingWraps = named(layout, 'wing-wrap');
+    assert.equal(wingWraps.length, wings, shape + ': one apron per wing');
+    wingParts.forEach(w => {
+      const e = extent(w.outline);
+      const front = e.z1 > 0 ? e.z0 : e.z1;   // the +Z wing faces -Z, the -Z wing faces +Z
+      const apron = wingWraps.find(p => Math.abs(p.center[2] - front) < 0.02);
+      assert.ok(apron, shape + ': an apron along the wing\'s front edge');
+      assert.ok(apron.center[2] - apron.size[2] / 2 >= e.z0 - 1e-9 && apron.center[2] + apron.size[2] / 2 <= e.z1 + 1e-9, shape + ': inside the wing');
+      assert.ok(apron.center[0] + apron.size[0] / 2 >= e.x1 - 1e-9, shape + ': out to the wing\'s end');
+      assert.ok(Math.abs((apron.center[1] + apron.size[1] / 2) - w.y0) < 1e-9, shape + ': right under the slab');
     });
     assert.equal(named(layout, 'main')[0].edge, 'stone-wrap', shape + ': the main run keeps the profile');
   });
@@ -442,7 +510,7 @@ test('«Подгиб камнем» is the main run\'s alone: the apron runs alo
   ['straight', 'rounding', 'bevel', 'figured'].forEach(edgeType => {
     ['straight', 'lshape', 'ushape'].forEach(shape => {
       const layout = at(shape, edgeType);
-      assert.equal(named(layout, 'wrap').length, 0, edgeType + ' ' + shape);
+      assert.equal(named(layout, 'wrap').length + named(layout, 'wing-wrap').length, 0, edgeType + ' ' + shape);
       assert.equal(named(layout, 'main')[0].edge, edgeType);
       named(layout, 'wing').forEach(w => assert.equal(w.edge, edgeType, edgeType + ' ' + shape + ': the wing shares the profile'));
     });
@@ -672,4 +740,85 @@ test('Г/П «с подступенками»: the landing at the turn has its o
   assert.equal(named(straight, 'riser').length, 10);
   const spiral = layoutFor('lestnitsa', Object.assign({ productSubcategory: { value: 'STAIR-08' } }, dims10));
   assert.equal(named(spiral, 'riser').length, 10);
+});
+
+// «Подгиб камнем» on the shaped sills (2026-10-11): as on the straight one, a
+// stone strip right under every edge that faces the room -- never along the
+// window, never across the ends at the walls.
+test('«Подгиб камнем» on every sill: under the room-side edges of the corner, bay, radius bay and figured sills too', () => {
+  const SIZES = { 'sill-arm-length': { value: '900' }, 'sill-bay-depth': { value: '400' }, 'sill-bay-front': { value: '800' } };
+  const sill = (id, edgeType) => layoutFor('podokonnik', Object.assign({ width: { value: '300' }, length: { value: '1500' }, productSubcategory: { value: id }, 'edge-type': { value: edgeType } }, SIZES));
+  const near = (a, b) => Math.abs(a - b) < 1e-6;
+  ['SILL-01', 'SILL-02', 'SILL-03', 'SILL-04', 'SILL-05'].forEach(id => {
+    const layout = sill(id, 'stone-wrap');
+    const main = named(layout, 'main')[0];
+    const wraps = named(layout, 'wrap');
+    assert.ok(wraps.length > 0, id + ': an apron');
+    const slab = extent(main.outline);
+    wraps.forEach(w => {
+      const top = w.kind === 'box' ? w.center[1] + w.size[1] / 2 : w.y1;
+      assert.ok(near(top, main.y0), id + ': right under the slab');
+      if (w.kind === 'prism') {
+        const e = extent(w.outline);
+        assert.ok(e.x0 >= slab.x0 - 1e-9 && e.x1 <= slab.x1 + 1e-9 && e.z0 >= slab.z0 - 1e-9 && e.z1 <= slab.z1 + 1e-9, id + ': inside the sill');
+        // Never along the window line, which is the back (-X) side.
+        assert.ok(w.outline.every(p => p[0] > -0.15 + 0.019 || id === 'SILL-02'), id + ': not along the window');
+      }
+    });
+    // The room-side front (x = +0.15) is under the apron along most of the run.
+    const frontLen = wraps.reduce((s, w) => {
+      if (w.kind === 'box') return s + w.size[2];
+      const pts = w.outline.filter(p => near(p[0], 0.15));
+      return s + (pts.length ? extent(pts).z1 - extent(pts).z0 : 0);
+    }, 0);
+    if (id !== 'SILL-05') assert.ok(frontLen > 0.5, id + ': along the front edge');
+    // Other profiles: no apron.
+    assert.equal(named(sill(id, 'rounding'), 'wrap').length, 0, id + ': no apron for a rounding');
+  });
+  // The corner sill: also under the arm's room-side edge.
+  const corner = named(sill('SILL-02', 'stone-wrap'), 'wrap');
+  assert.ok(corner.some(w => w.kind === 'prism' && w.outline.some(p => p[0] > 0.3)), 'SILL-02: along the arm too');
+});
+
+// «Подгиб камнем» on steps and stairs (2026-10-11): the front edge of every
+// tread and landing looks twice as thick -- a stone strip right under it.
+// With risers the front is stone all the way down already: nothing to add.
+test('«Подгиб камнем» on steps and stairs: a stone strip under the front of every tread and landing; with risers there is none', () => {
+  const T = 0.04;
+  const check = (layout, label) => {
+    const treads = named(layout, 'tread').concat(named(layout, 'landing'));
+    const wraps = named(layout, 'wrap');
+    assert.equal(wraps.length, treads.length, label + ': one per tread and landing');
+    wraps.forEach(w => {
+      assert.equal(w.role, 'stone');
+      assert.ok(Math.abs((w.y1 - w.y0) - T) < 1e-9, label + ': the tread\'s own thickness');
+      assert.ok(treads.some(t => Math.abs(t.y0 - w.y1) < 1e-9), label + ': right under a tread');
+    });
+    // The body under a tread never shares the apron's space: no z-fighting.
+    const inside = ([x, z], poly) => poly.reduce((acc, [x1, z1], i) => {
+      const [x2, z2] = poly[(i + 1) % poly.length];
+      return ((z1 > z) !== (z2 > z)) && x < x1 + (z - z1) * (x2 - x1) / (z2 - z1) ? !acc : acc;
+    }, false);
+    const distToEdges = ([x, z], poly) => Math.min(...poly.map(([x1, z1], i) => {
+      const [x2, z2] = poly[(i + 1) % poly.length];
+      const len2 = (x2 - x1) ** 2 + (z2 - z1) ** 2 || 1;
+      const t = Math.max(0, Math.min(1, ((x - x1) * (x2 - x1) + (z - z1) * (z2 - z1)) / len2));
+      return Math.hypot(x - (x1 + t * (x2 - x1)), z - (z1 + t * (z2 - z1)));
+    }));
+    named(layout, 'body').forEach(b => wraps.forEach(w => {
+      const sameHeight = b.y0 < w.y1 - 1e-9 && w.y0 < b.y1 - 1e-9;
+      if (!sameHeight) return;
+      // No corner of the apron inside the body at its height (touching its outline is fine).
+      w.outline.forEach(p => assert.ok(!inside(p, b.outline) || distToEdges(p, b.outline) < 1e-4, label + ': body clear of the apron'));
+    }));
+  };
+  const steps = id => layoutFor('stupeni', { width: { value: '350' }, length: { value: '1200' }, productSubcategory: { value: id }, 'edge-type': { value: 'stone-wrap' } });
+  ['STEP-01', 'STEP-02', 'STEP-03'].forEach(id => check(steps(id), id));
+  const stairs = id => layoutFor('lestnitsa', { width: { value: '1000' }, length: { value: '3000' }, 'step-count': { value: '6' }, productSubcategory: { value: id }, 'edge-type': { value: 'stone-wrap' } });
+  ['STAIR-01', 'STAIR-03', 'STAIR-05', 'STAIR-07'].forEach(id => check(stairs(id), id));
+  // With risers: none.
+  assert.equal(named(layoutFor('stupeni', { width: { value: '350' }, length: { value: '1200' }, 'stupeni-riser': { checked: true }, 'edge-type': { value: 'stone-wrap' } }), 'wrap').length, 0);
+  assert.equal(named(stairs('STAIR-02'), 'wrap').length, 0);
+  // Another profile: none.
+  assert.equal(named(layoutFor('stupeni', { width: { value: '350' }, length: { value: '1200' }, 'edge-type': { value: 'rounding' } }), 'wrap').length, 0);
 });

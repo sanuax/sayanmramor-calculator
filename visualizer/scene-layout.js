@@ -79,6 +79,48 @@
     return pts;
   }
 
+  // The same with the half-round at the +X end -- the bar counter's
+  // «сложная» end, out in the room. Built by swapping the axes of the one
+  // above (and reversing the points, so the outline keeps its winding).
+  function roundEndRectX(x0, x1, z0, z1, r) {
+    return roundEndRect(z0, z1, x0, x1, r, 1).map(([a, b]) => [b, a]).reverse();
+  }
+
+  // «Подгиб камнем»: a stone strip WRAP_T thick right under a slab's open
+  // edge, as deep as the slab -- the edge looks twice as thick. For a slab of
+  // any plan: `outline` is its plan, `isOpen(i)` says which of its edges
+  // (outline[i] -> outline[i + 1]) get it; consecutive open edges make one
+  // strip, mitred at the turns, laid inside the outline.
+  const WRAP_T = 0.02;
+  function wrapStrips(outline, isOpen, y0, y1, name) {
+    const n = outline.length;
+    let area = 0;
+    outline.forEach(([x1, z1], i) => { const [x2, z2] = outline[(i + 1) % n]; area += x1 * z2 - x2 * z1; });
+    const s = area > 0 ? 1 : -1;   // the inside is left of each edge (s = 1) or right (s = -1)
+    const normal = i => {
+      const [x1, z1] = outline[i], [x2, z2] = outline[(i + 1) % n];
+      const len = Math.hypot(x2 - x1, z2 - z1) || 1;
+      return [-s * (z2 - z1) / len, s * (x2 - x1) / len];
+    };
+    const strips = [];
+    for (let i = 0; i < n; i++) {
+      if (!isOpen(i) || isOpen((i - 1 + n) % n)) continue;   // a run starts here
+      const edges = [];
+      for (let k = i; isOpen(k % n) && edges.length < n; k++) edges.push(k % n);
+      const outer = edges.map(k => outline[k]).concat([outline[(edges[edges.length - 1] + 1) % n]]);
+      const inner = outer.map((pt, j) => {
+        const a = normal(edges[Math.max(0, j - 1)]), b = normal(edges[Math.min(edges.length - 1, j)]);
+        let mx = a[0] + b[0], mz = a[1] + b[1];
+        const ml = Math.hypot(mx, mz) || 1;
+        mx /= ml; mz /= ml;
+        const scale = Math.min(3, 1 / Math.max(0.33, mx * a[0] + mz * a[1]));
+        return [pt[0] + mx * WRAP_T * scale, pt[1] + mz * WRAP_T * scale];
+      });
+      strips.push(prism('stone', outer.concat(inner.reverse()), y0, y1, { name: name || 'wrap' }));
+    }
+    return strips;
+  }
+
   function prism(role, outline, y0, y1, extra) {
     return Object.assign({ kind: 'prism', role, outline, holes: [], y0, y1 }, extra || {});
   }
@@ -134,6 +176,14 @@
     wings.forEach(({ lengthM: wl }, i) => {
       const [z0, z1] = wingSpans[i];
       parts.push(prism('stone', rect(W / 2, W / 2 + wl, z0, z1), bottom, top, { edge: wingEdge, name: 'wing' }));
+      if (edge === 'stone-wrap') {
+        // The wing's front edge: its long side facing the kitchen (the +Z
+        // wing faces -Z, the -Z one +Z), out to its end; from the main run's
+        // front line, so it meets the main run's apron at the inner corner.
+        const front = z1 > 0 ? z0 + WRAP_T / 2 : z1 - WRAP_T / 2;
+        const from = W / 2 - WRAP_T;
+        parts.push(Object.assign(box('stone', [(from + W / 2 + wl) / 2, bottom - T / 2, front], [W / 2 + wl - from, T, WRAP_T]), { name: 'wing-wrap' }));
+      }
     });
 
     if (m.sink) {
@@ -191,12 +241,22 @@
     }
 
     if (m.barCounter) {
+      // A peninsula out into the room (attachment-geometry.js), a step above
+      // the worktop, on a stone panel under each end down to the floor: the
+      // near one against the countertop, the far one a "waterfall" end.
+      // «Сложная»: the room-side end is a half-round (the far panel then
+      // stands inside the round, under its flat start).
       const b = m.barCounter;
-      const x0 = b.offsetXM - b.widthM / 2, z0 = b.offsetZM - b.lengthM / 2;
+      const y0 = top + b.raiseM, y1 = y0 + T;
       const outline = b.variant === 'complex'
-        ? roundEndRect(x0, x0 + b.widthM, z0, z0 + b.lengthM, b.widthM / 2, b.offsetZM)
-        : rect(x0, x0 + b.widthM, z0, z0 + b.lengthM);
-      parts.push(prism('stone', outline, bottom, top, { edge, name: 'bar' }));
+        ? roundEndRectX(b.x0M, b.x1M, b.z0M, b.z1M, b.depthM / 2)
+        : rect(b.x0M, b.x1M, b.z0M, b.z1M);
+      parts.push(prism('stone', outline, y0, y1, { edge, name: 'bar' }));
+      const legH = y0 - bottom, legY = bottom + legH / 2, zc = (b.z0M + b.z1M) / 2;
+      const farX = b.variant === 'complex' ? b.x1M - b.depthM / 2 : b.x1M;
+      [b.x0M + T / 2, farX - T / 2].forEach(x => {
+        parts.push(Object.assign(box('stone', [x, legY, zc], [T, legH, b.depthM]), { name: 'bar-leg' }));
+      });
     }
 
     return parts;
@@ -241,17 +301,44 @@
     }
   }
 
+  // «Подгиб камнем» on a shaped sill: under every edge that faces the room --
+  // not along the window line, not across the two ends at the walls (the
+  // edges that meet the window line's ends), as on the straight sill.
+  function sillWrap(plan, W, L, T) {
+    const xw = -W / 2;
+    const line = plan.windowLine || [[xw, -L / 2], [xw, L / 2]];   // «Фигурный»: the straight window behind it
+    const onLine = ([x, z]) => line.some(([ax, az], i) => {
+      if (i === line.length - 1) return false;
+      const [bx, bz] = line[i + 1];
+      const len = Math.hypot(bx - ax, bz - az) || 1;
+      const t = ((x - ax) * (bx - ax) + (z - az) * (bz - az)) / (len * len);
+      const px = ax + t * (bx - ax), pz = az + t * (bz - az);
+      return t > -1e-6 && t < 1 + 1e-6 && Math.hypot(x - px, z - pz) < 1e-6;
+    });
+    const isEnd = ([x, z]) => [line[0], line[line.length - 1]].some(([ex, ez]) => Math.hypot(x - ex, z - ez) < 1e-6);
+    const out = plan.outline;
+    const isOpen = i => {
+      const a = out[i], b = out[(i + 1) % out.length];
+      if (onLine(a) && onLine(b)) return false;   // along the window
+      return !isEnd(a) && !isEnd(b);              // not an end at the wall
+    };
+    return wrapStrips(out, isOpen, -T / 2 - T, -T / 2);
+  }
+
   function windowsillParts(m) {
     const plan = (m.sill && m.sill.plan) || null;
+    const wrapped = m.edge && m.edge.type === 'stone-wrap';
     if (plan && plan.windowLine) {
       const T = m.visualThicknessM;
       const parts = [prism('stone', plan.outline, -T / 2, T / 2, { edge: m.edge ? m.edge.type : null, name: 'main' })];
+      if (wrapped) parts.push(...sillWrap(plan, m.widthM, m.lengthM, T));
       windowWallAlong(parts, plan.windowLine, T / 2);
       return parts;
     }
     // Фигурный: the same window as the straight sill, the slab's own outline.
     const parts = plan
       ? [prism('stone', plan.outline, -m.visualThicknessM / 2, m.visualThicknessM / 2, { edge: m.edge ? m.edge.type : null, name: 'main' })]
+        .concat(wrapped ? sillWrap(plan, m.widthM, m.lengthM, m.visualThicknessM) : [])
       : countertopParts(Object.assign({}, m, { sink: null, cooktop: null, holes: null, backsplash: null, wallPanel: null, curb: null, island: null, barCounter: null, wing: null, wings: null }));
     const W = m.widthM, L = m.lengthM, T = m.visualThicknessM;
     const wallT = 0.14, x = -W / 2 - wallT / 2;
@@ -764,6 +851,14 @@
           (level + k) * RISE, topY - T, { name: 'riser' }));
       }
       const bodyStart = a0 + (risers ? RISER_T : 0);
+      if (o.edge === 'stone-wrap' && !risers) {
+        // «Подгиб камнем»: a stone strip under the tread's front edge; the body
+        // steps back behind it (two pieces, so no two faces share a plane).
+        parts.push(prism('stone', bandOutline(stepFootprint(origin, dir, across, halfW, a0, a0 + WRAP_T, bulge), bulge), topY - 2 * T, topY - T, { name: 'wrap' }));
+        parts.push(prism('body', stepFootprint(origin, dir, across, halfW, a0, a1, bulge), 0, topY - 2 * T, { name: 'body' }));
+        parts.push(prism('body', stepFootprint(origin, dir, across, halfW, a0 + WRAP_T, a1, bulge), topY - 2 * T, topY - T, { name: 'body' }));
+        continue;
+      }
       parts.push(prism('body', stepFootprint(origin, dir, across, halfW, bodyStart, a1, risers ? 0 : bulge), 0, topY - T, { name: 'body' }));
     }
   }
@@ -807,6 +902,21 @@
           [d[0] * rOut + t[0] * RISER_T, d[1] * rOut + t[1] * RISER_T], [d[0] * rIn + t[0] * RISER_T, d[1] * rIn + t[1] * RISER_T],
         ];
         parts.push(prism('stone', band, k * RISE, topY - T, { name: 'riser' }));
+      }
+      if (o.edge === 'stone-wrap' && !risers) {
+        // «Подгиб камнем»: a stone strip under the tread's front (radial) edge.
+        const d = u(a0), t = [-Math.sin(a0), Math.cos(a0)];
+        const shift = ([x, z]) => [x + t[0] * WRAP_T, z + t[1] * WRAP_T];
+        const band = [[d[0] * rIn, d[1] * rIn], [d[0] * rOut, d[1] * rOut], shift([d[0] * rOut, d[1] * rOut]), shift([d[0] * rIn, d[1] * rIn])];
+        parts.push(prism('stone', band, topY - 2 * T, topY - T, { name: 'wrap' }));
+        if (!column) {
+          const behind = pts.slice();
+          behind[0] = shift(behind[0]);
+          behind[behind.length - 1] = shift(behind[behind.length - 1]);
+          parts.push(prism('body', pts, 0, topY - 2 * T, { name: 'body' }));
+          parts.push(prism('body', behind, topY - 2 * T, topY - T, { name: 'body' }));
+        }
+        continue;
       }
       if (!column) parts.push(prism('body', pts, 0, topY - T, { name: 'body' }));
     }
@@ -885,6 +995,11 @@
         parts.push(prism('stone', front, belowY, topY - T, { name: 'riser', landing: l.index }));
         parts.push(prism('body', l.outline, 0, belowY, { name: 'body' }));
         parts.push(prism('body', band(l, RISER_T, l.alongM), belowY, topY - T, { name: 'body' }));
+      } else if (edge === 'stone-wrap') {
+        // «Подгиб камнем» under the landing's front edge too.
+        parts.push(prism('stone', band(l, 0, WRAP_T), topY - 2 * T, topY - T, { name: 'wrap', landing: l.index }));
+        parts.push(prism('body', l.outline, 0, topY - 2 * T, { name: 'body' }));
+        parts.push(prism('body', band(l, WRAP_T, l.alongM), topY - 2 * T, topY - T, { name: 'body' }));
       } else {
         parts.push(prism('body', l.outline, 0, topY - T, { name: 'body' }));
       }
