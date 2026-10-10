@@ -193,6 +193,14 @@
     const lightboxOverlay = document.getElementById('lightboxOverlay');
     const lightboxClose = document.getElementById('lightboxClose');
     const lightboxImg = document.getElementById('lightboxImg');
+    // The glass chrome (search, filters, count, sort) lies over the stones; its
+    // height -- more rows on a phone, one more when «Сбросить» shows -- is where
+    // the first row of stones starts (--picker-chrome-h in the page's CSS).
+    const chrome = document.getElementById('pickerChrome');
+    function measureChrome() {
+      if (chrome && chrome.offsetHeight) overlay.style.setProperty('--picker-chrome-h', chrome.offsetHeight + 'px');
+    }
+    if (chrome && typeof ResizeObserver !== 'undefined') new ResizeObserver(measureChrome).observe(chrome);
 
     const SORT_LABELS = {
       'name-asc': 'A-Z', 'name-desc': 'Z-A',
@@ -478,6 +486,7 @@
       applySortButtonLabels();
       resetAndRender();
       overlay.hidden = false;
+      measureChrome();
       searchInput.focus();
     }
 

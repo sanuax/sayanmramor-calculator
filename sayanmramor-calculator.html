@@ -718,8 +718,27 @@
   .picker-overlay {
     position: fixed; inset: 0; background: #fff; z-index: 1000;
     display: flex; flex-direction: column;
-    padding: max(14px, env(safe-area-inset-top)) 0 0;
   }
+  /* Liquid glass (2026-10-10, the owner's request: more glass in the
+     configurator, the icons and the 3D untouched). The chrome -- search,
+     filters, the count, the sort -- is one pane of glass over the sheet, and
+     the stones scroll under it, frosted, so the wall of samples reaches the top
+     of the screen. Its height (more rows on a phone) is measured by
+     material-picker.js into --picker-chrome-h, where the first row of stones
+     starts. The glass is its own layer (::before), not the chrome itself: a
+     filter panel inside the chrome must still see the stones under it. In
+     Chromium it also bends near the edges (.glass-bend, the site's header.js). */
+  .picker-chrome {
+    position: absolute; top: 0; left: 0; right: 0; z-index: 2;
+    padding-top: max(14px, env(safe-area-inset-top));
+  }
+  .picker-chrome::before {
+    content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+    background: linear-gradient(rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 60%), rgba(255, 255, 255, 0.72);
+    -webkit-backdrop-filter: blur(18px) saturate(1.6); backdrop-filter: blur(18px) saturate(1.6);
+    box-shadow: inset 0 -1px 0 var(--pick-line), 0 10px 24px -20px rgba(28, 29, 27, 0.45);
+  }
+  .glass-bend .picker-chrome::before { backdrop-filter: url(#lg-bend) blur(18px) saturate(1.6); }
   .picker-overlay[hidden] { display: none; }
 
   /* One orchestrated entrance: the sheet comes forward while the results
@@ -746,7 +765,7 @@
     padding: 13px 14px 13px 42px;
     border: 1.5px solid transparent; border-radius: 12px;
     font-size: 16px; font-family: inherit; color: var(--pick-ink);
-    background: var(--pick-fill)
+    background: rgba(28, 29, 27, 0.06)   /* see-through: it lies in the glass */
       url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236e6a65' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20.5 20.5L16.2 16.2'/%3E%3C/svg%3E")
       no-repeat 14px center / 17px 17px;
     transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s;
@@ -798,8 +817,10 @@
   .filter-dropdown-panel {
     position: absolute; top: calc(100% + 8px); left: 0; z-index: 5;
     min-width: 208px; max-height: 280px; overflow-y: auto;
-    background: #fff; border: 1px solid var(--pick-line); border-radius: 14px;
-    box-shadow: 0 10px 28px rgba(28, 29, 27, 0.14);
+    background: linear-gradient(rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 40%), rgba(255, 255, 255, 0.8);
+    -webkit-backdrop-filter: blur(16px) saturate(1.6); backdrop-filter: blur(16px) saturate(1.6);
+    border: 1px solid rgba(255, 255, 255, 0.6); border-radius: 14px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 0 0 0.5px rgba(28, 29, 27, 0.14), 0 14px 32px -12px rgba(28, 29, 27, 0.35);
     padding: 8px; animation: picker-panel-in 140ms var(--pick-ease);
   }
   .filter-dropdown-panel[hidden] { display: none; }
@@ -909,7 +930,7 @@
   .picker-sort {
     align-self: flex-end; margin: 0 20px 14px;
     display: inline-flex; gap: 2px;
-    padding: 3px; background: var(--pick-fill); border-radius: 999px;
+    padding: 3px; background: rgba(28, 29, 27, 0.06); border-radius: 999px;   /* see-through: it lies in the glass */
   }
   /* Once there is room, sort moves up beside the search field rather than
      sitting alone on a row of its own -- it pairs with search (both shape the
@@ -945,9 +966,9 @@
        must be a descendant of the element that actually scrolls, otherwise
        its on-screen position never changes and IntersectionObserver (which
        tracks position relative to the viewport) only fires once. */
-    flex: 1; overflow-y: auto;
-    border-top: 1px solid var(--pick-line);
-    padding: 20px 20px 56px;
+    position: absolute; inset: 0; overflow-y: auto;
+    padding: calc(var(--picker-chrome-h, 160px) + 20px) 20px 56px;
+    scroll-padding-top: var(--picker-chrome-h, 160px);   /* a stone reached by the keyboard is never under the glass */
   }
   .picker-grid {
     display: grid;
@@ -1048,7 +1069,8 @@
   .picker-sentinel[hidden] { display: none; }
 
   .lightbox-overlay {
-    position: fixed; inset: 0; background: rgba(14, 17, 15, 0.94); z-index: 1100;
+    position: fixed; inset: 0; background: rgba(14, 17, 15, 0.72); z-index: 1100;
+    -webkit-backdrop-filter: blur(24px) saturate(1.3); backdrop-filter: blur(24px) saturate(1.3);   /* the stones behind, blurred, not black */
     display: flex; align-items: center; justify-content: center; padding: 24px;
     animation: lightbox-in 160ms var(--pick-ease);
   }
@@ -1066,7 +1088,9 @@
   #lightboxClose {
     position: absolute; top: 16px; right: 16px;
     width: 40px; height: 40px; border-radius: 50%;
-    background: rgba(255, 255, 255, 0.12); border: none;
+    background: linear-gradient(rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 50%), rgba(255, 255, 255, 0.12); border: none;
+    -webkit-backdrop-filter: blur(12px) saturate(1.6); backdrop-filter: blur(12px) saturate(1.6);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), inset 0 0 0 1px rgba(255, 255, 255, 0.12);
     color: #fff; font-size: 17px; line-height: 1; cursor: pointer;
     transition: background-color 0.15s;
   }
@@ -1085,10 +1109,16 @@
     .picker-sort { margin: 0 14px 12px; }
     .picker-meta-row { padding: 0 14px 10px; }
     .picker-supplier { font-size: 12px; }
-    .picker-results { padding: 16px 14px 48px; }
+    .picker-results { padding: calc(var(--picker-chrome-h, 200px) + 16px) 14px 48px; }
     .picker-grid { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 16px 10px; }
     .stone-card-name { font-size: 12px; margin-top: 8px; }
     .badge-oos { font-size: 9.5px; padding: 3px 7px; bottom: 6px; left: 6px; }
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    .picker-chrome::before, .glass-bend .picker-chrome::before { background: #fff; -webkit-backdrop-filter: none; backdrop-filter: none; }
+    .filter-dropdown-panel { background: #fff; -webkit-backdrop-filter: none; backdrop-filter: none; }
+    .lightbox-overlay { background: rgba(14, 17, 15, 0.94); -webkit-backdrop-filter: none; backdrop-filter: none; }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -1968,6 +1998,20 @@
              «…за одну ступень.», «…за основной сегмент…») -- right under the
              sizes it is counted from (ResultModel.buildResultView note). -->
         <p class="result-note" id="resultScopeNote" hidden></p>
+
+        <!-- What was configured stays together (2026-10-11, the owner's request):
+             the specs, the extra works, and the way back to change any of them --
+             then the texture note, the price and the request. -->
+        <div class="result-works" id="resultWorksBlock" hidden>
+          <div class="result-block-title">Дополнительные работы</div>
+          <ul class="result-works-list" id="resultWorksList"></ul>
+          <p class="result-works-empty" id="resultWorksEmpty" hidden>Без дополнительных работ</p>
+        </div>
+
+        <div class="result-edit">
+          <div class="result-block-title">Изменить конфигурацию</div>
+          <div class="result-edit-actions" id="resultEditActions"></div>
+        </div>
         <!-- The same note as under the material choice, word for word, so the
              client sees it once more next to the chosen stone before sending
              the request. -->
@@ -2023,17 +2067,6 @@
         <!-- Secondary action: the same product in the site's 3D house. A
              plain link (URL contract only), never in place of the lead CTA. -->
         <a class="result-showroom-link" id="resultShowroomLink" href="#" hidden>Посмотреть изделие в доме <span aria-hidden="true">→</span></a>
-
-        <div class="result-works" id="resultWorksBlock" hidden>
-          <div class="result-block-title">Дополнительные работы</div>
-          <ul class="result-works-list" id="resultWorksList"></ul>
-          <p class="result-works-empty" id="resultWorksEmpty" hidden>Без дополнительных работ</p>
-        </div>
-
-        <div class="result-edit">
-          <div class="result-block-title">Изменить конфигурацию</div>
-          <div class="result-edit-actions" id="resultEditActions"></div>
-        </div>
       </div>
     </section>
     </div><!-- /#stepViewport -->
@@ -2086,6 +2119,7 @@
 </div><!-- /.wrap -->
 
 <div class="picker-overlay" id="pickerOverlay" hidden role="dialog" aria-modal="true" aria-label="Выбор камня">
+  <div class="picker-chrome" id="pickerChrome">
   <div class="picker-header">
     <input type="search" id="pickerSearch" placeholder="Поиск по названию…" autocomplete="off">
     <button type="button" id="pickerClose" aria-label="Закрыть">✕</button>
@@ -2117,6 +2151,7 @@
     <button type="button" class="sort-btn active" data-sort-field="name" data-sort-dir="asc">A-Z</button>
     <button type="button" class="sort-btn" data-sort-field="price" data-sort-dir="asc">Цена ↑</button>
   </div>
+  </div><!-- /.picker-chrome -->
   <div class="picker-results" id="pickerResults">
     <div class="picker-grid" id="pickerGrid"></div>
     <div class="picker-sentinel" id="pickerSentinel"></div>

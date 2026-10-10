@@ -152,3 +152,55 @@ test('the step track: a sticky glass capsule under the header, a travelling lens
   assert.match(js, /list\.scrollTo\(/, 'the current step scrolled into the capsule, never the page');
   assert.doesNotMatch(js, /scrollIntoView/);
 });
+
+// The stone picker in glass (2026-10-10, the owner's request: more liquid glass in
+// the configurator, the icons and the 3D untouched). The picker's chrome -- search,
+// filters, the count, the sort -- is one pane of glass and the stones scroll under
+// it; the filter panels are glass over the stones; the zoomed stone lies over the
+// picker blurred, not over black.
+test('the stone picker in glass: the chrome over the scrolling stones, the filter panels, the sort, the zoomed stone; solid where less transparency is asked', () => {
+  const css = html.slice(html.indexOf('<style>'), html.indexOf('</style>'));
+  const rule = sel => { const i = css.indexOf('\n  ' + sel + ' {'); return i < 0 ? '' : css.slice(i, css.indexOf('}', i)); };
+  const overlay = html.slice(html.indexOf('id="pickerOverlay"'), html.indexOf('id="lightboxOverlay"'));
+  const chrome = overlay.slice(overlay.indexOf('<div class="picker-chrome" id="pickerChrome">'), overlay.indexOf('<div class="picker-results"'));
+  ['class="picker-header"', 'id="pickerFilters"', 'class="picker-meta-row"', 'id="pickerSort"'].forEach(part =>
+    assert.ok(chrome.includes(part), part + ' sits in the glass chrome'));
+  assert.ok(!chrome.includes('id="pickerGrid"'), 'the stones are not in it');
+  assert.match(rule('.picker-chrome'), /position: absolute; top: 0; left: 0; right: 0; z-index: 2;/);
+  // The glass on its own layer, not on the chrome: a filter panel inside the chrome must still see the stones under it.
+  const glass = rule('.picker-chrome::before');
+  assert.match(glass, /-webkit-backdrop-filter: blur\(18px\) saturate\(1\.6\); backdrop-filter: blur\(18px\) saturate\(1\.6\);/);
+  assert.match(css, /\.glass-bend \.picker-chrome::before \{ backdrop-filter: url\(#lg-bend\) blur\(18px\) saturate\(1\.6\); \}/);
+  assert.match(rule('.picker-results'), /position: absolute; inset: 0;[^}]*padding: calc\(var\(--picker-chrome-h, 160px\) \+ 20px\) 20px 56px;/, 'the stones start under the chrome and scroll beneath it');
+  assert.match(rule('.filter-dropdown-panel'), /backdrop-filter: blur\(16px\) saturate\(1\.6\);/);
+  assert.match(rule('.lightbox-overlay'), /backdrop-filter: blur\(24px\) saturate\(1\.3\);/);
+  assert.match(rule('#lightboxClose'), /backdrop-filter: blur\(12px\) saturate\(1\.6\);/);
+  const calm = css.slice(css.indexOf('@media (prefers-reduced-transparency: reduce) {\n    .picker-chrome::before'));
+  assert.ok(calm.length > 0, 'one block for less transparency');
+  assert.match(calm.slice(0, calm.indexOf('\n  }\n')), /\.picker-chrome::before, \.glass-bend \.picker-chrome::before \{ background: #fff; -webkit-backdrop-filter: none; backdrop-filter: none; \}/);
+  // The script measures the chrome (it wraps to more rows on a phone) for the stones' first row.
+  const picker = fs.readFileSync(path.join(__dirname, '..', 'material-picker.js'), 'utf8');
+  assert.match(picker, /getElementById\('pickerChrome'\)/);
+  assert.match(picker, /style\.setProperty\('--picker-chrome-h', /);
+  assert.match(picker, /new ResizeObserver\(/);
+});
+
+// The result column (2026-10-11, the owner's request): what was configured comes
+// first and together -- the specs, the extra works, the way back to change them --
+// then the note on the stone's texture, the price, the request and the house.
+test('the result column: specs, extra works and «Изменить конфигурацию» together under «Конфигурация готова», above the texture note and the price', () => {
+  const review = html.slice(html.indexOf('<section class="step" data-step-id="review"'), html.indexOf('</section>', html.indexOf('data-step-id="review"')));
+  const order = ['class="result-eyebrow">Конфигурация готова', 'id="resultSpecs"', 'id="resultScopeNote"', 'id="resultWorksBlock"', 'class="result-edit"',
+    'class="stone-texture-note result-texture-note"', 'class="result-pricing"', 'id="leadArea"', 'id="resultShowroomLink"'].map(part => {
+    const at = review.indexOf(part);
+    assert.ok(at > 0, part);
+    return at;
+  });
+  order.reduce((prev, at) => { assert.ok(prev < at, 'in this order'); return at; });
+});
+
+test('the glass leaves the icons and the 3D alone: the product, type and extras icons and the 3D panel keep their own rules', () => {
+  const css = html.slice(html.indexOf('<style>'), html.indexOf('</style>'));
+  const glassy = [...css.matchAll(/([^{}]+)\{[^}]*backdrop-filter/g)].map(m => m[1].replace(/\/\*[\s\S]*?\*\//g, ''));
+  glassy.forEach(sel => assert.doesNotMatch(sel, /product-card|product-grid|card-grid|pick-card|icon|shape-card|option-card|toggle-card|work-item|viewer-|configurator-side|summary-block|canvas/, sel.trim()));
+});
