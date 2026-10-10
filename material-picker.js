@@ -274,7 +274,7 @@
         btn.classList.toggle('active', !!text);
       }
       const control = PriceFilter.mount(panel, {
-        min: ends.min, max: ends.max, label: 'Цена камня, ₽/м²',
+        min: ends.min, max: ends.max, label: 'Цена камня, ₽/м²', prices: stones.map(shownPrice),
         onChange: (value) => { currentPrice = value; updateLabel(); resetAndRender(); },
       });
       updateLabel();

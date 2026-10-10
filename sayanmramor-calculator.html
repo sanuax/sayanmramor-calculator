@@ -781,7 +781,9 @@
   /* «Цена»: «от» and «до» fields over a two-handled slider (price-filter.js), by the
      stone's lowest price per m2 -- the «от … ₽/м²» on its card. The scale is
      logarithmic: most stones are under 50 000 ₽/м², a few agates near 730 000. */
-  .filter-price-panel { width: 320px; max-height: none; overflow: visible; padding: 14px 14px 6px; }
+  .filter-price-panel { width: 340px; max-height: none; overflow: visible; padding: 14px 14px 8px; }
+  /* The configurator's colours for the slider: its copper, a light tint of it, its line. */
+  .filter-price-panel .pf { --pf-accent: var(--pick-accent); --pf-accent-soft: #dfa784; --pf-line: var(--pick-line); --pf-ink: var(--pick-ink); --pf-muted: var(--pick-muted); }
   .filter-price-panel .pf-fields { display: flex; gap: 8px; }
   .filter-price-panel .pf-field {
     flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; height: 40px; padding: 0 12px;
@@ -794,33 +796,74 @@
     font: inherit; font-size: 14px; color: var(--pick-ink); font-variant-numeric: tabular-nums;
   }
   .filter-price-panel .pf-input::placeholder { color: var(--pick-muted); opacity: 0.8; }
-  .pf-slider { position: relative; height: 50px; margin-top: 10px; }
-  .pf-track { position: absolute; left: 10px; right: 10px; top: 12px; height: 4px; border-radius: 2px; background: var(--pick-line); }
-  .pf-fill { position: absolute; top: 0; bottom: 0; border-radius: 2px; background: var(--pick-accent); }
-  .pf-thumb {
-    position: absolute; left: 0; top: 0; width: 100%; height: 28px; margin: 0; padding: 0;
-    background: none; pointer-events: none; -webkit-appearance: none; appearance: none;
+/* The slider (price-filter.js; the same rules in the site and the configurator, only the
+     colours differ: --pf-accent, --pf-accent-soft, --pf-line, --pf-ink). Over the rail, a small
+     histogram of the stones along the scale, the bars inside the range lit. The rail is a groove
+     cut in the stone; the handles are glass capsules -- a highlight on top, the rail seen through
+     them -- that swell into a lens while held, a glass tip over them naming the price. The native
+     range inputs lie on top, invisible: they take the drag, the keyboard and the screen reader. */
+  .pf { --pf-ease: cubic-bezier(0.23, 1, 0.32, 1); }
+  .pf-slider { position: relative; margin-top: 14px; }
+  .pf-hist { display: flex; align-items: flex-end; gap: 2px; height: 34px; margin: 0 14px 4px; }
+  .pf-bar { flex: 1; min-width: 0; border-radius: 2px 2px 0 0; background: var(--pf-line); transition: background-color 150ms ease; }
+  .pf-bar.is-in { background: var(--pf-accent-soft); }
+  .pf-lane { position: relative; height: 28px; margin: 0 14px; touch-action: none; cursor: pointer; }
+  .pf-rail {
+    position: absolute; left: 0; right: 0; top: 11px; height: 6px; border-radius: 3px;
+    background: var(--pf-line); box-shadow: inset 0 1px 2px rgba(28, 29, 27, 0.18);
   }
-  .pf-thumb:focus { outline: none; }
+  .pf-fill { position: absolute; top: 0; bottom: 0; border-radius: 3px; background: linear-gradient(90deg, var(--pf-accent-soft), var(--pf-accent)); }
+  .pf-knob {
+    position: absolute; top: 3px; z-index: 2; width: 32px; height: 22px; margin-left: -16px; border-radius: 999px; pointer-events: none;
+    background: rgba(255, 255, 255, 0.6);
+    -webkit-backdrop-filter: blur(3px) saturate(1.8); backdrop-filter: blur(3px) saturate(1.8);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 1.5px rgba(28, 29, 27, 0.1),
+      0 0 0 0.5px rgba(28, 29, 27, 0.18), 0 2px 5px rgba(28, 29, 27, 0.16), 0 8px 18px -8px rgba(28, 29, 27, 0.36);
+    transition: transform 180ms var(--pf-ease), background-color 180ms ease;
+  }
+  /* The light on the glass: a soft band along its top. */
+  .pf-knob::before {
+    content: ''; position: absolute; left: 4px; right: 4px; top: 1px; height: 45%; border-radius: 999px;
+    background: linear-gradient(rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0));
+  }
+  .pf-knob.is-held { transform: scale(1.32); background: rgba(255, 255, 255, 0.24); }
+  .pf-knob.is-focus { outline: 2px solid var(--pf-accent); outline-offset: 3px; }
+  .pf-tip {
+    position: absolute; bottom: calc(100% + 8px); z-index: 3; padding: 5px 10px; border-radius: 10px; pointer-events: none;
+    white-space: nowrap; font-size: 12.5px; font-weight: 600; line-height: 1.2; color: var(--pf-ink); font-variant-numeric: tabular-nums;
+    background: rgba(255, 255, 255, 0.74);
+    -webkit-backdrop-filter: blur(10px) saturate(1.6); backdrop-filter: blur(10px) saturate(1.6);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 0 0 0.5px rgba(28, 29, 27, 0.16), 0 6px 16px -6px rgba(28, 29, 27, 0.36);
+    opacity: 0; transform: translateX(-50%) translateY(4px) scale(0.96); transform-origin: 50% 100%;
+    transition: opacity 120ms ease, transform 160ms var(--pf-ease);
+  }
+  .pf-tip.is-shown { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  /* The working inputs: as wide as the lane plus a handle, so a handle's middle runs end to end. */
+  .pf-thumb {
+    position: absolute; left: -14px; top: 0; z-index: 4; width: calc(100% + 28px); height: 28px; margin: 0; padding: 0;
+    background: none; opacity: 0; pointer-events: none; -webkit-appearance: none; appearance: none;
+  }
   .pf-thumb::-webkit-slider-runnable-track { height: 28px; background: none; border: 0; }
   .pf-thumb::-moz-range-track { height: 28px; background: none; border: 0; }
-  .pf-thumb::-webkit-slider-thumb {
-    -webkit-appearance: none; appearance: none; pointer-events: auto; cursor: grab;
-    width: 20px; height: 20px; margin-top: 4px; border-radius: 50%;
-    background: #fff; border: 2px solid var(--pick-accent); box-shadow: 0 1px 3px rgba(26, 24, 22, 0.25);
-  }
-  .pf-thumb::-moz-range-thumb {
-    pointer-events: auto; cursor: grab; width: 16px; height: 16px; border-radius: 50%;
-    background: #fff; border: 2px solid var(--pick-accent); box-shadow: 0 1px 3px rgba(26, 24, 22, 0.25);
-  }
-  .pf-thumb:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--pick-accent); outline-offset: 2px; }
-  .pf-thumb:focus-visible::-moz-range-thumb { outline: 2px solid var(--pick-accent); outline-offset: 2px; }
-  .pf-thumb + .pf-thumb { z-index: 1; }
-  .pf-from-on-top .pf-thumb:first-of-type { z-index: 2; }
-  .pf-ticks { position: absolute; left: 10px; right: 10px; top: 30px; }
-  .pf-tick { position: absolute; transform: translateX(-50%); font-size: 11px; color: var(--pick-muted); white-space: nowrap; }
+  .pf-thumb::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 28px; height: 28px; pointer-events: auto; cursor: grab; }
+  .pf-thumb::-moz-range-thumb { width: 28px; height: 28px; border: 0; pointer-events: auto; cursor: grab; }
+  .pf-thumb:active::-webkit-slider-thumb { cursor: grabbing; }
+  .pf-thumb:active::-moz-range-thumb { cursor: grabbing; }
+  .pf-thumb + .pf-thumb { z-index: 5; }
+  .pf-from-on-top .pf-thumb:first-of-type { z-index: 6; }
+  .pf-ticks { position: relative; height: 16px; margin: 4px 14px 0; }
+  .pf-tick { position: absolute; top: 0; transform: translateX(-50%); font-size: 11.5px; color: var(--pf-muted); white-space: nowrap; }
   .pf-tick:first-child { transform: none; }
   .pf-tick:last-child { transform: translateX(-100%); }
+  @media (prefers-reduced-motion: reduce) {
+    .pf-knob, .pf-tip { transition: opacity 120ms ease; }
+    .pf-knob.is-held { transform: none; }
+    .pf-tip, .pf-tip.is-shown { transform: translateX(-50%); }
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    .pf-knob, .pf-knob.is-held, .pf-tip { background: #fff; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  }
   .filter-option input {
     width: 16px; height: 16px; accent-color: var(--pick-accent); cursor: pointer;
   }
