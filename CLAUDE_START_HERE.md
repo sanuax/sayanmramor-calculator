@@ -49,7 +49,7 @@ three.js r160:
 
 ## Где данные материалов
 
-`<калькулятор>\data\slabs.json` (891 камень, 28 334 слэба с ценами) + `data\images\` — **не в git**. Парсер — `scripts\scrape_slabs.py` (Playwright), данные от 15.09.
+`<калькулятор>\data\slabs.json` (891 камень, 28 334 слэба с ценами) + `data\images\` — **в git с 2026-10-14** (разрешение на фото получено), опубликованы на GitHub Pages. Парсер — `scripts\scrape_slabs.py` (Playwright), данные от 15.09.
 
 ## Где цены
 
@@ -109,7 +109,7 @@ Push и commit — только по явной просьбе пользова�
 
 ## Известные ограничения
 
-- Прод-топология и хранение `slabs.json` не решены.
+- Прод-топология (2026-10-12): GitHub Pages — сайт https://sanuax.github.io/sayanmramor-site/, калькулятор https://sanuax.github.io/sayanmramor-calculator/sayanmramor-calculator.html. Каталог камня в git и на Pages с 2026-10-14.
 - Заявка никуда не отправляется.
 - Большая часть ставок — оценки.
 - Портфолио сайта — плейсхолдеры.

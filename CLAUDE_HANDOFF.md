@@ -26,14 +26,14 @@ git и файлам; где факт установить не удалось, �
 - Локальный `master` в `D:\calculator` целиком входит в `rate-catalog-subcategories` и отстаёт на 76 коммитов. Для работы и QA его **не использовать**.
 - Ветка `rate-catalog-subcategories` checkout'нута как git worktree в `D:\calculator\.worktrees\rate-catalog-subcategories`. Папка `.worktrees/` в `.gitignore` master'а.
 - На 2026-09-27 ветка **на 12 коммитов впереди origin, не запушена**: от `28fba7f`… до `eee7e60`. Push делается только по явному решению пользователя.
-- `data/slabs.json` и `data/images/` **не в git** (в `.gitignore`) в обоих checkout'ах. Файлы идентичны: md5 `92905e2820f2c0febf6b1e9cdd146385`.
+- `data/slabs.json` и `data/images/` с 2026-10-14 **в git** ветки `rate-catalog-subcategories` (компания получила разрешение на фото Venezia Stone) и опубликованы на GitHub Pages. В master-checkout они по-прежнему лежат вне git. md5 `slabs.json` на 2026-10-14: `92905e2820f2c0febf6b1e9cdd146385`. После нового запуска парсера их нужно закоммитить заново.
 
 ---
 
 ## A. Архитектура экосистемы
 
 ```
-veneziastone.com ──scripts/scrape_slabs.py (Playwright+BS4)──► data/slabs.json + data/images/*.webp   [calculator, не в git]
+veneziastone.com ──scripts/scrape_slabs.py (Playwright+BS4)──► data/slabs.json + data/images/*.webp   [calculator, в git с 2026-10-14]
                                                                      │
           ┌──────────────────────────────────────────────────────────┤ fetch /calculator/data/slabs.json
           ▼                                                          ▼
@@ -54,7 +54,7 @@ veneziastone.com ──scripts/scrape_slabs.py (Playwright+BS4)──► data/sl
 Оба проекта предполагают **один origin**: пути `/sayanmramor-site/…` и `/calculator/…`.
 
 - Локально это обеспечивает `D:\sayanmramor-site\scripts\dev_server.py`, порт 8000. Он отдаёт `/sayanmramor-site/` из репозитория сайта, `/calculator/` из worktree `rate-catalog-subcategories`, ставит `Cache-Control: no-store`, а `/` перенаправляет на главную.
-- **Прод-топология не решена**: спека сайта называет это «сознательно отложенным вопросом».
+- **Прод-топология (2026-10-12): GitHub Pages.** Сайт — https://sanuax.github.io/sayanmramor-site/ (ветка `master`), калькулятор — https://sanuax.github.io/sayanmramor-calculator/sayanmramor-calculator.html (ветка `rate-catalog-subcategories`). Префикс калькулятора поэтому `/sayanmramor-calculator/` (было `/calculator/`; dev-сервер сайта отдаёт оба).
 
 Запуск:
 
@@ -498,7 +498,7 @@ cd /d/photo_marble && python review_server.py
 
 - Сайт **не загружает код калькулятора** и не дублирует его логику (цена, размеры — только в конфигураторе). Связь — только 2 контракта.
 - Фильтрации камня по типу изделия на страницах категорий **нет:** показываются все камни.
-- Пути `/sayanmramor-site/` и `/calculator/` менять нельзя.
+- Пути `/sayanmramor-site/` и `/sayanmramor-calculator/` (до 2026-10-12 — `/calculator/`) менять нельзя: это адреса на GitHub Pages.
 - В шоуруме оптимизации **без потери качества**. MeshPhysical → MeshStandard, снижение DPR и подобное запрещено. Спорный визуальный результат считается FAIL и откатывается.
 
 **Фото:**
@@ -514,8 +514,8 @@ cd /d/photo_marble && python review_server.py
 **Критические:**
 
 1. Ветка калькулятора `rate-catalog-subcategories` — **12 коммитов не запушены**. Локальный `master` устарел, а на GitHub master'а нет — легко работать не в том checkout'е.
-2. `data/slabs.json` (8,9 МБ) и `data/images` (59 МБ) **не в git**: единственная копия на этом диске плюс копия в master-checkout. Как каталог попадёт на хостинг — не решено.
-3. **Прод-топология** (один хост для `/sayanmramor-site/` и `/calculator/`) не решена.
+2. ~~`data/slabs.json` и `data/images` не в git~~ — решено 2026-10-14: в git и на GitHub Pages.
+3. ~~Прод-топология~~ — решено 2026-10-12: GitHub Pages, один хост `sanuax.github.io`.
 4. Ставки: 5 из 9 продуктов считаются по **оценкам-заглушкам**. Ставки rate-catalog и xlsx пустые, «прочее» не учитывается. **Цена ориентировочная.**
 
 **Средние:**
