@@ -90,3 +90,34 @@ test('crossfade starts a real animation (returns true, does not settle synchrono
     global.requestAnimationFrame = originalRAF;
   }
 });
+
+// On a phone the steps differ by hundreds of pixels (2026-10-14, the owner: «всё
+// скачет»). The container used to stay at the old step's height for the whole
+// animation and then snap to the new one, throwing Далее/Назад and the 3D below
+// it up or down. It now travels from the old height to the new one with the fade.
+test('crossfade carries the container from the old step height to the new one, then lets it go', async () => {
+  const originalRAF = global.requestAnimationFrame;
+  global.requestAnimationFrame = (cb) => setTimeout(cb, 0);
+  try {
+    const fromEl = { style: {}, offsetHeight: 520 };
+    const toEl = { style: {}, offsetHeight: 300 };
+    const container = { style: {}, getBoundingClientRect: () => ({ height: 520 }) };
+    let settled = false;
+    TransitionLayer.crossfade({
+      container, fromEl, toEl, direction: 'forward', durationMs: 20,
+      win: { matchMedia: () => ({ matches: false }) },
+      onSettle: () => { settled = true; },
+    });
+    assert.equal(container.style.height, '520px', 'starts at the old height');
+    assert.equal(container.style.minHeight, undefined, 'never frozen by a min-height');
+    await new Promise(r => setTimeout(r, 5));
+    assert.equal(container.style.height, '300px', 'travels to the new height');
+    assert.match(container.style.transition, /^height 20ms /);
+    await new Promise(r => setTimeout(r, 120));
+    assert.equal(settled, true);
+    assert.equal(container.style.height, '', 'the container sizes itself again once settled');
+    assert.equal(container.style.transition, '');
+  } finally {
+    global.requestAnimationFrame = originalRAF;
+  }
+});

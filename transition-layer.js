@@ -41,7 +41,7 @@
   // crossfade({ container, fromEl, toEl, direction, durationMs, onSettle })
   //
   // - container: the positioned ancestor of fromEl/toEl (its own
-  //   position/min-height are touched only for the animation's duration and
+  //   position/height/overflow are touched only for the animation's duration and
   //   fully restored afterwards).
   // - fromEl: currently-visible element, or null/undefined if there is
   //   nothing to animate away (first render).
@@ -74,7 +74,13 @@
     const previousPosition = container.style.position;
     const height = container.getBoundingClientRect().height;
     container.style.position = previousPosition || 'relative';
-    container.style.minHeight = height + 'px';
+    // The container travels from the old step's height to the new one with the
+    // fade (2026-10-14): held at the old height and snapped at the end, it threw
+    // everything under it -- Далее/Назад, the 3D on a phone -- by hundreds of px.
+    // Clipped meanwhile, so a taller outgoing step never lies over what is below.
+    const previousOverflow = container.style.overflow;
+    container.style.height = height + 'px';
+    container.style.overflow = 'hidden';
 
     if (fromEl) {
       fromEl.style.position = 'absolute';
@@ -96,11 +102,14 @@
 
     // Force the browser to commit the "before" state above before the next
     // frame flips it to the "after" state -- otherwise both sets of styles
-    // can get batched into one paint and nothing visibly animates.
-    void toEl.offsetHeight;
+    // can get batched into one paint and nothing visibly animates. The same
+    // read gives the new step's own height (it is laid out, absolutely).
+    const toHeight = toEl.offsetHeight;
 
     requestAnimationFrame(() => {
       const transition = 'transform ' + duration + 'ms ease, opacity ' + duration + 'ms ease';
+      container.style.transition = 'height ' + duration + 'ms ease';
+      container.style.height = toHeight + 'px';
       if (fromEl) {
         fromEl.style.transition = transition;
         fromEl.style.transform = 'translateY(' + (sign * TRANSLATE_PX) + 'px)';
@@ -120,7 +129,9 @@
         resetInlineStyles(fromEl);
       }
       resetInlineStyles(toEl);
-      container.style.minHeight = '';
+      container.style.height = '';
+      container.style.transition = '';
+      container.style.overflow = previousOverflow;
       container.style.position = previousPosition;
       onSettle();
     }

@@ -2031,7 +2031,7 @@
         <div class="lead" id="leadArea">
           <button type="button" class="cta-btn" id="resultCtaBtn">Получить расчёт</button>
 
-          <form class="lead-form" id="leadForm" novalidate hidden>
+          <form class="lead-form" id="leadForm" novalidate hidden tabindex="-1">
             <div class="lead-form-head">
               <h3 class="lead-form-title">Получить расчёт</h3>
               <p class="lead-form-sub">Оставьте контакты — параметры изделия уже собраны в запрос, повторно их вводить не нужно.</p>
@@ -2118,7 +2118,7 @@
   </div><!-- /.configurator -->
 </div><!-- /.wrap -->
 
-<div class="picker-overlay" id="pickerOverlay" hidden role="dialog" aria-modal="true" aria-label="Выбор камня">
+<div class="picker-overlay" id="pickerOverlay" hidden role="dialog" aria-modal="true" aria-label="Выбор камня" tabindex="-1">
   <div class="picker-chrome" id="pickerChrome">
   <div class="picker-header">
     <input type="search" id="pickerSearch" placeholder="Поиск по названию…" autocomplete="off">
@@ -3358,6 +3358,29 @@
   if (typeof ResizeObserver !== 'undefined') new ResizeObserver(replaceStepLens).observe(stepProgressEl);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(replaceStepLens);
 
+  // On a phone (2026-10-14, the owner: «всё скачет, в лишний раз открывается
+  // клавиатура»). A mouse and a real keyboard keep the cursor in fields as before;
+  // a touch screen gets no focus in a field it did not tap, or up comes the keyboard.
+  function finePointer() {
+    return !window.matchMedia || window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+  }
+  // The field typed into on the step being left keeps the focus while hidden --
+  // and with it the keyboard: let it go before the step changes.
+  function releaseFieldIn(stepEl) {
+    if (stepEl && document.activeElement && stepEl.contains(document.activeElement)) document.activeElement.blur();
+  }
+  // The steps differ by hundreds of px; Далее sits under the step, so the next
+  // step used to open with its start far above the screen. Its start is brought
+  // just under the sticky step strip -- only when it is out of view.
+  function bringStepIntoView() {
+    const strip = stepProgressEl.getBoundingClientRect();
+    const limit = (strip.height ? strip.bottom : 96) + 12;
+    const top = stepViewportEl.getBoundingClientRect().top;
+    if (top < limit || top > window.innerHeight * 0.6) {
+      window.scrollBy({ top: top - limit, behavior: reducedMotion.matches ? 'auto' : 'smooth' });
+    }
+  }
+
   // desiredStepId/transitionDirection let one function serve both callers:
   //   - calculate() passes (currentStepId, null) on every recalculation
   //     (input change, product change, etc.) -- resolveCurrentStep() then
@@ -3418,6 +3441,10 @@
     const fromEl = (previousStepId && previousStepId !== currentStepId)
       ? document.querySelector('.configurator .step[data-step-id="' + previousStepId + '"]')
       : null;
+    if (transitionDirection) {
+      releaseFieldIn(fromEl);
+      if (!enteringResult) bringStepIntoView();
+    }
 
     if (transitionDirection && activeSection && fromEl && fromEl !== activeSection) {
       stepTransitionInFlight = true;
@@ -4715,7 +4742,7 @@
     leadForm.hidden = leadMode !== 'form';
     leadSuccessEl.hidden = leadMode !== 'success';
     if (!moveFocus) return;
-    const target = leadMode === 'form' ? leadFields.name.input : leadMode === 'success' ? leadSuccessEl : resultCtaBtn;
+    const target = leadMode === 'form' ? (finePointer() ? leadFields.name.input : leadForm) : leadMode === 'success' ? leadSuccessEl : resultCtaBtn;
     target.focus({ preventScroll: true });
     target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }

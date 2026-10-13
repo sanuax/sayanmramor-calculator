@@ -204,3 +204,27 @@ test('the glass leaves the icons and the 3D alone: the product, type and extras 
   const glassy = [...css.matchAll(/([^{}]+)\{[^}]*backdrop-filter/g)].map(m => m[1].replace(/\/\*[\s\S]*?\*\//g, ''));
   glassy.forEach(sel => assert.doesNotMatch(sel, /product-card|product-grid|card-grid|pick-card|icon|shape-card|option-card|toggle-card|work-item|viewer-|configurator-side|summary-block|canvas/, sel.trim()));
 });
+
+// On a phone (2026-10-14, the owner: «всё скачет, в лишний раз открывается клавиатура
+// — при расчёте и каталоге камня»): a step change brings the new step's start into view
+// under the step strip and closes the keyboard of the step left behind; the stone picker
+// and the request form open without putting the cursor in a field on a touch screen, so
+// the keyboard comes up only when a field is tapped. With a mouse, as before.
+test('phone: steps scroll to their start, no keyboard unless a field is tapped', () => {
+  const picker = fs.readFileSync(path.join(__dirname, '..', 'material-picker.js'), 'utf8');
+  const open = picker.slice(picker.indexOf('function open()'), picker.indexOf('return { open, close };'));
+  assert.match(open, /if \(finePointer\(\)\) searchInput\.focus\(\);\s*else overlay\.focus\(\{ preventScroll: true \}\);/);
+  assert.match(picker, /matchMedia\('\(hover: hover\) and \(pointer: fine\)'\)/);
+  assert.match(html, /<div class="picker-overlay" id="pickerOverlay" hidden role="dialog" aria-modal="true" aria-label="Выбор камня" tabindex="-1">/);
+
+  const lead = html.slice(html.indexOf('function applyLeadMode('), html.indexOf('function showLeadErrors('));
+  assert.match(lead, /leadMode === 'form' \? \(finePointer\(\) \? leadFields\.name\.input : leadForm\)/, 'the form itself, not «Имя», on a touch screen');
+  assert.match(html, /<form class="lead-form" id="leadForm" novalidate hidden tabindex="-1">/);
+
+  const apply = html.slice(html.indexOf('function applyStep('), html.indexOf('function updateStepUI('));
+  assert.match(apply, /if \(transitionDirection\) \{\s*releaseFieldIn\(fromEl\);\s*if \(!enteringResult\) bringStepIntoView\(\);/, 'the Result keeps its own scroll to the columns');
+  const helpers = html.slice(html.indexOf('function releaseFieldIn('), html.indexOf('function applyStep('));
+  assert.match(helpers, /document\.activeElement\.blur\(\)/);
+  assert.match(helpers, /const strip = stepProgressEl\.getBoundingClientRect\(\);[\s\S]*strip\.bottom/, 'under the sticky step strip');
+  assert.match(helpers, /window\.scrollBy\(\{ top: [^,]+, behavior: reducedMotion\.matches \? 'auto' : 'smooth' \}\)/);
+});

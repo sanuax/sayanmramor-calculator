@@ -178,6 +178,10 @@
     return n + ' ' + word;
   }
 
+  function finePointer() {
+    return typeof window === 'undefined' || !window.matchMedia || window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+  }
+
   function init({ stones, onSelect }) {
     const overlay = document.getElementById('pickerOverlay');
     const searchInput = document.getElementById('pickerSearch');
@@ -487,7 +491,10 @@
       resetAndRender();
       overlay.hidden = false;
       measureChrome();
-      searchInput.focus();
+      // Straight into the search with a mouse; on a touch screen the dialog
+      // itself, so the keyboard does not cover the stones until search is tapped.
+      if (finePointer()) searchInput.focus();
+      else overlay.focus({ preventScroll: true });
     }
 
     return { open, close };
