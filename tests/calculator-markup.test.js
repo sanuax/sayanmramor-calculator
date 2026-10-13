@@ -228,3 +228,8 @@ test('phone: steps scroll to their start, no keyboard unless a field is tapped',
   assert.match(helpers, /const strip = stepProgressEl\.getBoundingClientRect\(\);[\s\S]*strip\.bottom/, 'under the sticky step strip');
   assert.match(helpers, /window\.scrollBy\(\{ top: [^,]+, behavior: reducedMotion\.matches \? 'auto' : 'smooth' \}\)/);
 });
+
+// The tab icon is the site's (the old site's favicon, 2026-10-14), from the site on the same host.
+test('the configurator wears the site\'s tab icon', () => {
+  assert.match(html, /<\/title>\r?\n<link rel="icon" href="\/sayanmramor-site\/assets\/brand\/favicon\.ico">/);
+});
