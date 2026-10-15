@@ -246,3 +246,7 @@ test('phone: every number field asks for the digit keypad (inputmode="numeric")'
 test('phone: on a touch screen every field is at least 16 px, so focusing it never zooms the page', () => {
   assert.match(html, /@media \(pointer: coarse\) \{\s*input:not\(\[type="checkbox"\]\):not\(\[type="radio"\]\), select, textarea \{ font-size: 16px !important; \}\s*\}/);
 });
+
+test('the tab: «Конфигуратор изделий из камня - Саянмрамор» (2026-10-15, the owner)', () => {
+  assert.match(html, /<title>Конфигуратор изделий из камня - Саянмрамор<\/title>/);
+});
