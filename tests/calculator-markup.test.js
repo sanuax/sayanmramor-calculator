@@ -250,3 +250,7 @@ test('phone: on a touch screen every field is at least 16 px, so focusing it nev
 test('the tab: «Конфигуратор изделий из камня - Саянмрамор» (2026-10-15, the owner)', () => {
   assert.match(html, /<title>Конфигуратор изделий из камня - Саянмрамор<\/title>/);
 });
+
+test('the size step shows no formula: no «Формула: …» line under the fireplace or facade sizes (2026-10-15, the owner)', () => {
+  assert.doesNotMatch(html, /'Формула: '/);
+});

@@ -3720,16 +3720,14 @@
     return parts.join(' ');
   }
 
-  // What stone the fireplace is made of, its formula and what the price
-  // covers -- and, once every size is right, the area it gives:
+  // What the price covers -- and, once every size is right, the area it gives
+  // (no formula on the page, the owner 2026-10-15):
   //   Площадь камня портала: 1,94 м²
-  //   Формула: … (fireplace-model.js)
   //   Стоимость указана за каменный портал.
   function updateFireplaceAreaNote() {
     const type = currentFireplaceType();
     if (!type) return;
     const cfg = FireplaceModel.readFireplaceConfig(document, type.id);
-    const form = FireplaceModel.getForm(type, cfg.form);
     const line = (cls, text) => {
       const el = document.createElement('span');
       el.className = cls;
@@ -3738,7 +3736,6 @@
     };
     const lines = [];
     if (cfg.complete) lines.push(line('facade-area-total', type.areaTitle + ': ' + decimal2(cfg.areaM2) + ' м²'));
-    lines.push(line('facade-area-line', 'Формула: ' + form.formula + '.'));
     lines.push(line('facade-area-scope', FireplaceModel.priceNote(type)));
     document.getElementById('fireplaceAreaNote').replaceChildren(...lines);
   }
@@ -3801,17 +3798,15 @@
     updateFacadeAreaNote();
   }
 
-  // What is clad, how it is counted and what the price covers -- and, once
-  // every size is in, the area it gives (one piece x the quantity):
+  // What the price covers -- and, once every size is in, the area it gives
+  // (one piece x the quantity; no formula on the page, the owner 2026-10-15):
   //   Площадь облицовки колонн: 15,08 м²
   //   3,77 м² × 4 колонны
-  //   Формула: боковая поверхность колонны = 2 × π × R × H.
   //   Стоимость указана за облицовку колонн. (+ what the 3D shows only as image)
   function updateFacadeAreaNote() {
     const type = currentFacadeType();
     if (!type) return;
     const cfg = FacadeModel.readFacadeConfig(document, type.id);
-    const form = FacadeModel.getForm(type, cfg.form);
     const note = document.getElementById('facadeAreaNote');
     const line = (cls, text) => {
       const el = document.createElement('span');
@@ -3824,8 +3819,6 @@
       lines.push(line('facade-area-total', type.areaTitle + ': ' + decimal2(cfg.areaM2) + ' м²'));
       if (cfg.quantity > 1) lines.push(line('facade-area-line', decimal2(cfg.pieceAreaM2) + ' м² × ' + FacadeModel.countLabel(cfg.quantity, type.quantity.nouns)));
     }
-    // The formula never breaks across lines («4 × A × H» stays whole).
-    lines.push(line('facade-area-line', 'Формула: ' + form.surface + ' = ' + form.formula.replace(/ /g, ' ') + '.'));
     lines.push(line('facade-area-scope', [FacadeModel.priceNote(type), type.visualNote].filter(Boolean).join(' ')));
     note.replaceChildren(...lines);
   }
