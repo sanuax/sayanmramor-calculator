@@ -367,6 +367,11 @@
     border-color: var(--accent);
     background: var(--card);
   }
+  /* A touch screen: iPhone Safari zooms into a field whose text is under 16 px and stays
+     zoomed, so the page slides left and right while sizes are typed (the owner, 2026-10-15). */
+  @media (pointer: coarse) {
+    input:not([type="checkbox"]):not([type="radio"]), select, textarea { font-size: 16px !important; }
+  }
   .dims { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .checkboxes { margin-top: 24px; }
   .checkbox-row {
@@ -1487,7 +1492,7 @@
         </div>
         <input type="hidden" id="fireplace-form" value="">
         <select id="productSubcategory" hidden></select>
-        <input type="number" id="subcategoryQty" placeholder="Количество, шт." min="0" step="1" style="margin-top:14px;display:none">
+        <input type="number" inputmode="numeric" id="subcategoryQty" placeholder="Количество, шт." min="0" step="1" style="margin-top:14px;display:none">
       </div>
     </section>
 
@@ -1562,8 +1567,8 @@
           </div>
           <div class="dim-block-title" id="dimBlockTitle" hidden></div>
           <div class="dim-fields" id="dimGenericFields">
-            <div class="field-unit"><span class="unit-label" id="dimLengthUnitLabel">Длина</span><input type="number" id="length" min="0" step="1" placeholder="2000"><span class="unit">мм</span></div>
-            <div class="field-unit"><span class="unit-label" id="dimWidthUnitLabel">Ширина</span><input type="number" id="width" min="0" step="1" placeholder="600"><span class="unit">мм</span></div>
+            <div class="field-unit"><span class="unit-label" id="dimLengthUnitLabel">Длина</span><input type="number" inputmode="numeric" id="length" min="0" step="1" placeholder="2000"><span class="unit">мм</span></div>
+            <div class="field-unit"><span class="unit-label" id="dimWidthUnitLabel">Ширина</span><input type="number" inputmode="numeric" id="width" min="0" step="1" placeholder="600"><span class="unit">мм</span></div>
           </div>
           <!-- «Фасады»: the chosen form's own sizes, each under its own name
                (facade-model.js) -- only that form's fields are shown. -->
@@ -1690,12 +1695,12 @@
         <div class="field-row" id="wingField" style="margin-top:14px;display:none">
           <div class="field-unit">
             <span class="unit-label" id="wingWidthLabel">Крыло, ширина</span>
-            <input type="number" id="wing-width" min="0" step="1" placeholder="600">
+            <input type="number" inputmode="numeric" id="wing-width" min="0" step="1" placeholder="600">
             <span class="unit">мм</span>
           </div>
           <div class="field-unit">
             <span class="unit-label" id="wingLengthLabel">Крыло, длина</span>
-            <input type="number" id="wing-length" min="0" step="1" placeholder="1000">
+            <input type="number" inputmode="numeric" id="wing-length" min="0" step="1" placeholder="1000">
             <span class="unit">мм</span>
           </div>
         </div>
@@ -1860,7 +1865,7 @@
           </button>
           <div class="work-item-body"><div class="work-item-body-inner"><div class="work-item-body-pad">
             <div class="reveal-rows">
-              <div class="reveal-row"><span class="rr-title">Длина</span><div class="field-unit"><input type="number" id="extra-bortik" min="0" step="1" placeholder="0"><span class="unit">мм</span></div></div>
+              <div class="reveal-row"><span class="rr-title">Длина</span><div class="field-unit"><input type="number" inputmode="numeric" id="extra-bortik" min="0" step="1" placeholder="0"><span class="unit">мм</span></div></div>
             </div>
           </div></div></div>
         </div>
@@ -1879,8 +1884,8 @@
               <div class="reveal-row">
                 <span class="rr-title">Фартук</span>
                 <div class="rr-fields">
-                  <div class="field-unit"><span class="unit-label">Длина</span><input type="number" id="extra-fartuk-length" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
-                  <div class="field-unit"><span class="unit-label">Ширина</span><input type="number" id="extra-fartuk-width" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
+                  <div class="field-unit"><span class="unit-label">Длина</span><input type="number" inputmode="numeric" id="extra-fartuk-length" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
+                  <div class="field-unit"><span class="unit-label">Ширина</span><input type="number" inputmode="numeric" id="extra-fartuk-width" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
                 </div>
               </div>
             </div>
@@ -1901,8 +1906,8 @@
               <div class="reveal-row">
                 <span class="rr-title">Стеновая панель</span>
                 <div class="rr-fields">
-                  <div class="field-unit"><span class="unit-label">Длина</span><input type="number" id="extra-wallpanel-length" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
-                  <div class="field-unit"><span class="unit-label">Ширина</span><input type="number" id="extra-wallpanel-width" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
+                  <div class="field-unit"><span class="unit-label">Длина</span><input type="number" inputmode="numeric" id="extra-wallpanel-length" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
+                  <div class="field-unit"><span class="unit-label">Ширина</span><input type="number" inputmode="numeric" id="extra-wallpanel-width" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
                 </div>
               </div>
             </div>
@@ -1923,15 +1928,15 @@
               <div class="reveal-row">
                 <span class="rr-title">Прямоугольный</span>
                 <div class="rr-fields">
-                  <div class="field-unit"><span class="unit-label">Ширина</span><input type="number" id="extra-ostrov-width" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
-                  <div class="field-unit"><span class="unit-label">Длина</span><input type="number" id="extra-ostrov-length" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
+                  <div class="field-unit"><span class="unit-label">Ширина</span><input type="number" inputmode="numeric" id="extra-ostrov-width" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
+                  <div class="field-unit"><span class="unit-label">Длина</span><input type="number" inputmode="numeric" id="extra-ostrov-length" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
                 </div>
               </div>
               <div class="reveal-row">
                 <span class="rr-title">Фигурный</span>
                 <div class="rr-fields">
-                  <div class="field-unit"><span class="unit-label">Ширина</span><input type="number" id="extra-ostrov-figured-width" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
-                  <div class="field-unit"><span class="unit-label">Длина</span><input type="number" id="extra-ostrov-figured-length" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
+                  <div class="field-unit"><span class="unit-label">Ширина</span><input type="number" inputmode="numeric" id="extra-ostrov-figured-width" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
+                  <div class="field-unit"><span class="unit-label">Длина</span><input type="number" inputmode="numeric" id="extra-ostrov-figured-length" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
                 </div>
               </div>
             </div>
@@ -1952,15 +1957,15 @@
               <div class="reveal-row">
                 <span class="rr-title">Стандартная</span>
                 <div class="rr-fields">
-                  <div class="field-unit"><span class="unit-label">Ширина</span><input type="number" id="extra-bar-standard-width" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
-                  <div class="field-unit"><span class="unit-label">Длина</span><input type="number" id="extra-bar-standard-length" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
+                  <div class="field-unit"><span class="unit-label">Ширина</span><input type="number" inputmode="numeric" id="extra-bar-standard-width" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
+                  <div class="field-unit"><span class="unit-label">Длина</span><input type="number" inputmode="numeric" id="extra-bar-standard-length" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
                 </div>
               </div>
               <div class="reveal-row">
                 <span class="rr-title">Сложная</span>
                 <div class="rr-fields">
-                  <div class="field-unit"><span class="unit-label">Ширина</span><input type="number" id="extra-bar-complex-width" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
-                  <div class="field-unit"><span class="unit-label">Длина</span><input type="number" id="extra-bar-complex-length" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
+                  <div class="field-unit"><span class="unit-label">Ширина</span><input type="number" inputmode="numeric" id="extra-bar-complex-width" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
+                  <div class="field-unit"><span class="unit-label">Длина</span><input type="number" inputmode="numeric" id="extra-bar-complex-length" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
                 </div>
               </div>
             </div>

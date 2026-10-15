@@ -233,3 +233,16 @@ test('phone: steps scroll to their start, no keyboard unless a field is tapped',
 test('the configurator wears the site\'s tab icon', () => {
   assert.match(html, /<\/title>\r?\n<link rel="icon" href="\/sayanmramor-site\/assets\/brand\/favicon\.ico">/);
 });
+
+// Phone (2026-10-15, the owner: «при вводе размеров всё двигается вправо-влево», «открывается вся
+// клавиатура»): iPhone Safari zooms into any field whose text is under 16 px and stays zoomed, so
+// the page slides sideways; and a type="number" field without inputmode gets the full keyboard.
+test('phone: every number field asks for the digit keypad (inputmode="numeric")', () => {
+  const visible = (html.match(/<input [^>]*type="number"[^>]*>/g) || []).filter(tag => !/\shidden[\s>]/.test(tag));
+  assert.ok(visible.length > 20, 'the size fields are found');
+  visible.forEach(tag => assert.match(tag, /inputmode="numeric"/, tag));
+});
+
+test('phone: on a touch screen every field is at least 16 px, so focusing it never zooms the page', () => {
+  assert.match(html, /@media \(pointer: coarse\) \{\s*input:not\(\[type="checkbox"\]\):not\(\[type="radio"\]\), select, textarea \{ font-size: 16px !important; \}\s*\}/);
+});
