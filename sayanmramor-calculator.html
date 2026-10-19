@@ -1344,12 +1344,17 @@
     .configurator-columns.is-result .summary-title { font-size: var(--configurator-title); margin-bottom: 14px; }
     .configurator-columns.is-result .viewer-canvas-wrap { aspect-ratio: 1 / 1; }
   }
+  /* «Саянмрамор studio» -- the configurator's name in the site's header (the owner,
+     2026-10-20) is longer than the site's: on narrow phones a little smaller, so the
+     menu button stays inside the capsule. */
+  @media (max-width: 400px) { .site-header .site-logo { font-size: 14px; letter-spacing: 0.1em; } }
+  @media (max-width: 340px) { .site-header .site-logo { font-size: 11.5px; letter-spacing: 0.06em; } }
 </style>
 </head>
 <body>
 <header class="site-header">
   <div class="site-header-inner">
-    <a class="site-logo" href="/sayanmramor-site/index.html">Саянмрамор</a>
+    <a class="site-logo" href="/sayanmramor-site/index.html">Саянмрамор studio</a>
     <nav class="site-nav" id="siteNav" aria-label="Основное меню">
       <details class="nav-drop nav-products">
         <summary>Изделия</summary>

@@ -109,7 +109,7 @@ test('the site header: the capsule from the site, its menu, no actions; the stic
   const header = html.slice(html.indexOf('<header class="site-header">'), html.indexOf('</header>') + 9);
   assert.ok(header.length > 1000, 'the header is there');
   assert.ok(html.indexOf('<header class="site-header">') < html.indexOf('<div class="wrap">'), 'above the page, not inside it');
-  assert.match(header, /<a class="site-logo" href="\/sayanmramor-site\/index\.html">Саянмрамор<\/a>/);
+  assert.match(header, /<a class="site-logo" href="\/sayanmramor-site\/index\.html">Саянмрамор studio<\/a>/);   // «studio» only here, not on the site (the owner, 2026-10-20)
   assert.match(header, /<nav class="site-nav" id="siteNav" aria-label="Основное меню">/);
   assert.doesNotMatch(header, /site-header-actions|Заказать|Создать изделие|aria-current/);
   assert.doesNotMatch(html, /class="brand-mark"/, 'the old name-only mark is gone');
