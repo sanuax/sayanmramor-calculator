@@ -50,6 +50,7 @@
     --line: #dcd8cf;
     --page: #efede8;         /* limestone */
     --card: #f8f7f4;         /* milk-white paper */
+    --dim-col: 400px;        /* the size step's column (.dim-fields and all under it) */
     --card-hover: #f2f1ec;
     --accent: #2a5446;       /* serpentine verde (white on it 8.5:1) */
     --accent-hover: #1f4036;
@@ -556,13 +557,18 @@
     .reveal-row .rr-fields { flex: 1 1 100%; }
   }
 
-  .field-unit { position: relative; min-width: 0; }
+  /* The label over the field, «мм» inside the field at its right: a grid, so «мм» is
+     centred on the field itself, and in a row of fields whose labels wrap differently
+     («Ширина помещения» on two lines) the fields stand on one line (the owner, 2026-10-20). */
+  .field-unit { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto; align-content: end; }
+  .field-unit .unit-label { grid-row: 1; grid-column: 1; }
+  .field-unit input { grid-row: 2; grid-column: 1; }
   .field-unit input {
     width: 100%; padding: 10px 40px 10px 12px; border: 1px solid var(--line);
     border-radius: 8px; font-size: var(--configurator-text); background: var(--page); color: var(--ink);
   }
   .field-unit input:focus { outline: none; border-color: var(--accent); }
-  .field-unit .unit { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: var(--configurator-muted); color: var(--muted); pointer-events: none; }
+  .field-unit .unit { grid-row: 2; grid-column: 1; justify-self: end; align-self: center; margin-right: 12px; font-size: var(--configurator-muted); color: var(--muted); pointer-events: none; }
   .field-unit .unit-label { display: block; font-size: var(--configurator-text); color: var(--muted); margin-bottom: 4px; }
   .field-row { display: flex; gap: 10px; flex-wrap: wrap; }
   .field-row .field-unit { flex: 1 1 140px; }
@@ -617,33 +623,58 @@
 
   /* Диаграмма размеров: перенесено буквально из согласованного
      V2-конструктора (https://claude.ai/artifact/8fkDjjV6vDdwZypMQwN7zK). */
+  /* One column for everything in the size step (--dim-col): wide enough for two fields
+     side by side with the longest label and its «?» on one line («Диаметр лестницы» 172 px);
+     where two do not fit (a phone), one field per row, each its full name (the owner, 2026-10-20). */
   .dim-wrap { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px 16px; }
   .dim-diagram { display: flex; justify-content: center; margin-bottom: 16px; }
-  .dim-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; max-width: 320px; margin: 0 auto; }
+  .dim-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; max-width: var(--dim-col); margin: 0 auto; }
   .dim-fields[hidden] { display: none; }
   /* «Фасады»: the area, its breakdown, the formula and what the price
      covers -- one line each, the total first. */
-  #facadeAreaNote, #fireplaceAreaNote { display: grid; gap: 2px; max-width: 360px; margin: 14px auto 0; line-height: 1.45; }
+  #facadeAreaNote, #fireplaceAreaNote { display: grid; gap: 2px; margin-top: 14px; }
+  /* «Схема без крыла» explains the diagram: right under it, the fields below. */
+  #dimShapeNote { margin: -8px auto 16px; text-align: center; }
   #facadeAreaNote[hidden], #fireplaceAreaNote[hidden] { display: none; }
   .facade-area-total { color: var(--ink); font-size: var(--configurator-text); font-weight: 700; }
-  .facade-area-scope { margin-top: 6px; color: #474944; }
-  .dim-note { font-size: var(--configurator-muted); color: var(--muted); text-align: center; margin-top: 12px; }
+  /* Every note of the size step stands in the fields' own column, from its left edge, as
+     the notes under «Количество ступеней» do -- not centred across the whole card (the owner, 2026-10-20). */
+  .dim-note { max-width: var(--dim-col); margin: 12px auto 0; font-size: var(--configurator-muted); color: var(--muted); text-align: left; line-height: 1.45; }
   /* Ступени/лестницы: a titled size block and the step count right under it,
      in the same centred column as the size fields. */
-  .dim-block-title, .dim-count-title { max-width: 320px; margin: 0 auto 8px; font-size: var(--configurator-text); font-weight: 700; color: var(--ink); }
-  .dim-count { max-width: 320px; margin: 18px auto 0; }
+  .dim-block-title, .dim-count-title { max-width: var(--dim-col); margin: 0 auto 8px; font-size: var(--configurator-text); font-weight: 700; color: var(--ink); }
+  .dim-count { max-width: var(--dim-col); margin: 18px auto 0; }
   .dim-count .field-unit { max-width: calc(50% - 6px); }
   .dim-count .error { display: block; visibility: hidden; min-height: 1.5em; margin-bottom: 0; }
   .dim-count[hidden], .field-unit[hidden], .dim-note[hidden] { display: none; }
   /* Под полем: что такое марш / подступенок -- по левому краю, как поле. */
   .dim-count .step-count-note { text-align: left; margin-top: 4px; line-height: 1.45; }
-  #shapeFieldsNote { max-width: 360px; margin: 12px auto 0; line-height: 1.45; }
   #riserHeightField { margin-top: 18px; }
   /* «Количество маршей»: as wide as the count field under it. */
   .dim-count .march-select { width: auto; max-width: 100%; font-size: var(--configurator-text); background: var(--page); border-radius: 8px; }
   .dim-count .march-select + .step-count-note { margin-top: 6px; }
-  .field #riserHeightField { max-width: 320px; }
-  #dimHint { min-height: calc(2 * 1.45em); line-height: 1.45; }
+  .field #riserHeightField { max-width: var(--dim-col); }
+  /* The size step says no more than asked (the owner, 2026-10-20): a label whose size
+     needs explaining carries a «?»; a tap shows the one line about it under its block
+     (.dim-tip), a second tap hides it. What the calculator works out is one line of
+     figures (.dim-summary); only what the client must fix stays written out (.is-warn). */
+  /* The «?» always to the right of its label's text, however the text wraps (a
+     flex row: the text, then the mark at its first line); it stays light -- no
+     change on hover, a soft fill while its line is open (the owner, 2026-10-20). */
+  .has-tip, .field-unit .unit-label.has-tip { display: flex; align-items: flex-start; cursor: pointer; }
+  .has-tip::after {
+    content: '?' / ''; flex: none; display: inline-flex; align-items: center; justify-content: center;
+    width: 16px; height: 16px; margin: 2px 0 0 6px;
+    border: 1px solid var(--line-strong); border-radius: 50%;
+    font-size: 11px; font-weight: 700; line-height: 1; color: var(--muted);
+    transition: background-color 0.15s;
+  }
+  .has-tip[aria-expanded="true"]::after { background: var(--line); }
+  .has-tip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+  .dim-tip { max-width: var(--dim-col); margin: 10px auto 0; padding: 8px 12px; border-radius: 8px; background: var(--page); font-size: var(--configurator-muted); line-height: 1.45; color: var(--ink); }
+  .dim-count .dim-tip { margin-top: 8px; }
+  .dim-tip[hidden] { display: none; }
+  .dim-note.is-warn { color: var(--ink); }
 
   /* The picker's trigger deliberately keeps the same silhouette as the <select>
      and number inputs beside it -- it is one more field in the same form, and
@@ -1429,7 +1460,7 @@
 </header>
 <div class="wrap">
   <h1>Рассчитайте стоимость изделия</h1>
-  <p class="subtitle">Выберите тип изделия, материал и размеры — получите ориентировочную стоимость за несколько секунд. Точную цену рассчитает наш специалист после уточнения деталей проекта.</p>
+  <p class="subtitle">Выберите тип изделия, материал и размеры - получите ориентировочную стоимость за несколько секунд. Точную цену рассчитает наш специалист после уточнения деталей проекта.</p>
 
   <div class="configurator">
     <section class="step">
@@ -1570,6 +1601,11 @@
               </defs>
             </svg>
           </div>
+          <!-- Показывается только для lshape -- диаграмма не рисует крыло
+               (не придумываем новую геометрию), только явно оговаривает,
+               что это схема главного сегмента. Сразу под схемой, которую
+               поясняет (the owner, 2026-10-20). -->
+          <div class="dim-note" id="dimShapeNote" hidden>Схема без крыла</div>
           <div class="dim-block-title" id="dimBlockTitle" hidden></div>
           <div class="dim-fields" id="dimGenericFields">
             <div class="field-unit"><span class="unit-label" id="dimLengthUnitLabel">Длина</span><input type="number" inputmode="numeric" id="length" min="0" step="1" placeholder="2000"><span class="unit">мм</span></div>
@@ -1601,8 +1637,6 @@
           <!-- What those sizes are, in the client's words, and what is wrong
                with them when the shape cannot be built. -->
           <div class="dim-note" id="shapeFieldsNote" hidden></div>
-          <!-- What surface is clad, its formula, and the area it gives. -->
-          <div class="dim-note" id="facadeAreaNote" hidden></div>
           <!-- «Камины»: the chosen form's own sizes, each under its own name
                (fireplace-model.js) -- only that form's fields are shown. -->
           <div class="dim-fields" id="fireplaceFields" hidden>
@@ -1620,9 +1654,6 @@
             <div class="field-unit" data-fireplace-param="length"><span class="unit-label"></span><input type="number" id="fireplace-length" min="1" step="1" inputmode="numeric"><span class="unit">мм</span></div>
             <div class="field-unit" data-fireplace-param="height"><span class="unit-label"></span><input type="number" id="fireplace-height" min="1" step="1" inputmode="numeric"><span class="unit">мм</span></div>
           </div>
-          <!-- What stone a fireplace is made of, its formula and -- once every
-               size is right -- the area it gives (fireplace-model.js). -->
-          <div class="dim-note" id="fireplaceAreaNote" hidden></div>
           <!-- Количество (штучные фасадные изделия): validated like
                «Количество ступеней» -- only a whole number within the type's
                limits (facade-model.js QUANTITY_LIMITS) reaches #facade-quantity. -->
@@ -1636,10 +1667,12 @@
             <div class="error" id="facadeQtyError">Введите целое число от 1 до 30</div>
           </div>
           <input type="hidden" id="facade-quantity" value="">
-          <!-- Показывается только для lshape -- диаграмма не рисует крыло
-               (не придумываем новую геометрию), только явно оговаривает,
-               что это схема главного сегмента. -->
-          <div class="dim-note" id="dimShapeNote" hidden>Показан основной сегмент. Крыло указывается отдельно, на шаге «Форма».</div>
+          <!-- What surface is clad and the area it gives -- after the sizes AND
+               the quantity, both of which make it (the owner, 2026-10-20). -->
+          <div class="dim-note" id="facadeAreaNote" hidden></div>
+          <!-- What stone a fireplace is made of, its formula and -- once every
+               size is right -- the area it gives (fireplace-model.js). -->
+          <div class="dim-note" id="fireplaceAreaNote" hidden></div>
           <!-- What the sizes mean for the chosen step/stair type, and the
                tread depth the calculator derives (GeometryModel.stairPlan). -->
           <div class="dim-note" id="dimHint" hidden></div>
@@ -1653,7 +1686,6 @@
           <div class="dim-count" id="marchCountField" hidden>
             <div class="dim-count-title" id="marchCountTitle">Количество маршей</div>
             <select id="stair-marches" class="march-select" aria-labelledby="marchCountTitle"></select>
-            <div class="dim-note step-count-note">Марш — один участок лестницы между площадками или уровнями.</div>
           </div>
           <div class="dim-count" id="stepCountField" hidden>
             <div class="dim-count-title" id="stepCountTitle">Количество ступеней</div>
@@ -1663,22 +1695,21 @@
               <span class="unit">шт.</span>
             </div>
             <div class="error" id="stepCountError">Введите целое число от 1 до 30</div>
-            <!-- «Лестницы» with marches: what a march is, and the whole stair
-                 the count gives (marches x steps, landings). -->
-            <div class="dim-note step-count-note" id="stepCountNote" hidden></div>
+            <!-- What the count gives, in figures: marches, landings, steps in
+                 all, the tread depth (updateDimHint). -->
+            <div class="dim-note step-count-note dim-summary" id="stepCountNote" hidden></div>
           </div>
           <input type="hidden" id="step-count" value="">
           <!-- «Высота подступенка»: the riser's own size -- in this step for a
                «+ подступенки» stair, moved to the «Подступенок» step for
                «Ступени» (placeRiserHeightField). Required once risers are on. -->
           <div class="dim-count" id="riserHeightField" hidden>
-            <div class="dim-count-title">Высота подступенка</div>
+            <div class="dim-count-title" id="riserHeightTitle">Высота подступенка</div>
             <div class="field-unit">
               <span class="unit-label">Высота</span>
               <input type="number" id="riser-height" min="1" step="1" inputmode="numeric" placeholder="170">
               <span class="unit">мм</span>
             </div>
-            <div class="dim-note step-count-note">Подступенок — вертикальная плита под передним краем ступени. Его высота — от верха нижней ступени до низа верхней.</div>
           </div>
         </div>
         <div class="error" id="dimError">Укажите ширину и длину больше нуля</div>
@@ -1723,7 +1754,7 @@
          (ProductTypes.RISER_WORK_RATES, not the step's). -->
     <section class="step" data-step-id="riser" style="display:none">
       <div class="step-head"><span class="step-num">4</span><h2 class="step-title">Подступенок</h2></div>
-      <p class="step-sub">Отдельный параметр от формы ступени — см. шаг «Тип».</p>
+      <p class="step-sub">Отдельный параметр от формы ступени - см. шаг «Тип».</p>
       <div class="field">
         <div class="card-grid" id="stupeniRiserGrid" role="radiogroup" aria-label="Подступенки"></div>
         <div id="riserStepHost"></div>
@@ -2045,7 +2076,7 @@
           <form class="lead-form" id="leadForm" novalidate hidden tabindex="-1">
             <div class="lead-form-head">
               <h3 class="lead-form-title">Получить расчёт</h3>
-              <p class="lead-form-sub">Оставьте контакты — параметры изделия уже собраны в запрос, повторно их вводить не нужно.</p>
+              <p class="lead-form-sub">Оставьте контакты - параметры изделия уже собраны в запрос, повторно их вводить не нужно.</p>
             </div>
             <div class="lead-field">
               <label for="leadName">Имя</label>
@@ -2058,7 +2089,7 @@
               <div class="lead-error" id="leadPhoneError"></div>
             </div>
             <div class="lead-field">
-              <label for="leadComment">Комментарий <span class="lead-optional">— необязательно</span></label>
+              <label for="leadComment">Комментарий <span class="lead-optional">- необязательно</span></label>
               <textarea id="leadComment" name="comment" rows="3" maxlength="1000" aria-describedby="leadCommentError"></textarea>
               <div class="lead-error" id="leadCommentError"></div>
             </div>
@@ -2070,7 +2101,7 @@
 
           <div class="lead-success" id="leadSuccess" hidden tabindex="-1">
             <div class="lead-success-title">Запрос подготовлен</div>
-            <p>Конфигурация и ваши контакты собраны в один запрос. Онлайн-отправка менеджеру пока не подключена — запрос сохранён только на этой странице.</p>
+            <p>Конфигурация и ваши контакты собраны в один запрос. Онлайн-отправка менеджеру пока не подключена - запрос сохранён только на этой странице.</p>
             <button type="button" class="lead-secondary-btn" id="leadEditBtn">Изменить контакты</button>
           </div>
         </div>
@@ -2114,7 +2145,7 @@
                 <div class="warning-box" id="warningOut" style="display:none"></div>
                 <div class="result-breakdown" id="breakdown"></div>
                 <div class="remainder-line" id="remainderOut"></div>
-                <div class="info-block" id="infoBlock">Стоимость указана за весь слэб — остаток после раскроя бесплатно хранится на складе компании, клиент может использовать его для другого проекта или забрать себе.</div>
+                <div class="info-block" id="infoBlock">Стоимость указана за весь слэб - остаток после раскроя бесплатно хранится на складе компании, клиент может использовать его для другого проекта или забрать себе.</div>
               </div>
               <div>
                 <button class="cta-btn" id="ctaBtn">Получить расчёт</button>
@@ -2156,7 +2187,7 @@
   </div>
   <div class="picker-meta-row">
     <div class="picker-meta" id="pickerMeta"></div>
-    <p class="picker-supplier">Камень в нашей коллекции закупается у Venezia Stone. <a href="https://veneziastone.com/" target="_blank" rel="noopener">Подробнее о коллекции и материалах — на сайте Venezia Stone</a></p>
+    <p class="picker-supplier">Камень в нашей коллекции закупается у Venezia Stone. <a href="https://veneziastone.com/" target="_blank" rel="noopener">Подробнее о коллекции и материалах - на сайте Venezia Stone</a></p>
   </div>
   <div class="picker-sort" id="pickerSort">
     <button type="button" class="sort-btn active" data-sort-field="name" data-sort-dir="asc">A-Z</button>
@@ -2451,27 +2482,27 @@
     // Радиусная стена: the width field is the arc -- the wall measured along its curve.
     'WALL-04': { length: 'Высота стены', width: 'Длина дуги', lengthAxis: 'vertical', area: 'Площадь (длина дуги × высота)', placeholder: [2700, 4000], shape: 'radiusWall',
       fields: ['wallRadius'],
-      note: 'Радиус — расстояние от центра окружности, по которой изогнута стена, до самой стены. Длина дуги — длина стены, измеренная рулеткой вдоль её изгиба.' },
-    // Labels fit one line of a phone-width field; the note says the rest.
+      tips: { width: 'длина стены, измеренная рулеткой вдоль её изгиба.', wallRadius: 'от центра окружности, по которой изогнута стена, до самой стены.' } },
+    // Labels fit one line of a phone-width field; the «?» of each says the rest (tips).
     'SILL-02': { length: 'Длина вдоль окна', width: 'Глубина', placeholder: [1500, 300], shape: 'sill',
       fields: ['sillArm'],
-      note: 'Длина — вдоль первого окна, глубина — от окна в комнату. Второе плечо идёт вдоль второго окна: измерьте его от внутреннего угла до конца подоконника.' },
+      tips: { length: 'вдоль первого окна.', width: 'от окна в комнату.', sillArm: 'вдоль второго окна, от внутреннего угла до конца подоконника.' } },
     'SILL-03': { length: 'Ширина у стены', width: 'Выступ в комнату', placeholder: [2000, 300], shape: 'sill',
       fields: ['sillBayDepth', 'sillBayFront'],
-      note: 'Ширина у стены — между углами эркера по линии стены. Выступ в комнату — насколько подоконник заходит в комнату от этой линии. Глубина эркера — насколько эркер выходит наружу. Передняя сторона — длина среднего окна эркера.' },
+      tips: { length: 'между углами эркера по линии стены.', width: 'насколько подоконник заходит в комнату от этой линии.', sillBayDepth: 'насколько эркер выходит наружу.', sillBayFront: 'длина среднего окна эркера.' } },
     'SILL-04': { length: 'Ширина у стены', width: 'Выступ в комнату', placeholder: [2000, 300], shape: 'sill',
       fields: ['sillBayDepth'],
-      note: 'Ширина у стены — между краями дуги по линии стены. Выступ в комнату — насколько подоконник заходит в комнату от этой линии. Глубина эркера — насколько дуга выходит наружу в самом дальнем месте.' },
+      tips: { length: 'между краями дуги по линии стены.', width: 'насколько подоконник заходит в комнату от этой линии.', sillBayDepth: 'насколько дуга выходит наружу в самом дальнем месте.' } },
   };
   // What each still-missing size of a shape needs from the client.
   const MISSING_SIZE_HINTS = {
     riserHeight: 'Укажите высоту подступенка, чтобы рассчитать стоимость',
-    stairLength: 'Длины лестницы не хватает на все площадки и ступени — увеличьте длину или уменьшите число маршей',
+    stairLength: 'Длины лестницы не хватает на все площадки и ступени - увеличьте длину или уменьшите число маршей',
     wallRadius: 'Укажите радиус стены, чтобы рассчитать стоимость',
-    wallArc: 'Длина дуги больше целой окружности такого радиуса — проверьте радиус и длину дуги',
-    sillArm: 'Укажите длину второго плеча — она больше глубины подоконника',
+    wallArc: 'Длина дуги больше целой окружности такого радиуса - проверьте радиус и длину дуги',
+    sillArm: 'Укажите длину второго плеча - она больше глубины подоконника',
     sillBayDepth: 'Укажите глубину эркера',
-    sillBayFront: 'Укажите переднюю сторону эркера — она меньше ширины эркера у стены',
+    sillBayFront: 'Укажите переднюю сторону эркера - она меньше ширины эркера у стены',
   };
   // Read by updateDimDiagram() (defined further down) for its own fallback
   // label text -- same TDZ reasoning as the other module-scope state above.
@@ -2491,6 +2522,69 @@
   const stupeniRiserBox = document.getElementById('stupeni-riser');
   const stepCountTitleEl = document.getElementById('stepCountTitle');
   const stepCountNoteEl = document.getElementById('stepCountNote');
+  // «?» beside a label (the owner, 2026-10-20): what a size means stays off the
+  // page until asked for. setTip(el, text) gives a label its «?» (or takes it
+  // away); a tap shows «Название: text» in one line under the label's block
+  // (after a .dim-fields, at the end of a .dim-count), another tap or another
+  // «?» of that block hides it; closeTips() on every change of product or type.
+  // Text starts lower-case: it follows the label's name.
+  const tipSlots = new Map();
+  // Marches, landings and steps in all -- the start of the line under the count (updateStepCountTexts).
+  let stairCountFigures = [];
+  function tipSlotOf(block) {
+    let slot = tipSlots.get(block);
+    if (!slot) {
+      slot = document.createElement('div');
+      slot.className = 'dim-tip';
+      slot.hidden = true;
+      if (block.classList.contains('dim-count')) block.appendChild(slot); else block.after(slot);
+      tipSlots.set(block, slot);
+    }
+    return slot;
+  }
+  function showTip(el, open) {
+    const block = el.closest('.dim-fields, .dim-count');
+    if (!block) return;
+    const slot = tipSlotOf(block);
+    block.querySelectorAll('.has-tip[aria-expanded="true"]').forEach(o => o.setAttribute('aria-expanded', 'false'));
+    slot.hidden = !(open && el.dataset.tip);
+    if (slot.hidden) return;
+    el.setAttribute('aria-expanded', 'true');
+    slot.textContent = el.textContent.trim() + ': ' + el.dataset.tip;
+  }
+  function setTip(el, text) {
+    if (!el) return;
+    const open = el.getAttribute('aria-expanded') === 'true';
+    if (text) {
+      el.dataset.tip = text;
+      el.classList.add('has-tip');
+      el.setAttribute('role', 'button');
+      el.tabIndex = 0;
+      if (!open) el.setAttribute('aria-expanded', 'false');
+    } else {
+      delete el.dataset.tip;
+      el.classList.remove('has-tip');
+      ['role', 'tabindex', 'aria-expanded'].forEach(a => el.removeAttribute(a));
+    }
+    if (open) showTip(el, !!text);   // an open tip follows its new text, or closes
+  }
+  function closeTips() {
+    tipSlots.forEach(slot => { slot.hidden = true; });
+    document.querySelectorAll('.has-tip[aria-expanded="true"]').forEach(o => o.setAttribute('aria-expanded', 'false'));
+  }
+  // On the document: «Высота подступенка» moves to the «Подступенок» step for «Ступени».
+  document.addEventListener('click', e => {
+    const el = e.target.closest && e.target.closest('.has-tip');
+    if (el) showTip(el, el.getAttribute('aria-expanded') !== 'true');
+  });
+  document.addEventListener('keydown', e => {
+    const el = (e.key === 'Enter' || e.key === ' ') && e.target.closest && e.target.closest('.has-tip');
+    if (!el) return;
+    e.preventDefault();
+    showTip(el, el.getAttribute('aria-expanded') !== 'true');
+  });
+  setTip(document.getElementById('marchCountTitle'), 'марш - участок лестницы между площадками или уровнями.');
+  setTip(document.getElementById('riserHeightTitle'), 'от верха нижней ступени до низа верхней (подступенок - вертикальная плита под краем ступени).');
   const marchCountField = document.getElementById('marchCountField');
   const marchSelect = document.getElementById('stair-marches');
   const materialField = document.getElementById('materialField');
@@ -2773,36 +2867,43 @@
     return true;
   }
 
-  // One line under the fields: what the sizes mean for this type, and -- for
-  // a stair -- the tread depth the calculator derives from them.
+  // A stair's or a step's sizes say what they mean only when asked (the «?»
+  // of each label); what the calculator works out is one line of figures under
+  // the count (#stepCountNote); only a length too short stays written under
+  // the sizes -- the client has to fix it (the owner, 2026-10-20).
   function updateDimHint(lMm, wMm, info) {
-    let text = '';
     const p = info.plan;
     const depthMm = Math.round(p.treadDepthM * 1000);
     const known = lMm > 0 && wMm > 0;
+    const figures = stairCountFigures.slice();
+    let lengthTip = '', widthTip = '', countTip = '', warn = '';
     if (info.kind === 'steps') {
-      text = info.variant === 'winder'
-        ? 'Забежная ступень: глубина — по середине ступени, к узкому краю ступень сужается.'
+      lengthTip = 'поперёк ступени.';
+      widthTip = info.variant === 'winder'
+        ? 'по середине ступени (к узкому краю забежная ступень сужается).'
         : info.variant === 'radius'
-          ? 'Радиусная ступень: глубина — в самой глубокой точке дуги, в центре; по краям ступень мельче.'
-          : 'Длина — поперёк ступени, глубина — от переднего края к стене.';
+          ? 'в самой глубокой точке дуги, в центре (по краям ступень мельче).'
+          : 'от переднего края к стене.';
     } else if (info.variant === 'spiral') {
-      text = known
-        ? 'Ступени идут по кругу вокруг опоры Ø ' + Math.round(p.rIn * 2000) + ' мм, глубина ступени по середине — ' + depthMm + ' мм.'
-        : 'Диаметр — вся лестница в плане, ширина ступени — от опоры до края.';
-    } else if (known && p.fits === false) {
-      text = 'Длины не хватает на все площадки и ступени первого участка — увеличьте длину или уменьшите число маршей или ступеней.';
-    } else if (info.variant === 'l' || info.variant === 'u' || p.marches > 1) {
-      // The first run holds its marches, the landings between them and the
-      // turning landing.
-      const turn = info.variant === 'l' || info.variant === 'u';
-      text = 'Длина — весь первый участок лестницы' + (turn ? ' до поворота, с площадкой поворота' : ' со всеми площадками') + '. ' +
-        (known ? 'Глубина одной ступени: ' + depthMm + ' мм.' : 'Глубина одной ступени рассчитывается автоматически.');
+      lengthTip = 'вся лестница в плане.';
+      widthTip = 'от опоры до края.';
+      if (known) figures.push('опора Ø ' + Math.round(p.rIn * 2000) + ' мм', 'глубина ступени ' + depthMm + ' мм');
     } else {
-      text = known ? 'Глубина одной ступени: ' + depthMm + ' мм (длина ÷ количество ступеней).' : 'Глубина одной ступени рассчитывается автоматически: длина ÷ количество ступеней.';
+      // The first run holds its marches, the landings between them and the turning landing.
+      const turn = info.variant === 'l' || info.variant === 'u';
+      if (turn || p.marches > 1) lengthTip = 'весь первый участок лестницы' + (turn ? ' до поворота, с площадкой поворота.' : ' со всеми площадками.');
+      countTip = 'по длине и количеству калькулятор сам считает глубину ступени.';
+      if (known && p.fits === false) warn = 'Длины не хватает на все площадки и ступени: увеличьте длину или уменьшите число маршей или ступеней.';
+      else if (known) figures.push('глубина ступени ' + depthMm + ' мм');
     }
-    dimHintEl.hidden = !text;
-    dimHintEl.textContent = text;
+    setTip(dimLengthUnitLabelEl, lengthTip);
+    setTip(dimWidthUnitLabelEl, widthTip);
+    setTip(stepCountTitleEl, countTip);
+    dimHintEl.hidden = !warn;
+    dimHintEl.textContent = warn;
+    dimHintEl.classList.toggle('is-warn', !!warn);
+    stepCountNoteEl.hidden = !figures.length;
+    stepCountNoteEl.textContent = figures.join(' · ');
   }
   const dimShapeNote = document.getElementById('dimShapeNote');
   const priceOut = document.getElementById('priceOut');
@@ -2825,11 +2926,14 @@
     document.getElementById('wingWidthLabel').textContent = isUshape ? 'Крылья, ширина' : 'Крыло, ширина';
     document.getElementById('wingLengthLabel').textContent = isUshape ? 'Крылья, длина' : 'Крыло, длина';
     // Диаграмма размеров сама не рисует крылья (см. #dimShapeNote в разметке)
-    // -- только явно оговаривает, что показан главный сегмент.
-    dimShapeNote.hidden = !(isLshape || isUshape);
-    dimShapeNote.textContent = isUshape
-      ? 'Показан основной сегмент. Два одинаковых крыла указываются на шаге «Форма».'
-      : 'Показан основной сегмент. Крыло указывается отдельно, на шаге «Форма».';
+    // -- только явно оговаривает, что показан главный сегмент. Только у
+    // изделий с шагом «Форма» (столешницы): форма, выбранная у столешницы,
+    // остаётся в #productShape и после перехода, например, к ступеням
+    // (владелец, 2026-10-20); цена её там уже не учитывает (constructor-state.js).
+    const product = selectedProductKey ? PRODUCTS[selectedProductKey] : null;
+    const hasShape = !!(product && product.supportsShapeSelection);
+    dimShapeNote.hidden = !(hasShape && (isLshape || isUshape));
+    dimShapeNote.textContent = isUshape ? 'Схема без крыльев' : 'Схема без крыла';
   }
 
   function svgIcon(inner, viewBox) {
@@ -3175,7 +3279,7 @@
   }
 
   // Название типа для клиента -- то же, что на карточке (без каталожных
-  // приписок «— Стандартный» и т.п.); у лестницы подступенки дописываются
+  // приписок «- Стандартный» и т.п.); у лестницы подступенки дописываются
   // как часть описания конфигурации, а не как отдельный тип.
   function subcategoryLabel(row) {
     const card = typeCardFor(row.id);
@@ -3741,7 +3845,6 @@
     };
     const lines = [];
     if (cfg.complete) lines.push(line('facade-area-total', type.areaTitle + ': ' + decimal2(cfg.areaM2) + ' м²'));
-    lines.push(line('facade-area-scope', FireplaceModel.priceNote(type)));
     document.getElementById('fireplaceAreaNote').replaceChildren(...lines);
   }
 
@@ -3824,7 +3927,6 @@
       lines.push(line('facade-area-total', type.areaTitle + ': ' + decimal2(cfg.areaM2) + ' м²'));
       if (cfg.quantity > 1) lines.push(line('facade-area-line', decimal2(cfg.pieceAreaM2) + ' м² × ' + FacadeModel.countLabel(cfg.quantity, type.quantity.nouns)));
     }
-    lines.push(line('facade-area-scope', [FacadeModel.priceNote(type), type.visualNote].filter(Boolean).join(' ')));
     note.replaceChildren(...lines);
   }
 
@@ -3992,16 +4094,19 @@
     updateShapeFieldsNote();
   }
 
+  // A shape's own sizes explain themselves by their «?» (tips); under them
+  // only what follows from them: a bay's side windows, from its width, depth
+  // and front.
   function updateShapeFieldsNote() {
-    const note = currentDimLabels.note || '';
-    let extra = '';
-    // A bay's side windows follow from its width, depth and front.
+    const tips = currentDimLabels.tips || {};
+    shapeFieldsEl.querySelectorAll('[data-shape-field]').forEach(el => setTip(el.querySelector('.unit-label'), tips[el.dataset.shapeField]));
+    let figure = '';
     if (productSubcategorySelect.value === 'SILL-03' && selectedProductKey === 'podokonnik') {
       const L = parseFloat(lengthInput.value) || 0, D = parseFloat(sillBayDepthInput.value) || 0, F = parseFloat(sillBayFrontInput.value) || 0;
-      if (L > 0 && D > 0 && F > 0 && F < L) extra = ' Боковые стороны эркера — по ' + Math.round(Math.hypot((L - F) / 2, D)) + ' мм.';
+      if (L > 0 && D > 0 && F > 0 && F < L) figure = 'боковые стороны эркера по ' + Math.round(Math.hypot((L - F) / 2, D)) + ' мм';
     }
-    shapeFieldsNoteEl.hidden = !note;
-    shapeFieldsNoteEl.textContent = note + extra;
+    shapeFieldsNoteEl.hidden = !figure;
+    shapeFieldsNoteEl.textContent = figure;
   }
 
   // «Высота подступенка»: on the «Подступенок» step for «Ступени» (shown
@@ -4020,17 +4125,21 @@
     syncMarchField();
     const marches = currentMarches();
     stepCountTitleEl.textContent = marches > 0 ? 'Количество ступеней в одном марше' : 'Количество ступеней';
-    // The whole stair the count gives: marches x steps, landings.
-    stepCountNoteEl.hidden = !(marches > 1);
+    // The whole stair the count gives, in figures: marches, landings, steps
+    // in all; updateDimHint adds the tread depth.
+    stairCountFigures = [];
     if (marches > 1) {
       const n = Number(stepCountHidden.value) || 0;
       const landings = marches - 1;
-      stepCountNoteEl.textContent = 'У этой лестницы ' + marches + ' ' + plural(marches, 'марш', 'марша', 'маршей') + ' и ' + landings + ' ' + plural(landings, 'площадка', 'площадки', 'площадок') +
-        (n > 0 ? ': всего ' + (n * marches) + ' ' + plural(n * marches, 'ступень', 'ступени', 'ступеней') + ' (' + marches + ' × ' + n + ').' : '.');
+      stairCountFigures.push(marches + ' ' + plural(marches, 'марш', 'марша', 'маршей'), landings + ' ' + plural(landings, 'площадка', 'площадки', 'площадок'));
+      if (n > 0) stairCountFigures.push(n * marches + ' ' + plural(n * marches, 'ступень', 'ступени', 'ступеней'));
     }
+    stepCountNoteEl.hidden = !stairCountFigures.length;
+    stepCountNoteEl.textContent = stairCountFigures.join(' · ');
   }
 
   function updateDimensionLabels(productKey) {
+    closeTips();
     syncFacadeFields();
     syncFireplaceFields();
     const typeId = productSubcategorySelect.value;
@@ -4042,6 +4151,9 @@
     updateStepCountTexts();
     dimLengthUnitLabelEl.textContent = currentDimLabels.length;
     dimWidthUnitLabelEl.textContent = currentDimLabels.width;
+    const tips = currentDimLabels.tips || {};
+    setTip(dimLengthUnitLabelEl, tips.length);
+    setTip(dimWidthUnitLabelEl, tips.width);
     const placeholder = currentDimLabels.placeholder || [2000, 600];
     lengthInput.placeholder = String(placeholder[0]);
     widthInput.placeholder = String(placeholder[1]);
@@ -4186,7 +4298,7 @@
 
     if (stone.available === false) {
       setPriceValue('Нужно уточнить у менеджера');
-      warningOut.textContent = 'Этот камень сейчас распродан — пришлите размеры менеджеру для точного расчёта.';
+      warningOut.textContent = 'Этот камень сейчас распродан - пришлите размеры менеджеру для точного расчёта.';
       warningOut.style.display = 'block';
       breakdown.innerHTML = '';
       remainderOut.textContent = '';
@@ -4265,30 +4377,30 @@
 
     if (!result.ok) {
       setPriceValue('Нужно уточнить у менеджера');
-      let msg = 'Подходящего слэба нет в наличии — пришлите размеры менеджеру для точного расчёта.';
+      let msg = 'Подходящего слэба нет в наличии - пришлите размеры менеджеру для точного расчёта.';
       if (result.reason === 'no_slabs_for_stone') {
         msg = 'Для этого камня сейчас нет данных о слэбах в наличии.';
       } else if (result.reason === 'no_priced_slab') {
         // Slabs exist (so stock itself is real) but none of them have a
         // usable total price yet -- don't imply the stone is out of stock.
-        msg = 'Для этого камня есть слэбы в наличии, но актуальная цена ещё не определена — пришлите размеры менеджеру для точного расчёта.';
+        msg = 'Для этого камня есть слэбы в наличии, но актуальная цена ещё не определена - пришлите размеры менеджеру для точного расчёта.';
       } else if (result.reason === 'insufficient_stock') {
         // The combinatorial slab-selection now checks real, distinct stock,
         // so this means even every fitting slab combined falls short --
         // there's no single "need N, have M" count left to quote honestly.
-        msg = 'Даже все подходящие слэбы этого камня в сумме не покрывают нужный объём — пришлите размеры менеджеру для точного расчёта.';
+        msg = 'Даже все подходящие слэбы этого камня в сумме не покрывают нужный объём - пришлите размеры менеджеру для точного расчёта.';
       } else if (result.reason === 'no_fitting_slab') {
         // Type A only (Type B never returns this reason): the seam can only
         // run along the length, so an over-wide product is a geometry limit
         // of this product type, not a stock shortage -- don't quote slab
         // sizes here, that would wrongly read as "not enough stone".
-        msg = 'Указанная ширина слишком большая для цельного изделия такого типа — шов возможен только по длине. ' +
-          'Пришлите точные размеры менеджеру — подберём решение под ваш проект.';
+        msg = 'Указанная ширина слишком большая для цельного изделия такого типа - шов возможен только по длине. ' +
+          'Пришлите точные размеры менеджеру - подберём решение под ваш проект.';
       } else if (result.reason === 'exceeds_usage_limit') {
         // A piece that must stay whole takes more than 65% of every slab it
         // fits (the 35% reserve) -- a size for an individual layout.
-        msg = 'Деталь такого размера занимает больше 65% площади любого подходящего слэба — с обязательным запасом 35% её не вырезать онлайн. ' +
-          'Пришлите размеры менеджеру — подберём раскрой под ваш проект.';
+        msg = 'Деталь такого размера занимает больше 65% площади любого подходящего слэба - с обязательным запасом 35% её не вырезать онлайн. ' +
+          'Пришлите размеры менеджеру - подберём раскрой под ваш проект.';
       } else if (result.reason === 'dimensions_too_large') {
         // Past the online estimate's limits (Pricing.PRICING_LIMITS) -- most
         // often a mistyped size; either way no slab search is attempted.

@@ -75,7 +75,7 @@
     if (caps.sinkCutout) {
       ['overlay', 'undermount', 'integrated'].forEach(t => {
         const n = state.sinkCounts[t];
-        if (n > 0) works.push({ key: 'sink.' + t, label: 'Мойка — ' + SINK_LABELS[t], quantity: n, unit: 'шт.' });
+        if (n > 0) works.push({ key: 'sink.' + t, label: 'Мойка - ' + SINK_LABELS[t], quantity: n, unit: 'шт.' });
       });
     }
     if (caps.cooktopCutout && state.cooktopCount > 0) {
@@ -93,12 +93,12 @@
     if (caps.backsplash && hasArea(state.backsplash)) works.push(areaWork('backsplash', 'Фартук', state.backsplash));
     if (caps.wallPanel && hasArea(state.wallPanel)) works.push(areaWork('wallPanel', 'Стеновая панель', state.wallPanel));
     if (caps.island) {
-      if (hasArea(state.island.standard)) works.push(areaWork('island.standard', 'Остров — прямоугольный', state.island.standard));
-      if (hasArea(state.island.figured)) works.push(areaWork('island.figured', 'Остров — фигурный', state.island.figured));
+      if (hasArea(state.island.standard)) works.push(areaWork('island.standard', 'Остров - прямоугольный', state.island.standard));
+      if (hasArea(state.island.figured)) works.push(areaWork('island.figured', 'Остров - фигурный', state.island.figured));
     }
     if (caps.barCounter) {
-      if (hasArea(state.barCounter.standard)) works.push(areaWork('barCounter.standard', 'Барная стойка — стандартная', state.barCounter.standard));
-      if (hasArea(state.barCounter.complex)) works.push(areaWork('barCounter.complex', 'Барная стойка — сложная', state.barCounter.complex));
+      if (hasArea(state.barCounter.standard)) works.push(areaWork('barCounter.standard', 'Барная стойка - стандартная', state.barCounter.standard));
+      if (hasArea(state.barCounter.complex)) works.push(areaWork('barCounter.complex', 'Барная стойка - сложная', state.barCounter.complex));
     }
     return works;
   }
@@ -287,7 +287,7 @@
       ['polish', 'Полировка', r.polish],
       ['works', 'Кромка и дополнительные работы', (r.extras || 0) + (r.catalogExtras || 0)],
       // Parts with their own rates (подступенки): 0 until the company sets them.
-      ['parts', 'Подступенки — работы', r.groupWork || 0],
+      ['parts', 'Подступенки - работы', r.groupWork || 0],
       ['misc', 'Прочие работы', r.misc],
     ];
     const lines = candidates
@@ -343,7 +343,7 @@
   }
 
   // Display rows for the Result screen: only rows that apply to this
-  // product and actually carry a value -- no empty/"—"/null lines.
+  // product and actually carry a value -- no empty/"-"/null lines.
   function buildResultView(configuration) {
     const c = configuration;
     const specs = [];

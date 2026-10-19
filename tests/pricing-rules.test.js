@@ -222,7 +222,7 @@ test('the marches the UI offers are exactly the ones that build: straight 1-6, �
   assert.equal(GeometryModel.marchesFor('u', '6'), 6);
   assert.equal(GeometryModel.marchesFor('spiral', '3'), 0);
   assert.match(html, /<select id="stair-marches"/);
-  assert.match(html, /Марш — один участок лестницы между площадками или уровнями\./);
+  assert.match(html, /setTip\(document\.getElementById\('marchCountTitle'\), 'марш - участок лестницы между площадками или уровнями\.'\)/, 'what a march is: behind the «?» of «Количество маршей»');
   assert.match(html, /const range = shape \? GeometryModel\.MARCH_RANGE\[shape\] : null;/);
 });
 

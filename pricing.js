@@ -37,14 +37,14 @@
   }
 
   // When no single slab fits the product whole, Type A products (countertops,
-  // sills, steps) can still be cut with a seam — but the seam must run along
+  // sills, steps) can still be cut with a seam - but the seam must run along
   // one straight axis of the piece, so the check is geometric, not areal:
   // one dimension ("cross") must fit across a single slab, and the other
   // ("long") gets split into pieces cut from one or more slabs.
   //
   // A single slab can usually yield more than one piece: cutting a strip of
   // width `cross` doesn't consume the slab's other dimension, only `cross`
-  // worth of it — so floor(side / cross) parallel strips fit side by side,
+  // worth of it - so floor(side / cross) parallel strips fit side by side,
   // each up to the slab's other side long. Total length obtainable from one
   // slab is therefore floor(side / cross) * otherSide, maximized over which
   // side hosts the stacked strips.
@@ -134,7 +134,7 @@
     for (const slab of slabs) {
       if (!hasValidPrice(slab)) continue;
       const capacity = Math.floor(slabCapacityForCross(slab, cross));
-      if (capacity <= 0) continue; // cross exceeds every side of this slab — unusable, even with a seam
+      if (capacity <= 0) continue; // cross exceeds every side of this slab - unusable, even with a seam
       items.push({ capacity, cost: slab.price_total_rub, ref: slab });
     }
     if (!items.length) return null; // geometry limit: nothing fits the cross dimension at all

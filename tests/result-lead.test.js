@@ -117,10 +117,10 @@ test('floor/panel/wall/facade: no edge, shape, riser or additional-works rows, e
   });
 });
 
-test('no spec row ever carries an empty, "undefined", "null" or "—" value', () => {
+test('no spec row ever carries an empty, "undefined", "null" or "-" value', () => {
   Object.keys(PRODUCTS).forEach(key => {
     ResultModel.buildResultView(configFor(key, { 'edge-round': { value: '2000' }, 'opt-install': { checked: true } })).specs.forEach(spec => {
-      assert.ok(spec.value && !/undefined|null|^—$/.test(spec.value), key + ': ' + spec.key);
+      assert.ok(spec.value && !/undefined|null|^-$/.test(spec.value), key + ': ' + spec.key);
       assert.doesNotMatch(spec.detail, /undefined|null/);
     });
   });
@@ -166,7 +166,7 @@ test('additional works use human labels (never rate ids like CUT-02) with real q
   });
   const works = ResultModel.buildResultView(c).works;
   assert.deepEqual(works.map(w => w.label + ': ' + w.detail), [
-    'Мойка — снизу: 1 шт.', 'Отверстие под смеситель: 2 шт.', 'Бортик: 1200 мм', 'Фартук: 2400 × 600 мм',
+    'Мойка - снизу: 1 шт.', 'Отверстие под смеситель: 2 шт.', 'Бортик: 1200 мм', 'Фартук: 2400 × 600 мм',
   ]);
   works.forEach(w => assert.doesNotMatch(w.label, /[A-Z]+-\d+/));
 });
@@ -334,14 +334,14 @@ test('bathroom result: no cooktop/island/bar even when those fields hold values,
 
 test('steps result: type row from the subcategory, riser row, edge -- and no additional-works block', () => {
   const c = configFor('stupeni', { 'stupeni-riser': { checked: true }, 'edge-chamfer': { value: '1200' } }, {
-    subcategory: { id: 'STEP-02', label: 'Ступень — Забежная', unit: 'м²' },
+    subcategory: { id: 'STEP-02', label: 'Ступень - Забежная', unit: 'м²' },
   });
   const view = ResultModel.buildResultView(c);
   // Every step's area on its own row («Площадь всех ступеней»).
   assert.deepEqual(view.specs.map(s => s.key), ['type', 'dimensions', 'steps', 'area', 'material', 'edge', 'riser']);
   assert.equal(view.specs.find(s => s.key === 'area').label, 'Площадь всех ступеней');
   assert.equal(view.specs.find(s => s.key === 'riser').value, 'С подступенками');
-  assert.equal(view.specs.find(s => s.key === 'type').value, 'Ступень — Забежная');
+  assert.equal(view.specs.find(s => s.key === 'type').value, 'Ступень - Забежная');
   assert.equal(view.works, null);
   assert.equal(configFor('stupeni', {}).riser, false);
 });

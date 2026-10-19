@@ -17,7 +17,7 @@ test('sink, cooktop and hole counts are hidden flags, never a visible quantity i
     assert.equal(tags.length, 1, id);
     assert.match(tags[0], /type="hidden"/, id);
   });
-  assert.doesNotMatch(html, /Количество — /);
+  assert.doesNotMatch(html, /Количество - /);
 });
 
 test('cooktop and each hole are toggle cards bound to their field', () => {
@@ -49,7 +49,7 @@ test('type cards: client-facing names only -- no rate-catalog suffixes or riser 
   const titles = [...block.matchAll(/title: '([^']+)'/g)].map(m => m[1])
     .concat(require('../facade-model.js').FACADE_TYPES.map(t => t.title));
   assert.ok(titles.length >= 30, 'every product type has a card');
-  titles.forEach(t => assert.doesNotMatch(t, /тандартн|—|подступен/i, t));
+  titles.forEach(t => assert.doesNotMatch(t, /тандартн| - |подступен/i, t));   // « - »: a «name - suffix» separator, not the hyphen of «Г-образная»
 });
 
 test('countertop shape offers П-образная', () => {
@@ -88,7 +88,7 @@ test('the stone gallery names the supplier once, with a link to Venezia Stone in
   assert.equal(links.length, 1);
   assert.match(links[0], /target="_blank"/);
   assert.match(links[0], /rel="noopener"/);
-  assert.match(links[0], />Подробнее о коллекции и материалах — на сайте Venezia Stone</);
+  assert.match(links[0], />Подробнее о коллекции и материалах - на сайте Venezia Stone</);
   assert.equal(html.split('veneziastone.com').length - 1, 1, 'nowhere else in the calculator');
   assert.doesNotMatch(html, /взят с сайта/);
 });
@@ -206,7 +206,7 @@ test('the glass leaves the icons and the 3D alone: the product, type and extras 
 });
 
 // On a phone (2026-10-14, the owner: «всё скачет, в лишний раз открывается клавиатура
-// — при расчёте и каталоге камня»): a step change brings the new step's start into view
+// - при расчёте и каталоге камня»): a step change brings the new step's start into view
 // under the step strip and closes the keyboard of the step left behind; the stone picker
 // and the request form open without putting the cursor in a field on a touch screen, so
 // the keyboard comes up only when a field is tapped. With a mouse, as before.
@@ -253,4 +253,59 @@ test('the tab: «Конфигуратор изделий из камня - Са�
 
 test('the size step shows no formula: no «Формула: …» line under the fireplace or facade sizes (2026-10-15, the owner)', () => {
   assert.doesNotMatch(html, /'Формула: '/);
+});
+
+test('«Схема без крыла» only for a product with the «Форма» step (the countertops), not for the steps after a countertop was Г/П-shaped (2026-10-20, the owner)', () => {
+  const fn = html.slice(html.indexOf('function updateWingVisibility()'), html.indexOf('function svgIcon('));
+  assert.match(fn, /const hasShape = !!\(product && product\.supportsShapeSelection\);/);
+  assert.match(fn, /dimShapeNote\.hidden = !\(hasShape && \(isLshape \|\| isUshape\)\);/);
+});
+
+test('size fields: label over the field, «мм» centred on the field itself, fields in a row on one line however their labels wrap (2026-10-20, the owner)', () => {
+  assert.match(html, /\.field-unit \{ min-width: 0; display: grid;[^}]*align-content: end; \}/);
+  assert.match(html, /\.field-unit \.unit \{ grid-row: 2; grid-column: 1; justify-self: end; align-self: center;/);
+});
+
+test('the size step\'s notes stand in the fields\' column, from its left edge, not centred across the card (2026-10-20, the owner)', () => {
+  assert.match(html, /\.dim-note \{ max-width: var\(--dim-col\); margin: 12px auto 0;[^}]*text-align: left; line-height: 1\.45; \}/);
+  assert.doesNotMatch(html, /#facadeAreaNote, #fireplaceAreaNote \{[^}]*max-width/, 'the area notes take the same column');
+});
+
+test('no long dash anywhere a client reads in the configurator, only « - » (2026-10-20, the owner)', () => {
+  const root = path.join(__dirname, '..');
+  const js = dir => fs.readdirSync(path.join(root, dir)).filter(f => f.endsWith('.js')).map(f => path.join(dir, f));
+  ['sayanmramor-calculator.html', ...js('.'), ...js('visualizer')]
+    .forEach(f => assert.doesNotMatch(fs.readFileSync(path.join(__dirname, '..', f), 'utf8'), /[–—]/, f));
+});
+
+test('the size step says no more than asked (2026-10-20, the owner): what a size means is behind the «?» of its label, what the calculator works out is one line of figures, only what the client must fix is written out', () => {
+  // The «?»: a label gets it by setTip; a tap shows «Название: …» under its block, a second tap hides it.
+  assert.match(html, /function setTip\(el, text\) \{/);
+  assert.match(html, /slot\.textContent = el\.textContent\.trim\(\) \+ ': ' \+ el\.dataset\.tip;/);
+  assert.match(html, /\.has-tip::after \{[^}]*content: '\?' \/ '';/);
+  // No paragraph in the markup of the size step: the march and riser notes are tips on their titles.
+  const sizes = html.slice(html.indexOf('<section class="step" data-step-id="dimensions"'), html.indexOf('<section class="step" id="shapeField"'));
+  assert.doesNotMatch(sizes, /Марш - |Подступенок - /);
+  assert.match(html, /setTip\(document\.getElementById\('riserHeightTitle'\), /);
+  // The windowsill and radius-wall sizes: one tip per field, no paragraph.
+  const labels = html.slice(html.indexOf('const TYPE_DIMENSION_LABELS = {'), html.indexOf('const MISSING_SIZE_HINTS'));
+  assert.doesNotMatch(labels, /note: /);
+  ['WALL-04', 'SILL-02', 'SILL-03', 'SILL-04'].forEach(id => assert.match(labels, new RegExp("'" + id + "'[^\\n]*\\n[^\\n]*\\n\\s+tips: \\{"), id));
+  // A stair: the figures under the count, the tread depth with them; only «Длины не хватает» written out.
+  const hint = html.slice(html.indexOf('function updateDimHint('), html.indexOf("const dimShapeNote = document.getElementById('dimShapeNote');"));
+  assert.match(hint, /figures\.push\('глубина ступени ' \+ depthMm \+ ' мм'\)/);
+  assert.match(hint, /stepCountNoteEl\.textContent = figures\.join\(' · '\);/);
+  assert.match(hint, /warn = 'Длины не хватает/);
+  // Facades and fireplaces: the area in figures; what the price covers is said by the price, on the result screen.
+  assert.doesNotMatch(html, /facade-area-scope/);
+  // The countertop diagram: three words under it.
+  assert.match(html, /dimShapeNote\.textContent = isUshape \? 'Схема без крыльев' : 'Схема без крыла';/);
+  assert.ok(html.indexOf('id="dimShapeNote"') > html.indexOf('id="dimDiagram"') && html.indexOf('id="dimShapeNote"') < html.indexOf('id="dimGenericFields"'));
+  assert.ok(html.indexOf('id="facadeAreaNote"') > html.indexOf('id="facadeQtyField"'));
+});
+
+test('the size column: 400 px, two fields side by side with every label on one line, one per row where two do not fit (2026-10-20, the owner)', () => {
+  assert.match(html, /--dim-col: 400px;/);
+  assert.match(html, /\.dim-fields \{ display: grid; grid-template-columns: repeat\(auto-fit, minmax\(180px, 1fr\)\); gap: 12px; max-width: var\(--dim-col\);/);
+  assert.doesNotMatch(html, /max-width: 320px/);
 });

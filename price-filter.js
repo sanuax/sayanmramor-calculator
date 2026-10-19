@@ -105,10 +105,10 @@
     return (range.from == null || price >= range.from) && (range.to == null || price <= range.to);
   }
 
-  // The filter's state in a few words, for a button: «от 10 тыс.», «до 50 тыс.», «10 тыс. – 50 тыс.».
+  // The filter's state in a few words, for a button: «от 10 тыс.», «до 50 тыс.», «10 тыс. - 50 тыс.».
   function summary(range) {
     if (!isActive(range)) return '';
-    if (range.from != null && range.to != null) return formatShort(range.from) + ' – ' + formatShort(range.to);
+    if (range.from != null && range.to != null) return formatShort(range.from) + ' - ' + formatShort(range.to);
     return range.from != null ? 'от ' + formatShort(range.from) : 'до ' + formatShort(range.to);
   }
 

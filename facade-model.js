@@ -91,7 +91,7 @@
       }],
     },
     {
-      // Was «Фасадный элемент — Наличник окна»: the 3D always drew a surround
+      // Was «Фасадный элемент - Наличник окна»: the 3D always drew a surround
       // around an opening, so its sizes are now the opening's and the frame's.
       id: 'FACADE-02', key: 'surround', title: 'Обрамление проёма', desc: 'Наличник окна или двери',
       cameraPreset: 'front',
@@ -118,7 +118,7 @@
       cameraPreset: 'iso-eye-level',
       quantity: quantity('Количество колонн', ['колонна', 'колонны', 'колонн']),
       areaTitle: 'Площадь облицовки колонн', priceScope: 'облицовку колонн',
-      visualNote: 'Архитектурные элементы колоннады на 3D — визуальный образ и в расчёт не входят.',
+      visualNote: 'Архитектурные элементы колоннады на 3D - визуальный образ и в расчёт не входят.',
       forms: [
         {
           id: 'round', title: 'Круглая', desc: 'Круглое сечение',
