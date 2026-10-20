@@ -834,3 +834,10 @@ test('ThreeScene exports capture() for the passport, and taking a shot never cou
   assert.doesNotMatch(body, /userAdjusted/);
   assert.match(body, /toDataURL\('image\/jpeg', 0\.9\)/);
 });
+
+test("capture() puts the client's view back even if drawing the shot throws", () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'visualizer', 'three-scene.js'), 'utf8');
+  const start = src.indexOf('function capture(');
+  const body = src.slice(start, src.indexOf('\n}\n', start));
+  assert.match(body, /try \{[\s\S]*\} finally \{/);
+});

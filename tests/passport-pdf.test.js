@@ -139,3 +139,14 @@ test('a staircase with six parameters and four table rows still fits one page, t
   const bytes = PassportPdf.renderPassportPdf(doc, assets(), { jsPDF, qrcode });
   assert.equal(pageCount(bytes), 1);
 });
+
+test('a stone photo that came out empty degrades to the grey square, the passport still made', () => {
+  const bytes = PassportPdf.renderPassportPdf(passportDoc(), assets({ stonePhoto: 'data:,' , shots: ['data:,', PIXEL, null] }), { jsPDF, qrcode });
+  assert.equal(pageCount(bytes), 1);
+});
+
+test('the QR code: low error correction and 22 mm, so a long link still prints with readable modules', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'passport-pdf.js'), 'utf8');
+  assert.match(src, /qrcode\(0, 'L'\)/);
+  assert.match(src, /const qrSize = 22;/);
+});

@@ -121,6 +121,23 @@ test('the rows add up to the total exactly, even when each row rounds up', () =>
   const spec = PassportModel.buildSpecification(Object.assign({}, k, { result, pricing }));
   assert.equal(spec.totalRub, pricing.total);
   assert.equal(sumRows(spec), pricing.total);
+  // The leftover never lands on a row that is exactly price x quantity (a slab).
+  const slab = spec.sections[0].rows[0];
+  assert.equal(slab.amountRub, 50000);
+  assert.equal(slab.amountRub, slab.priceRub * slab.qty);
+  spec.sections.slice(1).forEach(sec => sec.rows.forEach(r => assert.ok(Math.abs(r.amountRub - [1000.5, 2000.5, 300.5].find(v => Math.abs(v - r.amountRub) <= 1)) <= 1, r.name)));
+});
+
+test("the area is shown precisely enough that rate x area gives the row's sum", () => {
+  const k = kitchen({ 'opt-install': { checked: true } });
+  const area = 0.792;
+  const result = Object.assign({}, k.result, { fabrication: 37500 * area, installation: 17500 * area });
+  result.total = result.subtotal + result.fabrication + result.installation;
+  const pricing = Object.assign({}, k.pricing, { total: Math.round(result.total) });
+  const spec = PassportModel.buildSpecification(Object.assign({}, k, { result, pricing, pricingInputs: Object.assign({}, k.pricingInputs, { mainAreaM2: area }) }));
+  const fab = spec.sections.find(s => s.title === 'Изготовление').rows[0];
+  assert.equal(fab.qty, 0.792);
+  assert.equal(fab.priceRub * fab.qty, fab.amountRub);
 });
 
 test('a price for the manager: the line instead of the table, and never 0 ₽ for work without a rate', () => {

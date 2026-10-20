@@ -57,7 +57,8 @@
   }
 
   const money = v => (typeof v === 'number' && v > 0 ? v : 0);
-  const area2 = m2 => Math.round(m2 * 100) / 100;
+  // The area as precisely as rate x area gives the row's sum (0,792 m², not 0,79).
+  const areaShown = m2 => Math.round(m2 * 10000) / 10000;
 
   function stoneRows(result, stoneName) {
     const groups = [];
@@ -89,7 +90,7 @@
       return { manual: (pricing && pricing.status !== 'ok' && pricing.message) || MANUAL_TEXT };
     }
     const rates = (pricingInputs && pricingInputs.rates) || {};
-    const area = pricingInputs && pricingInputs.mainAreaM2 ? area2(pricingInputs.mainAreaM2) : null;
+    const area = pricingInputs && pricingInputs.mainAreaM2 ? areaShown(pricingInputs.mainAreaM2) : null;
     const perM2 = (rate, mult) => (typeof rate === 'number' && rate > 0 ? rate * (mult || 1) : null);
     const complexMult = pricingInputs && pricingInputs.complexEnabled ? rates.complexShapeMultiplier : 1;
     const stoneName = (configuration.material && configuration.material.name) || 'камня';
@@ -112,11 +113,20 @@
       ] },
     ].map(s => ({ title: s.title, rows: s.rows.filter(r => r.amount > 0) })).filter(s => s.rows.length);
 
+    // Largest remainder: the rubles the rounding lost or gained go, one each,
+    // to the rows whose exact sums were closest to rounding the other way --
+    // never to a whole-ruble row (a slab: price x quantity stays exact).
     const totalRub = pricing.total;
     const rows = [];
     sections.forEach(s => s.rows.forEach(r => { r.amountRub = Math.round(r.amount); rows.push(r); }));
-    const left = totalRub - rows.reduce((sum, r) => sum + r.amountRub, 0);
-    if (left !== 0 && rows.length) rows.reduce((a, b) => (b.amountRub > a.amountRub ? b : a)).amountRub += left;
+    let left = totalRub - rows.reduce((sum, r) => sum + r.amountRub, 0);
+    const step = Math.sign(left);
+    const candidates = rows.filter(r => r.amount !== Math.round(r.amount))
+      .sort((a, b) => step * ((b.amount - b.amountRub) - (a.amount - a.amountRub)));
+    for (let i = 0; left !== 0 && candidates.length; i = (i + 1) % candidates.length) {
+      candidates[i].amountRub += step;
+      left -= step;
+    }
     rows.forEach(r => { delete r.amount; });
     return { sections, totalRub };
   }

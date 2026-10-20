@@ -74,8 +74,13 @@
       header();
     }
     function image(dataUrl, x, top, w, h) {
-      if (dataUrl) doc.addImage(dataUrl, 'JPEG', x, top, w, h, undefined, 'FAST');
-      else {
+      try {
+        if (dataUrl && dataUrl.length > 30) {
+          doc.addImage(dataUrl, 'JPEG', x, top, w, h, undefined, 'FAST');
+          return;
+        }
+      } catch (err) { /* an unreadable picture: the grey square below */ }
+      {
         doc.setFillColor.apply(doc, STONE);
         doc.rect(x, top, w, h, 'F');
       }
@@ -238,7 +243,7 @@
     const footTop = BOTTOM - FOOT_H + 4;
     doc.setDrawColor.apply(doc, LINE);
     doc.line(M, footTop - 3, PAGE_W - M, footTop - 3);
-    const qrSize = 20;
+    const qrSize = 22;
     drawQr(doc, libs.qrcode, passport.link, M, footTop, qrSize);
     font('Montserrat', 'bold', 9.5);
     doc.textWithLink('Открыть 3D-модель', M + qrSize + 5, footTop + 5, { url: passport.link });
@@ -252,7 +257,8 @@
   }
 
   function drawQr(doc, qrcode, text, x, top, size) {
-    const qr = qrcode(0, 'M');
+    // Low error correction: fewer, larger modules for a long link on paper.
+    const qr = qrcode(0, 'L');
     qr.addData(text);
     qr.make();
     const count = qr.getModuleCount();

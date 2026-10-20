@@ -3200,9 +3200,13 @@
   // The passport link (passport-link.js): every control of the steps and
   // what it held when the page opened, before the URL's product is applied
   // -- the link carries only what the client changed from that.
+  // The hidden step-count / facade-quantity only mirror their visible fields
+  // (stepCountInput, facadeQtyInput) and are left out: a shorter link.
+  const PASSPORT_MIRRORS = ['step-count', 'facade-quantity'];
   function passportFieldControls() {
     return Array.from(document.querySelectorAll('.configurator .step:not([data-step-id="review"])'))
-      .flatMap(step => Array.from(step.querySelectorAll('input[id], select[id], textarea[id]')));
+      .flatMap(step => Array.from(step.querySelectorAll('input[id], select[id], textarea[id]')))
+      .filter(el => !PASSPORT_MIRRORS.includes(el.id));
   }
   const passportInitial = new Map(passportFieldControls().map(el => [el.id, { value: el.value, checked: el.checked }]));
   const bootstrapParams = new URLSearchParams(window.location.search);
@@ -4847,6 +4851,10 @@
         return;
       }
       if (id === 'productShape') { selectShapeCard(value); return; }
+      if (id === 'stupeni-riser') {
+        document.getElementById('stupeniRiserGrid').children[value === '1' ? 1 : 0].click();
+        return;
+      }
       if (id === 'edge-type') {
         const card = edgeCardGrid.querySelector('[data-edge-type="' + value + '"]');
         if (card && edgeTypeInput.value !== value) card.click();
@@ -5025,14 +5033,18 @@
     if (!stone || !stone.image) return Promise.resolve(null);
     return new Promise(resolve => {
       const img = new Image();
+      // A photo that hangs is not waited for: the passport goes without it.
+      const timer = setTimeout(() => resolve(null), 8000);
       img.onload = () => {
+        clearTimeout(timer);
+        if (!img.naturalWidth || !img.naturalHeight) { resolve(null); return; }
         const side = Math.min(img.naturalWidth, img.naturalHeight);
         const canvas = document.createElement('canvas');
         canvas.width = canvas.height = Math.min(600, side);
         canvas.getContext('2d').drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, canvas.width, canvas.height);
         resolve(canvas.toDataURL('image/jpeg', 0.85));
       };
-      img.onerror = () => resolve(null);
+      img.onerror = () => { clearTimeout(timer); resolve(null); };
       img.src = 'data/' + stone.image;
     });
   }
@@ -5043,19 +5055,24 @@
     passportBtn.textContent = 'Готовим паспорт...';
     passportError.hidden = true;
     const stone = selectedStoneId ? STONES_BY_ID[selectedStoneId] : null;
-    const random4 = crypto.getRandomValues(new Uint32Array(1))[0] % 10000;
-    const passport = PassportModel.buildPassport(Object.assign({}, data, {
-      view: ResultModel.buildResultView(data.configuration), stone, createdAt: new Date(), random4,
-      link: location.origin + location.pathname + '?' + currentPassportQuery(),
-      defaultPreset: PRODUCTS[selectedProductKey].cameraPreset || 'iso',
-    }));
-    // The shots first, while the scene is exactly what the client sees.
-    const shots = passport.shots.map((preset, i) => (viewerReady && window.ThreeScene
-      ? window.ThreeScene.capture(preset, i === 0 ? { width: 1820, height: Math.round(1820 / PassportPdf.MAIN_RATIO) } : { width: 900, height: Math.round(900 * PassportPdf.SMALL_RATIO) }) : null));
-    Promise.all([
-      loadPassportScript('vendor/jspdf/jspdf.umd.min.js'), loadPassportScript('vendor/qrcode/qrcode.js'),
-      loadPassportFonts(), passportStonePhoto(stone),
-    ]).then(([, , fonts, stonePhoto]) => {
+    let passport, shots;
+    // Everything after the button turns busy is in the chain, so any failure
+    // ends in the error line and the button comes back.
+    Promise.resolve().then(() => {
+      const random4 = crypto.getRandomValues(new Uint32Array(1))[0] % 10000;
+      passport = PassportModel.buildPassport(Object.assign({}, data, {
+        view: ResultModel.buildResultView(data.configuration), stone, createdAt: new Date(), random4,
+        link: location.origin + location.pathname + '?' + currentPassportQuery(),
+        defaultPreset: PRODUCTS[selectedProductKey].cameraPreset || 'iso',
+      }));
+      // The shots first, while the scene is exactly what the client sees.
+      shots = passport.shots.map((preset, i) => (viewerReady && window.ThreeScene
+        ? window.ThreeScene.capture(preset, i === 0 ? { width: 1820, height: Math.round(1820 / PassportPdf.MAIN_RATIO) } : { width: 900, height: Math.round(900 * PassportPdf.SMALL_RATIO) }) : null));
+      return Promise.all([
+        loadPassportScript('vendor/jspdf/jspdf.umd.min.js'), loadPassportScript('vendor/qrcode/qrcode.js'),
+        loadPassportFonts(), passportStonePhoto(stone),
+      ]);
+    }).then(([, , fonts, stonePhoto]) => {
       const bytes = PassportPdf.renderPassportPdf(passport, { fonts, shots, stonePhoto }, { jsPDF: window.jspdf.jsPDF, qrcode: window.qrcode });
       const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
       const a = document.createElement('a');

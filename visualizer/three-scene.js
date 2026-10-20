@@ -763,12 +763,21 @@ function capture(presetName, { width, height }) {
     position: camera.position.clone(), target: controls.target.clone(),
     minDistance: controls.minDistance, maxDistance: controls.maxDistance,
   };
-  renderer.setPixelRatio(1);
-  renderer.setSize(width, height, false);
-  camera.aspect = width / height;
-  frame(preset.direction);
-  renderer.render(scene, camera);
-  const url = renderer.domElement.toDataURL('image/jpeg', 0.9);
+  let url = null;
+  try {
+    renderer.setPixelRatio(1);
+    renderer.setSize(width, height, false);
+    camera.aspect = width / height;
+    frame(preset.direction);
+    renderer.render(scene, camera);
+    url = renderer.domElement.toDataURL('image/jpeg', 0.9);
+  } finally {
+    restoreView(saved, size);
+  }
+  return url;
+}
+
+function restoreView(saved, size) {
   renderer.setPixelRatio(saved.pixelRatio);
   renderer.setSize(size.x, size.y, false);
   camera.aspect = saved.aspect;
@@ -781,7 +790,6 @@ function capture(presetName, { width, height }) {
   camera.updateProjectionMatrix();
   controls.update();
   renderer.render(scene, camera);
-  return url;
 }
 
 function dispose() {

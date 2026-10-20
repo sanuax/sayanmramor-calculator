@@ -348,3 +348,32 @@ test('applyLeadMode never hides the passport button', () => {
   const fn = html.slice(html.indexOf('function applyLeadMode('), html.indexOf('function showLeadErrors('));
   assert.doesNotMatch(fn, /passportBtn/);
 });
+
+// ---- Final review fixes (2026-10-20) ----
+test("a passport link restores the steps' riser choice through its card, so the card shows it", () => {
+  const fn = html.slice(html.indexOf('function restorePassportChoices('), html.indexOf('function openPassportStep('));
+  assert.match(fn, /id === 'stupeni-riser'/);
+  assert.match(fn, /stupeniRiserGrid/);
+});
+
+test('the link leaves out the hidden mirrors of the visible count fields (shorter link, smaller QR)', () => {
+  const fn = html.slice(html.indexOf('const PASSPORT_MIRRORS'), html.indexOf('const passportInitial'));
+  assert.match(fn, /\.filter\(el => !PASSPORT_MIRRORS\.includes\(el\.id\)\)/);
+  assert.match(fn, /step-count/);
+  assert.match(fn, /facade-quantity/);
+});
+
+test('the passport button never sticks: everything after it turns busy runs inside the promise chain', () => {
+  const fn = html.slice(html.indexOf('function downloadPassport('), html.indexOf("passportBtn.addEventListener('click', downloadPassport);"));
+  const busy = fn.indexOf("passportBtn.textContent = 'Готовим паспорт...';");
+  const chain = fn.indexOf('Promise.resolve().then(');
+  assert.ok(chain > busy, 'a chain after the busy state');
+  assert.ok(fn.indexOf('PassportModel.buildPassport') > chain, 'buildPassport inside it');
+  assert.ok(fn.indexOf('ThreeScene.capture') > chain, 'the shots inside it');
+});
+
+test('a stone photo that never loads or loads empty gives the placeholder, not a failed passport', () => {
+  const fn = html.slice(html.indexOf('function passportStonePhoto('), html.indexOf('function downloadPassport('));
+  assert.match(fn, /naturalWidth/);
+  assert.match(fn, /setTimeout\(/);
+});
