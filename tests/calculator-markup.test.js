@@ -309,3 +309,20 @@ test('the size column: 400 px, two fields side by side with every label on one l
   assert.match(html, /\.dim-fields \{ display: grid; grid-template-columns: repeat\(auto-fit, minmax\(180px, 1fr\)\); gap: 12px; max-width: var\(--dim-col\);/);
   assert.doesNotMatch(html, /max-width: 320px/);
 });
+
+// ---- The passport link (2026-10-20, the owner): the link reopens the same product ----
+test('the page loads passport-link.js next to url-bootstrap.js', () => {
+  assert.match(html, /<script src="url-bootstrap\.js"><\/script>\s*<script src="passport-link\.js"><\/script>/);
+});
+
+test('a passport link whose stone left the catalog: one hidden line in the material step, in the owner\'s words', () => {
+  const step = html.slice(html.indexOf('data-step-id="material"'), html.indexOf('data-step-id="dimensions"'));
+  const note = step.match(/<p[^>]*id="stoneGoneNote"[^>]*>([^<]*)<\/p>/);
+  assert.ok(note, '#stoneGoneNote in the material step');
+  assert.match(note[0], /\shidden[\s>]/);
+  assert.equal(note[1], 'Камень из паспорта больше не в каталоге - выберите другой');
+});
+
+test('every edge card carries its profile, so a link can pick it the way a click does', () => {
+  assert.match(html, /card\.dataset\.edgeType = edgeDef\.type;/);
+});

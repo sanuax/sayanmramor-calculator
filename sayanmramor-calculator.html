@@ -746,6 +746,8 @@
     font-size: var(--configurator-muted); line-height: 1.55; color: #474944;
   }
   .stone-texture-note svg { flex: none; margin-top: 2px; color: var(--stone-line); }
+  /* A passport link whose stone has left the catalog (2026-10-20, the owner). */
+  .stone-gone-note { margin: 10px 0 0; font-size: var(--configurator-muted); line-height: 1.5; color: var(--ink); }
   .result-texture-note { margin-top: 14px; }
 
   /* ---- Material picker -------------------------------------------------
@@ -1543,6 +1545,7 @@
           <span class="material-field-text" id="materialFieldText">Загрузка материалов…</span>
           <span class="material-field-chevron" aria-hidden="true">▾</span>
         </button>
+        <p class="stone-gone-note" id="stoneGoneNote" hidden>Камень из паспорта больше не в каталоге - выберите другой</p>
       </div>
       <!-- Крупный preview выбранного камня -- те же данные, что уже читает
            handleMaterialSelected() для .material-field выше (никакого
@@ -2233,6 +2236,7 @@
 <script src="visualizer/webgl-support.js"></script>
 <script src="visualizer/camera-preset-tracker.js"></script>
 <script src="url-bootstrap.js"></script>
+<script src="passport-link.js"></script>
 <script type="module" src="visualizer/three-scene.js"></script>
 <script>
   const { PRODUCTS, hasAdditionalWork } = ProductTypes;
@@ -2987,6 +2991,7 @@
     card.className = 'pick-card';
     card.setAttribute('role', 'button');
     card.setAttribute('tabindex', '0');
+    card.dataset.edgeType = edgeDef.type;
     card.innerHTML = '<span class="pc-check">✓</span>' + edgeDef.icon +
       '<div class="pc-title">' + edgeDef.title + '</div><div class="pc-desc">' + edgeDef.desc + '</div>';
     function selectEdge() {
@@ -3184,7 +3189,16 @@
   // Must run after DATA_LOADED/etc. above are declared: the dispatched
   // change event synchronously calls calculate(), which reads DATA_LOADED
   // -- doing this any earlier hits the `let` temporal dead zone.
+  // The passport link (passport-link.js): every control of the steps and
+  // what it held when the page opened, before the URL's product is applied
+  // -- the link carries only what the client changed from that.
+  function passportFieldControls() {
+    return Array.from(document.querySelectorAll('.configurator .step:not([data-step-id="review"])'))
+      .flatMap(step => Array.from(step.querySelectorAll('input[id], select[id], textarea[id]')));
+  }
+  const passportInitial = new Map(passportFieldControls().map(el => [el.id, { value: el.value, checked: el.checked }]));
   const bootstrapParams = new URLSearchParams(window.location.search);
+  const passportLink = PassportLink.readPassportQuery(bootstrapParams, passportFieldControls().map(el => el.id));
   const initialProductKey = UrlBootstrap.resolveInitialProductKey(bootstrapParams.get('product'), PRODUCTS);
   if (initialProductKey) {
     const initialProductInput = productGrid.querySelector('input[value="' + initialProductKey + '"]');
@@ -3207,9 +3221,15 @@
       // half of the URL bootstrap runs here rather than next to the
       // product one above. Reuses the real selection function -- same as
       // what MaterialPicker's onSelect callback calls on a manual click.
+      if (passportLink && selectedProductKey) restorePassportChoices(passportLink.fields);
       const initialStoneId = UrlBootstrap.resolveInitialStoneId(bootstrapParams.get('stone'), STONES_BY_ID);
-      if (initialStoneId) handleMaterialSelected(initialStoneId);
+      // A passport's stone that has left the catalog (or is out of stock) is
+      // not picked: the client chooses again, told why (#stoneGoneNote).
+      const stoneGone = !!(passportLink && passportLink.stoneId) && !(initialStoneId && STONES_BY_ID[initialStoneId].available !== false);
+      if (initialStoneId && !stoneGone) handleMaterialSelected(initialStoneId);
+      document.getElementById('stoneGoneNote').hidden = !stoneGone;
       calculate();
+      if (passportLink && selectedProductKey) openPassportStep();
     })
     .catch(() => {
       materialField.disabled = true;
@@ -3226,6 +3246,7 @@
     // calculator instead of just being a no-op.
     if (!stone) return;
     selectedStoneId = stoneId;
+    document.getElementById('stoneGoneNote').hidden = true;
     materialFieldText.textContent = stone.name;
     if (stone.image) {
       materialFieldThumbImg.src = 'data/' + stone.image;
@@ -4785,6 +4806,73 @@
     return node;
   }
 
+  // A passport link: the client's choices back through the same controls a
+  // click uses -- the type first (its cards render the forms and sizes the
+  // rest fill), then every field in the page's order.
+  function restorePassportChoices(fields) {
+    if (fields.productSubcategory !== undefined) {
+      const cards = TYPE_CARDS[selectedProductKey] || [];
+      const index = cards.findIndex(c => c.ids.includes(fields.productSubcategory));
+      if (index >= 0) {
+        typeCardIndex = index;
+        stairRisers = cards[index].ids.indexOf(fields.productSubcategory) === 1;
+        applyTypeSelection(true);
+      }
+    }
+    Object.keys(fields).forEach(id => {
+      const value = fields[id];
+      const el = document.getElementById(id);
+      if (!el || id === 'productSubcategory') return;
+      const on = v => parseFloat(v) > 0;
+      if (id === 'facade-form') {
+        const type = currentFacadeType();
+        if (type) { facadeFormByType[type.id] = value; renderFacadeForms(); syncFacadeFields(); }
+        return;
+      }
+      if (id === 'fireplace-form') {
+        const type = currentFireplaceType();
+        if (type) { fireplaceFormByType[type.id] = value; renderFireplaceForms(); syncFireplaceFields(); }
+        return;
+      }
+      if (id === 'productShape') { selectShapeCard(value); return; }
+      if (id === 'edge-type') {
+        const card = edgeCardGrid.querySelector('[data-edge-type="' + value + '"]');
+        if (card && edgeTypeInput.value !== value) card.click();
+        return;
+      }
+      if (id.indexOf('cut-sink-') === 0) {
+        if (on(value) && !on(el.value)) selectSinkVariant(id.slice('cut-sink-'.length));
+        return;
+      }
+      const toggle = document.querySelector('[data-toggle-field="' + id + '"]');
+      if (toggle) {
+        if (on(value) !== on(el.value)) toggle.click();
+        return;
+      }
+      if (el.type === 'checkbox') el.checked = value === '1';
+      else el.value = value;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  }
+
+  // ...and straight to the Result, or to the first step still missing data
+  // (a stone that has left the catalog).
+  function openPassportStep() {
+    const steps = StepEngine.getSteps(selectedProductKey);
+    const missing = steps.find(id => id !== 'review' && isCurrentStepDataValid(id) === false);
+    applyStep(selectedProductKey, missing || 'review', null);
+  }
+
+  // The link to this very product, for the passport (Task 6).
+  function currentPassportQuery() {
+    const controls = passportFieldControls().map(el => {
+      const initial = passportInitial.get(el.id) || { value: '', checked: false };
+      return { id: el.id, type: el.type, value: el.value, checked: el.checked, defaultValue: initial.value, defaultChecked: initial.checked };
+    });
+    return PassportLink.buildPassportQuery({ productKey: selectedProductKey, stoneId: selectedStoneId, fields: PassportLink.collectFields(controls) });
+  }
+
   function goToStep(stepId) {
     if (stepTransitionInFlight || !selectedProductKey || stepId === currentStepId) return;
     // Never further than Далее could get: a step past one still missing
@@ -4886,7 +4974,7 @@
     if (DEBUG_LEAD) console.info('[lead payload]', payload);
     return Promise.resolve({ delivered: false });
   }
-  window.SayanCalculator = { getLastLeadPayload: () => lastLeadPayload };
+  window.SayanCalculator = { getLastLeadPayload: () => lastLeadPayload, getPassportQuery: () => currentPassportQuery(), getResultData: () => currentResultData() };
 
   resultCtaBtn.addEventListener('click', () => { leadMode = 'form'; applyLeadMode(true); });
   document.getElementById('leadCancelBtn').addEventListener('click', () => { leadMode = 'cta'; showLeadErrors({}); applyLeadMode(true); });
