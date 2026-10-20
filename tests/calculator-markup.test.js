@@ -76,9 +76,9 @@ test('the stone texture note: one wording, under the material choice and once on
   assert.equal(sectionOf('material').split(TEXTURE_NOTE).length - 1, 1);
   const review = sectionOf('review');
   assert.equal(review.split(TEXTURE_NOTE).length - 1, 1);
-  // Next to the chosen stone (the specs list), before the price and the request form.
+  // Variant B (2026-10-20, the owner): last on the Result, under what was built.
   const at = review.indexOf(TEXTURE_NOTE);
-  assert.ok(review.indexOf('id="resultSpecs"') < at && at < review.indexOf('class="result-pricing"') && at < review.indexOf('id="leadArea"'));
+  assert.ok(review.indexOf('id="resultCards"') < at && review.indexOf('id="leadArea"') < at);
 });
 
 test('the stone gallery names the supplier once, with a link to Venezia Stone in a new tab', () => {
@@ -185,18 +185,27 @@ test('the stone picker in glass: the chrome over the scrolling stones, the filte
   assert.match(picker, /new ResizeObserver\(/);
 });
 
-// The result column (2026-10-11, the owner's request): what was configured comes
-// first and together -- the specs, the extra works, the way back to change them --
-// then the note on the stone's texture, the price, the request and the house.
-test('the result column: specs, extra works and «Изменить конфигурацию» together under «Конфигурация готова», above the texture note and the price', () => {
+// The result column, variant B (2026-10-20, the owner: «цена как будто должна быть сверху всего»):
+// the chosen stone with the price on it, the actions, what the price is made of, then what was
+// built -- one card per step, each with its own «Изменить» -- and the texture note last.
+test("the result column: the price on the stone first, then the actions, the price's make-up, the cards and the texture note", () => {
   const review = html.slice(html.indexOf('<section class="step" data-step-id="review"'), html.indexOf('</section>', html.indexOf('data-step-id="review"')));
-  const order = ['class="result-eyebrow">Конфигурация готова', 'id="resultSpecs"', 'id="resultScopeNote"', 'id="resultWorksBlock"', 'class="result-edit"',
-    'class="stone-texture-note result-texture-note"', 'class="result-pricing"', 'id="leadArea"', 'id="resultShowroomLink"'].map(part => {
+  const order = ['id="resultHero"', 'id="resultTotal"', 'id="resultPriceNote"', 'id="leadArea"', 'id="resultCtaBtn"', 'id="passportBtn"', 'id="resultShowroomLink"',
+    'class="result-price-parts"', 'id="resultLines"', 'class="result-built-title">Что вы собрали', 'id="resultCards"', 'id="resultScopeNote"',
+    'class="stone-texture-note result-texture-note"'].map(part => {
     const at = review.indexOf(part);
     assert.ok(at > 0, part);
     return at;
   });
   order.reduce((prev, at) => { assert.ok(prev < at, 'in this order'); return at; });
+  assert.ok(review.indexOf('id="leadForm"') > review.indexOf('id="resultShowroomLink"'), 'the form opens under the actions');
+  ['Конфигурация готова', 'Изменить конфигурацию', 'result-eyebrow', 'id="resultSpecs"', 'id="resultEditActions"'].forEach(old => assert.ok(!review.includes(old), old));
+});
+
+test('every result card links back to its own step, and the cards come from ResultModel.buildResultCards', () => {
+  const fn = html.slice(html.indexOf('function renderResult('), html.indexOf('function renderResult(') + 6000);
+  assert.match(fn, /ResultModel\.buildResultCards\(/);
+  assert.match(fn, /goToStep\(card\.stepId\)/);
 });
 
 test('the glass leaves the icons and the 3D alone: the product, type and extras icons and the 3D panel keep their own rules', () => {

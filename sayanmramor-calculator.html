@@ -1270,50 +1270,73 @@
   }
   .step-nav-next.is-hidden { display: none; }
 
-  .result-panel { display: flex; flex-direction: column; gap: 28px; }
-  .result-eyebrow, .result-block-title {
-    font-size: var(--configurator-muted); font-weight: 700; text-transform: uppercase;
-    letter-spacing: 1px; color: var(--muted); line-height: 1.5;
+  .result-panel { display: flex; flex-direction: column; gap: 16px; }
+  /* The stone with the price on it: the stone's photograph under a dark veil
+     (the site's green-graphite), white type on it; no photograph -- the veil alone. */
+  .result-hero {
+    position: relative; overflow: hidden; border-radius: 12px; min-height: 196px;
+    display: flex; flex-direction: column; justify-content: flex-end; background: var(--dark-bg); color: #fff;
   }
-  .result-block-title { margin-bottom: 10px; }
-  .result-eyebrow { margin-bottom: -16px; }
-  .result-specs { margin: 0; border-top: 1px solid var(--line); }
-  .result-spec {
-    display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px;
-    padding: 12px 0; border-bottom: 1px solid var(--line);
+  .result-hero-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .result-hero-img[hidden] { display: none; }
+  .result-hero::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(to top, rgba(18, 19, 17, 0.86) 10%, rgba(18, 19, 17, 0.55) 60%, rgba(18, 19, 17, 0.3));
   }
-  .result-spec dt { font-size: var(--configurator-muted); color: var(--muted); line-height: 1.5; padding-top: 1px; }
-  .result-spec dd { margin: 0; font-size: var(--configurator-text); font-weight: 700; color: var(--ink); line-height: 1.4; overflow-wrap: anywhere; }
-  .result-spec-detail { display: block; margin-top: 2px; font-size: var(--configurator-muted); font-weight: 400; color: var(--muted); line-height: 1.5; }
-
-  .result-works[hidden] { display: none; }
-  .result-works-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
-  .result-works-list li {
-    display: flex; justify-content: space-between; align-items: baseline; gap: 16px;
-    padding: 10px 0; border-bottom: 1px solid var(--line);
-    font-size: var(--configurator-text); color: var(--ink); line-height: 1.4;
-  }
-  .result-works-list .result-work-detail { flex: none; font-size: var(--configurator-muted); color: var(--muted); }
-  .result-works-empty { margin: 0; font-size: var(--configurator-text); color: var(--muted); line-height: 1.5; }
-  .result-works-empty[hidden] { display: none; }
-
-  .result-pricing {
-    background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px;
-  }
-  .result-pricing .result-block-title { margin-bottom: 4px; }
+  .result-hero-body { position: relative; z-index: 1; padding: 20px 22px; }
+  .result-hero-kicker { font-size: var(--configurator-muted); color: rgba(255, 255, 255, 0.85); line-height: 1.5; }
   .result-total {
-    font-size: var(--configurator-price); font-weight: 800; color: var(--ink);
-    line-height: 1.15; letter-spacing: -0.5px;
+    margin: 4px 0 6px; font-size: var(--configurator-price); font-weight: 800; color: #fff;
+    line-height: 1.1; letter-spacing: -0.5px;
   }
-  .result-total:empty { display: none; }
-  .result-manual { margin: 6px 0 0; font-size: var(--configurator-text); color: var(--accent-ink); line-height: 1.5; }
+  .result-total.is-manual { font-size: var(--configurator-heading); font-weight: 700; letter-spacing: 0; }
+  .result-price-note { margin: 0; font-size: var(--configurator-muted); color: rgba(255, 255, 255, 0.8); line-height: 1.5; }
+  .result-manual { margin: 0; font-size: var(--configurator-muted); color: var(--accent-ink); line-height: 1.5; }
   .result-manual[hidden] { display: none; }
-  .result-lines { margin: 14px 0 0; padding-top: 10px; border-top: 1px solid var(--line); }
-  .result-lines:empty { display: none; }
+
+  .result-secondary { display: flex; gap: 10px; margin-top: 10px; }
+  .result-secondary > * { flex: 1 1 0; }
+  .lead > .lead-form, .lead > .lead-success { margin-top: 12px; }
+
+  .result-price-parts summary {
+    cursor: pointer; list-style: none; font-size: var(--configurator-muted); font-weight: 600; color: var(--accent);
+  }
+  .result-price-parts summary::-webkit-details-marker { display: none; }
+  .result-price-parts summary::after { content: ' ▾'; }
+  .result-price-parts[open] summary::after { content: ' ▴'; }
+  .result-price-parts summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+  .result-lines { margin: 10px 0 0; padding-top: 8px; border-top: 1px solid var(--line); }
   .result-line { display: flex; justify-content: space-between; gap: 16px; padding: 3px 0; font-size: var(--configurator-muted); line-height: 1.5; }
   .result-line dt { color: var(--muted); }
   .result-line dd { margin: 0; color: var(--ink); white-space: nowrap; }
-  .result-note { margin: 12px 0 0; font-size: var(--configurator-muted); color: var(--muted); line-height: 1.5; }
+  .result-price-parts:has(.result-lines:empty) { display: none; }
+
+  /* What was built: one card per step, two to a row; works, options and long cards span it. */
+  .result-built-title { margin: 12px 0 10px; font-size: var(--configurator-heading); font-weight: 600; color: var(--ink); line-height: 1.3; }
+  .result-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .result-card {
+    min-width: 0; display: flex; flex-direction: column; gap: 4px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px;
+  }
+  .result-card.is-wide { grid-column: 1 / -1; }
+  .result-card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .result-card-label { font-size: var(--configurator-muted); color: var(--muted); line-height: 1.5; }
+  .result-card-edit {
+    padding: 0; border: 0; background: none; font-family: inherit; font-size: var(--configurator-muted);
+    font-weight: 600; color: var(--accent); cursor: pointer; white-space: nowrap;
+  }
+  @media (hover: hover) { .result-card-edit:hover { text-decoration: underline; } }
+  .result-card-edit:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+  .result-card-value { font-size: var(--configurator-text); font-weight: 600; color: var(--ink); line-height: 1.4; overflow-wrap: anywhere; }
+  .result-card-detail { font-size: var(--configurator-muted); color: var(--muted); line-height: 1.5; }
+  .result-card-empty { font-size: var(--configurator-text); color: var(--muted); line-height: 1.4; }
+  .result-card-rows { margin: 2px 0 0; padding: 0; list-style: none; }
+  .result-card-rows li {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 2px 0;
+    font-size: var(--configurator-text); font-weight: 500; color: var(--ink); line-height: 1.4;
+  }
+  .result-card-rows li span { flex: none; font-size: var(--configurator-muted); font-weight: 400; color: var(--muted); }
+  .result-note { margin: 10px 0 0; font-size: var(--configurator-muted); color: var(--muted); line-height: 1.5; }
 
   .lead-form, .lead-success {
     background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 22px;
@@ -1345,7 +1368,7 @@
   }
   .lead-secondary-btn:hover { color: var(--ink); border-color: var(--stone-line); }
   /* The product passport (2026-10-20, the owner): always here on the Result, no contacts needed. */
-  .passport-btn { display: block; width: 100%; margin-top: 10px; }
+  .passport-btn { display: block; width: 100%; }
   .passport-btn:disabled { cursor: progress; opacity: 0.7; }
   .passport-error { margin: 8px 0 0; font-size: var(--configurator-muted); color: var(--accent-ink); line-height: 1.5; }
   .lead-success { border-left: 3px solid var(--sage); outline: none; }
@@ -1354,23 +1377,16 @@
 
   .result-showroom-link {
     display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px;
-    margin-top: -12px; padding: 12px 18px; border: 1px solid var(--line-strong, #b6b0a4); border-radius: 6px;
+    padding: 12px 14px; border: 1px solid var(--line); border-radius: 6px;
     background: transparent; font-size: var(--configurator-text); font-weight: 700;
     color: var(--ink); text-decoration: none; transition: border-color 0.15s, background-color 0.15s;
   }
   .result-showroom-link:hover { border-color: var(--stone-line); background: var(--card); }
   .result-showroom-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .result-showroom-link[hidden] { display: none; }
-  .result-edit-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-  .result-edit-btn {
-    padding: 8px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--card);
-    font-family: inherit; font-size: var(--configurator-muted); color: var(--ink); cursor: pointer;
-    transition: border-color 0.15s, background-color 0.15s;
-  }
-  .result-edit-btn:hover { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); }
-  .result-edit-btn:focus-visible, .lead-secondary-btn:focus-visible, .cta-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .lead-secondary-btn:focus-visible, .cta-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   @media (max-width: 480px) {
-    .result-spec { grid-template-columns: 1fr; gap: 2px; }
+    .result-cards { grid-template-columns: 1fr; }
     .lead-actions { flex-direction: column; }
   }
   /* Phones: the 3D gets the width (less panel padding) and a square canvas
@@ -2041,45 +2057,27 @@
          hand, and there is no second renderer/state. -->
     <section class="step" data-step-id="review" style="display:none">
       <div class="result-panel">
-        <div class="result-eyebrow">Конфигурация готова</div>
-        <dl class="result-specs" id="resultSpecs"></dl>
-        <!-- What the price covers («Стоимость указана за облицовку колонн.»,
-             «…за одну ступень.», «…за основной сегмент…») -- right under the
-             sizes it is counted from (ResultModel.buildResultView note). -->
-        <p class="result-note" id="resultScopeNote" hidden></p>
-
-        <!-- What was configured stays together (2026-10-11, the owner's request):
-             the specs, the extra works, and the way back to change any of them --
-             then the texture note, the price and the request. -->
-        <div class="result-works" id="resultWorksBlock" hidden>
-          <div class="result-block-title">Дополнительные работы</div>
-          <ul class="result-works-list" id="resultWorksList"></ul>
-          <p class="result-works-empty" id="resultWorksEmpty" hidden>Без дополнительных работ</p>
+        <!-- Variant B (2026-10-20, the owner: «цена как будто должна быть сверху всего»):
+             the chosen stone is the face of the Result with the price on it, then the
+             actions, what the price is made of, what was built -- one card per step,
+             each with its own «Изменить» -- and the note on the texture last. -->
+        <div class="result-hero" id="resultHero">
+          <img class="result-hero-img" id="resultHeroImg" alt="" hidden>
+          <div class="result-hero-body">
+            <div class="result-hero-kicker" id="resultHeroKicker"></div>
+            <div class="result-total" id="resultTotal"></div>
+            <p class="result-price-note" id="resultPriceNote"></p>
+          </div>
         </div>
-
-        <div class="result-edit">
-          <div class="result-block-title">Изменить конфигурацию</div>
-          <div class="result-edit-actions" id="resultEditActions"></div>
-        </div>
-        <!-- The same note as under the material choice, word for word, so the
-             client sees it once more next to the chosen stone before sending
-             the request. -->
-        <p class="stone-texture-note result-texture-note">
-          <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="6.6" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M8 7.3v4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="4.9" r="0.9" fill="currentColor"/></svg>
-          <span>Текстура камня на изделии носит ориентированный характер. Точная раскладка и направление рисунка будут согласованы с дизайнером при разработке проекта.</span>
-        </p>
-
-        <div class="result-pricing">
-          <div class="result-block-title">Предварительная стоимость</div>
-          <div class="result-total" id="resultTotal"></div>
-          <p class="result-manual" id="resultManual" hidden></p>
-          <dl class="result-lines" id="resultLines"></dl>
-          <p class="result-note">Стоимость предварительная и уточняется после проверки проекта.</p>
-        </div>
+        <p class="result-manual" id="resultManual" hidden></p>
 
         <div class="lead" id="leadArea">
           <button type="button" class="cta-btn" id="resultCtaBtn">Получить расчёт</button>
-          <button type="button" class="lead-secondary-btn passport-btn" id="passportBtn">Скачать паспорт</button>
+          <div class="result-secondary">
+            <button type="button" class="lead-secondary-btn passport-btn" id="passportBtn">Скачать паспорт</button>
+            <!-- The same product in the site's 3D house. A plain link (URL contract only). -->
+            <a class="result-showroom-link" id="resultShowroomLink" href="#" hidden>Посмотреть в доме <span aria-hidden="true">→</span></a>
+          </div>
           <p class="passport-error" id="passportError" hidden>Не удалось подготовить паспорт, попробуйте ещё раз</p>
 
           <form class="lead-form" id="leadForm" novalidate hidden tabindex="-1">
@@ -2115,9 +2113,23 @@
           </div>
         </div>
 
-        <!-- Secondary action: the same product in the site's 3D house. A
-             plain link (URL contract only), never in place of the lead CTA. -->
-        <a class="result-showroom-link" id="resultShowroomLink" href="#" hidden>Посмотреть изделие в доме <span aria-hidden="true">→</span></a>
+        <details class="result-price-parts" id="resultPriceParts">
+          <summary>Из чего складывается цена</summary>
+          <dl class="result-lines" id="resultLines"></dl>
+        </details>
+
+        <div class="result-built">
+          <h3 class="result-built-title">Что вы собрали</h3>
+          <div class="result-cards" id="resultCards"></div>
+          <!-- What the price covers («Стоимость указана за облицовку колонн.»), under the sizes. -->
+          <p class="result-note" id="resultScopeNote" hidden></p>
+        </div>
+
+        <!-- The same note as under the material choice, word for word. -->
+        <p class="stone-texture-note result-texture-note">
+          <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="6.6" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M8 7.3v4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="4.9" r="0.9" fill="currentColor"/></svg>
+          <span>Текстура камня на изделии носит ориентированный характер. Точная раскладка и направление рисунка будут согласованы с дизайнером при разработке проекта.</span>
+        </p>
       </div>
     </section>
     </div><!-- /#stepViewport -->
@@ -4772,14 +4784,13 @@
   shapeCornerSelect.addEventListener('change', calculate);
 
   // ===== Result + lead =====
-  const resultSpecsEl = document.getElementById('resultSpecs');
-  const resultWorksBlockEl = document.getElementById('resultWorksBlock');
-  const resultWorksListEl = document.getElementById('resultWorksList');
-  const resultWorksEmptyEl = document.getElementById('resultWorksEmpty');
+  const resultHeroImg = document.getElementById('resultHeroImg');
+  const resultHeroKicker = document.getElementById('resultHeroKicker');
+  const resultPriceNote = document.getElementById('resultPriceNote');
+  const resultCardsEl = document.getElementById('resultCards');
   const resultTotalEl = document.getElementById('resultTotal');
   const resultManualEl = document.getElementById('resultManual');
   const resultLinesEl = document.getElementById('resultLines');
-  const resultEditActionsEl = document.getElementById('resultEditActions');
   const resultCtaBtn = document.getElementById('resultCtaBtn');
   const resultShowroomLink = document.getElementById('resultShowroomLink');
   const leadForm = document.getElementById('leadForm');
@@ -4907,36 +4918,66 @@
     if (!data) return;
     const view = ResultModel.buildResultView(data.configuration);
 
-    resultSpecsEl.replaceChildren(...view.specs.map(spec => {
-      const row = el('div', 'result-spec');
-      const dd = el('dd', null, spec.value);
-      if (spec.detail) dd.appendChild(el('span', 'result-spec-detail', spec.detail));
-      row.append(el('dt', null, spec.label), dd);
-      return row;
-    }));
-
-    const scopeNoteEl = document.getElementById('resultScopeNote');
-    scopeNoteEl.hidden = !view.note;
-    scopeNoteEl.textContent = view.note || '';
-
-    resultWorksBlockEl.hidden = view.works === null;
-    if (view.works) {
-      resultWorksListEl.replaceChildren(...view.works.map(work => {
-        const li = el('li', null, work.label);
-        if (work.detail) li.appendChild(el('span', 'result-work-detail', work.detail));
-        return li;
-      }));
-      resultWorksListEl.hidden = view.works.length === 0;
-      resultWorksEmptyEl.hidden = view.works.length > 0;
-    }
-
+    // The stone with the price on it.
+    const stone = selectedStoneId ? STONES_BY_ID[selectedStoneId] : null;
+    resultHeroImg.hidden = !(stone && stone.image);
+    if (stone && stone.image) resultHeroImg.src = 'data/' + stone.image;
+    resultHeroKicker.textContent = view.title + (stone ? ' · ' + stone.name : '');
     const pricing = data.pricing;
-    resultTotalEl.textContent = pricing.status === 'ok' ? '≈ ' + ResultModel.formatRub(pricing.total) : '';
-    const manualText = pricing.status === 'ok' ? pricing.message
-      : pricing.status === 'manual' ? (pricing.message || 'Стоимость уточнит менеджер.')
+    const priced = pricing.status === 'ok';
+    resultTotalEl.textContent = priced ? '≈ ' + ResultModel.formatRub(pricing.total) : 'Стоимость уточнит менеджер';
+    resultTotalEl.classList.toggle('is-manual', !priced);
+    resultPriceNote.textContent = 'Предварительно' + (UPDATED_AT ? ', по ценам на ' + formatDate(UPDATED_AT) : '');
+    const manualText = priced ? pricing.message
+      : pricing.status === 'manual' ? pricing.message
       : INCOMPLETE_HINT;
     resultManualEl.textContent = manualText || '';
     resultManualEl.hidden = !manualText;
+
+    // What was built: one card per step, each with its way back.
+    const stepLabels = Object.assign({}, StepEngine.STEP_LABELS, { type: TYPE_STEP_TITLES[selectedProductKey] || StepEngine.STEP_LABELS.type });
+    resultCardsEl.replaceChildren(...ResultModel.buildResultCards(view, StepEngine.getSteps(selectedProductKey), stepLabels).map(card => {
+      const box = el('div', 'result-card' + (card.wide ? ' is-wide' : ''));
+      const head = el('div', 'result-card-head');
+      const edit = el('button', 'result-card-edit', 'Изменить');
+      edit.type = 'button';
+      edit.setAttribute('aria-label', 'Изменить: ' + card.label);
+      edit.addEventListener('click', () => goToStep(card.stepId));
+      head.append(el('span', 'result-card-label', card.label), edit);
+      box.appendChild(head);
+      if (card.empty !== null) {
+        box.appendChild(el('div', 'result-card-empty', card.empty));
+      } else if (card.works) {
+        const list = el('ul', 'result-card-rows');
+        card.works.forEach(w => {
+          const li = el('li', null, w.label);
+          if (w.detail) li.appendChild(el('span', null, w.detail));
+          list.appendChild(li);
+        });
+        box.appendChild(list);
+      } else if (card.items.length > 2) {
+        const list = el('ul', 'result-card-rows');
+        card.items.forEach(i => {
+          const li = el('li', null, i.label);
+          li.appendChild(el('span', null, i.value + (i.detail ? ' · ' + i.detail : '')));
+          list.appendChild(li);
+        });
+        box.appendChild(list);
+      } else {
+        card.items.forEach((i, n) => {
+          if (n === 0) {
+            box.appendChild(el('div', 'result-card-value', i.value));
+            if (i.detail) box.appendChild(el('div', 'result-card-detail', i.detail));
+          } else {
+            box.appendChild(el('div', 'result-card-detail', i.label + ' ' + i.value));
+          }
+        });
+      }
+      return box;
+    }));
+    const scopeNoteEl = document.getElementById('resultScopeNote');
+    scopeNoteEl.hidden = !view.note;
+    scopeNoteEl.textContent = view.note || '';
     resultLinesEl.replaceChildren(...pricing.lines.map(line => {
       const row = el('div', 'result-line');
       row.append(el('dt', null, line.label), el('dd', null, ResultModel.formatRub(line.amountRub)));
@@ -4947,13 +4988,6 @@
     resultShowroomLink.hidden = !showroomUrl;
     if (showroomUrl) resultShowroomLink.href = showroomUrl;
 
-    const stepLabels = Object.assign({}, StepEngine.STEP_LABELS, { type: TYPE_STEP_TITLES[selectedProductKey] || StepEngine.STEP_LABELS.type });
-    resultEditActionsEl.replaceChildren(...ResultModel.buildEditTargets(StepEngine.getSteps(selectedProductKey), stepLabels).map(target => {
-      const btn = el('button', 'result-edit-btn', target.label);
-      btn.type = 'button';
-      btn.addEventListener('click', () => goToStep(target.stepId));
-      return btn;
-    }));
 
     // A prepared request describes one exact configuration -- once that
     // changes, "Запрос подготовлен" would no longer be true.

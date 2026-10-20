@@ -430,3 +430,66 @@ test('«Забежные»: the limited count (max 10) is the one the Result and
   assert.deepEqual(payloadFor('stupeni', { productSubcategory: { value: 'STEP-02' }, 'step-count': { value: '30' } }).configuration.steps, { count: 10 });
   assert.deepEqual(configFor('stupeni', { productSubcategory: { value: 'STEP-01' }, 'step-count': { value: '30' } }).steps, { count: 30 });
 });
+
+// ---- The Result, variant B (2026-10-20, the owner): what was built as one card per step ----
+const KITCHEN_STEPS = StepEngine.getSteps('stoleshnitsa_kuhnya');
+
+test('result cards: one per step of the product, in the steps\' order, each with its own way back', () => {
+  const view = ResultModel.buildResultView(configFor('stoleshnitsa_kuhnya', {
+    productShape: { value: 'ushape' }, 'wing-width': { value: '600' }, 'wing-length': { value: '1200' },
+    'edge-type': { value: 'bevel' }, 'cut-cooktop': { value: '1' }, 'opt-install': { checked: true },
+  }));
+  const cards = ResultModel.buildResultCards(view, KITCHEN_STEPS, StepEngine.STEP_LABELS);
+  assert.deepEqual(cards.map(c => c.stepId), ['shape', 'dimensions', 'material', 'edge', 'additionalWorks', 'options']);
+  assert.deepEqual(cards.map(c => c.label), ['Форма', 'Размеры', 'Материал', 'Кромка', 'Доп. работы', 'Опции']);
+  const by = id => cards.find(c => c.stepId === id);
+  assert.deepEqual(by('shape').items.map(i => i.key), ['shape', 'wing']);
+  assert.ok(by('dimensions').items.some(i => i.key === 'dimensions'));
+  assert.equal(by('material').items[0].value, 'Delicato Brown');
+  assert.equal(by('edge').items[0].value, 'Скос (фаска)');
+  assert.equal(by('additionalWorks').works.length, 1);
+  assert.equal(by('options').items[0].value, 'Монтаж на объекте');
+  assert.deepEqual(cards.map(c => c.wide), [false, false, false, false, true, true]);
+});
+
+test('result cards: a step left as it was still shows, in words, never empty', () => {
+  const view = ResultModel.buildResultView(configFor('stoleshnitsa_kuhnya', {}));
+  const cards = ResultModel.buildResultCards(view, KITCHEN_STEPS, StepEngine.STEP_LABELS);
+  const by = id => cards.find(c => c.stepId === id);
+  assert.equal(by('edge').empty, 'Не выбрана');
+  assert.equal(by('additionalWorks').empty, 'Без дополнительных работ');
+  assert.equal(by('options').empty, 'Без опций');
+  assert.equal(by('dimensions').empty, null);
+});
+
+test('result cards: a choice whose own step the product does not have goes to «Размеры»; a long card spans the row', () => {
+  const view = { specs: [
+    { key: 'type', label: 'Тип', value: 'Винтовая', detail: '' },
+    { key: 'shape', label: 'Форма', value: 'Г-образная', detail: '' },
+    { key: 'dimensions', label: 'Размер', value: '2200 × 880 мм', detail: '' },
+    { key: 'steps', label: 'Количество ступеней', value: '3 шт.', detail: '' },
+  ], works: null, note: null };
+  const cards = ResultModel.buildResultCards(view, StepEngine.getSteps('lestnitsa'), Object.assign({}, StepEngine.STEP_LABELS, { type: 'Тип лестницы' }));
+  assert.deepEqual(cards.map(c => c.stepId), ['type', 'dimensions', 'material', 'edge', 'options']);
+  assert.equal(cards[0].label, 'Тип лестницы');
+  assert.deepEqual(cards[1].items.map(i => i.key), ['shape', 'dimensions', 'steps']);
+  assert.equal(cards[1].wide, true);
+});
+
+test('result cards: a short card left alone between long ones spans the row too, so no row has a hole', () => {
+  const view = { specs: [
+    { key: 'type', label: 'Тип', value: 'Каминный портал', detail: '' },
+    { key: 'fireplace.a', label: 'Ширина проёма', value: '990 мм', detail: '' },
+    { key: 'fireplace.b', label: 'Высота проёма', value: '770 мм', detail: '' },
+    { key: 'fireplace.c', label: 'Глубина портала', value: '220 мм', detail: '' },
+    { key: 'material', label: 'Материал', value: 'Delicato Brown', detail: '' },
+  ], works: null, note: null };
+  const cards = ResultModel.buildResultCards(view, StepEngine.getSteps('kaminy'), StepEngine.STEP_LABELS);
+  assert.deepEqual(cards.map(c => [c.stepId, c.wide]), [['type', true], ['dimensions', true], ['material', true], ['options', true]]);
+  // Two short ones side by side stay a pair.
+  const kitchen = ResultModel.buildResultCards({ specs: [
+    { key: 'shape', label: 'Форма', value: 'Прямая', detail: '' }, { key: 'dimensions', label: 'Размер', value: '2400 × 650 мм', detail: '' },
+    { key: 'material', label: 'Материал', value: 'X', detail: '' },
+  ], works: [], note: null }, KITCHEN_STEPS, StepEngine.STEP_LABELS);
+  assert.deepEqual(kitchen.map(c => c.wide), [false, false, false, false, true, true]);
+});

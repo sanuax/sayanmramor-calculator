@@ -409,6 +409,44 @@
     return { title: c.product.title, specs, works, note: c.facade ? facadeNote(c.facade) : (c.fireplace ? c.fireplace.priceNote : null) };
   }
 
+  // The Result's «Что вы собрали» (variant B, 2026-10-20, the owner): one card
+  // per real step of the product, in the steps' order, each holding what was
+  // chosen there and its own way back. A choice whose own step this product
+  // does not have (a staircase's shape is set with its sizes) goes to
+  // «Размеры». A step left as it was says so in words, never an empty card.
+  const SPEC_STEPS = {
+    type: 'type', 'facade.form': 'type', 'fireplace.form': 'type',
+    shape: 'shape', wing: 'shape',
+    material: 'material', riser: 'riser', edge: 'edge', options: 'options',
+  };
+  const EMPTY_CARDS = { edge: 'Не выбрана', additionalWorks: 'Без дополнительных работ', options: 'Без опций' };
+
+  function buildResultCards(view, steps, stepLabels) {
+    const cards = (steps || []).filter(id => id !== 'review').map(stepId => ({
+      stepId, label: (stepLabels && stepLabels[stepId]) || stepId, items: [], works: null, empty: null, wide: false,
+    }));
+    const card = id => cards.find(c => c.stepId === id);
+    (view.specs || []).forEach(spec => {
+      const target = card(SPEC_STEPS[spec.key] || 'dimensions') || card('dimensions') || cards[0];
+      if (target) target.items.push(spec);
+    });
+    const works = card('additionalWorks');
+    if (works) works.works = view.works || [];
+    cards.forEach(c => {
+      const nothing = c.works ? c.works.length === 0 : c.items.length === 0;
+      c.empty = nothing ? (EMPTY_CARDS[c.stepId] || '') : null;
+      c.wide = c.works !== null || c.stepId === 'options' || c.items.length > 2;
+    });
+    // Short cards go two to a row; one left alone between long ones spans the row.
+    let alone = null;
+    cards.forEach(c => {
+      if (c.wide) { if (alone) alone.wide = true; alone = null; }
+      else alone = alone ? null : c;
+    });
+    if (alone) alone.wide = true;
+    return cards;
+  }
+
   // Edit shortcuts: every real step of this product except the Result
   // itself, in the product's own step order (step-engine.js).
   function buildEditTargets(steps, stepLabels) {
@@ -419,7 +457,7 @@
 
   return {
     RESULT_TITLES,
-    resultTitle, buildConfiguration, summarizePricing, buildResultView, buildEditTargets,
+    resultTitle, buildConfiguration, summarizePricing, buildResultView, buildResultCards, buildEditTargets,
     formatRub, formatWorkDetail,
   };
 });
