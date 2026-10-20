@@ -1344,6 +1344,10 @@
     font-family: inherit; font-size: var(--configurator-text); font-weight: 700; color: var(--muted); cursor: pointer;
   }
   .lead-secondary-btn:hover { color: var(--ink); border-color: var(--stone-line); }
+  /* The product passport (2026-10-20, the owner): always here on the Result, no contacts needed. */
+  .passport-btn { display: block; width: 100%; margin-top: 10px; }
+  .passport-btn:disabled { cursor: progress; opacity: 0.7; }
+  .passport-error { margin: 8px 0 0; font-size: var(--configurator-muted); color: var(--accent-ink); line-height: 1.5; }
   .lead-success { border-left: 3px solid var(--sage); outline: none; }
   .lead-success-title { font-size: var(--configurator-heading); font-weight: 700; color: var(--ink); margin-bottom: 6px; }
   .lead-success p { margin: 0 0 16px; font-size: var(--configurator-text); color: var(--muted); line-height: 1.5; }
@@ -2075,6 +2079,8 @@
 
         <div class="lead" id="leadArea">
           <button type="button" class="cta-btn" id="resultCtaBtn">Получить расчёт</button>
+          <button type="button" class="lead-secondary-btn passport-btn" id="passportBtn">Скачать паспорт</button>
+          <p class="passport-error" id="passportError" hidden>Не удалось подготовить паспорт, попробуйте ещё раз</p>
 
           <form class="lead-form" id="leadForm" novalidate hidden tabindex="-1">
             <div class="lead-form-head">
@@ -2237,6 +2243,8 @@
 <script src="visualizer/camera-preset-tracker.js"></script>
 <script src="url-bootstrap.js"></script>
 <script src="passport-link.js"></script>
+<script src="passport-model.js"></script>
+<script src="passport-pdf.js"></script>
 <script type="module" src="visualizer/three-scene.js"></script>
 <script>
   const { PRODUCTS, hasAdditionalWork } = ProductTypes;
@@ -4562,7 +4570,7 @@
       return { state: constructorState, outcome: { kind: 'manual', reason: 'unpriced_work', message: warningOut.textContent } };
     }
     const message = warningOut.textContent || null;
-    return { state: constructorState, outcome: { kind: 'ok', result, message } };
+    return { state: constructorState, outcome: { kind: 'ok', result, message }, pricingInputs: { rates, mainAreaM2: job.mainAreaM2, complexEnabled } };
   }
 
   [widthInput, lengthInput].forEach(el => {
@@ -4796,7 +4804,11 @@
       edgeTitles: EDGE_TITLES,
       dimensionLabels: currentDimLabels,
     });
-    return { configuration, pricing: ResultModel.summarizePricing(snap.outcome, UPDATED_AT) };
+    return {
+      configuration, pricing: ResultModel.summarizePricing(snap.outcome, UPDATED_AT),
+      // The calculation itself, for the passport's table (passport-model.js).
+      result: snap.outcome.kind === 'ok' ? snap.outcome.result : null, pricingInputs: snap.pricingInputs || null,
+    };
   }
 
   function el(tag, className, text) {
@@ -4975,6 +4987,93 @@
     return Promise.resolve({ delivered: false });
   }
   window.SayanCalculator = { getLastLeadPayload: () => lastLeadPayload, getPassportQuery: () => currentPassportQuery(), getResultData: () => currentResultData() };
+
+  // ---- The product passport (docs/superpowers/specs/2026-10-20-product-passport-design.md) ----
+  // A PDF made here in the browser: the libraries and fonts load on the
+  // first click only (once), the shots come from the client's own 3D scene.
+  const passportBtn = document.getElementById('passportBtn');
+  const passportError = document.getElementById('passportError');
+  const passportScripts = {};
+  function loadPassportScript(src) {
+    if (!passportScripts[src]) {
+      passportScripts[src] = new Promise((resolve, reject) => {
+        const tag = document.createElement('script');
+        tag.src = src;
+        tag.onload = resolve;
+        tag.onerror = () => { delete passportScripts[src]; reject(new Error('script ' + src)); };
+        document.head.appendChild(tag);
+      });
+    }
+    return passportScripts[src];
+  }
+  let passportFonts = null;
+  function loadPassportFonts() {
+    const base64 = buf => {
+      const bytes = new Uint8Array(buf);
+      let bin = '';
+      for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+      return btoa(bin);
+    };
+    const one = file => fetch('vendor/fonts/' + file).then(r => { if (!r.ok) throw new Error(file); return r.arrayBuffer(); }).then(base64);
+    passportFonts = passportFonts || Promise.all([one('Montserrat-Regular.ttf'), one('Montserrat-SemiBold.ttf'), one('Unbounded-Medium.ttf')])
+      .then(([regular, semibold, display]) => ({ regular, semibold, display }))
+      .catch(err => { passportFonts = null; throw err; });
+    return passportFonts;
+  }
+  // The stone's photograph as a square JPEG (the PDF takes no WebP); null if it does not load.
+  function passportStonePhoto(stone) {
+    if (!stone || !stone.image) return Promise.resolve(null);
+    return new Promise(resolve => {
+      const img = new Image();
+      img.onload = () => {
+        const side = Math.min(img.naturalWidth, img.naturalHeight);
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = Math.min(600, side);
+        canvas.getContext('2d').drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.85));
+      };
+      img.onerror = () => resolve(null);
+      img.src = 'data/' + stone.image;
+    });
+  }
+  function downloadPassport() {
+    const data = currentResultData();
+    if (!data || passportBtn.disabled) return;
+    passportBtn.disabled = true;
+    passportBtn.textContent = 'Готовим паспорт...';
+    passportError.hidden = true;
+    const stone = selectedStoneId ? STONES_BY_ID[selectedStoneId] : null;
+    const random4 = crypto.getRandomValues(new Uint32Array(1))[0] % 10000;
+    const passport = PassportModel.buildPassport(Object.assign({}, data, {
+      view: ResultModel.buildResultView(data.configuration), stone, createdAt: new Date(), random4,
+      link: location.origin + location.pathname + '?' + currentPassportQuery(),
+      defaultPreset: PRODUCTS[selectedProductKey].cameraPreset || 'iso',
+    }));
+    // The shots first, while the scene is exactly what the client sees.
+    const shots = passport.shots.map((preset, i) => (viewerReady && window.ThreeScene
+      ? window.ThreeScene.capture(preset, i === 0 ? { width: 1820, height: Math.round(1820 / PassportPdf.MAIN_RATIO) } : { width: 900, height: Math.round(900 * PassportPdf.SMALL_RATIO) }) : null));
+    Promise.all([
+      loadPassportScript('vendor/jspdf/jspdf.umd.min.js'), loadPassportScript('vendor/qrcode/qrcode.js'),
+      loadPassportFonts(), passportStonePhoto(stone),
+    ]).then(([, , fonts, stonePhoto]) => {
+      const bytes = PassportPdf.renderPassportPdf(passport, { fonts, shots, stonePhoto }, { jsPDF: window.jspdf.jsPDF, qrcode: window.qrcode });
+      const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = passport.fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    }).catch(err => {
+      console.error('[passport]', err);
+      passportError.hidden = false;
+    }).finally(() => {
+      passportBtn.disabled = false;
+      passportBtn.textContent = 'Скачать паспорт';
+    });
+  }
+  passportBtn.addEventListener('click', downloadPassport);
 
   resultCtaBtn.addEventListener('click', () => { leadMode = 'form'; applyLeadMode(true); });
   document.getElementById('leadCancelBtn').addEventListener('click', () => { leadMode = 'cta'; showLeadErrors({}); applyLeadMode(true); });

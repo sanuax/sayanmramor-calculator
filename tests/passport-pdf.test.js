@@ -18,6 +18,7 @@ const PIXEL = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0
 
 function recordingJsPDF() {
   const pages = [];
+  const calls = [];
   // jsPDF puts its methods on each instance, so text() is wrapped there.
   class Recording extends jsPDF {
     constructor(options) {
@@ -26,11 +27,12 @@ function recordingJsPDF() {
       this.text = (value, x, y, opts) => {
         const page = this.getCurrentPageInfo().pageNumber;
         (pages[page - 1] = pages[page - 1] || []).push([].concat(value).join(' '));
+        calls.push({ value, x, y });
         return text.call(this, value, x, y, opts);
       };
     }
   }
-  return { Recording, pages };
+  return { Recording, pages, calls };
 }
 
 function passportDoc(over) {
@@ -95,4 +97,45 @@ test('a price for the manager: the line instead of the table', () => {
   const text = pages.flat().join('\n');
   assert.ok(text.includes('Стоимость рассчитает менеджер'));
   assert.ok(!text.includes('Всего'));
+});
+
+test('a long parameter name wraps in its column instead of running into the value', () => {
+  const doc = passportDoc({ specs: [{ key: 'fireplace.area', label: 'Площадь камня каминного портала с полкой', value: '2,20 м²', detail: '' }] });
+  const { Recording, calls } = recordingJsPDF();
+  PassportPdf.renderPassportPdf(doc, assets(), { jsPDF: Recording, qrcode });
+  const label = calls.find(c => [].concat(c.value).join(' ') === 'Площадь камня каминного портала с полкой');
+  assert.ok(Array.isArray(label.value) && label.value.length > 1, 'the label in two lines');
+});
+
+test('a long manager message wraps inside its box', () => {
+  const message = 'Камень: ≈ 42 422 ₽. Стоимость изготовления, монтажа и полировки уточнит менеджер, когда получит размеры и фотографии объекта.';
+  const { Recording, calls } = recordingJsPDF();
+  PassportPdf.renderPassportPdf(passportDoc({ specification: { manual: message } }), assets(), { jsPDF: Recording, qrcode });
+  const box = calls.find(c => [].concat(c.value).join(' ') === message);
+  assert.ok(Array.isArray(box.value) && box.value.length > 1);
+});
+
+test('a staircase with six parameters and four table rows still fits one page, the QR code with it', () => {
+  const doc = passportDoc({
+    title: 'Лестница',
+    specs: [
+      { key: 'type', label: 'Тип', value: 'Винтовая, с подступенками', detail: '' },
+      { key: 'dimensions', label: 'Размер лестницы', value: '2200 × 880 мм', detail: 'диаметр лестницы × ширина ступени' },
+      { key: 'steps', label: 'Количество ступеней', value: '3 шт.', detail: '' },
+      { key: 'shape.riser', label: 'Высота подступенка', value: '187 мм', detail: '' },
+      { key: 'area', label: 'Площадь облицовки', value: '0,79 м²', detail: '' },
+      { key: 'options', label: 'Опции', value: 'Дополнительная полировка, Монтаж на объекте', detail: '' },
+    ],
+    works: [],
+    specification: { sections: [
+      { title: 'Камень', rows: [{ name: 'Слэб Delicato Brown, 1960 × 1540 мм', unit: 'шт.', qty: 1, priceRub: 36662, amountRub: 36662 }] },
+      { title: 'Изготовление', rows: [
+        { name: 'Изготовление изделия', unit: 'м²', qty: 0.79, priceRub: 67500, amountRub: 53460 },
+        { name: 'Полировка', unit: 'м²', qty: 0.79, priceRub: 32400, amountRub: 25661 },
+      ] },
+      { title: 'Монтаж', rows: [{ name: 'Монтаж', unit: 'м²', qty: 0.79, priceRub: 31500, amountRub: 24948 }] },
+    ], totalRub: 140731 },
+  });
+  const bytes = PassportPdf.renderPassportPdf(doc, assets(), { jsPDF, qrcode });
+  assert.equal(pageCount(bytes), 1);
 });

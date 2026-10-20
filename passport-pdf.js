@@ -27,8 +27,13 @@
   const M = 14;
   const W = PAGE_W - 2 * M;
   const BOTTOM = PAGE_H - M;
-  const FOOT_H = 26;
+  const FOOT_H = 23;
 
+  // The main view's width : height (the page captures it at this shape).
+  const MAIN_RATIO = 2.9;
+  const SMALL_RATIO = 0.6;
+  // The parameters' names column: «Количество ступеней» on one line.
+  const LABEL_W = 40;
   const SHOT_LABELS = { top: 'сверху', front: 'спереди', side: 'сбоку', iso: 'изометрия' };
   const NBSP = ' ';
 
@@ -89,11 +94,11 @@
     const shots = assets.shots || [];
     const hasShots = shots.some(Boolean);
     if (hasShots) {
-      image(shots[0], M, y, W, W / 2.6);
-      y += W / 2.6 + 4;
+      image(shots[0], M, y, W, W / MAIN_RATIO);
+      y += W / MAIN_RATIO + 4;
     }
     const colW = (W - 8) / 3;
-    const smallH = colW * 0.66;
+    const smallH = colW * SMALL_RATIO;
     const bandTop = y;
     if (hasShots) {
       [1, 2].forEach((i, n) => {
@@ -124,18 +129,19 @@
     // The stone has its own block above, the edge stands with the works.
     (passport.specs || []).filter(s => s.key !== 'material' && s.key !== 'edge').forEach(s => {
       font('Montserrat', 'normal', 8, MUTED);
-      doc.text(s.label, M, ly);
+      const label = doc.splitTextToSize(s.label, LABEL_W - 2);
+      doc.text(label.length > 1 ? label : s.label, M, ly);
       font('Montserrat', 'bold', 8.5);
-      const value = s.value + (s.detail ? '  ' : '');
-      doc.text(value, M + 34, ly);
+      const value = doc.splitTextToSize(s.value, halfW - LABEL_W);
+      doc.text(value.length > 1 ? value : s.value, M + LABEL_W, ly);
+      let rowH = Math.max(label.length, value.length) * 3.6;
       if (s.detail) {
         font('Montserrat', 'normal', 7, MUTED);
-        const lines = doc.splitTextToSize(s.detail, halfW - 36);
-        ly += 3.6;
-        doc.text(lines, M + 34, ly);
-        ly += (lines.length - 1) * 3.2;
+        const lines = doc.splitTextToSize(s.detail, halfW - LABEL_W);
+        doc.text(lines, M + LABEL_W, ly + value.length * 3.6);
+        rowH = Math.max(rowH, value.length * 3.6 + lines.length * 3.2);
       }
-      ly += 5;
+      ly += rowH + 1.6;
     });
     let ry = y + 5;
     const works = (passport.works || []).slice();
@@ -169,11 +175,13 @@
     blockTitle('Спецификация', M, y);
     y += 3;
     if (spec.manual) {
-      doc.setDrawColor.apply(doc, LINE);
-      doc.rect(M, y, W, 11);
       font('Montserrat', 'bold', 10);
-      doc.text(spec.manual, M + 4, y + 7);
-      y += 15;
+      const lines = doc.splitTextToSize(spec.manual, W - 8);
+      const boxH = lines.length * 4.6 + 6;
+      doc.setDrawColor.apply(doc, LINE);
+      doc.rect(M, y, W, boxH);
+      doc.text(lines.length > 1 ? lines : spec.manual, M + 4, y + 7);
+      y += boxH + 4;
     } else {
       const cols = [
         { title: 'Наименование', x: M + 2, w: 90 },
@@ -221,15 +229,16 @@
       font('Montserrat', 'bold', 10, [255, 255, 255]);
       doc.text('Всего', M + 3, y + 7);
       doc.text(rub(spec.totalRub) + NBSP + '₽', PAGE_W - M - 3, y + 7, { align: 'right' });
-      y += 12;
+      y += 11;
     }
 
     // The foot: the prices' date and the way back to the 3D model.
-    if (y + FOOT_H > BOTTOM) newPage();
+    // The foot hangs at the page's bottom; its rule only has to stay below the table.
+    if (y > BOTTOM - FOOT_H) newPage();
     const footTop = BOTTOM - FOOT_H + 4;
     doc.setDrawColor.apply(doc, LINE);
     doc.line(M, footTop - 3, PAGE_W - M, footTop - 3);
-    const qrSize = 22;
+    const qrSize = 20;
     drawQr(doc, libs.qrcode, passport.link, M, footTop, qrSize);
     font('Montserrat', 'bold', 9.5);
     doc.textWithLink('Открыть 3D-модель', M + qrSize + 5, footTop + 5, { url: passport.link });
@@ -256,5 +265,5 @@
     }
   }
 
-  return { renderPassportPdf };
+  return { MAIN_RATIO, SMALL_RATIO, renderPassportPdf };
 });

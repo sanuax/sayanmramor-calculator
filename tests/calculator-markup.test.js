@@ -326,3 +326,25 @@ test('a passport link whose stone left the catalog: one hidden line in the mater
 test('every edge card carries its profile, so a link can pick it the way a click does', () => {
   assert.match(html, /card\.dataset\.edgeType = edgeDef\.type;/);
 });
+
+// ---- The passport download (2026-10-20, the owner): on the Result, no contacts needed ----
+test('«Скачать паспорт» sits in the lead area beside «Получить расчёт», outside the contact form, styled like its neighbours', () => {
+  const area = html.slice(html.indexOf('<div class="lead" id="leadArea">'), html.indexOf('<form class="lead-form" id="leadForm"'));
+  assert.match(area, /<button type="button" class="lead-secondary-btn passport-btn" id="passportBtn">Скачать паспорт<\/button>/);
+});
+
+test('the passport modules load with the page; the PDF / QR libraries only on the click', () => {
+  assert.match(html, /<script src="passport-link\.js"><\/script>\s*<script src="passport-model\.js"><\/script>\s*<script src="passport-pdf\.js"><\/script>/);
+  assert.doesNotMatch(html, /<script[^>]+vendor\/(jspdf|qrcode)\//);
+  assert.match(html, /'vendor\/jspdf\/jspdf\.umd\.min\.js'/);
+  assert.match(html, /'vendor\/qrcode\/qrcode\.js'/);
+});
+
+test('the price snapshot keeps what the passport\'s table needs: the rates, the area and the complex-shape choice', () => {
+  assert.match(html, /return \{ state: constructorState, outcome: \{ kind: 'ok', result, message \}, pricingInputs: \{ rates, mainAreaM2: job\.mainAreaM2, complexEnabled \} \};/);
+});
+
+test('applyLeadMode never hides the passport button', () => {
+  const fn = html.slice(html.indexOf('function applyLeadMode('), html.indexOf('function showLeadErrors('));
+  assert.doesNotMatch(fn, /passportBtn/);
+});
