@@ -19,7 +19,9 @@ const PIXEL = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0
 function recordingJsPDF() {
   const pages = [];
   const calls = [];
-  // jsPDF puts its methods on each instance, so text() is wrapped there.
+  const sizes = new Set();
+  const images = [];
+  // jsPDF puts its methods on each instance, so its methods are wrapped there.
   class Recording extends jsPDF {
     constructor(options) {
       super(options);
@@ -30,9 +32,13 @@ function recordingJsPDF() {
         calls.push({ value, x, y });
         return text.call(this, value, x, y, opts);
       };
+      const setFontSize = this.setFontSize;
+      this.setFontSize = size => { sizes.add(size); return setFontSize.call(this, size); };
+      const addImage = this.addImage;
+      this.addImage = (...args) => { images.push({ w: args[4], h: args[5] }); return addImage.apply(this, args); };
     }
   }
-  return { Recording, pages, calls };
+  return { Recording, pages, calls, sizes, images };
 }
 
 function passportDoc(over) {
@@ -148,5 +154,35 @@ test('a stone photo that came out empty degrades to the grey square, the passpor
 test('the QR code: low error correction and 22 mm, so a long link still prints with readable modules', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'passport-pdf.js'), 'utf8');
   assert.match(src, /qrcode\(0, 'L'\)/);
-  assert.match(src, /const qrSize = 22;/);
+  assert.match(src, /const QR = 22;/);
+});
+
+// ---- One type scale, the stone as large as the views (2026-10-20, the owner) ----
+test('one type scale: the title, the headings, the body and the small print -- four sizes, nothing in between', () => {
+  const { Recording, sizes } = recordingJsPDF();
+  PassportPdf.renderPassportPdf(passportDoc(), assets(), { jsPDF: Recording, qrcode });
+  assert.deepEqual([...sizes].sort((a, b) => a - b), [7, 8.5, 10, 17]);
+  assert.deepEqual(PassportPdf.TYPE, { title: 17, heading: 10, body: 8.5, small: 7 });
+});
+
+test('the stone photo is as large as the two views beside it, the main view one and a half of their height', () => {
+  const { Recording, images } = recordingJsPDF();
+  PassportPdf.renderPassportPdf(passportDoc(), assets(), { jsPDF: Recording, qrcode });
+  assert.equal(images.length, 4);
+  const [main, a, b, stone] = images;
+  assert.deepEqual(stone, a);
+  assert.deepEqual(b, a);
+  assert.ok(Math.abs(main.h - 1.5 * a.h) < 0.01, main.h + ' vs ' + a.h);
+});
+
+test('a page never carries the foot alone: when the table does not fit, the specification goes to page 2 with it', () => {
+  const many = Array.from({ length: 6 }, (_, i) => ({ key: 'p' + i, label: 'Параметр ' + (i + 1), value: (i + 1) * 100 + ' мм', detail: 'длина × ширина, каждое из двух' }));
+  const rows = Array.from({ length: 5 }, (_, i) => ({ name: 'Работа ' + (i + 1), unit: 'шт.', qty: 1, priceRub: 1000, amountRub: 1000 }));
+  const doc = passportDoc({ specs: many, specification: { sections: [{ title: 'Кромка и дополнительные работы', rows }], totalRub: 5000 } });
+  const { Recording, pages } = recordingJsPDF();
+  PassportPdf.renderPassportPdf(doc, assets(), { jsPDF: Recording, qrcode });
+  const last = pages[pages.length - 1].join('\n');
+  assert.ok(last.includes('Открыть 3D-модель'));
+  assert.ok(last.includes('Всего'), "the total on the foot's page");
+  assert.ok(last.includes('Наименование'), 'and the table with it');
 });

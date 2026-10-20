@@ -5028,7 +5028,8 @@
       .catch(err => { passportFonts = null; throw err; });
     return passportFonts;
   }
-  // The stone's photograph as a square JPEG (the PDF takes no WebP); null if it does not load.
+  // The stone's photograph as a JPEG (the PDF takes no WebP), cut to the shape of the views beside
+  // it in the passport (PassportPdf.SMALL_RATIO: the same cell); null if it does not load.
   function passportStonePhoto(stone) {
     if (!stone || !stone.image) return Promise.resolve(null);
     return new Promise(resolve => {
@@ -5038,10 +5039,13 @@
       img.onload = () => {
         clearTimeout(timer);
         if (!img.naturalWidth || !img.naturalHeight) { resolve(null); return; }
-        const side = Math.min(img.naturalWidth, img.naturalHeight);
+        const ratio = PassportPdf.SMALL_RATIO;
+        const w = Math.min(img.naturalWidth, img.naturalHeight / ratio);
+        const h = w * ratio;
         const canvas = document.createElement('canvas');
-        canvas.width = canvas.height = Math.min(600, side);
-        canvas.getContext('2d').drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, canvas.width, canvas.height);
+        canvas.width = Math.round(Math.min(900, w));
+        canvas.height = Math.round(canvas.width * ratio);
+        canvas.getContext('2d').drawImage(img, (img.naturalWidth - w) / 2, (img.naturalHeight - h) / 2, w, h, 0, 0, canvas.width, canvas.height);
         resolve(canvas.toDataURL('image/jpeg', 0.85));
       };
       img.onerror = () => { clearTimeout(timer); resolve(null); };

@@ -377,3 +377,8 @@ test('a stone photo that never loads or loads empty gives the placeholder, not a
   assert.match(fn, /naturalWidth/);
   assert.match(fn, /setTimeout\(/);
 });
+
+test('the stone photo is cropped to the shape of the views beside it (PassportPdf.SMALL_RATIO), not to a square', () => {
+  const fn = html.slice(html.indexOf('function passportStonePhoto('), html.indexOf('function downloadPassport('));
+  assert.match(fn, /PassportPdf\.SMALL_RATIO/);
+});

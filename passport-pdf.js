@@ -27,13 +27,31 @@
   const M = 14;
   const W = PAGE_W - 2 * M;
   const BOTTOM = PAGE_H - M;
-  const FOOT_H = 23;
+  const GAP = 4;
 
-  // The main view's width : height (the page captures it at this shape).
-  const MAIN_RATIO = 2.9;
-  const SMALL_RATIO = 0.6;
+  // One type scale (2026-10-20, the owner: «у заголовков одно, у основного
+  // другое»): each step about 1.2 times the one below -- the small print,
+  // the body, the headings -- and the product's name on top. Line height
+  // 1.4 of the size, in mm.
+  const TYPE = { title: 17, heading: 10, body: 8.5, small: 7 };
+  const LH = size => size * 0.3528 * 1.4;
+
+  // The views on one grid: three equal cells across the page (two views and
+  // the stone's photograph, all of one size) under the main view, which is
+  // one and a half cells high. The page captures the shots at these shapes.
+  const CELL_W = (W - 2 * GAP) / 3;
+  const CELL_H = CELL_W / 1.6;
+  const MAIN_H = CELL_H * 1.5;
+  const MAIN_RATIO = W / MAIN_H;
+  const SMALL_RATIO = CELL_H / CELL_W;
+
   // The parameters' names column: «Количество ступеней» on one line.
-  const LABEL_W = 40;
+  const LABEL_W = 38;
+  // Between the parameters' rows, and above / below a table row's text.
+  const ROW_PAD = 0.8;
+  const CELL_PAD = 0.6;
+  const QR = 22;
+  const FOOT_H = QR + 4;
   const SHOT_LABELS = { top: 'сверху', front: 'спереди', side: 'сбоку', iso: 'изометрия' };
   const NBSP = ' ';
 
@@ -50,23 +68,27 @@
     doc.addFont('Unbounded-Medium.ttf', 'Unbounded', 'normal');
     doc.setProperties({ title: passport.fileName.replace(/\.pdf$/, ''), creator: 'Саянмрамор' });
 
-    const font = (family, style, size, color) => {
-      doc.setFont(family, style);
-      doc.setFontSize(size);
+    // text(role, weight, color): role is a TYPE step; the display face only for the name and the title.
+    const font = (role, weight, color) => {
+      if (role === 'title' || weight === 'display') doc.setFont('Unbounded', 'normal');
+      else doc.setFont('Montserrat', weight === 'bold' ? 'bold' : 'normal');
+      doc.setFontSize(TYPE[role]);
       doc.setTextColor.apply(doc, color || INK);
     };
+    const wrap = (text, width) => doc.splitTextToSize(String(text), width);
+    const one = lines => (lines.length > 1 ? lines : lines[0]);
     let page = 1;
     let y = 0;
 
     function header() {
-      font('Unbounded', 'normal', 10);
+      font('heading', 'display');
       doc.text('САЯНМРАМОР', M, M + 3);
-      font('Montserrat', 'normal', 8, MUTED);
+      font('small', 'normal', MUTED);
       doc.text('Паспорт № ' + passport.number + ' · ' + passport.dateText + (page > 1 ? ' · стр. ' + page : ''), PAGE_W - M, M + 3, { align: 'right' });
       doc.setDrawColor.apply(doc, LINE);
       doc.setLineWidth(0.3);
       doc.line(M, M + 6, PAGE_W - M, M + 6);
-      y = M + 12;
+      y = M + 6 + GAP + 2;
     }
     function newPage() {
       doc.addPage();
@@ -79,118 +101,124 @@
           doc.addImage(dataUrl, 'JPEG', x, top, w, h, undefined, 'FAST');
           return;
         }
-      } catch (err) { /* an unreadable picture: the grey square below */ }
-      {
-        doc.setFillColor.apply(doc, STONE);
-        doc.rect(x, top, w, h, 'F');
-      }
+      } catch (err) { /* an unreadable picture: the grey cell below */ }
+      doc.setFillColor.apply(doc, STONE);
+      doc.rect(x, top, w, h, 'F');
     }
-    function blockTitle(text, x, top) {
-      font('Montserrat', 'bold', 7, MUTED);
-      doc.text(text.toUpperCase(), x, top);
+    function heading(text, x) {
+      font('heading', 'bold');
+      doc.text(text, x, y + LH(TYPE.heading) * 0.75);
     }
 
     header();
-    font('Unbounded', 'normal', 17);
-    doc.text(passport.title, M, y + 4);
-    y += 10;
+    font('title');
+    doc.text(passport.title, M, y + LH(TYPE.title) * 0.7);
+    y += LH(TYPE.title) + GAP;
 
-    // The views: the product's own large, two more beside the stone.
+    // The views and the stone, on the grid.
     const shots = assets.shots || [];
     const hasShots = shots.some(Boolean);
     if (hasShots) {
-      image(shots[0], M, y, W, W / MAIN_RATIO);
-      y += W / MAIN_RATIO + 4;
+      image(shots[0], M, y, W, MAIN_H);
+      y += MAIN_H + GAP;
     }
-    const colW = (W - 8) / 3;
-    const smallH = colW * SMALL_RATIO;
-    const bandTop = y;
+    const captionY = y + CELL_H + LH(TYPE.small);
     if (hasShots) {
       [1, 2].forEach((i, n) => {
-        const x = M + n * (colW + 4);
-        image(shots[i], x, y, colW, smallH);
-        font('Montserrat', 'normal', 7, MUTED);
-        doc.text(SHOT_LABELS[passport.shots[i]] || '', x, y + smallH + 3.5);
+        const x = M + n * (CELL_W + GAP);
+        image(shots[i], x, y, CELL_W, CELL_H);
+        font('small', 'normal', MUTED);
+        doc.text(SHOT_LABELS[passport.shots[i]] || '', x, captionY);
       });
     }
-    // The stone: its photograph and name.
-    const stoneX = hasShots ? M + 2 * (colW + 4) : M;
-    blockTitle('Камень', stoneX, bandTop + 2.5);
-    image(assets.stonePhoto, stoneX, bandTop + 5, 22, 22);
+    const stoneX = hasShots ? M + 2 * (CELL_W + GAP) : M;
+    image(assets.stonePhoto, stoneX, y, CELL_W, CELL_H);
+    let captionBottom = captionY;
     if (passport.stone) {
-      font('Montserrat', 'bold', 9.5);
-      doc.text(doc.splitTextToSize(passport.stone.name, colW - 25), stoneX + 25, bandTop + 9);
-      font('Montserrat', 'normal', 7.5, MUTED);
-      doc.text(doc.splitTextToSize(passport.stone.meta || '', colW - 25), stoneX + 25, bandTop + 18);
+      font('body', 'bold');
+      const name = wrap(passport.stone.name, CELL_W);
+      doc.text(one(name), stoneX, captionY);
+      if (passport.stone.meta) {
+        font('small', 'normal', MUTED);
+        captionBottom = captionY + (name.length - 1) * LH(TYPE.body) + LH(TYPE.small);
+        doc.text(passport.stone.meta, stoneX, captionBottom);
+      }
     }
-    y = bandTop + Math.max(hasShots ? smallH + 10 : 0, 30);
+    y = captionBottom + GAP + 2;
 
     // Sizes on the left, edge and works on the right.
-    const halfW = (W - 8) / 2;
-    const rightX = M + halfW + 8;
-    blockTitle('Размеры и параметры', M, y);
-    blockTitle('Кромка и работы', rightX, y);
-    let ly = y + 5;
-    // The stone has its own block above, the edge stands with the works.
+    const halfW = (W - 2 * GAP) / 2;
+    const rightX = M + halfW + 2 * GAP;
+    heading('Размеры и параметры', M);
+    heading('Кромка и работы', rightX);
+    y += LH(TYPE.heading) + GAP / 2;
+    const rowTop = y;
+    let ly = y + LH(TYPE.body) * 0.75;
+    // The stone has its own cell above, the edge stands with the works.
     (passport.specs || []).filter(s => s.key !== 'material' && s.key !== 'edge').forEach(s => {
-      font('Montserrat', 'normal', 8, MUTED);
-      const label = doc.splitTextToSize(s.label, LABEL_W - 2);
-      doc.text(label.length > 1 ? label : s.label, M, ly);
-      font('Montserrat', 'bold', 8.5);
-      const value = doc.splitTextToSize(s.value, halfW - LABEL_W);
-      doc.text(value.length > 1 ? value : s.value, M + LABEL_W, ly);
-      let rowH = Math.max(label.length, value.length) * 3.6;
+      font('body', 'normal', MUTED);
+      const label = wrap(s.label, LABEL_W - 2);
+      doc.text(one(label), M, ly);
+      font('body', 'bold');
+      const value = wrap(s.value, halfW - LABEL_W);
+      doc.text(one(value), M + LABEL_W, ly);
+      let rowH = Math.max(label.length, value.length) * LH(TYPE.body);
       if (s.detail) {
-        font('Montserrat', 'normal', 7, MUTED);
-        const lines = doc.splitTextToSize(s.detail, halfW - LABEL_W);
-        doc.text(lines, M + LABEL_W, ly + value.length * 3.6);
-        rowH = Math.max(rowH, value.length * 3.6 + lines.length * 3.2);
+        font('small', 'normal', MUTED);
+        const lines = wrap(s.detail, halfW - LABEL_W);
+        doc.text(lines, M + LABEL_W, ly + value.length * LH(TYPE.body) - 0.6);
+        rowH = Math.max(rowH, value.length * LH(TYPE.body) + lines.length * LH(TYPE.small));
       }
-      ly += rowH + 1.6;
+      ly += rowH + ROW_PAD;
     });
-    let ry = y + 5;
+    if (passport.note) {
+      font('small', 'normal', MUTED);
+      const lines = wrap(passport.note, halfW);
+      doc.text(lines, M, ly);
+      ly += lines.length * LH(TYPE.small) + ROW_PAD;
+    }
+    let ry = rowTop + LH(TYPE.body) * 0.75;
     const works = (passport.works || []).slice();
     const edge = (passport.specs || []).find(s => s.key === 'edge');
     if (edge) works.unshift({ label: 'Кромка: ' + edge.value, detail: edge.detail });
     if (!works.length) {
-      font('Montserrat', 'normal', 8.5, MUTED);
+      font('body', 'normal', MUTED);
       doc.text('Без дополнительных работ', rightX, ry);
-      ry += 5;
+      ry += LH(TYPE.body) + ROW_PAD;
     }
     works.forEach(w => {
-      font('Montserrat', 'normal', 8.5);
-      const lines = doc.splitTextToSize(w.label, halfW - 18);
-      doc.text(lines, rightX, ry);
+      font('body', 'normal');
+      const lines = wrap(w.label, halfW - 18);
+      doc.text(one(lines), rightX, ry);
       if (w.detail) {
-        font('Montserrat', 'normal', 8, MUTED);
+        font('body', 'normal', MUTED);
         doc.text(w.detail, PAGE_W - M, ry, { align: 'right' });
       }
-      ry += lines.length * 4 + 1.5;
+      ry += lines.length * LH(TYPE.body) + ROW_PAD;
     });
-    if (passport.note) {
-      font('Montserrat', 'normal', 7, MUTED);
-      const lines = doc.splitTextToSize(passport.note, halfW);
-      doc.text(lines, M, ly);
-      ly += lines.length * 3.2 + 1;
-    }
-    y = Math.max(ly, ry) + 3;
+    y = Math.max(ly, ry) - LH(TYPE.body) * 0.75 + GAP + 2;
 
-    // The specification.
+    // The specification. A table that does not fit flows on to the next page,
+    // its last row and the total always with the foot (never the foot alone).
     const spec = passport.specification;
-    blockTitle('Спецификация', M, y);
-    y += 3;
+    const rowH = r => wrap(r.name, 90).length * LH(TYPE.body) + 2 * CELL_PAD;
+    const sectionH = LH(TYPE.body) + 2 * CELL_PAD;
+    const totalH = 8;
+    if (y + LH(TYPE.heading) + GAP / 2 + 6 + sectionH + GAP > BOTTOM - FOOT_H) newPage();
+    heading('Спецификация', M);
+    y += LH(TYPE.heading) + GAP / 2;
     if (spec.manual) {
-      font('Montserrat', 'bold', 10);
-      const lines = doc.splitTextToSize(spec.manual, W - 8);
-      const boxH = lines.length * 4.6 + 6;
+      font('heading', 'bold');
+      const lines = wrap(spec.manual, W - 8);
+      const boxH = lines.length * LH(TYPE.heading) + 6;
       doc.setDrawColor.apply(doc, LINE);
       doc.rect(M, y, W, boxH);
-      doc.text(lines.length > 1 ? lines : spec.manual, M + 4, y + 7);
-      y += boxH + 4;
+      doc.text(one(lines), M + 4, y + 3 + LH(TYPE.heading) * 0.75);
+      y += boxH + GAP;
     } else {
       const cols = [
-        { title: 'Наименование', x: M + 2, w: 90 },
-        { title: 'Ед.', x: M + 96, w: 10 },
+        { title: 'Наименование', x: M + 2 },
+        { title: 'Ед.', x: M + 96 },
         { title: 'Кол-во', x: M + 124, align: 'right' },
         { title: 'Цена, ₽', x: M + 152, align: 'right' },
         { title: 'Сумма, ₽', x: PAGE_W - M - 2, align: 'right' },
@@ -198,8 +226,8 @@
       const tableHead = () => {
         doc.setFillColor(242, 241, 236);
         doc.rect(M, y, W, 6, 'F');
-        font('Montserrat', 'bold', 7.5, MUTED);
-        cols.forEach(c => doc.text(c.title, c.x, y + 4.1, c.align ? { align: c.align } : undefined));
+        font('small', 'bold', MUTED);
+        cols.forEach(c => doc.text(c.title, c.x, y + 4, c.align ? { align: c.align } : undefined));
         y += 6;
       };
       const room = h => {
@@ -208,50 +236,55 @@
         tableHead();
       };
       tableHead();
+      const lastRow = spec.sections[spec.sections.length - 1].rows.slice(-1)[0];
       spec.sections.forEach(section => {
-        room(6);
-        font('Montserrat', 'bold', 8);
-        doc.text(section.title.toUpperCase(), M + 2, y + 4.2);
-        y += 6;
+        room(sectionH + rowH(section.rows[0]));
+        font('body', 'bold');
+        doc.text(section.title, cols[0].x, y + CELL_PAD + LH(TYPE.body) * 0.75);
+        y += sectionH;
         section.rows.forEach(r => {
-          font('Montserrat', 'normal', 8);
-          const lines = doc.splitTextToSize(r.name, cols[0].w);
-          const h = lines.length * 3.6 + 2.6;
-          room(h);
-          doc.text(lines, cols[0].x, y + 3.8);
-          doc.text(r.unit || '', cols[1].x, y + 3.8);
-          doc.text(qtyText(r.qty), cols[2].x, y + 3.8, { align: 'right' });
-          doc.text(r.priceRub ? rub(r.priceRub) : '', cols[3].x, y + 3.8, { align: 'right' });
-          doc.text(rub(r.amountRub), cols[4].x, y + 3.8, { align: 'right' });
+          font('body', 'normal');
+          const lines = wrap(r.name, 90);
+          const h = rowH(r);
+          room(r === lastRow ? h + 1.5 + totalH + FOOT_H : h);
+          const by = y + CELL_PAD + LH(TYPE.body) * 0.75;
+          doc.text(one(lines), cols[0].x, by);
+          doc.text(r.unit || '', cols[1].x, by);
+          doc.text(qtyText(r.qty), cols[2].x, by, { align: 'right' });
+          doc.text(r.priceRub ? rub(r.priceRub) : '', cols[3].x, by, { align: 'right' });
+          doc.text(rub(r.amountRub), cols[4].x, by, { align: 'right' });
           y += h;
           doc.setDrawColor.apply(doc, LINE);
           doc.line(M, y, PAGE_W - M, y);
         });
       });
-      room(10);
+      room(totalH + 1.5);
       doc.setFillColor.apply(doc, ACCENT);
-      doc.rect(M, y + 1.5, W, 8, 'F');
-      font('Montserrat', 'bold', 10, [255, 255, 255]);
-      doc.text('Всего', M + 3, y + 7);
-      doc.text(rub(spec.totalRub) + NBSP + '₽', PAGE_W - M - 3, y + 7, { align: 'right' });
-      y += 11;
+      doc.rect(M, y + 1.5, W, totalH, 'F');
+      font('heading', 'bold', [255, 255, 255]);
+      doc.text('Всего', M + 3, y + 1.5 + totalH / 2 + LH(TYPE.heading) * 0.25);
+      doc.text(rub(spec.totalRub) + NBSP + '₽', PAGE_W - M - 3, y + 1.5 + totalH / 2 + LH(TYPE.heading) * 0.25, { align: 'right' });
+      y += totalH + 1.5;
     }
 
-    // The foot: the prices' date and the way back to the 3D model.
-    // The foot hangs at the page's bottom; its rule only has to stay below the table.
+    // The foot hangs at the page's bottom: the prices' date and the way back to the 3D model.
     if (y > BOTTOM - FOOT_H) newPage();
-    const footTop = BOTTOM - FOOT_H + 4;
+    const footTop = BOTTOM - QR;
     doc.setDrawColor.apply(doc, LINE);
-    doc.line(M, footTop - 3, PAGE_W - M, footTop - 3);
-    const qrSize = 22;
-    drawQr(doc, libs.qrcode, passport.link, M, footTop, qrSize);
-    font('Montserrat', 'bold', 9.5);
-    doc.textWithLink('Открыть 3D-модель', M + qrSize + 5, footTop + 5, { url: passport.link });
-    font('Montserrat', 'normal', 7.5, MUTED);
-    doc.text(doc.splitTextToSize('Наведите камеру телефона на код или нажмите на ссылку: откроется калькулятор с этим изделием, его можно вращать.', W - qrSize - 5), M + qrSize + 5, footTop + 10);
+    doc.line(M, footTop - GAP / 2, PAGE_W - M, footTop - GAP / 2);
+    drawQr(doc, libs.qrcode, passport.link, M, footTop, QR);
+    const textX = M + QR + 2 * GAP;
+    const textW = W - QR - 2 * GAP;
+    font('heading', 'bold');
+    doc.textWithLink('Открыть 3D-модель', textX, footTop + LH(TYPE.heading) * 0.75, { url: passport.link });
+    font('small', 'normal', MUTED);
+    let fy = footTop + LH(TYPE.heading) + LH(TYPE.small) * 0.75 + 1;
+    const how = wrap('Наведите камеру телефона на код или нажмите на ссылку: откроется калькулятор с этим изделием, его можно вращать.', textW);
+    doc.text(how, textX, fy);
+    fy += how.length * LH(TYPE.small) + 1.5;
     const priceNote = (passport.pricesDateText ? 'Цены на ' + passport.pricesDateText + '. ' : '') +
       'Цена предварительная. Доставку и окончательную стоимость рассчитает менеджер.';
-    doc.text(doc.splitTextToSize(priceNote, W - qrSize - 5), M + qrSize + 5, footTop + 18);
+    doc.text(wrap(priceNote, textW), textX, fy);
 
     return new Uint8Array(doc.output('arraybuffer'));
   }
@@ -271,5 +304,5 @@
     }
   }
 
-  return { MAIN_RATIO, SMALL_RATIO, renderPassportPdf };
+  return { TYPE, MAIN_RATIO, SMALL_RATIO, renderPassportPdf };
 });
