@@ -391,3 +391,10 @@ test('the stone photo is cropped to the shape of the views beside it (PassportPd
   const fn = html.slice(html.indexOf('function passportStonePhoto('), html.indexOf('function downloadPassport('));
   assert.match(fn, /PassportPdf\.SMALL_RATIO/);
 });
+
+// ---- The page holds still on a phone (2026-10-20, the owner): as on the site ----
+test('the calculator\'s viewport is fixed at the phone\'s width, and the page only scrolls up and down', () => {
+  assert.match(html, /<meta name="viewport" content="width=device-width, initial-scale=1\.0, maximum-scale=1\.0, user-scalable=no">/);
+  assert.match(html, /\n {2}html \{ touch-action: pan-y; \}/);
+  assert.match(html, /\n {2}body \{[^}]*overflow-x: clip;/);
+});
