@@ -23,3 +23,15 @@
 каждый файл только если на странице есть символы его диапазона (`unicode-range`).
 
 Если шрифты на сайте поменяются, их нужно заменить и здесь.
+
+## TTF для паспорта изделия (2026-10-20)
+
+PDF-библиотека (jsPDF, `vendor/jspdf/`) встраивает только статические TrueType,
+поэтому для паспорта лежат TTF тех же шрифтов (та же лицензия SIL OFL 1.1).
+Грузятся только по кнопке «Скачать паспорт».
+
+| Файл | Источник | Байт | SHA-256 |
+|---|---|---|---|
+| `Montserrat-Regular.ttf` | github.com/JulietaUla/Montserrat, `fonts/ttf/` | 445928 | `3e8abe50c44c82e2242e97d1ec8c0d385c4890cdc50447bcdb8605c81a38cfb2` |
+| `Montserrat-SemiBold.ttf` | github.com/JulietaUla/Montserrat, `fonts/ttf/` | 454716 | `b4e1563393d73fdff491a869441245aef31add2ec03d9c97a6dae4de07c52fd0` |
+| `Unbounded-Medium.ttf` | github.com/googlefonts/unbounded, `fonts/ttf/` | 478652 | `1d6ab5ee3296ab9eb1c1db6ed4bdf501129c65cc9ee818dcf99e4338089483a3` |
