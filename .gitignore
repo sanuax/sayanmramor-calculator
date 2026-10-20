@@ -5,3 +5,5 @@ scripts/catalog_queue.txt
 scripts/failed_urls.txt
 scripts/failed_image_urls.txt
 .worktrees/
+
+.superpowers/
