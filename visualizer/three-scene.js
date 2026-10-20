@@ -748,6 +748,42 @@ function resetView() {
   setView(cameraPresetTracker.getDefaultPreset());
 }
 
+// A still of the current product from a preset view, for the passport: the
+// canvas is resized, framed, drawn and read in one go -- the drawing buffer is
+// read before the browser can clear it (no preserveDrawingBuffer) and before
+// it paints, so the client never sees it -- then everything is put back. The
+// client's own view (userAdjusted) is not touched.
+function capture(presetName, { width, height }) {
+  if (!renderer || !hasModel || !lastBounds) return null;
+  const presets = window.VisualizerConstants.CAMERA_PRESETS;
+  const preset = presets[presetName] || presets.iso;
+  const size = renderer.getSize(new THREE.Vector2());
+  const saved = {
+    pixelRatio: renderer.getPixelRatio(), aspect: camera.aspect, near: camera.near, far: camera.far,
+    position: camera.position.clone(), target: controls.target.clone(),
+    minDistance: controls.minDistance, maxDistance: controls.maxDistance,
+  };
+  renderer.setPixelRatio(1);
+  renderer.setSize(width, height, false);
+  camera.aspect = width / height;
+  frame(preset.direction);
+  renderer.render(scene, camera);
+  const url = renderer.domElement.toDataURL('image/jpeg', 0.9);
+  renderer.setPixelRatio(saved.pixelRatio);
+  renderer.setSize(size.x, size.y, false);
+  camera.aspect = saved.aspect;
+  camera.near = saved.near;
+  camera.far = saved.far;
+  camera.position.copy(saved.position);
+  controls.target.copy(saved.target);
+  controls.minDistance = saved.minDistance;
+  controls.maxDistance = saved.maxDistance;
+  camera.updateProjectionMatrix();
+  controls.update();
+  renderer.render(scene, camera);
+  return url;
+}
+
 function dispose() {
   if (frameId !== null) cancelAnimationFrame(frameId);
   if (resizeObserver) resizeObserver.disconnect();
@@ -767,6 +803,6 @@ function dispose() {
   lastBounds = null; lastProductKey = null; hasModel = false; userAdjusted = false;
 }
 
-const ThreeScene = { init, update, setView, resetView, dispose };
+const ThreeScene = { init, update, setView, resetView, capture, dispose };
 window.ThreeScene = ThreeScene;
 export default ThreeScene;

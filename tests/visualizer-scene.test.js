@@ -822,3 +822,15 @@ test('«Подгиб камнем» on steps and stairs: a stone strip under the
   // Another profile: none.
   assert.equal(named(layoutFor('stupeni', { width: { value: '350' }, length: { value: '1200' }, 'edge-type': { value: 'rounding' } }), 'wrap').length, 0);
 });
+
+// ---- The passport's shots (2026-10-20): ThreeScene.capture ----
+// three-scene.js is an ES module (it imports three), so it is read as text here.
+test('ThreeScene exports capture() for the passport, and taking a shot never counts as the client looking around', () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'visualizer', 'three-scene.js'), 'utf8');
+  assert.match(src, /const ThreeScene = \{ init, update, setView, resetView, capture, dispose \};/);
+  const start = src.indexOf('function capture(');
+  assert.ok(start > 0, 'function capture');
+  const body = src.slice(start, src.indexOf('\n}\n', start));
+  assert.doesNotMatch(body, /userAdjusted/);
+  assert.match(body, /toDataURL\('image\/jpeg', 0\.9\)/);
+});
