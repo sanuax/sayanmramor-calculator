@@ -2479,6 +2479,8 @@
   let leadMode = 'cta';
   let leadPreparedKey = null;
   let lastLeadPayload = null;
+  // The passport built on an iPhone / iPad, waiting for the tap that saves it: { key, file }.
+  let preparedPassport = null;
   // "Длина"/"Ширина" read as the wrong words for a floor (a room isn't
   // "длина 4000мм") or a wall (its two dimensions are a run and a height,
   // not a length and a width) -- same numeric fields/state either way
@@ -4993,6 +4995,12 @@
     if (showroomUrl) resultShowroomLink.href = showroomUrl;
 
 
+    // A passport prepared on an iPhone is of this exact configuration: a change drops it.
+    if (preparedPassport && preparedPassport.key !== JSON.stringify(data)) {
+      preparedPassport = null;
+      passportBtn.textContent = 'Скачать паспорт';
+    }
+
     // A prepared request describes one exact configuration -- once that
     // changes, "Запрос подготовлен" would no longer be true.
     if (leadMode === 'success' && JSON.stringify(data) !== leadPreparedKey) leadMode = 'cta';
@@ -5090,9 +5098,39 @@
       img.src = 'data/' + stone.image;
     });
   }
+  // iPhone / iPad: WebKit saves a file only from a tap itself, and the passport is ready a
+  // moment after the tap (fonts, shots, the PDF) -- so there the first tap prepares it and the
+  // button turns into «Сохранить паспорт», and the second tap hands the file over at once.
+  function appleTouch() {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  }
+  function downloadPassportFile(file) {
+    const url = URL.createObjectURL(file);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = file.name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  }
+  // The share sheet with the file where there is one («Сохранить в Файлы», messengers), a download otherwise.
+  function savePassportFile(file) {
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: file.name.replace(/\.pdf$/, '') })
+        .catch(err => { if (!err || err.name !== 'AbortError') downloadPassportFile(file); });
+      return;
+    }
+    downloadPassportFile(file);
+  }
   function downloadPassport() {
     const data = currentResultData();
     if (!data || passportBtn.disabled) return;
+    const key = JSON.stringify(data);
+    if (preparedPassport && preparedPassport.key === key) {
+      savePassportFile(preparedPassport.file);
+      return;
+    }
     passportBtn.disabled = true;
     passportBtn.textContent = 'Готовим паспорт...';
     passportError.hidden = true;
@@ -5116,20 +5154,15 @@
       ]);
     }).then(([, , fonts, stonePhoto]) => {
       const bytes = PassportPdf.renderPassportPdf(passport, { fonts, shots, stonePhoto }, { jsPDF: window.jspdf.jsPDF, qrcode: window.qrcode });
-      const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = passport.fileName;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      const file = new File([bytes], passport.fileName, { type: 'application/pdf' });
+      if (appleTouch()) preparedPassport = { key, file };
+      else downloadPassportFile(file);
     }).catch(err => {
       console.error('[passport]', err);
       passportError.hidden = false;
     }).finally(() => {
       passportBtn.disabled = false;
-      passportBtn.textContent = 'Скачать паспорт';
+      passportBtn.textContent = preparedPassport && preparedPassport.key === key ? 'Сохранить паспорт' : 'Скачать паспорт';
     });
   }
   passportBtn.addEventListener('click', downloadPassport);

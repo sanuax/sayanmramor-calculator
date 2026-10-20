@@ -398,3 +398,33 @@ test('the calculator\'s viewport is fixed at the phone\'s width, and the page on
   assert.match(html, /\n {2}html \{ touch-action: pan-y; \}/);
   assert.match(html, /\n {2}body \{[^}]*overflow-x: clip;/);
 });
+
+// ---- The passport on an iPhone (2026-10-20, the owner: nothing was saved) ----
+// WebKit saves a file only from a tap itself; the passport is ready a moment after the tap
+// (fonts, shots, the PDF), when that tap no longer counts. So on an iPhone / iPad the first
+// tap prepares the passport and the button turns into «Сохранить паспорт»; the second tap
+// hands the file over at once -- the share sheet («Сохранить в Файлы», messengers), or a
+// download where there is none. Elsewhere one tap still downloads.
+const passportCode = () => html.slice(html.indexOf('// ---- The product passport'), html.indexOf("passportBtn.addEventListener('click', downloadPassport);"));
+
+test('passport on an iPhone: the first tap prepares, the second saves within the tap itself', () => {
+  const code = passportCode();
+  assert.match(code, /function appleTouch\(\)/);
+  assert.match(code, /'Сохранить паспорт'/);
+  const handler = code.slice(code.indexOf('function downloadPassport('));
+  const save = handler.indexOf('savePassportFile(preparedPassport.file)');
+  assert.ok(save > 0, 'a prepared passport is saved straight from the tap');
+  assert.ok(save < handler.indexOf('Promise.resolve()'), 'before anything waits');
+});
+
+test('passport saving: the share sheet with the file where there is one, a download otherwise', () => {
+  const fn = passportCode().slice(passportCode().indexOf('function savePassportFile('));
+  assert.match(fn, /navigator\.canShare && navigator\.canShare\(\{ files: \[file\] \}\)/);
+  assert.match(fn, /navigator\.share\(\{ files: \[file\]/);
+  assert.match(fn, /downloadPassportFile\(file\)/);
+});
+
+test('a prepared passport is dropped as soon as the product changes', () => {
+  const fn = html.slice(html.indexOf('function renderResult('), html.indexOf('function renderResult(') + 9000);
+  assert.match(fn, /preparedPassport = null;/);
+});
