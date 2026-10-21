@@ -445,3 +445,8 @@ test('result cards: a long value with its explanation wraps inside the card, nev
   assert.match(rule, /min-width: 0;/);
   assert.match(rule, /text-align: right;/);
 });
+
+test('the fireplace sizes carry their «?» like every other product\'s', () => {
+  const fn = html.slice(html.indexOf('function syncFireplaceFields('), html.indexOf('function fireplaceSizeError('));
+  assert.match(fn, /setTip\(row\.querySelector\('\.unit-label'\), param\.tip\)/);
+});

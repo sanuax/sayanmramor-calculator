@@ -3866,6 +3866,7 @@
       if (!param) return;
       row.querySelector('.unit-label').textContent = param.label;
       row.querySelector('input').placeholder = String(param.placeholderMm);
+      setTip(row.querySelector('.unit-label'), param.tip);   // what the size is, behind its «?» (the owner, 2026-10-21)
     });
     form.params.forEach(p => container.appendChild(container.querySelector('[data-fireplace-param="' + p.key + '"]')));
     updateFireplaceAreaNote();

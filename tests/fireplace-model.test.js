@@ -409,3 +409,22 @@ test('the model loads nothing else: no Three.js, scene, parts, pricing, slabs or
   assert.doesNotMatch(src, /require\(/);
   assert.doesNotMatch(src, /THREE|SceneLayout|ProductParts|Pricing|RateCatalog|WORK_RATES|slabs/);
 });
+
+// ---- What each size is, behind its «?» (2026-10-21, the owner: «у камина добавь пояснения
+// что за размеры, также как у всех изделий»): one line, lower-case after the name, like the
+// other products' tips.
+test('every size of every fireplace form has its «?» line', () => {
+  FireplaceModel.FIREPLACE_TYPES.forEach(type => type.forms.forEach(form => form.params.forEach(p => {
+    const where = type.key + '/' + form.id + '/' + p.key;
+    assert.equal(typeof p.tip, 'string', where);
+    assert.match(p.tip, /^[а-яё0-9]/, where + ': starts lower-case, after the name');
+    assert.match(p.tip, /\.$/, where);
+    assert.doesNotMatch(p.tip, /—/, where);
+  })));
+});
+
+test('a size with the same key in two fireplace types is told by its own type (a portal\'s depth is not a podium\'s)', () => {
+  const tip = (typeKey, key) => FireplaceModel.getTypeByKey(typeKey).forms[0].params.find(p => p.key === key).tip;
+  assert.notEqual(tip('portal', 'depth'), tip('podium', 'depth'));
+  assert.notEqual(tip('cladding', 'depth'), tip('podium', 'depth'));
+});

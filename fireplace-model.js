@@ -330,6 +330,36 @@
     };
   }
 
+  // What each size is, behind its «?» on the size step (2026-10-21, the owner): by type, as
+  // the same key means a different thing in each (a portal's depth is not a podium's).
+  // Lower-case: the line follows the size's name («Глубина портала: насколько ...»).
+  const SIZE_TIPS = {
+    portal: {
+      openingWidth: 'просвет внутри рамки по горизонтали - ширина топки, которую обрамляет портал.',
+      openingHeight: 'просвет внутри рамки от пола до низа перемычки.',
+      pierWidth: 'ширина каждой боковой стойки портала, слева и справа от проёма.',
+      lintelHeight: 'высота верхней части рамки над проёмом.',
+      depth: 'насколько портал выступает от стены.',
+      shelfProjection: 'насколько каминная полка выступает вперёд за лицевую сторону портала.',
+    },
+    cladding: {
+      claddingWidth: 'ширина передней стороны короба, от края до края.',
+      claddingHeight: 'от пола до верха короба.',
+      depth: 'насколько короб выступает от стены.',
+      fireboxWidth: 'ширина отверстия под топку в передней стороне короба.',
+      fireboxHeight: 'высота отверстия под топку.',
+      fireboxBottom: 'от пола до нижнего края отверстия топки; 0 - топка у самого пола.',
+    },
+    podium: {
+      length: 'вдоль стены.',
+      depth: 'от стены вперёд, в комнату.',
+      height: 'от пола до верха подиума.',
+    },
+  };
+  FIREPLACE_TYPES.forEach(type => type.forms.forEach(form => form.params.forEach(p => {
+    p.tip = (SIZE_TIPS[type.key] || {})[p.key] || null;
+  })));
+
   return {
     LENGTH_UNIT, AREA_UNIT, PLATE_THICKNESS_M, PARAM_FIELDS, FORM_FIELD, FIREPLACE_TYPES,
     getType, getTypeByKey, getForm, checkConstraints, computeArea,
