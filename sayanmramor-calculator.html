@@ -1135,6 +1135,21 @@
     .stone-card:hover .stone-card-image img { transform: none; }
     .stone-card:active { transform: none; }
   }
+  /* Firefox and a growing scene or photo (the owner, 2026-10-22: «в firefox иконки изделий
+     дрожат»; filmed in a real Firefox window at 60 frames a second, both ways). With a flat scale
+     Firefox redraws the scene in jumps as it grows -- frames stand, then 170-670 pixels change at
+     once, three or four times in half a second -- and a stone photo steps back against its motion
+     three or four times. A 3D transform that changes nothing in the picture -- perspective(2000px),
+     as on the site's photos -- makes both move on smoothly. Only while hovered: at rest a photo
+     with it is drawn softer and a scene settles half a pixel off, so at rest both stay exactly as
+     before. What is left is the last frame, where Firefox draws the grown picture sharp (within
+     half a pixel). Firefox only (-moz-appearance). */
+  @supports (-moz-appearance: none) {
+    @media (prefers-reduced-motion: no-preference) {
+      .product-card:hover .product-card-scene > svg { transform: scale(1.035) perspective(2000px); }
+      .stone-card:hover .stone-card-image img { transform: scale(1.06) perspective(2000px); }
+    }
+  }
 
   .result-label {
     font-size: var(--configurator-muted);
