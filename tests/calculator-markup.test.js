@@ -428,3 +428,20 @@ test('a prepared passport is dropped as soon as the product changes', () => {
   const fn = html.slice(html.indexOf('function renderResult('), html.indexOf('function renderResult(') + 9000);
   assert.match(fn, /preparedPassport = null;/);
 });
+
+// ---- The «?» line under its own field (2026-10-21, the owner: on a phone the line about
+// «Ширина у стены» showed under «Выступ в комнату») ----
+test('a size\'s «?» line goes right under the row of its own field (one field a row on a phone), across the row', () => {
+  const fn = html.slice(html.indexOf('function placeTip('), html.indexOf('function setTip('));
+  assert.match(fn, /placeTip\(slot, el, block\);/);
+  assert.match(fn, /el\.closest\('\.field-unit'\)/, 'the field the label belongs to');
+  assert.match(fn, /offsetTop/, 'the fields of the same row');
+  assert.match(html, /\.dim-fields > \.dim-tip \{ grid-column: 1 \/ -1;/);
+});
+
+test('result cards: a long value with its explanation wraps inside the card, never past its edge', () => {
+  const rule = html.match(/\.result-card-rows li span \{[^}]*\}/)[0];
+  assert.doesNotMatch(rule, /flex: none/);
+  assert.match(rule, /min-width: 0;/);
+  assert.match(rule, /text-align: right;/);
+});

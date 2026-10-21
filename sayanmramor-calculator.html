@@ -677,6 +677,7 @@
   .has-tip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
   .dim-tip { max-width: var(--dim-col); margin: 10px auto 0; padding: 8px 12px; border-radius: 8px; background: var(--page); font-size: var(--configurator-muted); line-height: 1.45; color: var(--ink); }
   .dim-count .dim-tip { margin-top: 8px; }
+  .dim-fields > .dim-tip { grid-column: 1 / -1; margin: 0; max-width: none; }
   .dim-tip[hidden] { display: none; }
   .dim-note.is-warn { color: var(--ink); }
 
@@ -1339,7 +1340,7 @@
     display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 2px 0;
     font-size: var(--configurator-text); font-weight: 500; color: var(--ink); line-height: 1.4;
   }
-  .result-card-rows li span { flex: none; font-size: var(--configurator-muted); font-weight: 400; color: var(--muted); }
+  .result-card-rows li span { flex: 0 1 auto; min-width: 0; text-align: right; overflow-wrap: anywhere; font-size: var(--configurator-muted); font-weight: 400; color: var(--muted); }
   .result-note { margin: 10px 0 0; font-size: var(--configurator-muted); color: var(--muted); line-height: 1.5; }
 
   .lead-form, .lead-success {
@@ -2572,6 +2573,14 @@
     }
     return slot;
   }
+  // In a .dim-fields grid the line goes right under the row of its own field, across the
+  // row -- on a phone, one field a row, under that very field (the owner, 2026-10-21).
+  function placeTip(slot, el, block) {
+    const unit = el.closest('.field-unit');
+    if (!block.classList.contains('dim-fields') || !unit || unit.parentNode !== block) return;
+    const row = Array.from(block.children).filter(c => c.classList.contains('field-unit') && c.offsetParent !== null && c.offsetTop === unit.offsetTop);
+    (row[row.length - 1] || unit).after(slot);
+  }
   function showTip(el, open) {
     const block = el.closest('.dim-fields, .dim-count');
     if (!block) return;
@@ -2581,6 +2590,7 @@
     if (slot.hidden) return;
     el.setAttribute('aria-expanded', 'true');
     slot.textContent = el.textContent.trim() + ': ' + el.dataset.tip;
+    placeTip(slot, el, block);
   }
   function setTip(el, text) {
     if (!el) return;
