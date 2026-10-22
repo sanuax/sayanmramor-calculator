@@ -14,8 +14,11 @@
 //
 // Part kinds:
 //   prism   -- a horizontal outline [[x,z],...] extruded from y0 to y1, with
-//              optional holes ({ rect:{x,z,w,l} } | { circle:{x,z,r} })
-//   box     -- axis-aligned box: center [x,y,z], size [sx,sy,sz]
+//              optional holes ({ rect:{x,z,w,l} } | { circle:{x,z,r} });
+//              a stone prism's `edge` is its profile, cut on every outline
+//              edge except those listed in `closed` (indices of outline[i] ->
+//              outline[i+1]: against a wall, or a joint between pieces)
+//   box    -- axis-aligned box: center [x,y,z], size [sx,sy,sz]
 //   basin   -- open-top box hanging below yTop: center [x,yTop,z], size [sx,depth,sz]
 //   cooktop -- glass plate sitting on yTop: center [x,yTop,z], size [sx,sy,sz]
 //   seams   -- line segments [[x1,y1,z1,x2,y2,z2],...] drawn on a surface
@@ -116,7 +119,7 @@
         const scale = Math.min(3, 1 / Math.max(0.33, mx * a[0] + mz * a[1]));
         return [pt[0] + mx * WRAP_T * scale, pt[1] + mz * WRAP_T * scale];
       });
-      strips.push(prism('stone', outer.concat(inner.reverse()), y0, y1, { name: name || 'wrap' }));
+      strips.push(prism('stone', outer.concat(inner.reverse()), y0, y1, { edge: 'apron', name: name || 'wrap' }));
     }
     return strips;
   }
@@ -148,14 +151,28 @@
       const h = m.holes && m.holes[key];
       if (h) holes.push({ circle: { x: lx(h.position.xM), z: lz(h.position.zM), r: h.radiusM } });
     });
-    parts.push(prism('stone', rect(-W / 2, W / 2, -L / 2, L / 2), bottom, top, { holes, edge, name: 'main' }));
-
     // Г: one wing at the chosen end of the run; П: one at each end.
     const wings = m.wings && m.wings.length ? m.wings : (m.wing ? [m.wing] : []);
     const wingSpans = wings.map(({ widthM: ww, corner }) => {
       const z0 = corner === 'left' ? L / 2 - ww : -L / 2;
       return [z0, z0 + ww];
     });
+
+    // The edge profile is cut only where the stone is open to the room
+    // (`closed`: the outline's edges that stay a straight cut). The main
+    // run: never along the wall; where a wing joins its room side, the joint
+    // is straight, and so is its end along the wing's wall.
+    const joins = [].concat(...wingSpans).filter(z => z > -L / 2 + 1e-9 && z < L / 2 - 1e-9);
+    const roomSide = [-L / 2].concat([...new Set(joins)].sort((a, b) => a - b), [L / 2]);
+    const mainOutline = [[-W / 2, -L / 2]].concat(roomSide.map(z => [W / 2, z]), [[-W / 2, L / 2]]);
+    const mainClosed = [mainOutline.length - 1];   // the wall side: back from the last corner to the first
+    roomSide.slice(0, -1).forEach((z, k) => {
+      const mid = (z + roomSide[k + 1]) / 2;
+      if (wingSpans.some(([a, b]) => mid > a && mid < b)) mainClosed.push(k + 1);
+    });
+    if (wingSpans.some(([, b]) => b >= L / 2 - 1e-9)) mainClosed.push(roomSide.length);   // the +Z end
+    if (wingSpans.some(([a]) => a <= -L / 2 + 1e-9)) mainClosed.push(0);                // the -Z end
+    parts.push(prism('stone', mainOutline, bottom, top, { holes, edge, closed: mainClosed.sort((a, b) => a - b), name: 'main' }));
 
     if (edge === 'stone-wrap') {
       // "Подгиб камнем" belongs to the main run only: a stone apron under its
@@ -175,7 +192,9 @@
     const wingEdge = edge === 'stone-wrap' ? null : edge;
     wings.forEach(({ lengthM: wl }, i) => {
       const [z0, z1] = wingSpans[i];
-      parts.push(prism('stone', rect(W / 2, W / 2 + wl, z0, z1), bottom, top, { edge: wingEdge, name: 'wing' }));
+      // rect's edges: 0 along z0, 1 the far end, 2 along z1, 3 the joint. The
+      // wing's wall side is its outer one, in line with the main run's end.
+      parts.push(prism('stone', rect(W / 2, W / 2 + wl, z0, z1), bottom, top, { edge: wingEdge, closed: [z1 > 0 ? 2 : 0, 3], name: 'wing' }));
       if (edge === 'stone-wrap') {
         // The wing's front edge: its long side facing the kitchen (the +Z
         // wing faces -Z, the -Z one +Z), out to its end; from the main run's
@@ -304,7 +323,9 @@
   // «Подгиб камнем» on a shaped sill: under every edge that faces the room --
   // not along the window line, not across the two ends at the walls (the
   // edges that meet the window line's ends), as on the straight sill.
-  function sillWrap(plan, W, L, T) {
+  // A sill's edges open to the room: not along the window, not the two ends
+  // at the walls (the edges that meet the window line's ends).
+  function sillOpenEdges(plan, W, L) {
     const xw = -W / 2;
     const line = plan.windowLine || [[xw, -L / 2], [xw, L / 2]];   // «Фигурный»: the straight window behind it
     const onLine = ([x, z]) => line.some(([ax, az], i) => {
@@ -317,12 +338,22 @@
     });
     const isEnd = ([x, z]) => [line[0], line[line.length - 1]].some(([ex, ez]) => Math.hypot(x - ex, z - ez) < 1e-6);
     const out = plan.outline;
-    const isOpen = i => {
+    return i => {
       const a = out[i], b = out[(i + 1) % out.length];
       if (onLine(a) && onLine(b)) return false;   // along the window
       return !isEnd(a) && !isEnd(b);              // not an end at the wall
     };
-    return wrapStrips(out, isOpen, -T / 2 - T, -T / 2);
+  }
+
+  function sillWrap(plan, W, L, T) {
+    return wrapStrips(plan.outline, sillOpenEdges(plan, W, L), -T / 2 - T, -T / 2);
+  }
+
+  // The sill's straight cuts: where its edge profile is not cut (see
+  // countertopParts).
+  function sillClosed(plan, W, L) {
+    const isOpen = sillOpenEdges(plan, W, L);
+    return plan.outline.map((_, i) => i).filter(i => !isOpen(i));
   }
 
   function windowsillParts(m) {
@@ -330,14 +361,14 @@
     const wrapped = m.edge && m.edge.type === 'stone-wrap';
     if (plan && plan.windowLine) {
       const T = m.visualThicknessM;
-      const parts = [prism('stone', plan.outline, -T / 2, T / 2, { edge: m.edge ? m.edge.type : null, name: 'main' })];
+      const parts = [prism('stone', plan.outline, -T / 2, T / 2, { edge: m.edge ? m.edge.type : null, closed: sillClosed(plan, m.widthM, m.lengthM), name: 'main' })];
       if (wrapped) parts.push(...sillWrap(plan, m.widthM, m.lengthM, T));
       windowWallAlong(parts, plan.windowLine, T / 2);
       return parts;
     }
     // Фигурный: the same window as the straight sill, the slab's own outline.
     const parts = plan
-      ? [prism('stone', plan.outline, -m.visualThicknessM / 2, m.visualThicknessM / 2, { edge: m.edge ? m.edge.type : null, name: 'main' })]
+      ? [prism('stone', plan.outline, -m.visualThicknessM / 2, m.visualThicknessM / 2, { edge: m.edge ? m.edge.type : null, closed: sillClosed(plan, m.widthM, m.lengthM), name: 'main' })]
         .concat(wrapped ? sillWrap(plan, m.widthM, m.lengthM, m.visualThicknessM) : [])
       : countertopParts(Object.assign({}, m, { sink: null, cooktop: null, holes: null, backsplash: null, wallPanel: null, curb: null, island: null, barCounter: null, wing: null, wings: null }));
     const W = m.widthM, L = m.lengthM, T = m.visualThicknessM;
@@ -854,7 +885,7 @@
       if (o.edge === 'stone-wrap' && !risers) {
         // «Подгиб камнем»: a stone strip under the tread's front edge; the body
         // steps back behind it (two pieces, so no two faces share a plane).
-        parts.push(prism('stone', bandOutline(stepFootprint(origin, dir, across, halfW, a0, a0 + WRAP_T, bulge), bulge), topY - 2 * T, topY - T, { name: 'wrap' }));
+        parts.push(prism('stone', bandOutline(stepFootprint(origin, dir, across, halfW, a0, a0 + WRAP_T, bulge), bulge), topY - 2 * T, topY - T, { edge: 'apron', name: 'wrap' }));
         parts.push(prism('body', stepFootprint(origin, dir, across, halfW, a0, a1, bulge), 0, topY - 2 * T, { name: 'body' }));
         parts.push(prism('body', stepFootprint(origin, dir, across, halfW, a0 + WRAP_T, a1, bulge), topY - 2 * T, topY - T, { name: 'body' }));
         continue;
@@ -908,7 +939,7 @@
         const d = u(a0), t = [-Math.sin(a0), Math.cos(a0)];
         const shift = ([x, z]) => [x + t[0] * WRAP_T, z + t[1] * WRAP_T];
         const band = [[d[0] * rIn, d[1] * rIn], [d[0] * rOut, d[1] * rOut], shift([d[0] * rOut, d[1] * rOut]), shift([d[0] * rIn, d[1] * rIn])];
-        parts.push(prism('stone', band, topY - 2 * T, topY - T, { name: 'wrap' }));
+        parts.push(prism('stone', band, topY - 2 * T, topY - T, { edge: 'apron', name: 'wrap' }));
         if (!column) {
           const behind = pts.slice();
           behind[0] = shift(behind[0]);

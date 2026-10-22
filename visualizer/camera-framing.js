@@ -110,5 +110,49 @@
     return boundsChanged(previousBounds, nextBounds) ? 'refit' : 'keep';
   }
 
-  return { fitCamera, cornersInView, boundsCorners, boundsCenter, boundsChanged, decideCameraAction };
+  // «Кромка»: a close look at the chosen edge profile. The slab is the
+  // product's main one (or the lowest step, the one nearest the viewer); its
+  // edge is the longest open one (not in `closed`) facing the viewer's usual
+  // side (+X, +Z); the camera stands out from it near its end and looks back
+  // along it from a little above, so the profile reads in cross-section with
+  // the veins running over it. null when no part carries a chosen edge.
+  const EDGE_VIEW_SIDE = [Math.SQRT1_2, Math.SQRT1_2];
+  const EDGE_VIEW = { fromEnd: 0.15, inset: 0.025, out: 0.45, past: 0.5, up: 0.16 };
+  function edgeCloseup(layout) {
+    const slabs = ((layout && layout.parts) || []).filter(p => p.kind === 'prism' && p.role === 'stone' && p.outline && p.edge && p.edge !== 'apron');
+    if (!slabs.length) return null;
+    const slab = slabs.find(p => p.name === 'main') || slabs.reduce((a, b) => (b.y1 < a.y1 ? b : a));
+    const pts = slab.outline, n = pts.length, closed = new Set(slab.closed || []);
+    let area = 0;
+    pts.forEach(([x1, z1], i) => { const [x2, z2] = pts[(i + 1) % n]; area += x1 * z2 - x2 * z1; });
+    const s = area > 0 ? 1 : -1;
+    let best = null;
+    pts.forEach((p, i) => {
+      if (closed.has(i)) return;
+      const q = pts[(i + 1) % n];
+      const len = Math.hypot(q[0] - p[0], q[1] - p[1]);
+      if (len < 1e-6) return;
+      const dir = [(q[0] - p[0]) / len, (q[1] - p[1]) / len];
+      const out = [s * dir[1], -s * dir[0]];
+      const score = len * (0.2 + Math.max(0, out[0] * EDGE_VIEW_SIDE[0] + out[1] * EDGE_VIEW_SIDE[1]));
+      if (!best || score > best.score) best = { score, p, q, dir, out, len };
+    });
+    if (!best) return null;
+    // The end on the viewer's side, and the way along the edge toward it.
+    const toQ = best.dir[0] * EDGE_VIEW_SIDE[0] + best.dir[1] * EDGE_VIEW_SIDE[1] >= 0;
+    const end = toQ ? best.q : best.p;
+    const along = toQ ? best.dir : [-best.dir[0], -best.dir[1]];
+    const back = Math.min(EDGE_VIEW.fromEnd, best.len / 2);
+    const tx = end[0] - along[0] * back - best.out[0] * EDGE_VIEW.inset;
+    const tz = end[1] - along[1] * back - best.out[1] * EDGE_VIEW.inset;
+    const target = [tx, slab.y1, tz];
+    const position = [
+      tx + best.out[0] * EDGE_VIEW.out + along[0] * EDGE_VIEW.past,
+      slab.y1 + EDGE_VIEW.up,
+      tz + best.out[1] * EDGE_VIEW.out + along[1] * EDGE_VIEW.past,
+    ];
+    return { target, position, distance: Math.hypot(position[0] - tx, position[1] - slab.y1, position[2] - tz) };
+  }
+
+  return { fitCamera, cornersInView, boundsCorners, boundsCenter, boundsChanged, decideCameraAction, edgeCloseup };
 });

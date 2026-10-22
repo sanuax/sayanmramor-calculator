@@ -228,9 +228,13 @@
     const across = footprint.map(([x, z]) => x * -grain[1] + z * grain[0]);
     const a0 = Math.min(...along), b0 = Math.min(...across);
     const lengthM = Math.max(...along) - a0, widthM = Math.max(...across) - b0, heightM = y1 - y0;
+    const upright = heightM > Math.max(lengthM, widthM);
     return {
       grain,
-      upright: heightM > Math.max(lengthM, widthM),
+      upright,
+      // A slab (thinner than it is wide): its edges show the top's stone
+      // folding over them (see stoneUVs).
+      fold: !upright && heightM <= Math.min(lengthM, widthM),
       start: [round6(a0), round6(b0), round6(y0)],
       extent: [round6(lengthM), round6(widthM), round6(heightM)],
       seed: Number.isInteger(index) && index >= 0 ? index : 0,
@@ -255,11 +259,37 @@
   //                       part so the long side of the photo stands
   // A face that runs along the grain shares the top's `along` coordinate,
   // so a countertop's veins run on over its front edge.
+  //
+  // A slab (projection.fold) is one piece of stone folded over its edges, as
+  // a real edge shows the veins that reach it: a face's point takes the top's
+  // stone as far out past the rim as the point is below the top -- the top
+  // unfolded down the face along the face's normal. The rounding and the
+  // chamfer unfold with it, without a seam; so does a «подгиб камнем» apron
+  // under the edge (it takes its slab's projection). Only the flat underside
+  // keeps the plain top-down view.
   function stoneUVs(positions, normals, { projection, patternSizeM }) {
     const count = positions.length / 3;
     const uv = new Float32Array(count * 2);
     const { grain: [gx, gz], upright, start: [a0, b0, y0], extent: [lengthM, widthM, heightM], seed } = projection;
     const U = patternSizeM[0], V = patternSizeM[1];
+    if (projection.fold) {
+      // The top keeps its own region of the photo; an edge that folds past
+      // the photo's border shows its mirror there, without a seam.
+      const offFoldA = photoOffset(seed, lengthM, U, 0), offFoldB = photoOffset(seed, widthM, V, 0.5);
+      for (let i = 0; i < count; i++) {
+        const x = positions[i * 3], drop = heightM - (positions[i * 3 + 1] - y0), z = positions[i * 3 + 2];
+        const nx = normals[i * 3], nz = normals[i * 3 + 2];
+        let a = x * gx + z * gz - a0, b = x * -gz + z * gx - b0;
+        const h = Math.hypot(nx, nz);
+        if (h > 1e-6) {
+          a += drop * (nx * gx + nz * gz) / h;
+          b += drop * (nx * -gz + nz * gx) / h;
+        }
+        uv[i * 2] = a / U + offFoldA;
+        uv[i * 2 + 1] = b / V + offFoldB;
+      }
+      return uv;
+    }
     // Where the part starts in the photo, per axis and in that axis' units.
     const offA = photoOffset(seed, lengthM, U, 0), offB = photoOffset(seed, widthM, V, 0.5);
     const offAcrossU = photoOffset(seed, widthM, U, 0.75), offHeightV = photoOffset(seed, heightM, V, 0.5);

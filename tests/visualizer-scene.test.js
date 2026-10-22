@@ -827,7 +827,7 @@ test('«Подгиб камнем» on steps and stairs: a stone strip under the
 // three-scene.js is an ES module (it imports three), so it is read as text here.
 test('ThreeScene exports capture() for the passport, and taking a shot never counts as the client looking around', () => {
   const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'visualizer', 'three-scene.js'), 'utf8');
-  assert.match(src, /const ThreeScene = \{ init, update, setView, resetView, capture, dispose \};/);
+  assert.match(src, /const ThreeScene = \{ init, update, setView, resetView, showEdge, canShowEdge, capture, dispose \};/);
   const start = src.indexOf('function capture(');
   assert.ok(start > 0, 'function capture');
   const body = src.slice(start, src.indexOf('\n}\n', start));
@@ -840,4 +840,42 @@ test("capture() puts the client's view back even if drawing the shot throws", ()
   const start = src.indexOf('function capture(');
   const body = src.slice(start, src.indexOf('\n}\n', start));
   assert.match(body, /try \{[\s\S]*\} finally \{/);
+});
+
+// «Кромка» (2026-10-22): a close look at the chosen edge -- the main run's
+// room-side edge near its end, from outside and a little above; the edge
+// profile is cut only where the stone is open to the room.
+test('«Кромка»: the close view looks at the open room-side edge; no chosen edge, no view', () => {
+  const layout = layoutFor('stoleshnitsa_kuhnya', { 'edge-type': { value: 'rounding' } });
+  const view = CameraFraming.edgeCloseup(layout);
+  assert.ok(view, 'a view');
+  assert.ok(Math.abs(view.target[0] - (0.325 - 0.025)) < 1e-9, 'just inside the room-side edge');
+  assert.ok(view.position[0] > 0.325 && view.position[1] > view.target[1], 'from outside, above');
+  assert.ok(view.distance > 0.3 && view.distance < 1.5, 'close');
+  assert.equal(CameraFraming.edgeCloseup(layoutFor('stoleshnitsa_kuhnya', {})), null);
+  assert.equal(CameraFraming.edgeCloseup(layoutFor('pol', {})), null);
+  const steps = CameraFraming.edgeCloseup(layoutFor('stupeni', { width: { value: '350' }, length: { value: '1200' }, 'edge-type': { value: 'bevel' } }));
+  assert.ok(steps, 'steps: the lowest tread');
+});
+
+test('the profile stays off the wall and the joints: main run, wings and sills list their straight cuts', () => {
+  const at = shape => layoutFor('stoleshnitsa_kuhnya', { productShape: { value: shape }, 'wing-width': { value: '600' }, 'wing-length': { value: '1500' }, 'edge-type': { value: 'rounding' } });
+  const wallSide = main => main.outline.findIndex((p, i) => {
+    const q = main.outline[(i + 1) % main.outline.length];
+    return Math.abs(p[0] + 0.325) < 1e-9 && Math.abs(q[0] + 0.325) < 1e-9;
+  });
+  const straight = named(at('straight'), 'main')[0];
+  assert.deepEqual(straight.closed, [wallSide(straight)]);
+  const l = at('lshape');
+  const main = named(l, 'main')[0], wing = named(l, 'wing')[0];
+  assert.ok(main.closed.includes(wallSide(main)), 'wall side');
+  // The joint: the stretch of the room side the wing covers.
+  const joint = main.closed.find(i => {
+    const p = main.outline[i], q = main.outline[(i + 1) % main.outline.length];
+    return Math.abs(p[0] - 0.325) < 1e-9 && Math.abs(q[0] - 0.325) < 1e-9;
+  });
+  assert.ok(joint !== undefined, 'joint on the room side');
+  assert.ok(wing.closed.includes(3), 'the wing\'s joint');
+  const sill = named(layoutFor('podokonnik', { width: { value: '300' }, length: { value: '1500' }, productSubcategory: { value: 'SILL-02' }, 'edge-type': { value: 'rounding' } }), 'main')[0];
+  assert.ok(sill.closed && sill.closed.length > 0, 'a sill: along the window and at the walls');
 });

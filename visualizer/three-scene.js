@@ -13,6 +13,7 @@ let keyLight, fillLight, rimLight;
 let frameId = null;
 let cameraPresetTracker = null;
 let lastBounds = null;
+let lastLayout = null;
 let lastProductKey = null;
 let hasModel = false;
 // True once the client orbits/zooms by hand -- until then, a canvas resize
@@ -359,22 +360,22 @@ function buildMaterials(desc) {
 
 // ---- geometry ------------------------------------------------------------
 
-// Edge profile as a geometry parameter: a generic, honest approximation of
-// the chosen edge (soft round, sharp chamfer, ...), not a CNC profile. Every
-// stone edge gets at least a hairline arris so it catches the light.
-function bevelFor(part) {
-  const depth = part.y1 - part.y0;
-  if (part.role !== 'stone' || depth < 0.015) return { size: 0, segments: 0 };
-  const cap = depth * 0.35;
-  switch (part.edge) {
-    case 'rounding': return { size: Math.min(cap, 0.012), segments: 5 };
-    case 'bevel': return { size: Math.min(cap, 0.008), segments: 1 };
-    case 'figured': return { size: Math.min(cap, 0.01), segments: 3 };
-    default: return { size: 0.0015, segments: 1 };
-  }
+// A stone prism is a solid with its real edge profile (EdgeProfile, a UMD
+// script on window): the profile only along the edges open to the room, the
+// plan its exact size, smooth where the stone is curved.
+const toVec2 = pts => pts.map(p => new THREE.Vector2(p.x, p.y));
+function buildStoneSolid(part) {
+  const solid = window.EdgeProfile.buildSolid(part, {
+    triangulate: (contour, holes) => THREE.ShapeUtils.triangulateShape(toVec2(contour), holes.map(toVec2)),
+  });
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(solid.positions, 3));
+  geometry.setAttribute('normal', new THREE.BufferAttribute(solid.normals, 3));
+  return geometry;
 }
 
 function buildPrismGeometry(part) {
+  if (part.role === 'stone') return buildStoneSolid(part);
   // Shape lives in (x, -z); rotating -90deg about X maps shape-y to world -Z
   // and the extrusion to world +Y.
   const shape = new THREE.Shape();
@@ -394,18 +395,9 @@ function buildPrismGeometry(part) {
     }
     shape.holes.push(path);
   });
-  const bevel = bevelFor(part);
-  const depth = Math.max(0.001, part.y1 - part.y0 - 2 * bevel.size);
-  const geometry = new THREE.ExtrudeGeometry(shape, {
-    depth,
-    bevelEnabled: bevel.size > 0,
-    bevelThickness: bevel.size,
-    bevelSize: bevel.size,
-    bevelSegments: bevel.segments,
-    curveSegments: 20,
-  });
+  const geometry = new THREE.ExtrudeGeometry(shape, { depth: Math.max(0.001, part.y1 - part.y0), bevelEnabled: false, curveSegments: 20 });
   geometry.rotateX(-Math.PI / 2);
-  geometry.translate(0, part.y0 + bevel.size, 0);
+  geometry.translate(0, part.y0, 0);
   return geometry;
 }
 
@@ -422,10 +414,11 @@ function addMesh(group, geometry, material, position, cast) {
 // stone walls of real thickness around the cavity and a stone floor -- so
 // its inner faces are there from any camera angle. (Built from single-sided
 // planes, as the steel basins are, the walls faced outward and vanished
-// when looking into the bowl.) The cavity is flush with the opening, which
-// the slab's own extrusion bevel insets by bevelFor(slab).size.
+// when looking into the bowl.) The cavity is flush with the opening's
+// straight face, which is the cut itself (EdgeProfile: the profile goes into
+// the stone).
 //
-// No seam (2026-10-10): the slab's bevel rounds its opening at the bottom
+// No seam (2026-10-10): the slab's profile rounds its opening at the bottom
 // too, and a bowl that began at the slab's underside left that rounding as
 // a groove all round the bowl -- a line where the bowl met the slab. So the
 // walls rise inside the opening up to where its top rounding begins, a
@@ -439,9 +432,9 @@ function buildStoneBowl(group, part, materials) {
   const [cx, top, cz] = part.center;
   const [sx, depth, sz] = part.size;
   const slabM = part.slabThicknessM || 0;
-  const inset = bevelFor({ role: 'stone', y0: 0, y1: slabM, edge: part.edge }).size;
-  const rise = Math.max(0, slabM - inset);   // from the slab's underside to where its top rounding begins
-  const w = sx / 2 - inset - STONE_BOWL_OVERLAP_M, l = sz / 2 - inset - STONE_BOWL_OVERLAP_M, t = STONE_BOWL_WALL_M;
+  const rounding = window.EdgeProfile.profile(part.edge, 0, slabM).topSize;
+  const rise = Math.max(0, slabM - rounding);   // from the slab's underside to where its top rounding begins
+  const w = sx / 2 - STONE_BOWL_OVERLAP_M, l = sz / 2 - STONE_BOWL_OVERLAP_M, t = STONE_BOWL_WALL_M;
   const shape = new THREE.Shape();
   shape.moveTo(-w - t, -l - t); shape.lineTo(w + t, -l - t); shape.lineTo(w + t, l + t); shape.lineTo(-w - t, l + t); shape.closePath();
   const cavity = new THREE.Path();
@@ -525,6 +518,7 @@ function projectStoneUVs(group, desc) {
   group.userData.patternSizeM = desc.patternSizeM.join('x');
 }
 
+const APRON_NAMES = ['wrap', 'wing-wrap'];
 function buildProductGroup(layout, materialDescriptor) {
   const group = new THREE.Group();
   const materials = buildMaterials(materialDescriptor);
@@ -532,6 +526,7 @@ function buildProductGroup(layout, materialDescriptor) {
   group.userData.stoneMeshes = [];
   let stoneIndex = 0;
   let mainStone = null;   // the countertop's own slab: { part, index }
+  let lastSlab = null;    // the stone part drawn last, apart from aprons
   layout.parts.forEach(part => {
     const before = group.children.length;
     buildPart(group, part, materials);
@@ -540,7 +535,11 @@ function buildProductGroup(layout, materialDescriptor) {
       if (part.name === 'main' && !mainStone) mainStone = { part, index };
       // An integrated sink is the countertop's own stone, not a piece of its own:
       // the bowl takes the slab's projection, so the veins run on into it unbroken.
-      const own = part.kind === 'basin' && mainStone ? mainStone : { part, index };
+      // So does a «подгиб камнем» apron (laid out right after its slab): the
+      // stone folds over the edge, the veins run down the edge and the apron.
+      const apron = APRON_NAMES.includes(part.name) && lastSlab;
+      const own = part.kind === 'basin' && mainStone ? mainStone : (apron ? lastSlab : { part, index });
+      if (!apron) lastSlab = own;
       group.children.slice(before).forEach(mesh => {
         if (mesh.isMesh) group.userData.stoneMeshes.push(captureStoneMesh(mesh, own.part, own.index));
       });
@@ -725,6 +724,7 @@ function update(geometryModel, materialDescriptor) {
     nextPreset: cameraPresetTracker.getDefaultPreset(),
   });
   lastBounds = layout.bounds;
+  lastLayout = layout;
   framePadding = layout.framePadding;
   lastProductKey = geometryModel.productKey;
   hasModel = true;
@@ -739,6 +739,24 @@ function setView(presetName) {
   const preset = presetsByName[presetName] || presetsByName.iso;
   frame(preset.direction);
   userAdjusted = false;
+}
+
+// «Кромка»: up close to the chosen edge profile (CameraFraming.edgeCloseup).
+// The client may orbit and zoom on from there; a canvas resize keeps it.
+function showEdge() {
+  const view = canShowEdge() && window.CameraFraming.edgeCloseup(lastLayout);
+  if (!view) return;
+  controls.target.set(...view.target);
+  camera.position.set(...view.position);
+  camera.near = Math.max(0.005, view.distance / 100);
+  camera.updateProjectionMatrix();
+  controls.minDistance = Math.min(controls.minDistance, view.distance * 0.4);
+  controls.update();
+  userAdjusted = true;
+}
+
+function canShowEdge() {
+  return !!(hasModel && lastLayout && window.CameraFraming.edgeCloseup(lastLayout));
 }
 
 function resetView() {
@@ -808,9 +826,9 @@ function dispose() {
   keyLight = fillLight = rimLight = null;
   cameraPresetTracker = null;
   textures = null;
-  lastBounds = null; lastProductKey = null; hasModel = false; userAdjusted = false;
+  lastBounds = null; lastLayout = null; lastProductKey = null; hasModel = false; userAdjusted = false;
 }
 
-const ThreeScene = { init, update, setView, resetView, capture, dispose };
+const ThreeScene = { init, update, setView, resetView, showEdge, canShowEdge, capture, dispose };
 window.ThreeScene = ThreeScene;
 export default ThreeScene;

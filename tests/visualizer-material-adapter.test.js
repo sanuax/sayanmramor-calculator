@@ -461,3 +461,23 @@ test('photoExposure lifts only an underexposed photo of a light-listed stone, mo
   assert.equal(MaterialAdapter.photoExposure(unknown, 0.3), 1, 'no listed color: no guess');
   [NaN, 0, -1, undefined].forEach(v => assert.equal(MaterialAdapter.photoExposure(white, v), 1));
 });
+
+// A slab's edge is the top folded over it (2026-10-22): a point on the front
+// edge d below the top shows the stone the top would have d past its rim, so
+// the veins that reach the edge run on down it -- and down a «подгиб
+// камнем» apron, which takes its slab's projection.
+test('a slab\'s edges show the top folded over them; an upright panel keeps its own faces', () => {
+  const main = named(layoutFor('stoleshnitsa_kuhnya', {}), 'main')[0];
+  const projection = partProjection(main, 0);
+  assert.equal(projection.fold, true);
+  const W = 0.65, top = main.y1, z = 0.3, d = 0.03;
+  const uv = (pts, nrm) => [...stoneUVs(new Float32Array(pts), new Float32Array(nrm), { projection, patternSizeM: MARBLE.patternSizeM })];
+  const onTop = uv([W / 2 + d, top, z], [0, 1, 0]);
+  const onEdge = uv([W / 2, top - d, z], [1, 0, 0]);
+  assert.ok(Math.abs(onTop[0] - onEdge[0]) < 1e-6 && Math.abs(onTop[1] - onEdge[1]) < 1e-6, 'front edge continues the top');
+  const rim = uv([W / 2, top, z], [0, 1, 0]), rimOnEdge = uv([W / 2, top, z], [1, 0, 0]);
+  assert.ok(Math.abs(rim[0] - rimOnEdge[0]) < 1e-6 && Math.abs(rim[1] - rimOnEdge[1]) < 1e-6, 'no seam at the rim');
+  const panel = stoneParts(layoutFor('panno', {}))[0];
+  assert.ok(panel, 'a panno part');
+  assert.equal(partProjection(panel, 0).fold, false);
+});

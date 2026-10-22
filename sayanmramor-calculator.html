@@ -2136,6 +2136,7 @@
                   <button type="button" data-view="front">Спереди</button>
                   <button type="button" data-view="side">Сбоку</button>
                   <button type="button" data-view="iso">Изометрия</button>
+                  <button type="button" id="viewerEdge" hidden>Кромка</button>
                   <button type="button" id="viewerReset">Сбросить вид</button>
                 </div>
               </div>
@@ -2231,6 +2232,7 @@
 <script src="visualizer/geometry-model.js"></script>
 <script src="product-parts.js"></script>
 <script src="visualizer/material-adapter.js"></script>
+<script src="visualizer/edge-profile.js"></script>
 <script src="visualizer/scene-layout.js"></script>
 <script src="visualizer/camera-framing.js"></script>
 <script src="visualizer/webgl-support.js"></script>
@@ -3112,6 +3114,8 @@
       btn.addEventListener('click', () => window.ThreeScene.setView(btn.dataset.view));
     });
     document.getElementById('viewerReset').addEventListener('click', () => window.ThreeScene.resetView());
+    // «Кромка»: shown once the product has a chosen edge profile to look at.
+    document.getElementById('viewerEdge').addEventListener('click', () => window.ThreeScene.showEdge());
     if (DATA_LOADED) calculate();
   }
   // A `<script type="module">` (visualizer/three-scene.js) is always deferred
@@ -4300,6 +4304,7 @@
       const geometryModel = GeometryModel.buildGeometryModel(constructorState);
       const materialDescriptor = MaterialAdapter.resolveMaterial(constructorState.stone, constructorState.bookmatchMode);
       window.ThreeScene.update(geometryModel, materialDescriptor);
+      document.getElementById('viewerEdge').hidden = !window.ThreeScene.canShowEdge();
     }
 
     if (!selectedProductKey) {
