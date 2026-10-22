@@ -11,6 +11,7 @@ import { OrbitControls } from '../vendor/three/OrbitControls.js';
 let renderer, scene, camera, controls, productGroup, currentCanvas, resizeObserver;
 let keyLight, fillLight, rimLight, hemiLight;
 let frameId = null;
+let renderLoop = null;   // animate(), kept so AR can pause and resume it
 let cameraPresetTracker = null;
 let lastBounds = null;
 let lastLayout = null;
@@ -119,9 +120,10 @@ function buildTextures() {
 
 // A soft photo-studio environment for reflections (clear coat, steel,
 // glass): a dark warm room with a large overhead softbox and a warm key
-// panel on the room side. Built from plain meshes -- no HDR file.
-function buildEnvironment() {
-  const pmrem = new THREE.PMREMGenerator(renderer);
+// panel on the room side. Built from plain meshes -- no HDR file. For the
+// view's renderer, or AR's own (ar-view.js).
+function buildEnvironment(target) {
+  const pmrem = new THREE.PMREMGenerator(target);
   const env = new THREE.Scene();
   const room = new THREE.Mesh(new THREE.BoxGeometry(20, 10, 20), new THREE.MeshBasicMaterial({ color: '#2a241e', side: THREE.BackSide }));
   env.add(room);
@@ -1254,7 +1256,7 @@ function init(canvasEl) {
   textures = buildTextures();
   scene = new THREE.Scene();
   scene.background = textures.background;
-  scene.environment = buildEnvironment();
+  scene.environment = buildEnvironment(renderer);
 
   camera = new THREE.PerspectiveCamera(FOV_DEG, 1, 0.01, 100);
   camera.position.set(1.5, 1.2, 1.5);
@@ -1298,6 +1300,7 @@ function init(canvasEl) {
     stepDims();
     renderer.render(scene, camera);
   }
+  renderLoop = animate;
   animate();
 }
 
@@ -1502,7 +1505,7 @@ function dispose() {
   proceduralMaps.forEach(t => t.dispose());
   proceduralMaps.clear();
   if (renderer) renderer.dispose();
-  renderer = scene = camera = controls = productGroup = currentCanvas = resizeObserver = null;
+  renderer = scene = camera = controls = productGroup = currentCanvas = resizeObserver = renderLoop = null;
   keyLight = fillLight = rimLight = hemiLight = null;
   roomLights = []; roomFade = null; lampsLayout = null;
   dimsLabels = null; dimsOn = false; dimsShown = 0; dimsFade = null; lastModel = null;
@@ -1513,6 +1516,59 @@ function dispose() {
   cameraMove = null; morph = null; lastFrameTime = 0;
 }
 
-const ThreeScene = { init, update, setView, resetView, showEdge, canShowEdge, setRoom, roomOptions, setDimensions, canShowDimensions, capture, dispose };
+// ---- AR («Поставить у себя в комнате», the owner, 2026-10-22) -------------
+//
+// Everything of AR is in ar-view.js (and the USDZ exporter it loads for
+// Quick Look), imported only here, on the tap: until then AR costs the page
+// nothing -- not a file, not a line in a frame.
+const NO_AR_PRODUCTS = ['fasad'];   // a building's facade: house-sized
+
+function canShowAr() {
+  return hasModel && !NO_AR_PRODUCTS.includes(lastProductKey);
+}
+
+// The product as configured, for AR, once its stone photo is on: the sizes
+// typed last, a stone fade finished. ar-view.js keeps only the product's own
+// meshes -- not the room, the floor disc, the dimensions or the context
+// (a window's wall).
+function arProduct() {
+  flushResize();
+  const materials = productGroup.userData.materials;
+  const desc = materials.descriptor;
+  const photo = desc && desc.source === 'image' ? loadStonePhoto(desc) : Promise.resolve();
+  return photo.then(() => {
+    if (materials.fade && !materials.pending) finishFade(materials);
+    return { group: productGroup, productKey: lastProductKey, materials, environment: buildEnvironment };
+  });
+}
+
+// While the AR session runs the view is not drawn.
+const viewRendering = {
+  pause() { if (frameId !== null) cancelAnimationFrame(frameId); frameId = null; },
+  resume() { if (renderer && frameId === null) { lastFrameTime = 0; renderLoop(); } },
+};
+
+// mode: WebglSupport.arMode(). Resolves once AR is open (Quick Look, or the
+// AR session running); rejects if it could not start.
+function startAr(mode) {
+  if (!canShowAr()) return Promise.reject(new Error('no product for AR'));
+  if (mode !== 'webxr') return Promise.all([import('./ar-view.js'), arProduct()]).then(([ar, product]) => ar.quickLook(product));
+  // A WebXR session has to be asked for within the tap itself; the page
+  // over the camera (dom-overlay) is filled by ar-view.js.
+  const overlay = document.createElement('div');
+  overlay.style.display = 'none';
+  document.body.appendChild(overlay);
+  const session = navigator.xr.requestSession('immersive-ar', { requiredFeatures: ['hit-test'], optionalFeatures: ['dom-overlay'], domOverlay: { root: overlay } });
+  return Promise.all([import('./ar-view.js'), arProduct()])
+    .then(([ar, product]) => session.then(s => ar.webXr(s, product, overlay, viewRendering)))
+    .catch(e => {
+      overlay.remove();
+      session.then(s => s.end()).catch(() => {});
+      viewRendering.resume();
+      throw e;
+    });
+}
+
+const ThreeScene = { init, update, setView, resetView, showEdge, canShowEdge, setRoom, roomOptions, setDimensions, canShowDimensions, canShowAr, startAr, capture, dispose };
 window.ThreeScene = ThreeScene;
 export default ThreeScene;

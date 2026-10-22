@@ -365,6 +365,23 @@
   .viewer-facades-label { font-size: var(--configurator-muted); color: var(--dark-text-muted); margin-right: 2px; }
   .viewer-controls .viewer-swatch { width: 26px; height: 26px; padding: 0; background: var(--swatch); }
   .viewer-controls .viewer-swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--dark-bg-2), 0 0 0 3px var(--dark-accent); }
+  /* AR «Поставить у себя в комнате»: only on a phone or tablet where AR works
+     (WebglSupport.arMode) -- the main action there, so a wide button of its own. */
+  .viewer-ar {
+    display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 12px; margin-top: 4px;
+    border: 1px solid var(--dark-accent); border-radius: 8px; background: transparent; color: var(--dark-text);
+    font: inherit; font-size: 15px; cursor: pointer;
+  }
+  .viewer-ar[hidden] { display: none; }
+  .viewer-ar:disabled { opacity: 0.7; cursor: progress; }
+  .viewer-ar svg { flex: none; }
+  /* Another browser on iPhone and Safari did not open (iOS before 17). */
+  .viewer-ar-note { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: var(--configurator-muted); color: var(--dark-text-muted); }
+  .viewer-ar-note[hidden] { display: none; }
+  .viewer-ar-note button {
+    padding: 6px 12px; border: 1px solid var(--dark-border); border-radius: 3px; background: var(--dark-bg-2); color: var(--dark-text);
+    font: inherit; cursor: pointer;
+  }
   label {
     display: block;
     font-size: var(--configurator-text);
@@ -2166,6 +2183,14 @@
                     <span class="viewer-facades-label">Фасады</span>
                   </div>
                 </div>
+                <button type="button" class="viewer-ar" id="viewerAr" hidden>
+                  <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg>
+                  <span id="viewerArLabel">Поставить у себя в комнате</span>
+                </button>
+                <div class="viewer-ar-note" id="viewerArNote" hidden>
+                  <span>AR на iPhone открывается в Safari. Скопируйте ссылку на это изделие и откройте её в Safari.</span>
+                  <button type="button" id="viewerArCopy">Скопировать ссылку</button>
+                </div>
               </div>
             </div>
 
@@ -3158,6 +3183,64 @@
       window.ThreeScene.setRoom({ facade: btn.dataset.facade });
     }));
   }
+  // AR «Поставить у себя в комнате» (the owner, 2026-10-22): the product at
+  // its real size in the client's room through the phone's camera. The
+  // button only where AR works (arMode: 'quicklook' on iPhone/iPad in
+  // Safari, 'webxr' on Android); all of AR is loaded by three-scene.js on
+  // the tap. In another browser on iPhone ('safari': Chrome, Яндекс,
+  // Telegram...) Quick Look can't open a model made on the page, so the
+  // button opens this very product -- the passport link, every choice in
+  // it -- in Safari (x-safari-https:, iOS 17+), where the button works; if
+  // Safari did not open, a note and the link to copy (the owner, 2026-10-23).
+  let viewerArMode = null;
+  const VIEWER_AR_LABEL = 'Поставить у себя в комнате';
+  const SAFARI_WAIT_MS = 1500;
+  function productLink() {
+    return location.origin + location.pathname + '?' + currentPassportQuery();
+  }
+  function openInSafari() {
+    const a = document.createElement('a');
+    a.href = 'x-safari-' + productLink();
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => {
+      // Still here, and on screen: Safari did not open.
+      if (document.visibilityState === 'visible') document.getElementById('viewerArNote').hidden = false;
+    }, SAFARI_WAIT_MS);
+  }
+  function initViewerAr() {
+    const btn = document.getElementById('viewerAr');
+    const label = document.getElementById('viewerArLabel');
+    const copy = document.getElementById('viewerArCopy');
+    copy.addEventListener('click', () => {
+      const done = () => { copy.textContent = 'Ссылка скопирована'; };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(productLink()).then(done, () => window.prompt('Ссылка на изделие', productLink()));
+      else window.prompt('Ссылка на изделие', productLink());
+    });
+    btn.addEventListener('click', () => {
+      if (viewerArMode === 'safari') { openInSafari(); return; }
+      if (btn.disabled) return;
+      btn.disabled = true;
+      label.textContent = 'Готовлю...';
+      window.ThreeScene.startAr(viewerArMode).then(() => {
+        btn.disabled = false;
+        label.textContent = VIEWER_AR_LABEL;
+      }, () => {
+        label.textContent = 'Не получилось открыть AR';
+        setTimeout(() => { btn.disabled = false; label.textContent = VIEWER_AR_LABEL; }, 3000);
+      });
+    });
+    WebglSupport.arMode().then(mode => { viewerArMode = mode; updateViewerAr(); });
+  }
+  function updateViewerAr() {
+    const hidden = !viewerArMode || !window.ThreeScene.canShowAr();
+    document.getElementById('viewerAr').hidden = hidden;
+    // The note belongs to this product's link: gone with the button, and
+    // the copy button fresh for the next product.
+    if (hidden) document.getElementById('viewerArNote').hidden = true;
+    document.getElementById('viewerArCopy').textContent = 'Скопировать ссылку';
+  }
   function updateViewerRoom() {
     document.getElementById('viewerFacades').hidden = viewerRoomMode === 'studio' || !window.ThreeScene.roomOptions().hasFacades;
   }
@@ -3180,6 +3263,7 @@
     // «Кромка»: shown once the product has a chosen edge profile to look at.
     document.getElementById('viewerEdge').addEventListener('click', () => window.ThreeScene.showEdge());
     initViewerRoom();
+    initViewerAr();
     // «Размеры»: the entered sizes on the model, off until pressed.
     const dimsBtn = document.getElementById('viewerDims');
     dimsBtn.addEventListener('click', () => {
@@ -4377,6 +4461,7 @@
       window.ThreeScene.update(geometryModel, materialDescriptor);
       document.getElementById('viewerEdge').hidden = !window.ThreeScene.canShowEdge();
       updateViewerRoom();
+      updateViewerAr();
       const dimsBtn = document.getElementById('viewerDims');
       dimsBtn.hidden = !window.ThreeScene.canShowDimensions();
       if (dimsBtn.hidden && dimsBtn.getAttribute('aria-pressed') === 'true') {
