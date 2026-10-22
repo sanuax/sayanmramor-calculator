@@ -14,6 +14,7 @@ let frameId = null;
 let cameraPresetTracker = null;
 let lastBounds = null;
 let lastLayout = null;
+let lastModel = null;
 let lastProductKey = null;
 let hasModel = false;
 // True once the client orbits/zooms by hand -- until then, a canvas resize
@@ -973,6 +974,114 @@ function roomOptions() {
   return { hasRoom: !!data, hasFacades: !!(data && data.hasFacades) };
 }
 
+// ---- «Размеры» --------------------------------------------------------------
+
+// The entered sizes on the model (Dimensions3d), shown by the «Размеры»
+// button and off by default: thin lines with ticks at their ends, drawn over
+// the model, and their labels as page text over the canvas (crisp at any
+// zoom), following the model as the camera moves. They fade in and out
+// (DIMS_FADE_S), are part of the product's group (so they ease with a new
+// size), and never appear in a passport shot.
+const DIMS_FADE_S = 0.25;
+const DIMS_TICK_M = 0.022;
+const DIMS_COLOR = '#ece6da';
+let dimsOn = false;
+let dimsShown = 0;          // 0..1, the fade
+let dimsFade = null;        // { from, to, start }
+let dimsLabels = null;      // the overlay element over the canvas
+const dimsWorld = new THREE.Vector3();
+
+function buildDims(group) {
+  const dims = window.Dimensions3d.build(lastModel, lastLayout);
+  const points = [];
+  const seg = (a, b) => points.push(...a, ...b);
+  dims.forEach(d => {
+    seg(d.line[0], d.line[1]);
+    d.extensions.forEach(([a, b]) => seg(a, b));
+    // A short slash across each end of the line, as on a drawing.
+    const dir = [0, 1, 2].map(i => d.line[1][i] - d.line[0][i]);
+    const len = Math.hypot(...dir) || 1;
+    const out = [0, 1, 2].map(i => d.extensions[0][1][i] - d.extensions[0][0][i]);
+    const outLen = Math.hypot(...out) || 1;
+    const slash = [0, 1, 2].map(i => (dir[i] / len + out[i] / outLen) * DIMS_TICK_M / Math.SQRT2);
+    d.line.forEach(p => seg([0, 1, 2].map(i => p[i] - slash[i]), [0, 1, 2].map(i => p[i] + slash[i])));
+  });
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
+  const material = new THREE.LineBasicMaterial({ color: DIMS_COLOR, transparent: true, opacity: 0, depthTest: false, depthWrite: false });
+  const lines = new THREE.LineSegments(geometry, material);
+  lines.renderOrder = 10;
+  group.add(lines);
+  dimsLabels.replaceChildren(...dims.map(d => {
+    const el = document.createElement('span');
+    el.className = 'viewer-dim-label';
+    el.textContent = d.label;
+    return el;
+  }));
+  group.userData.dims = { dims, lines };
+  return group.userData.dims;
+}
+
+function disposeDims(group) {
+  const d = group.userData.dims;
+  if (!d) return;
+  d.lines.geometry.dispose();
+  d.lines.material.dispose();
+}
+
+function applyDims(shownNow) {
+  dimsShown = shownNow;
+  if (!productGroup) return;
+  let d = productGroup.userData.dims;
+  if (shownNow > 0 && !d && lastModel) d = buildDims(productGroup);
+  if (d) {
+    d.lines.visible = shownNow > 0;
+    d.lines.material.opacity = 0.9 * shownNow;
+  }
+  dimsLabels.style.opacity = String(shownNow);
+  dimsLabels.hidden = shownNow <= 0;
+}
+
+// The labels follow their points on screen, kept whole inside the view.
+const DIMS_EDGE_PX = 4;
+function placeDimLabels() {
+  const d = productGroup && productGroup.userData.dims;
+  if (!d || dimsShown <= 0) return;
+  const w = currentCanvas.clientWidth, h = currentCanvas.clientHeight;
+  productGroup.updateMatrixWorld();
+  [...dimsLabels.children].forEach((el, i) => {
+    dimsWorld.set(...d.dims[i].labelAt).applyMatrix4(productGroup.matrixWorld).project(camera);
+    const visible = dimsWorld.z < 1;
+    el.style.visibility = visible ? 'visible' : 'hidden';
+    if (!visible) return;
+    const hw = el.offsetWidth / 2 + DIMS_EDGE_PX, hh = el.offsetHeight / 2 + DIMS_EDGE_PX;
+    const x = Math.min(w - hw, Math.max(hw, (dimsWorld.x + 1) / 2 * w));
+    const y = Math.min(h - hh, Math.max(hh, (1 - dimsWorld.y) / 2 * h));
+    el.style.transform = 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px) translate(-50%, -50%)';
+  });
+}
+
+function stepDims() {
+  if (dimsFade) {
+    if (dimsFade.start === null) dimsFade.start = performance.now();
+    const t = window.Motion.fadeAt((performance.now() - dimsFade.start) / 1000, DIMS_FADE_S);
+    applyDims(dimsFade.from + (dimsFade.to - dimsFade.from) * t);
+    if (t >= 1) dimsFade = null;
+  }
+  placeDimLabels();
+}
+
+function setDimensions(on) {
+  dimsOn = !!on && canShowDimensions();
+  const to = dimsOn ? 1 : 0;
+  if (reducedMotion.matches) { dimsFade = null; applyDims(to); placeDimLabels(); return; }
+  dimsFade = { from: dimsShown, to, start: null };
+}
+
+function canShowDimensions() {
+  return !!(hasModel && lastModel && window.Dimensions3d.build(lastModel, lastLayout).length);
+}
+
 // ---- camera --------------------------------------------------------------
 
 function currentDirection() {
@@ -1165,6 +1274,12 @@ function init(canvasEl) {
   controls.maxPolarAngle = Math.PI * 0.49;
   controls.addEventListener('start', () => { userAdjusted = true; stopCameraMove(); });
 
+  dimsLabels = document.createElement('div');
+  dimsLabels.className = 'viewer-dims';
+  dimsLabels.hidden = true;
+  dimsLabels.setAttribute('aria-hidden', 'true');
+  canvasEl.parentElement.appendChild(dimsLabels);
+
   resizeObserver = new ResizeObserver(() => resize());
   resizeObserver.observe(canvasEl.parentElement);
   resize();
@@ -1178,6 +1293,7 @@ function init(canvasEl) {
     stepRoomFade();
     if (cameraMove) stepCamera(dt);
     else controls.update();
+    stepDims();
     renderer.render(scene, camera);
   }
   animate();
@@ -1234,6 +1350,7 @@ function update(geometryModel, materialDescriptor) {
 }
 
 function rebuild(geometryModel, materialDescriptor) {
+  lastModel = geometryModel;
   const geometryKey = JSON.stringify(geometryModel);
   const layout = window.SceneLayout.buildSceneLayout(geometryModel);
   const structure = geometryModel.productKey + '#' + structureOf(layout);
@@ -1242,6 +1359,7 @@ function rebuild(geometryModel, materialDescriptor) {
   if (productGroup) {
     scene.remove(productGroup);
     disposeRoom(productGroup);
+    disposeDims(productGroup);
     disposeGroup(productGroup);
   }
   productGroup = buildProductGroup(layout, materialDescriptor);
@@ -1272,6 +1390,7 @@ function rebuild(geometryModel, materialDescriptor) {
   lastProductKey = geometryModel.productKey;
   if (resized) startMorph(resized, layout.bounds);
   showRoom();
+  if (dimsOn || dimsShown > 0) applyDims(dimsShown);
   const first = !hasModel;
   hasModel = true;
   if (action === 'reset') setView(cameraPresetTracker.getDefaultPreset(), !first);
@@ -1336,6 +1455,8 @@ function capture(presetName, { width, height }) {
   const studio = onScreen.room === 0 && onScreen.lamps === 0 && !roomFade;
   try {
     if (!studio) applyRoomState(roomTarget('studio'));
+    const dimLines = productGroup.userData.dims && productGroup.userData.dims.lines;
+    if (dimLines) dimLines.visible = false;
     renderer.setPixelRatio(1);
     renderer.setSize(width, height, false);
     camera.aspect = width / height;
@@ -1344,6 +1465,7 @@ function capture(presetName, { width, height }) {
     url = renderer.domElement.toDataURL('image/jpeg', 0.9);
   } finally {
     if (!studio) applyRoomState(onScreen);
+    if (productGroup.userData.dims) productGroup.userData.dims.lines.visible = dimsShown > 0;
     restoreView(saved, size);
   }
   return url;
@@ -1368,7 +1490,8 @@ function dispose() {
   if (frameId !== null) cancelAnimationFrame(frameId);
   if (pendingResize) { clearTimeout(pendingResize.timer); pendingResize = null; }
   if (resizeObserver) resizeObserver.disconnect();
-  if (productGroup) { disposeRoom(productGroup); disposeGroup(productGroup); }
+  if (productGroup) { disposeRoom(productGroup); disposeDims(productGroup); disposeGroup(productGroup); }
+  if (dimsLabels) dimsLabels.remove();
   if (controls) controls.dispose();
   if (scene && scene.environment) scene.environment.dispose();
   if (textures) Object.values(textures).forEach(t => t.dispose());
@@ -1380,6 +1503,7 @@ function dispose() {
   renderer = scene = camera = controls = productGroup = currentCanvas = resizeObserver = null;
   keyLight = fillLight = rimLight = hemiLight = null;
   roomLights = []; roomFade = null; lampsLayout = null;
+  dimsLabels = null; dimsOn = false; dimsShown = 0; dimsFade = null; lastModel = null;
   shown = { room: 0, glow: 0, lamps: 0, front: null };
   cameraPresetTracker = null;
   textures = null;
@@ -1387,6 +1511,6 @@ function dispose() {
   cameraMove = null; morph = null; lastFrameTime = 0;
 }
 
-const ThreeScene = { init, update, setView, resetView, showEdge, canShowEdge, setRoom, roomOptions, capture, dispose };
+const ThreeScene = { init, update, setView, resetView, showEdge, canShowEdge, setRoom, roomOptions, setDimensions, canShowDimensions, capture, dispose };
 window.ThreeScene = ThreeScene;
 export default ThreeScene;
