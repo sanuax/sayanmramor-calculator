@@ -879,3 +879,17 @@ test('the profile stays off the wall and the joints: main run, wings and sills l
   const sill = named(layoutFor('podokonnik', { width: { value: '300' }, length: { value: '1500' }, productSubcategory: { value: 'SILL-02' }, 'edge-type': { value: 'rounding' } }), 'main')[0];
   assert.ok(sill.closed && sill.closed.length > 0, 'a sill: along the window and at the walls');
 });
+
+// Smooth changes (2026-10-22): the camera glides, a new size eases in once
+// typing pauses, a new stone fades in -- all of it skipped under «reduce
+// motion»; a passport shot never shows a model mid-change; at rest the
+// stone is sampled exactly as before.
+test('3D changes ease in, except under reduced motion; shots and the resting stone are unaffected', () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'visualizer', 'three-scene.js'), 'utf8');
+  assert.match(src, /matchMedia\('\(prefers-reduced-motion: reduce\)'\)/);
+  assert.match(src, /if \(!smooth \|\| reducedMotion\.matches \|\| !hasModel\)/, 'camera: no glide');
+  assert.match(src, /!reducedMotion\.matches && productGroup\.userData\.shape === shapeOf/, 'sizes: at once');
+  const capture = src.slice(src.indexOf('function capture('), src.indexOf('\n}\n', src.indexOf('function capture(')));
+  assert.match(capture, /flushResize\(\);/);
+  assert.match(src, /\} else \{\n    diffuseColor \*= stoneNow;\n  \}/, 'at rest: the stone as before');
+});

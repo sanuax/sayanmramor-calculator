@@ -19,6 +19,11 @@ let hasModel = false;
 // True once the client orbits/zooms by hand -- until then, a canvas resize
 // (e.g. entering the Result layout) reframes the model automatically.
 let userAdjusted = false;
+// The client's «reduce motion» setting: views, sizes and stones change at once.
+const reducedMotion = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
+let cameraMove = null;   // a glide to a new view: { spring, goal }
+let morph = null;        // the model easing to a new size: { spring } over the shown bounds
+let lastFrameTime = 0;
 let textures = null;
 
 const FOV_DEG = 32;
@@ -193,7 +198,11 @@ function loadStonePhoto(desc) {
     img.onload = () => {
       // The renderer may have been disposed while the photo was loading.
       if (!renderer) { resolve(null); return; }
-      try { record.entry = photoTexture(img, desc); } catch (e) { record.entry = null; }
+      try {
+        record.entry = photoTexture(img, desc);
+        // Uploaded now, while nothing moves, not in a fade's first frame.
+        renderer.initTexture(record.entry.texture);
+      } catch (e) { record.entry = null; }
       resolve(record.entry);
     };
     // A missing or broken photo: the procedural stone stays -- no error UI.
@@ -246,15 +255,113 @@ function scaledTexture(source, perMetre, desc) {
 // then the stone's photo once it is loaded. The procedural look -- the
 // stone's listed color over soft mottling -- is shown meanwhile and stays
 // for a stone without a usable photo.
-function applyStone(materials, desc) {
+//
+// Another stone on the same model: the stone on screen stays
+// until the new one's photo is ready, then the new one fades in over it
+// (STONE_FADE_S) -- no flash of the procedural look between two photos. A
+// photo that takes long (PHOTO_WAIT_S) fades in the procedural look first.
+const STONE_FADE_S = 0.35;
+const PHOTO_WAIT_S = 0.6;
+
+// A look: the map and tint on the stone, and its whole finish.
+const baseFinish = desc => ({ roughness: desc.roughness, metalness: desc.metalness || 0, bumpScale: desc.bumpScale });
+
+function proceduralLook(materials, desc) {
+  return { ...baseFinish(desc), map: materials.cloud, color: new THREE.Color(desc.fallbackColor), envMapIntensity: desc.envMapIntensity,
+    clearcoat: desc.clearcoat || 0, clearcoatRoughness: desc.clearcoatRoughness, tiles: null,
+    seam: new THREE.Color(desc.fallbackColor).multiplyScalar(0.62) };
+}
+
+function photoLook(materials, desc, photo) {
+  const tuned = window.MaterialAdapter.adjustForLuminance(desc, photo.luminance);
+  const tiles = materials.tiled && window.MaterialAdapter.tileParams(materials.tiled.tiling, materials.tiled.projection, desc.patternSizeM);
+  return { ...baseFinish(desc), map: photo.texture, color: new THREE.Color(PHOTO_TINT), envMapIntensity: tuned.envMapIntensity,
+    clearcoat: tuned.clearcoat, clearcoatRoughness: tuned.clearcoatRoughness, tiles: tiles || null,
+    seam: new THREE.Color().setRGB(...photo.color, THREE.SRGBColorSpace).multiplyScalar(0.62) };
+}
+
+// The finish numbers a fade moves between.
+const FADED = ['roughness', 'metalness', 'clearcoat', 'clearcoatRoughness', 'bumpScale', 'envMapIntensity'];
+const finishOf = stone => Object.fromEntries(FADED.map(k => [k, stone[k]]));
+
+// What is on screen now becomes the "before" a fade starts from: its photo
+// (or procedural map) with its placement, tint, tiling, finish and UVs.
+// Mid-fade, the nearer of the two looks is kept.
+function holdCurrentLook(materials) {
+  const stone = materials.stone, u = stone.userData.tileUniforms;
+  if (materials.fade && u.stoneMix.value < 0.5) return;
+  stone.map.updateMatrix();
+  u.stonePrevMap.value = stone.map;
+  u.stonePrevTransform.value.copy(stone.map.matrix);
+  u.stonePrevColor.value.copy(stone.color);
+  u.stonePrevTileOn.value = u.stoneTileOn.value;
+  u.stonePrevTileCell.value.copy(u.stoneTileCell.value);
+  u.stonePrevTileRoom.value.copy(u.stoneTileRoom.value);
+  u.stonePrevTileSplit.value.copy(u.stoneTileSplit.value);
+  productGroup.userData.stoneMeshes.forEach(({ mesh }) => mesh.geometry.setAttribute('stoneUvPrev', mesh.geometry.getAttribute('uv')));
+  materials.heldFinish = finishOf(stone);
+}
+
+// Puts a look on the material: at once, or fading in over the held one.
+function showLook(materials, look, fade) {
+  const stone = materials.stone, u = stone.userData.tileUniforms;
+  stone.color.copy(look.color);
+  stone.map = look.map;
+  FADED.forEach(k => { stone[k] = look[k]; });
+  u.stoneTileOn.value = look.tiles ? 1 : 0;
+  if (look.tiles) {
+    u.stoneTileCell.value.set(...look.tiles.cell);
+    u.stoneTileRoom.value.set(...look.tiles.room);
+    u.stoneTileSplit.value.set(...look.tiles.split);
+  }
+  stone.needsUpdate = true;
+  materials.seam.color.copy(look.seam);
+  materials.pending = null;
+  if (fade && materials.heldFinish) {
+    materials.fade = { start: null, from: materials.heldFinish, to: finishOf(stone) };
+    Object.assign(stone, materials.heldFinish);
+    u.stoneMix.value = 0;
+  } else {
+    materials.fade = { to: finishOf(stone) };
+    finishFade(materials);
+  }
+}
+
+function finishFade(materials) {
+  const stone = materials.stone, u = stone.userData.tileUniforms;
+  if (materials.fade) Object.assign(stone, materials.fade.to);
+  materials.fade = null;
+  u.stoneMix.value = 1;
+  u.stonePrevMap.value = stone.map;
+  (materials.retired || []).forEach(t => t.dispose());
+  materials.retired = [];
+}
+
+// One frame of a running fade; a look held for a loading photo waits.
+function stepFade(materials) {
+  const fade = materials.fade;
+  if (!fade || materials.pending) return;
+  // The fade runs from the first frame that draws it.
+  if (fade.start === null) fade.start = performance.now();
+  const t = window.Motion.fadeAt((performance.now() - fade.start) / 1000, STONE_FADE_S);
+  if (t >= 1) { finishFade(materials); return; }
   const stone = materials.stone;
-  (materials.owned || []).forEach(t => t.dispose());
+  FADED.forEach(k => { stone[k] = fade.from[k] + (fade.to[k] - fade.from[k]) * t; });
+  stone.userData.tileUniforms.stoneMix.value = t;
+}
+
+// `fade`: the caller has held the look on screen (holdCurrentLook) and the
+// new stone fades in over it.
+function applyStone(materials, desc, fade) {
+  const stone = materials.stone;
+  // The old maps go once nothing shows them any more.
+  materials.retired = (materials.retired || []).concat(materials.owned || []);
+  if (!fade) { materials.retired.forEach(t => t.dispose()); materials.retired = []; }
   const grain = scaledTexture(textures.grain, 1.5, desc);
   const cloud = scaledTexture(proceduralMap(desc.procedural), desc.procedural.pattern === 'speckle' ? 2.5 : 0.6, desc);
   materials.owned = [grain, cloud];
+  materials.cloud = cloud;
   materials.descriptor = desc;
-  stone.color.set(desc.fallbackColor);
-  stone.map = cloud;
   stone.roughness = desc.roughness;
   stone.roughnessMap = desc.microGrain ? grain : null;
   stone.metalness = desc.metalness || 0;
@@ -263,39 +370,49 @@ function applyStone(materials, desc) {
   stone.bumpMap = desc.bumpScale > 0 ? grain : null;
   stone.bumpScale = desc.bumpScale;
   stone.envMapIntensity = desc.envMapIntensity;
-  stone.userData.tileUniforms.stoneTileOn.value = 0;
-  stone.needsUpdate = true;
-  materials.seam.color.set(desc.fallbackColor).multiplyScalar(0.62);
+  const current = () => materials.descriptor === desc && productGroup && productGroup.userData.materials === materials;
 
+  const cached = desc.source === 'image' && stoneTextures.get(desc.imageUrl);
+  if (cached && cached.entry) {
+    cached.lastUsed = ++stoneUseCounter;
+    showLook(materials, photoLook(materials, desc, cached.entry), fade);
+    return;
+  }
+  if (desc.source !== 'image' || !fade) {
+    showLook(materials, proceduralLook(materials, desc), fade);
+  } else {
+    // The stone on screen (its finish too) stays while the photo loads.
+    materials.pending = desc;
+    materials.fade = { from: materials.heldFinish, to: finishOf(stone) };
+    Object.assign(stone, materials.heldFinish);
+    stone.userData.tileUniforms.stoneMix.value = 0;
+    stone.needsUpdate = true;
+    setTimeout(() => {
+      if (current() && materials.pending === desc) showLook(materials, proceduralLook(materials, desc), true);
+    }, PHOTO_WAIT_S * 1000);
+  }
   if (desc.source !== 'image') return;
   loadStonePhoto(desc).then(photo => {
     // Only if this stone is still the one on screen.
-    if (!photo || materials.descriptor !== desc || !productGroup || productGroup.userData.materials !== materials) return;
-    const tuned = window.MaterialAdapter.adjustForLuminance(desc, photo.luminance);
-    stone.color.set(PHOTO_TINT);
-    stone.map = photo.texture;
-    stone.envMapIntensity = tuned.envMapIntensity;
-    stone.clearcoat = tuned.clearcoat;
-    stone.clearcoatRoughness = tuned.clearcoatRoughness;
-    const tiles = materials.tiled && window.MaterialAdapter.tileParams(materials.tiled.tiling, materials.tiled.projection, desc.patternSizeM);
-    if (tiles) {
-      const u = stone.userData.tileUniforms;
-      u.stoneTileCell.value.set(...tiles.cell);
-      u.stoneTileRoom.value.set(...tiles.room);
-      u.stoneTileSplit.value.set(...tiles.split);
-      u.stoneTileOn.value = 1;
-    }
-    stone.needsUpdate = true;
-    materials.seam.color.setRGB(...photo.color, THREE.SRGBColorSpace).multiplyScalar(0.62);
+    if (!photo || !current()) return;
+    const smoothly = !reducedMotion.matches;
+    if (smoothly && !materials.pending) holdCurrentLook(materials);
+    showLook(materials, photoLook(materials, desc, photo), smoothly);
   });
 }
 
 // Tiled surfaces (see MaterialAdapter.tileCoords): the photo is sampled
 // per tile -- each tile its own region, chosen by a fixed hash of the tile's
 // grid cell. textureGrad keeps the mip level continuous across the joints.
+// During a fade the stone shown before is sampled the same way, from its
+// own photo, UVs and tiling (the stonePrev* uniforms), and mixed under it;
+// at rest (stoneMix 1) only the stone on screen is sampled.
 const STONE_TILE_VERTEX = `
 attribute vec2 stoneTile;
 varying vec2 vStoneTile;
+attribute vec2 stoneUvPrev;
+uniform mat3 stonePrevTransform;
+varying vec2 vStonePrevUv;
 `;
 const STONE_TILE_FRAGMENT = `
 uniform float stoneTileOn;
@@ -303,21 +420,38 @@ uniform vec2 stoneTileCell;
 uniform vec2 stoneTileRoom;
 uniform vec2 stoneTileSplit;
 varying vec2 vStoneTile;
-`;
-const STONE_TILE_MAP = `
-#ifdef USE_MAP
-  vec2 stoneUv = vMapUv;
-  vec2 stoneGx = dFdx(vMapUv), stoneGy = dFdy(vMapUv);
-  vec2 tileGx = dFdx(vStoneTile) * stoneTileCell, tileGy = dFdy(vStoneTile) * stoneTileCell;
-  if (stoneTileOn > 0.5 && vStoneTile.x > -1000.0) {
-    vec2 cell = floor(vStoneTile) * stoneTileSplit;
+uniform float stoneMix;
+uniform sampler2D stonePrevMap;
+uniform vec3 stonePrevColor;
+uniform float stonePrevTileOn;
+uniform vec2 stonePrevTileCell;
+uniform vec2 stonePrevTileRoom;
+uniform vec2 stonePrevTileSplit;
+varying vec2 vStonePrevUv;
+vec4 stoneSample(sampler2D tex, vec2 baseUv, float tileOn, vec2 tileCell, vec2 tileRoom, vec2 tileSplit) {
+  vec2 stoneUv = baseUv;
+  vec2 stoneGx = dFdx(baseUv), stoneGy = dFdy(baseUv);
+  vec2 tileGx = dFdx(vStoneTile) * tileCell, tileGy = dFdy(vStoneTile) * tileCell;
+  if (tileOn > 0.5 && vStoneTile.x > -1000.0) {
+    vec2 cell = floor(vStoneTile) * tileSplit;
     vec2 pick = fract(sin(vec2(dot(cell, vec2(127.1, 311.7)), dot(cell, vec2(269.5, 183.3)))) * 43758.5453);
     // Split axes restart the photo in every tile; a joint-free axis runs on.
-    stoneUv = mix(vStoneTile, fract(vStoneTile), stoneTileSplit) * stoneTileCell + pick * stoneTileRoom;
+    stoneUv = mix(vStoneTile, fract(vStoneTile), tileSplit) * tileCell + pick * tileRoom;
     stoneGx = tileGx;
     stoneGy = tileGy;
   }
-  diffuseColor *= textureGrad(map, stoneUv, stoneGx, stoneGy);
+  return textureGrad(tex, stoneUv, stoneGx, stoneGy);
+}
+`;
+const STONE_TILE_MAP = `
+#ifdef USE_MAP
+  vec4 stoneNow = stoneSample(map, vMapUv, stoneTileOn, stoneTileCell, stoneTileRoom, stoneTileSplit);
+  if (stoneMix < 1.0) {
+    vec4 stoneBefore = vec4(stonePrevColor, diffuseColor.a) * stoneSample(stonePrevMap, vStonePrevUv, stonePrevTileOn, stonePrevTileCell, stonePrevTileRoom, stonePrevTileSplit);
+    diffuseColor = mix(stoneBefore, diffuseColor * stoneNow, stoneMix);
+  } else {
+    diffuseColor *= stoneNow;
+  }
 #endif
 `;
 
@@ -328,11 +462,20 @@ function buildStoneMaterial(desc) {
     stoneTileCell: { value: new THREE.Vector2(1, 1) },
     stoneTileRoom: { value: new THREE.Vector2(0, 0) },
     stoneTileSplit: { value: new THREE.Vector2(1, 1) },
+    stoneMix: { value: 1 },
+    stonePrevMap: { value: null },
+    stonePrevTransform: { value: new THREE.Matrix3() },
+    stonePrevColor: { value: new THREE.Color() },
+    stonePrevTileOn: { value: 0 },
+    stonePrevTileCell: { value: new THREE.Vector2(1, 1) },
+    stonePrevTileRoom: { value: new THREE.Vector2(0, 0) },
+    stonePrevTileSplit: { value: new THREE.Vector2(1, 1) },
   };
   stone.userData.tileUniforms = uniforms;
   stone.onBeforeCompile = shader => {
     Object.assign(shader.uniforms, uniforms);
-    shader.vertexShader = STONE_TILE_VERTEX + shader.vertexShader.replace('#include <uv_vertex>', '#include <uv_vertex>\n  vStoneTile = stoneTile;');
+    shader.vertexShader = STONE_TILE_VERTEX + shader.vertexShader.replace('#include <uv_vertex>',
+      '#include <uv_vertex>\n  vStoneTile = stoneTile;\n  vStonePrevUv = (stonePrevTransform * vec3(stoneUvPrev, 1.0)).xy;');
     shader.fragmentShader = STONE_TILE_FRAGMENT + shader.fragmentShader.replace('#include <map_fragment>', STONE_TILE_MAP);
   };
   stone.customProgramCacheKey = () => 'stone-tiles';
@@ -512,8 +655,10 @@ function captureStoneMesh(mesh, part, index) {
 // pattern size (see MaterialAdapter.partProjection).
 function projectStoneUVs(group, desc) {
   group.userData.stoneMeshes.forEach(({ mesh, positions, normals, projection }) => {
-    const uv = window.MaterialAdapter.stoneUVs(positions, normals, { projection, patternSizeM: desc.patternSizeM });
-    mesh.geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    const uv = new THREE.BufferAttribute(window.MaterialAdapter.stoneUVs(positions, normals, { projection, patternSizeM: desc.patternSizeM }), 2);
+    mesh.geometry.setAttribute('uv', uv);
+    // The UVs a fade samples the stone shown before with (holdCurrentLook).
+    if (!mesh.geometry.getAttribute('stoneUvPrev')) mesh.geometry.setAttribute('stoneUvPrev', uv);
   });
   group.userData.patternSizeM = desc.patternSizeM.join('x');
 }
@@ -580,7 +725,7 @@ function disposeGroup(group) {
   const materials = group.userData.materials || {};
   // Photo textures belong to the cache, not to a material; only this
   // group's own scaled copies are released here.
-  (materials.owned || []).forEach(t => t.dispose());
+  (materials.owned || []).concat(materials.retired || []).forEach(t => t.dispose());
   Object.values(materials).forEach(m => { if (m && m.isMaterial) m.dispose(); });
 }
 
@@ -613,17 +758,151 @@ function currentDirection() {
   return d.lengthSq() > 1e-9 ? [d.x, d.y, d.z] : [1, 0.8, 1];
 }
 
-function frame(direction) {
-  if (!lastBounds) return;
+// Where the camera goes to show the whole product from `direction`.
+function fitView(direction) {
   const fit = window.CameraFraming.fitCamera({ bounds: lastBounds, direction, fovDeg: FOV_DEG, aspect: camera.aspect, padding: framePadding });
-  controls.target.set(...fit.target);
-  camera.position.set(...fit.position);
-  camera.near = Math.max(0.01, fit.distance / 100);
-  camera.far = fit.distance * 40;
+  return {
+    target: fit.target, position: fit.position,
+    near: Math.max(0.01, fit.distance / 100), far: fit.distance * 40,
+    minDistance: fit.distance * 0.3, maxDistance: fit.distance * 3.5,
+  };
+}
+
+function placeCamera(view) {
+  controls.target.set(...view.target);
+  camera.position.set(...view.position);
+  camera.near = view.near;
+  camera.far = view.far;
   camera.updateProjectionMatrix();
-  controls.minDistance = fit.distance * 0.3;
-  controls.maxDistance = fit.distance * 3.5;
+  controls.minDistance = view.minDistance;
+  controls.maxDistance = view.maxDistance;
   controls.update();
+}
+
+// `smooth`: the camera glides there (moveCamera) instead of jumping.
+function frame(direction, smooth) {
+  if (!lastBounds) return;
+  moveCamera(fitView(direction), smooth);
+}
+
+// The camera glides to a new view around the model, never through it: the
+// target, the angles around it (as OrbitControls has them: azimuth about the
+// vertical, tilt from straight above -- so a glide into the top view turns
+// the picture smoothly instead of snapping at the end) and the distance (on
+// a log scale, so a close look and a whole kitchen move alike) each ease
+// toward the view (Motion, a critically damped spring); a new view mid-way
+// is picked up without a jump. Grabbing the model stops the glide.
+function cameraValues(target, position) {
+  const d = [position[0] - target[0], position[1] - target[1], position[2] - target[2]];
+  const dist = Math.hypot(d[0], d[1], d[2]) || 1e-6;
+  const azimuth = Math.atan2(d[0], d[2]);
+  const tilt = Math.acos(Math.max(-1, Math.min(1, d[1] / dist)));
+  return [target[0], target[1], target[2], azimuth, tilt, Math.log(dist)];
+}
+
+// The goal's azimuth the short way round from where the camera is.
+function nearAzimuth(values, from) {
+  const turn = 2 * Math.PI;
+  values[3] = from + ((((values[3] - from) % turn) + turn + Math.PI) % turn) - Math.PI;
+  return values;
+}
+
+function moveCamera(view, smooth) {
+  if (!smooth || reducedMotion.matches || !hasModel) {
+    cameraMove = null;
+    placeCamera(view);
+    return;
+  }
+  if (!cameraMove) {
+    cameraMove = { spring: window.Motion.createSpring(cameraValues(controls.target.toArray(), camera.position.toArray())) };
+  }
+  cameraMove.goal = view;
+  window.Motion.retarget(cameraMove.spring, nearAzimuth(cameraValues(view.target, view.position), cameraMove.spring.x[3]));
+}
+
+function stepCamera(dt) {
+  const { spring, goal } = cameraMove;
+  if (window.Motion.step(spring, dt, 2e-4)) {
+    cameraMove = null;
+    placeCamera(goal);
+    return;
+  }
+  const [tx, ty, tz, azimuth, tilt, logDist] = spring.x;
+  const dist = Math.exp(logDist);
+  controls.target.set(tx, ty, tz);
+  camera.position.set(tx + dist * Math.sin(tilt) * Math.sin(azimuth), ty + dist * Math.cos(tilt), tz + dist * Math.sin(tilt) * Math.cos(azimuth));
+  camera.lookAt(controls.target);
+  camera.near = Math.max(0.005, dist / 100);
+  camera.far = Math.max(goal.far, dist * 40);
+  camera.updateProjectionMatrix();
+}
+
+// The client takes over mid-glide: the camera stays where it is, and the
+// zoom limits leave room for that distance.
+function stopCameraMove() {
+  if (!cameraMove) return;
+  const { goal } = cameraMove;
+  cameraMove = null;
+  const dist = camera.position.distanceTo(controls.target);
+  controls.minDistance = Math.min(goal.minDistance, dist);
+  controls.maxDistance = Math.max(goal.maxDistance, dist);
+}
+
+// The direction the camera is looking from -- or, mid-glide, going to.
+function viewDirection() {
+  if (!cameraMove) return currentDirection();
+  const g = cameraMove.goal;
+  return [g.position[0] - g.target[0], g.position[1] - g.target[1], g.position[2] - g.target[2]];
+}
+
+// ---- the model easing to a new size ----------------------------------------
+
+// A new size of the same product (the same parts, only longer, wider, ...):
+// the model eases from the size on screen to the new one instead of jumping
+// -- the new model is drawn stretched to the old one's bounds and relaxes to
+// its own (Motion; the bounds on screen spring toward the new bounds, so a
+// size typed digit by digit is followed without jumps). Lights and shadows
+// follow the bounds on screen. A product that gains or loses parts (a wing,
+// a sink, another step count) changes at once.
+function structureOf(layout) {
+  return layout.parts.map(p => [p.kind, p.role, p.name || '', p.outline ? p.outline.length : 0, (p.holes || []).length].join(':')).join('|');
+}
+
+const boundsValues = b => b.min.concat(b.max);
+
+function shownBounds() {
+  if (!morph) return lastBounds;
+  const x = morph.spring.x;
+  return { min: x.slice(0, 3), max: x.slice(3, 6) };
+}
+
+function startMorph(from, to) {
+  if (!morph) morph = { spring: window.Motion.createSpring(boundsValues(from)) };
+  window.Motion.retarget(morph.spring, boundsValues(to));
+  applyMorph();
+}
+
+// Maps the product's own bounds onto the bounds on screen.
+function applyMorph() {
+  const shown = shownBounds(), own = lastBounds;
+  for (let i = 0; i < 3; i++) {
+    const size = own.max[i] - own.min[i];
+    const s = size > 1e-6 ? (shown.max[i] - shown.min[i]) / size : 1;
+    productGroup.scale.setComponent(i, s);
+    productGroup.position.setComponent(i, shown.min[i] - s * own.min[i]);
+  }
+  placeLights(shown);
+}
+
+function stepMorph(dt) {
+  if (window.Motion.step(morph.spring, dt, 1e-4)) {
+    morph = null;
+    productGroup.scale.set(1, 1, 1);
+    productGroup.position.set(0, 0, 0);
+    placeLights(lastBounds);
+    return;
+  }
+  applyMorph();
 }
 
 function init(canvasEl) {
@@ -661,15 +940,20 @@ function init(canvasEl) {
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
   controls.maxPolarAngle = Math.PI * 0.49;
-  controls.addEventListener('start', () => { userAdjusted = true; });
+  controls.addEventListener('start', () => { userAdjusted = true; stopCameraMove(); });
 
   resizeObserver = new ResizeObserver(() => resize());
   resizeObserver.observe(canvasEl.parentElement);
   resize();
 
-  function animate() {
+  function animate(now) {
     frameId = requestAnimationFrame(animate);
-    controls.update();
+    const dt = lastFrameTime && now ? (now - lastFrameTime) / 1000 : 0;
+    lastFrameTime = now || 0;
+    if (morph) stepMorph(dt);
+    if (productGroup) stepFade(productGroup.userData.materials);
+    if (cameraMove) stepCamera(dt);
+    else controls.update();
     renderer.render(scene, camera);
   }
   animate();
@@ -684,10 +968,27 @@ function resize() {
   camera.updateProjectionMatrix();
   // A new canvas shape (Result layout, rotating a phone) changes what fits:
   // reframe, unless the client is currently looking around by hand.
-  if (hasModel && !userAdjusted) frame(currentDirection());
+  if (hasModel && !userAdjusted) frame(viewDirection(), !!cameraMove);
+}
+
+// Only sizes changed (the same product, parts and choices): while a size is
+// being typed digit by digit the model would pass through 1 mm, 15 mm, ...
+// so the 3D waits for a pause (RESIZE_SETTLE_MS) and then eases straight to
+// the size typed. Anything else changes at once.
+const RESIZE_SETTLE_MS = 350;
+let pendingResize = null;   // { geometryModel, materialDescriptor, timer }
+const shapeOf = geometryModel => JSON.stringify(geometryModel, (k, v) => (typeof v === 'number' ? 0 : v));
+
+function flushResize() {
+  if (!pendingResize) return;
+  const { geometryModel, materialDescriptor, timer } = pendingResize;
+  clearTimeout(timer);
+  pendingResize = null;
+  rebuild(geometryModel, materialDescriptor);
 }
 
 function update(geometryModel, materialDescriptor) {
+  if (pendingResize) { clearTimeout(pendingResize.timer); pendingResize = null; }
   // Same geometry, another stone (or the same one again): only the stone
   // material changes -- meshes, lights, camera and controls stay as they are.
   const geometryKey = JSON.stringify(geometryModel);
@@ -695,19 +996,36 @@ function update(geometryModel, materialDescriptor) {
     const materials = productGroup.userData.materials;
     const previous = materials.descriptor;
     if (previous && JSON.stringify(previous) === JSON.stringify(materialDescriptor)) return;
+    const fade = !reducedMotion.matches && !!materials.stone.map;
+    if (fade) holdCurrentLook(materials);
     if (productGroup.userData.patternSizeM !== materialDescriptor.patternSizeM.join('x')) projectStoneUVs(productGroup, materialDescriptor);
-    applyStone(materials, materialDescriptor);
+    applyStone(materials, materialDescriptor, fade);
     return;
   }
+  if (productGroup && !reducedMotion.matches && productGroup.userData.shape === shapeOf(geometryModel)) {
+    pendingResize = { geometryModel, materialDescriptor, timer: setTimeout(flushResize, RESIZE_SETTLE_MS) };
+    return;
+  }
+  rebuild(geometryModel, materialDescriptor);
+}
+
+function rebuild(geometryModel, materialDescriptor) {
+  const geometryKey = JSON.stringify(geometryModel);
   const layout = window.SceneLayout.buildSceneLayout(geometryModel);
+  const structure = geometryModel.productKey + '#' + structureOf(layout);
+  const resized = productGroup && lastBounds && layout.bounds && !reducedMotion.matches
+    && productGroup.userData.structure === structure ? shownBounds() : null;
   if (productGroup) {
     scene.remove(productGroup);
     disposeGroup(productGroup);
   }
   productGroup = buildProductGroup(layout, materialDescriptor);
   productGroup.userData.geometryKey = geometryKey;
+  productGroup.userData.structure = structure;
+  productGroup.userData.shape = shapeOf(geometryModel);
   scene.add(productGroup);
-  if (layout.bounds) placeLights(layout.bounds);
+  if (!resized) morph = null;
+  if (layout.bounds && !resized) placeLights(layout.bounds);
 
   // Every update() adopts the current product's own default -- switching
   // products immediately changes what "Сбросить вид" returns to.
@@ -727,17 +1045,21 @@ function update(geometryModel, materialDescriptor) {
   lastLayout = layout;
   framePadding = layout.framePadding;
   lastProductKey = geometryModel.productKey;
+  if (resized) startMorph(resized, layout.bounds);
+  const first = !hasModel;
   hasModel = true;
-  if (action === 'reset') resetView();
-  else if (action === 'refit') { frame(currentDirection()); userAdjusted = false; }
+  if (action === 'reset') setView(cameraPresetTracker.getDefaultPreset(), !first);
+  else if (action === 'refit') { frame(viewDirection(), true); userAdjusted = false; }
 }
 
-function setView(presetName) {
+// The view buttons glide (`smooth` unless false); the first model is
+// placed at once.
+function setView(presetName, smooth) {
   // CAMERA_PRESETS lives in visualizer/constants.js -- one source of truth
   // for the view directions.
   const presetsByName = window.VisualizerConstants.CAMERA_PRESETS;
   const preset = presetsByName[presetName] || presetsByName.iso;
-  frame(preset.direction);
+  frame(preset.direction, smooth !== false);
   userAdjusted = false;
 }
 
@@ -746,12 +1068,12 @@ function setView(presetName) {
 function showEdge() {
   const view = canShowEdge() && window.CameraFraming.edgeCloseup(lastLayout);
   if (!view) return;
-  controls.target.set(...view.target);
-  camera.position.set(...view.position);
-  camera.near = Math.max(0.005, view.distance / 100);
-  camera.updateProjectionMatrix();
-  controls.minDistance = Math.min(controls.minDistance, view.distance * 0.4);
-  controls.update();
+  const limits = cameraMove ? cameraMove.goal : { minDistance: controls.minDistance, maxDistance: controls.maxDistance };
+  moveCamera({
+    target: view.target, position: view.position,
+    near: Math.max(0.005, view.distance / 100), far: camera.far,
+    minDistance: Math.min(limits.minDistance, view.distance * 0.4), maxDistance: limits.maxDistance,
+  }, true);
   userAdjusted = true;
 }
 
@@ -763,7 +1085,7 @@ function resetView() {
   // Deliberately NOT "the last view the user manually picked" -- always the
   // current product's own declared default, tracked separately from manual
   // setView() calls. See visualizer/camera-preset-tracker.js.
-  setView(cameraPresetTracker.getDefaultPreset());
+  setView(cameraPresetTracker.getDefaultPreset(), true);
 }
 
 // A still of the current product from a preset view, for the passport: the
@@ -773,6 +1095,8 @@ function resetView() {
 // client's own view (userAdjusted) is not touched.
 function capture(presetName, { width, height }) {
   if (!renderer || !hasModel || !lastBounds) return null;
+  flushResize();
+  if (morph) { morph.spring.x = morph.spring.goal.slice(); stepMorph(0); }
   const presets = window.VisualizerConstants.CAMERA_PRESETS;
   const preset = presets[presetName] || presets.iso;
   const size = renderer.getSize(new THREE.Vector2());
@@ -786,7 +1110,7 @@ function capture(presetName, { width, height }) {
     renderer.setPixelRatio(1);
     renderer.setSize(width, height, false);
     camera.aspect = width / height;
-    frame(preset.direction);
+    placeCamera(fitView(preset.direction));
     renderer.render(scene, camera);
     url = renderer.domElement.toDataURL('image/jpeg', 0.9);
   } finally {
@@ -812,6 +1136,7 @@ function restoreView(saved, size) {
 
 function dispose() {
   if (frameId !== null) cancelAnimationFrame(frameId);
+  if (pendingResize) { clearTimeout(pendingResize.timer); pendingResize = null; }
   if (resizeObserver) resizeObserver.disconnect();
   if (productGroup) disposeGroup(productGroup);
   if (controls) controls.dispose();
@@ -827,6 +1152,7 @@ function dispose() {
   cameraPresetTracker = null;
   textures = null;
   lastBounds = null; lastLayout = null; lastProductKey = null; hasModel = false; userAdjusted = false;
+  cameraMove = null; morph = null; lastFrameTime = 0;
 }
 
 const ThreeScene = { init, update, setView, resetView, showEdge, canShowEdge, capture, dispose };
