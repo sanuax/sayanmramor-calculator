@@ -15,7 +15,7 @@
   const isNode = typeof module !== 'undefined' && module.exports;
   const {
     VISUAL_FALLBACK_THICKNESS_M, VISUAL_FALLBACK_FLOOR_THICKNESS_M,
-    VISUAL_LAYOUT_MODULE_M, VISUAL_LARGE_FORMAT_MODULE_M, VISUAL_STAIR_TREAD_DEPTH_M,
+    VISUAL_LAYOUT_MODULE_M, VISUAL_LARGE_FORMAT_MODULE_M, VISUAL_STAIR_TREAD_DEPTH_M, VISUAL_STAIR_RISE_M,
   } = isNode ? require('./constants.js') : globalRoot.VisualizerConstants;
   const { resolveSinkCutout, resolveCooktopCutout, resolveHoles } = isNode ? require('./cutout-geometry.js') : globalRoot.CutoutGeometry;
   const { resolveBacksplash, resolveCurb, resolveWallPanel, resolveIsland, resolveBarCounter } = isNode ? require('./attachment-geometry.js') : globalRoot.AttachmentGeometry;
@@ -309,16 +309,26 @@
     };
   }
 
+  // The rise from step to step: with risers whose height the client entered,
+  // that riser under a tread of the drawn thickness -- so the 3D's riser is
+  // exactly the entered one; otherwise the usual rise.
+  function riseFor(risers, riserHeightM) {
+    return risers && riserHeightM > 0 ? riserHeightM + VISUAL_FALLBACK_THICKNESS_M : VISUAL_STAIR_RISE_M;
+  }
+
   function buildStairs(productKey, state) {
     const id = state.subcategory ? state.subcategory.id : null;
     if (productKey === 'stupeni') {
       // Type A: the entered size is ONE tread (see pricing.js) -- drawn as a
       // short illustrative flight of identical treads.
       const variant = STEP_VARIANTS[id] || 'straight';
+      const cfg = (state.productConfig && state.productConfig.stupeni) || {};
+      const risers = !!cfg.riser;
+      const riserHeightM = risers ? cfg.riserHeightM || 0 : 0;
       return {
         kind: 'steps',
         variant,
-        risers: !!(state.productConfig && state.productConfig.stupeni && state.productConfig.stupeni.riser),
+        risers, riserHeightM, riseM: riseFor(risers, riserHeightM),
         // The client's «Количество ступеней» -- drawn exactly.
         count: state.stepCount,
         plan: stairPlan('steps', variant, state.dimensions.lengthM, state.dimensions.widthM, state.stepCount),
@@ -328,8 +338,10 @@
       // Type B: the entered size is the cladded flight (width x run).
       const shape = STAIR_SHAPES[id] || 'straight';
       const cfg = state.productConfig && state.productConfig.lestnitsa;
+      const risers = STAIR_WITH_RISERS.includes(id);
+      const riserHeightM = risers && cfg ? cfg.riserHeightM || 0 : 0;
       return {
-        kind: 'flight', shape, risers: STAIR_WITH_RISERS.includes(id), count: state.stepCount,
+        kind: 'flight', shape, risers, riserHeightM, riseM: riseFor(risers, riserHeightM), count: state.stepCount,
         plan: stairPlan('flight', shape, state.dimensions.lengthM, state.dimensions.widthM, state.stepCount, cfg ? cfg.marches : undefined),
       };
     }
@@ -369,7 +381,7 @@
     const form = FacadeModel.getForm(type, cfg ? cfg.form : null);
     const params = {};
     form.params.forEach(p => { params[p.key] = cfg && cfg.complete ? cfg.params[p.key] : p.placeholderMm / 1000; });
-    return { type: type.key, form: form.id, params, quantity: cfg ? cfg.quantity : 1, cameraPreset: type.cameraPreset };
+    return { type: type.key, form: form.id, params, quantity: cfg ? cfg.quantity : 1, cameraPreset: type.cameraPreset, placeholder: !(cfg && cfg.complete) };
   }
 
   // ---- «Камины»: one plan of stone plates for the 3D, the area and the cut --

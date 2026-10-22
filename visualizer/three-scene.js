@@ -995,16 +995,18 @@ function buildDims(group) {
   const dims = window.Dimensions3d.build(lastModel, lastLayout);
   const points = [];
   const seg = (a, b) => points.push(...a, ...b);
+  const norm = v => { const l = Math.hypot(...v) || 1; return v.map(c => c / l); };
   dims.forEach(d => {
-    seg(d.line[0], d.line[1]);
+    // The line (a curve for an arc), its extension lines, and a short slash
+    // across each end, as on a drawing.
+    d.line.slice(1).forEach((p, i) => seg(d.line[i], p));
     d.extensions.forEach(([a, b]) => seg(a, b));
-    // A short slash across each end of the line, as on a drawing.
-    const dir = [0, 1, 2].map(i => d.line[1][i] - d.line[0][i]);
-    const len = Math.hypot(...dir) || 1;
-    const out = [0, 1, 2].map(i => d.extensions[0][1][i] - d.extensions[0][0][i]);
-    const outLen = Math.hypot(...out) || 1;
-    const slash = [0, 1, 2].map(i => (dir[i] / len + out[i] / outLen) * DIMS_TICK_M / Math.SQRT2);
-    d.line.forEach(p => seg([0, 1, 2].map(i => p[i] - slash[i]), [0, 1, 2].map(i => p[i] + slash[i])));
+    const last = d.line.length - 1;
+    [[d.line[0], d.line[1], d.tickOut[0]], [d.line[last], d.line[last - 1], d.tickOut[1]]].forEach(([p, q, out]) => {
+      const dir = norm([0, 1, 2].map(i => p[i] - q[i])), o = norm(out);
+      const slash = [0, 1, 2].map(i => (dir[i] + o[i]) * DIMS_TICK_M / Math.SQRT2);
+      seg([0, 1, 2].map(i => p[i] - slash[i]), [0, 1, 2].map(i => p[i] + slash[i]));
+    });
   });
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));

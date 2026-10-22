@@ -730,7 +730,7 @@ test('Г/П «с подступенками»: the landing at the turn has its o
     const risers = named(withRisers, 'riser');
     assert.equal(risers.length, 11, on + ': one riser per step plus the one under the landing edge');
     const landingE = extent(named(withRisers, 'landing')[0].outline);
-    const firstFlightTop = 5 * require('../visualizer/constants.js').VISUAL_STAIR_RISE_M;
+    const firstFlightTop = 5 * modelFor('lestnitsa', Object.assign({ productSubcategory: { value: on } }, dims)).stairs.riseM;
     const turn = risers.find(r => Math.abs(extent(r.outline).x1 - landingE.x1) < 1e-9 && Math.abs(r.y0 - firstFlightTop) < 1e-9);
     assert.ok(turn, on + ': a riser stands at the landing\'s front edge, from the first flight\'s top step up');
     assert.ok(Math.abs(turn.y1 - named(withRisers, 'landing')[0].y0) < 1e-9, on + ': ...up to the landing slab');

@@ -237,17 +237,17 @@
     const wallX = -W / 2;
     const alongWall = len => Math.min(len, L);
     if (m.backsplash) {
-      parts.push(box('stone', [wallX - 0.01, top + m.backsplash.heightM / 2, 0], [0.02, m.backsplash.heightM, alongWall(m.backsplash.lengthM)]));
+      parts.push(Object.assign(box('stone', [wallX - 0.01, top + m.backsplash.heightM / 2, 0], [0.02, m.backsplash.heightM, alongWall(m.backsplash.lengthM)]), { name: 'backsplash' }));
     }
     if (m.wallPanel) {
       // Directly on the wall; a backsplash, if any, stands in front of it.
       const x = wallX - (m.backsplash ? 0.02 : 0) - 0.01;
-      parts.push(box('stone', [x, top + m.wallPanel.heightM / 2, 0], [0.02, m.wallPanel.heightM, alongWall(m.wallPanel.lengthM)]));
+      parts.push(Object.assign(box('stone', [x, top + m.wallPanel.heightM / 2, 0], [0.02, m.wallPanel.heightM, alongWall(m.wallPanel.lengthM)]), { name: 'wall-panel' }));
     }
     if (m.curb) {
       // On the countertop, along the wall edge.
       const h = m.curb.heightM;
-      parts.push(box('stone', [wallX + h / 2, top + h / 2, 0], [h, h, alongWall(m.curb.lengthM)]));
+      parts.push(Object.assign(box('stone', [wallX + h / 2, top + h / 2, 0], [h, h, alongWall(m.curb.lengthM)]), { name: 'curb' }));
     }
 
     if (m.island) {
@@ -733,7 +733,7 @@
     }
     const form = m.surface && m.surface.form;
     if (m.productKey === 'stena' && form === 'radius') return radiusWallParts(m, runM, heightM, T);
-    const wall = box('stone', [0, y0 + heightM / 2, 0], [T, heightM, runM]);
+    const wall = named(box('stone', [0, y0 + heightM / 2, 0], [T, heightM, runM]), m.productKey === 'panno' ? 'panel' : 'wall');
     // The joints' grid on the room-side face, for the renderer to give each
     // piece its own stone (presentation only -- no geometry changes).
     if (m.surface && m.surface.pattern) {
@@ -846,6 +846,8 @@
 
   // ---- stairs and steps ---------------------------------------------------
 
+  // The usual rise; a stair with entered risers rises by them (GeometryModel
+  // stairs.riseM), passed to the flights as `rise`.
   const RISE = C.VISUAL_STAIR_RISE_M;
   const RISER_T = C.VISUAL_RISER_THICKNESS_M;
   // Plan angle (in the X/Z plane) of the stairs' default camera
@@ -872,6 +874,7 @@
 
   function straightFlight(parts, o) {
     const { origin, dir, across, width, count, depth, level, risers, bulge, T } = o;
+    const RISE = o.rise;
     const halfW = width / 2;
     for (let k = 0; k < count; k++) {
       const topY = (level + k + 1) * RISE;
@@ -912,6 +915,7 @@
   // flight turns away from there, so the climb stays readable.
   function fanFlight(parts, o) {
     const { rIn, rOut, count, angle, risers, T, column, straightOuter } = o;
+    const RISE = o.rise;
     const start = o.startAngle - angle / 2;
     const u = a => [Math.cos(a), Math.sin(a)];
     const outerSegments = straightOuter ? 1 : ARC_SEGMENTS;
@@ -967,6 +971,8 @@
   function stairParts(m) {
     const T = m.visualThicknessM;
     const s = m.stairs;
+    const RISE = s.riseM || C.VISUAL_STAIR_RISE_M;
+    const rise = RISE;
     const edge = m.edge ? m.edge.type : null;
     const parts = [];
     const up = [-1, 0], side = [0, 1]; // flights climb away from the viewer (toward X-)
@@ -978,12 +984,12 @@
       // Размер одной ступени x количество: N identical treads.
       const count = stepCountOf(s);
       if (s.variant === 'winder') {
-        fanFlight(parts, { rIn: p.rIn, rOut: p.rOut, count, angle: p.angle, risers: s.risers, T, edge, column: false, straightOuter: true, startAngle: VIEWER_ANGLE });
+        fanFlight(parts, { rIn: p.rIn, rOut: p.rOut, count, angle: p.angle, risers: s.risers, T, edge, column: false, straightOuter: true, startAngle: VIEWER_ANGLE, rise });
       } else {
         // A radius step: the side edges at edgeDepthM, the arc bowing out to
         // the full (entered) depth.
         const edgeDepth = p.edgeDepthM !== undefined ? p.edgeDepthM : p.treadDepthM;
-        straightFlight(parts, { origin: [0, 0], dir: up, across: side, width: p.treadLengthM, count, depth: edgeDepth, level: 0, risers: s.risers, bulge: p.bulgeM, T, edge });
+        straightFlight(parts, { origin: [0, 0], dir: up, across: side, width: p.treadLengthM, count, depth: edgeDepth, level: 0, risers: s.risers, bulge: p.bulgeM, T, edge, rise });
       }
       return { parts, floorY: 0 };
     }
@@ -994,7 +1000,7 @@
     const n = stepCountOf(s);
     const depth = p.treadDepthM;
     if (s.shape === 'spiral') {
-      fanFlight(parts, { rIn: p.rIn, rOut: p.rOut, count: n, angle: p.angle, risers: s.risers, T, edge, column: true, startAngle: VIEWER_ANGLE });
+      fanFlight(parts, { rIn: p.rIn, rOut: p.rOut, count: n, angle: p.angle, risers: s.risers, T, edge, column: true, startAngle: VIEWER_ANGLE, rise });
       return { parts, floorY: 0 };
     }
     // Every march and landing of the way up (GeometryModel.stairPath): the
@@ -1004,11 +1010,11 @@
     // starts behind it, as under every step.
     const path = p.path;
     if (!path) {
-      straightFlight(parts, { origin: [0, 0], dir: up, across: side, width, count: n, depth, level: 0, risers: s.risers, bulge: 0, T, edge });
+      straightFlight(parts, { origin: [0, 0], dir: up, across: side, width, count: n, depth, level: 0, risers: s.risers, bulge: 0, T, edge, rise });
       return { parts, floorY: 0 };
     }
     path.marches.forEach(m => {
-      straightFlight(parts, { origin: m.origin, dir: m.dir, across: m.across, width, count: m.count, depth: m.depth, level: m.level, risers: s.risers, bulge: 0, T, edge });
+      straightFlight(parts, { origin: m.origin, dir: m.dir, across: m.across, width, count: m.count, depth: m.depth, level: m.level, risers: s.risers, bulge: 0, T, edge, rise });
     });
     const at = (l, along, t) => [l.edge[0] + l.dir[0] * along + l.across[0] * t, l.edge[1] + l.dir[1] * along + l.across[1] * t];
     const wound = pts => {

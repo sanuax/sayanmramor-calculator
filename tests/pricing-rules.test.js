@@ -243,10 +243,12 @@ test('the 3D builds exactly that stair: every tread and landing at its level, la
       const landings = layout.parts.filter(p => p.name === 'landing');
       assert.equal(treads.length, M * n, id + ' x ' + M);
       assert.equal(landings.length, M - 1, id + ' x ' + M);
-      const plan = GeometryModel.buildGeometryModel(state).stairs.plan;
-      landings.forEach((l, i) => close(l.y1, plan.path.landings[i].top * RISE, 'landing ' + i + ' height'));
+      const { plan, riseM } = GeometryModel.buildGeometryModel(state).stairs;
+      // With its entered risers (170 mm) the stair rises by them plus a tread.
+      close(riseM, 0.17 + 0.04, 'the rise from the entered riser');
+      landings.forEach((l, i) => close(l.y1, plan.path.landings[i].top * riseM, 'landing ' + i + ' height'));
       // The treads climb one rise at a time, landings in between.
-      const tops = treads.map(t => Math.round(t.y1 / RISE)).sort((a, b) => a - b);
+      const tops = treads.map(t => Math.round(t.y1 / riseM)).sort((a, b) => a - b);
       const expected = [];
       plan.path.marches.forEach(m => { for (let k = 1; k <= m.count; k++) expected.push(m.level + k); });
       assert.deepEqual(tops, expected.sort((a, b) => a - b));
