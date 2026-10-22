@@ -893,3 +893,13 @@ test('3D changes ease in, except under reduced motion; shots and the resting sto
   assert.match(capture, /flushResize\(\);/);
   assert.match(src, /\} else \{\n    diffuseColor \*= stoneNow;\n  \}/, 'at rest: the stone as before');
 });
+
+// «Студия / День / Вечер» and the fronts' colour fade (2026-10-22), except
+// under reduced motion; a fade's new shaders are compiled before it starts.
+test('the room and the fronts fade in and out; shaders are ready before a fade starts', () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'visualizer', 'three-scene.js'), 'utf8');
+  const start = src.indexOf('function fadeRoomTo(');
+  const fade = src.slice(start, src.indexOf('\n}\n', start));
+  assert.match(fade, /if \(reducedMotion\.matches \|\| !hasModel\)/);
+  assert.match(fade, /compileAsync/);
+});

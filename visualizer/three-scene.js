@@ -769,23 +769,25 @@ function facadeColor() {
   return (list.find(f => f.id === facadeId) || list[0]).hex;
 }
 
+// The room fades in and out, so its materials are see-through from the start
+// (at full opacity they draw as solid ones).
 function roomMaterials() {
-  const flat = (color, roughness) => new THREE.MeshStandardMaterial({ color, roughness, metalness: 0, envMapIntensity: 0.3 });
+  const flat = (color, roughness) => new THREE.MeshStandardMaterial({ color, roughness, metalness: 0, envMapIntensity: 0.3, transparent: true, opacity: 0 });
   const { wall, floor } = window.RoomLayout.ROOM_COLORS;
   return {
     wall: flat(wall, 0.95), floor: flat(floor, 0.7),
     front: flat('#ffffff', 0.6), carcass: flat('#ffffff', 0.88), plinth: flat('#ffffff', 0.88),
     // A mirror reflects the room: the studio's dark surroundings would make it
     // a black panel, so it shows a soft, light reflection instead.
-    mirror: new THREE.MeshStandardMaterial({ color: '#e4e7ea', roughness: 0.18, metalness: 0.9, envMapIntensity: 2.4 }),
-    glow: new THREE.MeshBasicMaterial({ color: '#ffd7a3' }),
+    mirror: new THREE.MeshStandardMaterial({ color: '#e4e7ea', roughness: 0.18, metalness: 0.9, envMapIntensity: 2.4, transparent: true, opacity: 0 }),
+    glow: new THREE.MeshBasicMaterial({ color: '#ffd7a3', transparent: true, opacity: 0 }),
   };
 }
 
-// The fronts in the chosen colour; the carcass and plinth a shade darker,
-// so the gaps between the fronts read.
-function paintFacades(materials) {
-  const c = new THREE.Color(facadeColor());
+// The fronts in the given colour; the carcass and plinth a shade darker, so
+// the gaps between the fronts read.
+function paintFacades(materials, color) {
+  const c = color || new THREE.Color(facadeColor());
   materials.front.color.copy(c);
   materials.carcass.color.copy(c).multiplyScalar(0.8);
   materials.plinth.color.copy(c).multiplyScalar(0.55);
@@ -794,7 +796,7 @@ function paintFacades(materials) {
 function buildRoom(group) {
   const data = window.RoomLayout.buildRoom(lastLayout, lastProductKey);
   const room = { data, group: new THREE.Group(), materials: roomMaterials() };
-  paintFacades(room.materials);
+  paintFacades(room.materials, shown.front);
   (data ? data.boxes : []).forEach(b => {
     const size = [0, 1, 2].map(i => b.max[i] - b.min[i]);
     const center = [0, 1, 2].map(i => (b.min[i] + b.max[i]) / 2);
@@ -813,60 +815,155 @@ function disposeRoom(group) {
   Object.values(room.materials).forEach(m => m.dispose());
 }
 
-// Shows the current mode on the current model: the room (built on first
-// use), the studio floor disc where the room has its own floor, and the
-// mode's lights and lamps.
-function showRoom() {
-  if (!productGroup) return;
-  const studio = roomMode === 'studio';
-  let room = productGroup.userData.room;
-  if (!studio && !room) room = buildRoom(productGroup);
-  if (room) {
-    room.group.visible = !studio;
-    room.group.children.forEach(m => { if (m.userData.role === 'glow') m.visible = roomMode === 'evening'; });
-    paintFacades(room.materials);
-  }
-  const disc = productGroup.userData.floorDisc;
-  if (disc) disc.visible = studio || !(room && room.data);
-  applyLights(roomMode);
+// A switch of mode or front colour fades (ROOM_FADE_S, the colour faster):
+// the lights, the exposure, the room's opacity (and the studio floor disc's,
+// the other way), the mirror's glow, the evening's lamps and bounce light,
+// and the fronts' colour all move together from what is on screen to the new
+// mode. At the end of a fade to «Студия» the room is hidden and the lamps go:
+// the studio is exactly as before. Reduced motion: at once.
+const ROOM_FADE_S = 0.6;
+const FACADE_FADE_S = 0.35;
+let shown = { room: 0, glow: 0, lamps: 0, front: null };   // what the scene shows now, between modes
+let roomFade = null;     // { from, to, start, duration }
+let lampsLayout = null;  // the layout the lamps were placed for
+
+function roomTarget(mode) {
+  const L = window.RoomLayout.LIGHTS[mode];
+  return {
+    key: [new THREE.Color(L.key[0]), L.key[1]], fill: [new THREE.Color(L.fill[0]), L.fill[1]], rim: [new THREE.Color(L.rim[0]), L.rim[1]],
+    hemi: [new THREE.Color(L.hemi[0]), new THREE.Color(L.hemi[1]), L.hemi[2]], exposure: L.exposure,
+    room: mode === 'studio' ? 0 : 1, glow: mode === 'evening' ? 1 : 0, lamps: L.lamp ? 1 : 0,
+    front: new THREE.Color(facadeColor()),
+  };
 }
 
-function applyLights(mode) {
-  const L = window.RoomLayout.LIGHTS[mode];
-  keyLight.color.set(L.key[0]); keyLight.intensity = L.key[1];
-  fillLight.color.set(L.fill[0]); fillLight.intensity = L.fill[1];
-  rimLight.color.set(L.rim[0]); rimLight.intensity = L.rim[1];
-  hemiLight.color.set(L.hemi[0]); hemiLight.groundColor.set(L.hemi[1]); hemiLight.intensity = L.hemi[2];
-  renderer.toneMappingExposure = L.exposure;
-  roomLights.forEach(l => { scene.remove(l); if (l.target) scene.remove(l.target); });
-  roomLights = [];
-  if (!lastLayout) return;
-  const b = lastBounds;
-  if (L.bounce) {
-    const [color, intensity, dir] = L.bounce;
-    const light = new THREE.DirectionalLight(color, intensity);
-    const c = [0, 1, 2].map(i => (b.min[i] + b.max[i]) / 2);
-    light.position.set(c[0] + dir[0] * 5, c[1] + dir[1] * 5, c[2] + dir[2] * 5);
-    light.target.position.set(...c);
-    scene.add(light); scene.add(light.target);
-    light.target.updateMatrixWorld();
-    roomLights.push(light);
+function roomCurrent() {
+  return {
+    key: [keyLight.color.clone(), keyLight.intensity], fill: [fillLight.color.clone(), fillLight.intensity], rim: [rimLight.color.clone(), rimLight.intensity],
+    hemi: [hemiLight.color.clone(), hemiLight.groundColor.clone(), hemiLight.intensity], exposure: renderer.toneMappingExposure,
+    room: shown.room, glow: shown.glow, lamps: shown.lamps, front: (shown.front || new THREE.Color(facadeColor())).clone(),
+  };
+}
+
+function mixRoom(a, b, t) {
+  const n = (x, y) => x + (y - x) * t, c = (x, y) => x.clone().lerp(y, t);
+  return {
+    key: [c(a.key[0], b.key[0]), n(a.key[1], b.key[1])], fill: [c(a.fill[0], b.fill[0]), n(a.fill[1], b.fill[1])], rim: [c(a.rim[0], b.rim[0]), n(a.rim[1], b.rim[1])],
+    hemi: [c(a.hemi[0], b.hemi[0]), c(a.hemi[1], b.hemi[1]), n(a.hemi[2], b.hemi[2])], exposure: n(a.exposure, b.exposure),
+    room: n(a.room, b.room), glow: n(a.glow, b.glow), lamps: n(a.lamps, b.lamps), front: c(a.front, b.front),
+  };
+}
+
+// The evening's bounce light and lamps for the current model (off).
+function makeLampLights() {
+  const E = window.RoomLayout.LIGHTS.evening, b = lastBounds;
+  const [color, strength, dir] = E.bounce;
+  const bounce = new THREE.DirectionalLight(color, 0);
+  const c = [0, 1, 2].map(i => (b.min[i] + b.max[i]) / 2);
+  bounce.position.set(c[0] + dir[0] * 5, c[1] + dir[1] * 5, c[2] + dir[2] * 5);
+  bounce.target.position.set(...c);
+  bounce.target.updateMatrixWorld();
+  bounce.userData.strength = strength;
+  const lamps = window.RoomLayout.lampsFor(lastLayout, lastProductKey).map(lamp => {
+    const light = new THREE.PointLight(E.lamp[0], 0, 0, 2);
+    light.position.set(...lamp.position);
+    light.userData.strength = lamp.kind === 'mirror' ? E.lamp[1] * 0.6 : E.lamp[1];
+    return light;
+  });
+  return [bounce].concat(lamps);
+}
+
+// The evening's lights at `weight` of their strength: placed for the
+// current model, gone at 0.
+function setLamps(weight) {
+  if (weight <= 0 || lampsLayout !== lastLayout) {
+    roomLights.forEach(l => { scene.remove(l); if (l.target) scene.remove(l.target); });
+    roomLights = [];
+    lampsLayout = null;
   }
-  if (L.lamp) {
-    window.RoomLayout.lampsFor(lastLayout, lastProductKey).forEach(lamp => {
-      const light = new THREE.PointLight(L.lamp[0], lamp.kind === 'mirror' ? L.lamp[1] * 0.6 : L.lamp[1], 0, 2);
-      light.position.set(...lamp.position);
-      scene.add(light);
-      roomLights.push(light);
-    });
+  if (weight <= 0 || !lastLayout) return;
+  if (!roomLights.length) {
+    roomLights = makeLampLights();
+    roomLights.forEach(l => { scene.add(l); if (l.target) scene.add(l.target); });
+    lampsLayout = lastLayout;
   }
+  roomLights.forEach(l => { l.intensity = l.userData.strength * weight; });
+}
+
+function applyRoomState(S) {
+  keyLight.color.copy(S.key[0]); keyLight.intensity = S.key[1];
+  fillLight.color.copy(S.fill[0]); fillLight.intensity = S.fill[1];
+  rimLight.color.copy(S.rim[0]); rimLight.intensity = S.rim[1];
+  hemiLight.color.copy(S.hemi[0]); hemiLight.groundColor.copy(S.hemi[1]); hemiLight.intensity = S.hemi[2];
+  renderer.toneMappingExposure = S.exposure;
+  shown = { room: S.room, glow: S.glow, lamps: S.lamps, front: S.front.clone() };
+  setLamps(S.lamps);
+  if (!productGroup) return;
+  let room = productGroup.userData.room;
+  if (S.room > 0 && !room) room = buildRoom(productGroup);
+  if (room) {
+    room.group.visible = S.room > 0;
+    Object.entries(room.materials).forEach(([role, m]) => { m.opacity = role === 'glow' ? S.room * S.glow : S.room; });
+    room.group.children.forEach(m => { if (m.userData.role === 'glow') m.visible = S.glow > 0; });
+    paintFacades(room.materials, S.front);
+  }
+  const disc = productGroup.userData.floorDisc;
+  if (disc) {
+    const opacity = room && room.data ? 1 - S.room : 1;
+    disc.material.opacity = opacity;
+    // Fading, it must not hide the room's floor below it.
+    disc.material.depthWrite = opacity >= 1;
+    disc.visible = opacity > 0;
+  }
+}
+
+function fadeRoomTo(to, duration) {
+  if (reducedMotion.matches || !hasModel) {
+    roomFade = null;
+    applyRoomState(to);
+    return;
+  }
+  const fade = roomFade = { from: roomCurrent(), to, start: null, duration, ready: false };
+  // The room and the lamps the fade brings in are new to the GPU: their
+  // shaders (and the stone's, with more lights) are compiled first, off the
+  // main thread where the browser can, so the fade runs without a stall.
+  const go = () => { if (roomFade === fade) fade.ready = true; };
+  if (to.room > 0 && productGroup && !productGroup.userData.room) buildRoom(productGroup).group.visible = false;
+  if (!renderer.compileAsync) { go(); return; }
+  const target = new THREE.Scene();
+  target.environment = scene.environment;
+  if (to.lamps > 0 && !roomLights.length && lastLayout) makeLampLights().forEach(l => target.add(l));
+  renderer.compileAsync(scene, camera, target).then(go, go);
+}
+
+function stepRoomFade() {
+  if (!roomFade || !roomFade.ready) return;
+  // The fade runs from the first frame that draws it.
+  if (roomFade.start === null) roomFade.start = performance.now();
+  const t = window.Motion.fadeAt((performance.now() - roomFade.start) / 1000, roomFade.duration);
+  if (t >= 1) {
+    const { to } = roomFade;
+    roomFade = null;
+    applyRoomState(to);
+    return;
+  }
+  applyRoomState(mixRoom(roomFade.from, roomFade.to, t));
+}
+
+// The current mode on a new model, at once (it arrives with the model).
+function showRoom() {
+  if (roomFade) { const { to } = roomFade; roomFade = null; applyRoomState(to); return; }
+  if (roomMode !== 'studio') applyRoomState(roomTarget(roomMode));
 }
 
 // `mode`: 'studio' | 'day' | 'evening'; `facade`: a RoomLayout.FACADES id.
 function setRoom({ mode, facade }) {
-  if (mode && window.RoomLayout.MODES.includes(mode)) roomMode = mode;
-  if (facade) facadeId = facade;
-  showRoom();
+  const modeChanged = !!mode && window.RoomLayout.MODES.includes(mode) && mode !== roomMode;
+  if (modeChanged) roomMode = mode;
+  const facadeChanged = !!facade && facade !== facadeId;
+  if (facadeChanged) facadeId = facade;
+  if (!modeChanged && !facadeChanged) return;
+  fadeRoomTo(roomTarget(roomMode), modeChanged ? ROOM_FADE_S : FACADE_FADE_S);
 }
 
 // What the room offers for the current product: a room at all, and fronts
@@ -1078,6 +1175,7 @@ function init(canvasEl) {
     lastFrameTime = now || 0;
     if (morph) stepMorph(dt);
     if (productGroup) stepFade(productGroup.userData.materials);
+    stepRoomFade();
     if (cameraMove) stepCamera(dt);
     else controls.update();
     renderer.render(scene, camera);
@@ -1173,7 +1271,7 @@ function rebuild(geometryModel, materialDescriptor) {
   framePadding = layout.framePadding;
   lastProductKey = geometryModel.productKey;
   if (resized) startMorph(resized, layout.bounds);
-  if (roomMode !== 'studio') showRoom();
+  showRoom();
   const first = !hasModel;
   hasModel = true;
   if (action === 'reset') setView(cameraPresetTracker.getDefaultPreset(), !first);
@@ -1234,9 +1332,10 @@ function capture(presetName, { width, height }) {
     minDistance: controls.minDistance, maxDistance: controls.maxDistance,
   };
   let url = null;
-  const shownMode = roomMode;
+  const onScreen = roomCurrent();
+  const studio = onScreen.room === 0 && onScreen.lamps === 0 && !roomFade;
   try {
-    if (shownMode !== 'studio') { roomMode = 'studio'; showRoom(); }
+    if (!studio) applyRoomState(roomTarget('studio'));
     renderer.setPixelRatio(1);
     renderer.setSize(width, height, false);
     camera.aspect = width / height;
@@ -1244,7 +1343,7 @@ function capture(presetName, { width, height }) {
     renderer.render(scene, camera);
     url = renderer.domElement.toDataURL('image/jpeg', 0.9);
   } finally {
-    if (shownMode !== 'studio') { roomMode = shownMode; showRoom(); }
+    if (!studio) applyRoomState(onScreen);
     restoreView(saved, size);
   }
   return url;
@@ -1280,7 +1379,8 @@ function dispose() {
   if (renderer) renderer.dispose();
   renderer = scene = camera = controls = productGroup = currentCanvas = resizeObserver = null;
   keyLight = fillLight = rimLight = hemiLight = null;
-  roomLights = [];
+  roomLights = []; roomFade = null; lampsLayout = null;
+  shown = { room: 0, glow: 0, lamps: 0, front: null };
   cameraPresetTracker = null;
   textures = null;
   lastBounds = null; lastLayout = null; lastProductKey = null; hasModel = false; userAdjusted = false;
