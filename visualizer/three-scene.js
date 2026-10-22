@@ -9,7 +9,7 @@ import * as THREE from '../vendor/three/three.module.js';
 import { OrbitControls } from '../vendor/three/OrbitControls.js';
 
 let renderer, scene, camera, controls, productGroup, currentCanvas, resizeObserver;
-let keyLight, fillLight, rimLight;
+let keyLight, fillLight, rimLight, hemiLight;
 let frameId = null;
 let cameraPresetTracker = null;
 let lastBounds = null;
@@ -24,6 +24,10 @@ const reducedMotion = window.matchMedia ? window.matchMedia('(prefers-reduced-mo
 let cameraMove = null;   // a glide to a new view: { spring, goal }
 let morph = null;        // the model easing to a new size: { spring } over the shown bounds
 let lastFrameTime = 0;
+// «Студия» / «День» / «Вечер» and the furniture fronts' colour (RoomLayout).
+let roomMode = 'studio';
+let facadeId = null;
+let roomLights = [];   // the evening's lamps and bounce light, only while shown
 let textures = null;
 
 const FOV_DEG = 32;
@@ -628,6 +632,7 @@ function buildFloor(group, layout, materials) {
   disc.rotateX(-Math.PI / 2);
   const mesh = addMesh(group, disc, floorMaterial, [(min[0] + max[0]) / 2, layout.floorY - 0.0005, (min[2] + max[2]) / 2], false);
   mesh.receiveShadow = true;
+  group.userData.floorDisc = mesh;
 }
 
 // Layout-space vertex positions/normals of a stone mesh, kept so its UVs
@@ -749,6 +754,126 @@ function placeLights(bounds) {
   cam.left = -half; cam.right = half; cam.top = half; cam.bottom = -half;
   cam.near = 0.1; cam.far = size * 6 + 2;
   cam.updateProjectionMatrix();
+}
+
+// ---- the room: «Студия», «День», «Вечер» -----------------------------------
+
+// «Студия» is the plain studio, as before. «День» and «Вечер» stand the
+// product in a room (RoomLayout: a wall and a floor, kitchen cabinets, a
+// wall-hung vanity with a mirror, a wall along a stair) under daylight or
+// warm evening lamps. The room is built only when it is first shown, as a
+// part of the product's group (so it eases with a new size), and never
+// appears in a passport shot.
+function facadeColor() {
+  const list = window.RoomLayout.FACADES;
+  return (list.find(f => f.id === facadeId) || list[0]).hex;
+}
+
+function roomMaterials() {
+  const flat = (color, roughness) => new THREE.MeshStandardMaterial({ color, roughness, metalness: 0, envMapIntensity: 0.3 });
+  const { wall, floor } = window.RoomLayout.ROOM_COLORS;
+  return {
+    wall: flat(wall, 0.95), floor: flat(floor, 0.7),
+    front: flat('#ffffff', 0.6), carcass: flat('#ffffff', 0.88), plinth: flat('#ffffff', 0.88),
+    // A mirror reflects the room: the studio's dark surroundings would make it
+    // a black panel, so it shows a soft, light reflection instead.
+    mirror: new THREE.MeshStandardMaterial({ color: '#e4e7ea', roughness: 0.18, metalness: 0.9, envMapIntensity: 2.4 }),
+    glow: new THREE.MeshBasicMaterial({ color: '#ffd7a3' }),
+  };
+}
+
+// The fronts in the chosen colour; the carcass and plinth a shade darker,
+// so the gaps between the fronts read.
+function paintFacades(materials) {
+  const c = new THREE.Color(facadeColor());
+  materials.front.color.copy(c);
+  materials.carcass.color.copy(c).multiplyScalar(0.8);
+  materials.plinth.color.copy(c).multiplyScalar(0.55);
+}
+
+function buildRoom(group) {
+  const data = window.RoomLayout.buildRoom(lastLayout, lastProductKey);
+  const room = { data, group: new THREE.Group(), materials: roomMaterials() };
+  paintFacades(room.materials);
+  (data ? data.boxes : []).forEach(b => {
+    const size = [0, 1, 2].map(i => b.max[i] - b.min[i]);
+    const center = [0, 1, 2].map(i => (b.min[i] + b.max[i]) / 2);
+    const flat = b.role === 'wall' || b.role === 'floor' || b.role === 'glow' || b.role === 'mirror';
+    const mesh = addMesh(room.group, new THREE.BoxGeometry(...size), room.materials[b.role], center, !flat);
+    mesh.userData.role = b.role;
+  });
+  group.add(room.group);
+  group.userData.room = room;
+  return room;
+}
+
+function disposeRoom(group) {
+  const room = group.userData.room;
+  if (!room) return;
+  Object.values(room.materials).forEach(m => m.dispose());
+}
+
+// Shows the current mode on the current model: the room (built on first
+// use), the studio floor disc where the room has its own floor, and the
+// mode's lights and lamps.
+function showRoom() {
+  if (!productGroup) return;
+  const studio = roomMode === 'studio';
+  let room = productGroup.userData.room;
+  if (!studio && !room) room = buildRoom(productGroup);
+  if (room) {
+    room.group.visible = !studio;
+    room.group.children.forEach(m => { if (m.userData.role === 'glow') m.visible = roomMode === 'evening'; });
+    paintFacades(room.materials);
+  }
+  const disc = productGroup.userData.floorDisc;
+  if (disc) disc.visible = studio || !(room && room.data);
+  applyLights(roomMode);
+}
+
+function applyLights(mode) {
+  const L = window.RoomLayout.LIGHTS[mode];
+  keyLight.color.set(L.key[0]); keyLight.intensity = L.key[1];
+  fillLight.color.set(L.fill[0]); fillLight.intensity = L.fill[1];
+  rimLight.color.set(L.rim[0]); rimLight.intensity = L.rim[1];
+  hemiLight.color.set(L.hemi[0]); hemiLight.groundColor.set(L.hemi[1]); hemiLight.intensity = L.hemi[2];
+  renderer.toneMappingExposure = L.exposure;
+  roomLights.forEach(l => { scene.remove(l); if (l.target) scene.remove(l.target); });
+  roomLights = [];
+  if (!lastLayout) return;
+  const b = lastBounds;
+  if (L.bounce) {
+    const [color, intensity, dir] = L.bounce;
+    const light = new THREE.DirectionalLight(color, intensity);
+    const c = [0, 1, 2].map(i => (b.min[i] + b.max[i]) / 2);
+    light.position.set(c[0] + dir[0] * 5, c[1] + dir[1] * 5, c[2] + dir[2] * 5);
+    light.target.position.set(...c);
+    scene.add(light); scene.add(light.target);
+    light.target.updateMatrixWorld();
+    roomLights.push(light);
+  }
+  if (L.lamp) {
+    window.RoomLayout.lampsFor(lastLayout, lastProductKey).forEach(lamp => {
+      const light = new THREE.PointLight(L.lamp[0], lamp.kind === 'mirror' ? L.lamp[1] * 0.6 : L.lamp[1], 0, 2);
+      light.position.set(...lamp.position);
+      scene.add(light);
+      roomLights.push(light);
+    });
+  }
+}
+
+// `mode`: 'studio' | 'day' | 'evening'; `facade`: a RoomLayout.FACADES id.
+function setRoom({ mode, facade }) {
+  if (mode && window.RoomLayout.MODES.includes(mode)) roomMode = mode;
+  if (facade) facadeId = facade;
+  showRoom();
+}
+
+// What the room offers for the current product: a room at all, and fronts
+// to colour.
+function roomOptions() {
+  const data = hasModel && window.RoomLayout.buildRoom(lastLayout, lastProductKey);
+  return { hasRoom: !!data, hasFacades: !!(data && data.hasFacades) };
 }
 
 // ---- camera --------------------------------------------------------------
@@ -926,7 +1051,8 @@ function init(canvasEl) {
   camera = new THREE.PerspectiveCamera(FOV_DEG, 1, 0.01, 100);
   camera.position.set(1.5, 1.2, 1.5);
 
-  scene.add(new THREE.HemisphereLight('#fff2e0', '#2b231c', 0.3));
+  hemiLight = new THREE.HemisphereLight('#fff2e0', '#2b231c', 0.3);
+  scene.add(hemiLight);
   keyLight = new THREE.DirectionalLight('#ffefd9', 1.5);
   keyLight.castShadow = true;
   keyLight.shadow.mapSize.set(2048, 2048);
@@ -1017,6 +1143,7 @@ function rebuild(geometryModel, materialDescriptor) {
     && productGroup.userData.structure === structure ? shownBounds() : null;
   if (productGroup) {
     scene.remove(productGroup);
+    disposeRoom(productGroup);
     disposeGroup(productGroup);
   }
   productGroup = buildProductGroup(layout, materialDescriptor);
@@ -1046,6 +1173,7 @@ function rebuild(geometryModel, materialDescriptor) {
   framePadding = layout.framePadding;
   lastProductKey = geometryModel.productKey;
   if (resized) startMorph(resized, layout.bounds);
+  if (roomMode !== 'studio') showRoom();
   const first = !hasModel;
   hasModel = true;
   if (action === 'reset') setView(cameraPresetTracker.getDefaultPreset(), !first);
@@ -1106,7 +1234,9 @@ function capture(presetName, { width, height }) {
     minDistance: controls.minDistance, maxDistance: controls.maxDistance,
   };
   let url = null;
+  const shownMode = roomMode;
   try {
+    if (shownMode !== 'studio') { roomMode = 'studio'; showRoom(); }
     renderer.setPixelRatio(1);
     renderer.setSize(width, height, false);
     camera.aspect = width / height;
@@ -1114,6 +1244,7 @@ function capture(presetName, { width, height }) {
     renderer.render(scene, camera);
     url = renderer.domElement.toDataURL('image/jpeg', 0.9);
   } finally {
+    if (shownMode !== 'studio') { roomMode = shownMode; showRoom(); }
     restoreView(saved, size);
   }
   return url;
@@ -1138,7 +1269,7 @@ function dispose() {
   if (frameId !== null) cancelAnimationFrame(frameId);
   if (pendingResize) { clearTimeout(pendingResize.timer); pendingResize = null; }
   if (resizeObserver) resizeObserver.disconnect();
-  if (productGroup) disposeGroup(productGroup);
+  if (productGroup) { disposeRoom(productGroup); disposeGroup(productGroup); }
   if (controls) controls.dispose();
   if (scene && scene.environment) scene.environment.dispose();
   if (textures) Object.values(textures).forEach(t => t.dispose());
@@ -1148,13 +1279,14 @@ function dispose() {
   proceduralMaps.clear();
   if (renderer) renderer.dispose();
   renderer = scene = camera = controls = productGroup = currentCanvas = resizeObserver = null;
-  keyLight = fillLight = rimLight = null;
+  keyLight = fillLight = rimLight = hemiLight = null;
+  roomLights = [];
   cameraPresetTracker = null;
   textures = null;
   lastBounds = null; lastLayout = null; lastProductKey = null; hasModel = false; userAdjusted = false;
   cameraMove = null; morph = null; lastFrameTime = 0;
 }
 
-const ThreeScene = { init, update, setView, resetView, showEdge, canShowEdge, capture, dispose };
+const ThreeScene = { init, update, setView, resetView, showEdge, canShowEdge, setRoom, roomOptions, capture, dispose };
 window.ThreeScene = ThreeScene;
 export default ThreeScene;

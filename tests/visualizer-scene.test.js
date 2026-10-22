@@ -827,7 +827,7 @@ test('«Подгиб камнем» on steps and stairs: a stone strip under the
 // three-scene.js is an ES module (it imports three), so it is read as text here.
 test('ThreeScene exports capture() for the passport, and taking a shot never counts as the client looking around', () => {
   const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'visualizer', 'three-scene.js'), 'utf8');
-  assert.match(src, /const ThreeScene = \{ init, update, setView, resetView, showEdge, canShowEdge, capture, dispose \};/);
+  assert.match(src, /const ThreeScene = \{ init, update, setView, resetView, showEdge, canShowEdge, setRoom, roomOptions, capture, dispose \};/);
   const start = src.indexOf('function capture(');
   assert.ok(start > 0, 'function capture');
   const body = src.slice(start, src.indexOf('\n}\n', start));

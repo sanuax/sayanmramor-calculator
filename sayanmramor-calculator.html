@@ -349,6 +349,15 @@
     font-size: var(--configurator-muted); cursor: pointer;
   }
   .viewer-controls button:hover { border-color: var(--dark-accent); color: var(--dark-text); }
+  /* «Студия / День / Вечер» and the fronts' colours (RoomLayout). */
+  .viewer-controls button[aria-pressed="true"] { border-color: var(--dark-accent); color: var(--dark-text); }
+  .viewer-room { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; }
+  .viewer-room-modes { display: flex; gap: 6px; }
+  .viewer-facades { display: flex; align-items: center; gap: 6px; }
+  .viewer-facades[hidden] { display: none; }
+  .viewer-facades-label { font-size: var(--configurator-muted); color: var(--dark-text-muted); margin-right: 2px; }
+  .viewer-controls .viewer-swatch { width: 26px; height: 26px; padding: 0; background: var(--swatch); }
+  .viewer-controls .viewer-swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--dark-bg-2), 0 0 0 3px var(--dark-accent); }
   label {
     display: block;
     font-size: var(--configurator-text);
@@ -2139,6 +2148,16 @@
                   <button type="button" id="viewerEdge" hidden>Кромка</button>
                   <button type="button" id="viewerReset">Сбросить вид</button>
                 </div>
+                <div class="viewer-controls viewer-room">
+                  <div class="viewer-room-modes" role="group" aria-label="Обстановка">
+                    <button type="button" data-room="studio" aria-pressed="true">Студия</button>
+                    <button type="button" data-room="day" aria-pressed="false">День</button>
+                    <button type="button" data-room="evening" aria-pressed="false">Вечер</button>
+                  </div>
+                  <div class="viewer-facades" id="viewerFacades" role="group" aria-label="Цвет фасадов" hidden>
+                    <span class="viewer-facades-label">Фасады</span>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -2234,6 +2253,7 @@
 <script src="visualizer/material-adapter.js"></script>
 <script src="visualizer/edge-profile.js"></script>
 <script src="visualizer/motion.js"></script>
+<script src="visualizer/room-layout.js"></script>
 <script src="visualizer/scene-layout.js"></script>
 <script src="visualizer/camera-framing.js"></script>
 <script src="visualizer/webgl-support.js"></script>
@@ -3100,6 +3120,39 @@
   const viewerCanvas = document.getElementById('viewerCanvas');
   let viewerReady = false;
 
+  // «Студия / День / Вечер»: the product in the plain studio (the default),
+  // or in a room by day or by evening; the fronts' colour for a kitchen or a
+  // bathroom top (RoomLayout.FACADES). Only the 3D view changes -- never the
+  // price, the request or the passport.
+  let viewerRoomMode = 'studio';
+  function initViewerRoom() {
+    const facades = document.getElementById('viewerFacades');
+    RoomLayout.FACADES.forEach((f, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'viewer-swatch';
+      b.dataset.facade = f.id;
+      b.title = f.name;
+      b.setAttribute('aria-label', f.name);
+      b.setAttribute('aria-pressed', i === 0 ? 'true' : 'false');
+      b.style.setProperty('--swatch', f.hex);
+      facades.appendChild(b);
+    });
+    document.querySelectorAll('.viewer-room [data-room]').forEach(btn => btn.addEventListener('click', () => {
+      viewerRoomMode = btn.dataset.room;
+      document.querySelectorAll('.viewer-room [data-room]').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+      window.ThreeScene.setRoom({ mode: viewerRoomMode });
+      updateViewerRoom();
+    }));
+    facades.querySelectorAll('[data-facade]').forEach(btn => btn.addEventListener('click', () => {
+      facades.querySelectorAll('[data-facade]').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+      window.ThreeScene.setRoom({ facade: btn.dataset.facade });
+    }));
+  }
+  function updateViewerRoom() {
+    document.getElementById('viewerFacades').hidden = viewerRoomMode === 'studio' || !window.ThreeScene.roomOptions().hasFacades;
+  }
+
   function mountViewerIfSupported() {
     if (!WebglSupport.isWebglAvailable()) return;
     if (!window.ThreeScene) return; // see DOMContentLoaded note below
@@ -3117,6 +3170,7 @@
     document.getElementById('viewerReset').addEventListener('click', () => window.ThreeScene.resetView());
     // «Кромка»: shown once the product has a chosen edge profile to look at.
     document.getElementById('viewerEdge').addEventListener('click', () => window.ThreeScene.showEdge());
+    initViewerRoom();
     if (DATA_LOADED) calculate();
   }
   // A `<script type="module">` (visualizer/three-scene.js) is always deferred
@@ -4306,6 +4360,7 @@
       const materialDescriptor = MaterialAdapter.resolveMaterial(constructorState.stone, constructorState.bookmatchMode);
       window.ThreeScene.update(geometryModel, materialDescriptor);
       document.getElementById('viewerEdge').hidden = !window.ThreeScene.canShowEdge();
+      updateViewerRoom();
     }
 
     if (!selectedProductKey) {
