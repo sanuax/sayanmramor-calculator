@@ -107,3 +107,70 @@ test('a cabinet under a sink is hollow: no body where the bowl hangs, side panel
     });
   });
 });
+
+// The owner, 2026-10-23: the Г / П bathroom wings had no fronts, the island
+// none, and the bar counter did not read as a bar.
+const v = value => ({ value: String(value) });
+const extentOf = outline => ({ x0: Math.min(...outline.map(q => q[0])), x1: Math.max(...outline.map(q => q[0])), z0: Math.min(...outline.map(q => q[1])), z1: Math.max(...outline.map(q => q[1])) });
+
+test('bathroom Г / П: every wing has a wall-hung unit with drawers toward the room between, none inside the stone', () => {
+  [['lshape', 1], ['ushape', 2]].forEach(([shape, count]) => {
+    const layout = layoutFor('stoleshnitsa_vannaya', { width: v(550), length: v(1800), productShape: v(shape), 'wing-width': v(500), 'wing-length': v(900) });
+    const room = RoomLayout.buildRoom(layout, 'stoleshnitsa_vannaya');
+    const wings = layout.parts.filter(p => p.name === 'wing').map(w => extentOf(w.outline));
+    assert.equal(wings.length, count, shape);
+    const main = extentOf(layout.parts.find(p => p.name === 'main').outline);
+    wings.forEach(w => {
+      const under = byRole(room, 'front').filter(f => f.min[0] >= main.x1 - 1e-6 && f.min[2] >= w.z0 - 0.05 && f.max[2] <= w.z1 + 0.05);
+      assert.ok(under.length >= 2 && under.length % 2 === 0, shape + ': two drawers per module under the wing');
+      const facesMinusZ = w.z1 > (main.z0 + main.z1) / 2;
+      under.forEach(f => assert.ok(facesMinusZ ? f.max[2] <= w.z0 + 0.06 : f.min[2] >= w.z1 - 0.06, 'toward the room between the wings'));
+      under.forEach(f => assert.ok(f.min[1] > room.floorY + 0.2, 'hangs on the wall'));
+      // The main run's drawers stop where the wing's unit is.
+      byRole(room, 'front').filter(f => f.max[0] <= main.x1).forEach(f => assert.ok(f.max[2] <= w.z0 + 1e-6 || f.min[2] >= w.z1 - 1e-6));
+    });
+    stoneBoxes(layout).forEach(s => room.boxes.forEach(b => assert.ok(!overlaps(s, b), shape + ': ' + b.role + ' inside the stone')));
+  });
+});
+
+test('island: cabinets on a plinth under it with fronts on both long sides; under a rounded one they stop short of the rounded ends', () => {
+  [['extra-ostrov-width', 'extra-ostrov-length', false], ['extra-ostrov-figured-width', 'extra-ostrov-figured-length', true]].forEach(([wf, lf, rounded]) => {
+    const layout = layoutFor('stoleshnitsa_kuhnya', { width: v(600), length: v(3000), [wf]: v(1000), [lf]: v(2000) });
+    const room = RoomLayout.buildRoom(layout, 'stoleshnitsa_kuhnya');
+    const part = layout.parts.find(p => p.name === 'island');
+    const e = extentOf(part.outline);
+    const inside = b => b.min[0] >= e.x0 - 0.03 && b.max[0] <= e.x1 + 0.03 && b.min[2] >= e.z0 && b.max[2] <= e.z1;
+    const fronts = byRole(room, 'front').filter(inside);
+    assert.ok(fronts.some(f => f.min[0] > (e.x0 + e.x1) / 2) && fronts.some(f => f.max[0] < (e.x0 + e.x1) / 2), 'fronts on both long sides');
+    fronts.forEach(f => { assert.ok(Math.abs(f.min[1] - (room.floorY + 0.1 + 0.003)) < 1e-6); assert.ok(f.max[1] <= part.y0); });
+    assert.ok(byRole(room, 'plinth').some(inside) && byRole(room, 'carcass').some(inside));
+    if (rounded) {
+      const r = Math.min(e.x1 - e.x0, e.z1 - e.z0) * 0.3;
+      byRole(room, 'carcass').filter(inside).forEach(c => assert.ok(c.min[2] >= e.z0 + r - 1e-9 && c.max[2] <= e.z1 - r + 1e-9));
+    }
+    stoneBoxes(layout).forEach(s => room.boxes.forEach(b => assert.ok(!overlaps(s, b), b.role + ' inside the stone')));
+  });
+});
+
+test('bar counter: its stone end panels go down to the floor, and bar stools stand along it under its top', () => {
+  [['extra-bar-standard-width', 'extra-bar-standard-length', 1200, 500], ['extra-bar-complex-width', 'extra-bar-complex-length', 500, 1400]].forEach(([wf, lf, w, l]) => {
+    const layout = layoutFor('stoleshnitsa_kuhnya', { width: v(600), length: v(3000), [wf]: v(w), [lf]: v(l) });
+    const room = RoomLayout.buildRoom(layout, 'stoleshnitsa_kuhnya');
+    const legs = layout.parts.filter(p => p.name === 'bar-leg');
+    const panels = byRole(room, 'stone');
+    assert.equal(panels.length, legs.length);
+    panels.forEach(pnl => {
+      const leg = layout.parts[pnl.replaces];
+      assert.equal(leg.name, 'bar-leg');
+      assert.ok(Math.abs(pnl.min[1] - room.floorY) < 1e-9, 'from the floor');
+      assert.ok(Math.abs(pnl.max[1] - (leg.center[1] + leg.size[1] / 2)) < 1e-9, 'up to the bar top');
+      [0, 2].forEach(i => assert.ok(Math.abs(pnl.max[i] - pnl.min[i] - leg.size[i]) < 1e-9, 'the panel own thickness and depth'));
+    });
+    const bar = layout.parts.find(p => p.name === 'bar');
+    const seats = byRole(room, 'stool').filter(b => b.max[0] - b.min[0] > 0.3 && b.max[1] - b.min[1] < 0.06 && b.min[1] > room.floorY + 0.5);
+    assert.ok(seats.length >= 1 && seats.length <= 3, 'one to three stools');
+    seats.forEach(s => assert.ok(Math.abs(s.max[1] - (bar.y1 - 0.3)) < 1e-9, 'a seat 300 mm under the bar top'));
+    byRole(room, 'stool').forEach(s => assert.ok(s.min[1] >= room.floorY - 1e-9));
+    stoneBoxes(layout).forEach(s => byRole(room, 'stool').forEach(b => assert.ok(!overlaps(s, b), 'a stool inside the stone')));
+  });
+});

@@ -694,7 +694,10 @@ function buildProductGroup(layout, materialDescriptor) {
       const own = part.kind === 'basin' && mainStone ? mainStone : (apron ? lastSlab : { part, index });
       if (!apron) lastSlab = own;
       group.children.slice(before).forEach(mesh => {
-        if (mesh.isMesh) group.userData.stoneMeshes.push(captureStoneMesh(mesh, own.part, own.index));
+        if (!mesh.isMesh) return;
+        group.userData.stoneMeshes.push(captureStoneMesh(mesh, own.part, own.index));
+        mesh.userData.part = part;
+        mesh.userData.stoneOwn = own;
       });
     }
   });
@@ -784,6 +787,8 @@ function roomMaterials() {
     // a black panel, so it shows a soft, light reflection instead.
     mirror: new THREE.MeshStandardMaterial({ color: '#e4e7ea', roughness: 0.18, metalness: 0.9, envMapIntensity: 2.4, transparent: true, opacity: 0 }),
     glow: new THREE.MeshBasicMaterial({ color: '#ffd7a3', transparent: true, opacity: 0 }),
+    // Bar stools: dark satin metal.
+    stool: new THREE.MeshStandardMaterial({ color: '#2c2b29', roughness: 0.4, metalness: 0.6, envMapIntensity: 0.8, transparent: true, opacity: 0 }),
   };
 }
 
@@ -798,11 +803,12 @@ function paintFacades(materials, color) {
 
 function buildRoom(group) {
   const data = window.RoomLayout.buildRoom(lastLayout, lastProductKey);
-  const room = { data, group: new THREE.Group(), materials: roomMaterials() };
+  const room = { data, group: new THREE.Group(), materials: roomMaterials(), stone: [], replaced: [] };
   paintFacades(room.materials, shown.front);
   (data ? data.boxes : []).forEach(b => {
     const size = [0, 1, 2].map(i => b.max[i] - b.min[i]);
     const center = [0, 1, 2].map(i => (b.min[i] + b.max[i]) / 2);
+    if (b.role === 'stone') { roomStone(group, room, b, size, center); return; }
     const flat = b.role === 'wall' || b.role === 'floor' || b.role === 'glow' || b.role === 'mirror';
     const mesh = addMesh(room.group, new THREE.BoxGeometry(...size), room.materials[b.role], center, !flat);
     mesh.userData.role = b.role;
@@ -810,6 +816,28 @@ function buildRoom(group) {
   group.add(room.group);
   group.userData.room = room;
   return room;
+}
+
+// The product's stone carried on into the room (a bar's end panels down to
+// the floor): the same stone material and piece of stone as the part it
+// stands in for, so its pattern follows a new stone. Stone does not fade --
+// it takes over from the part at the middle of the room's fade
+// (applyRoomState).
+function roomStone(group, room, b, size, center) {
+  const part = lastLayout.parts[b.replaces];
+  const replaced = group.children.filter(m => m.isMesh && m.userData.part === part);
+  if (!replaced.length) return;
+  const own = replaced[0].userData.stoneOwn;
+  const mesh = addMesh(room.group, new THREE.BoxGeometry(...size), group.userData.materials.stone, center);
+  mesh.visible = false;
+  const record = captureStoneMesh(mesh, own.part, own.index);
+  group.userData.stoneMeshes.push(record);
+  const uv = new THREE.BufferAttribute(window.MaterialAdapter.stoneUVs(record.positions, record.normals,
+    { projection: record.projection, patternSizeM: group.userData.materials.descriptor.patternSizeM }), 2);
+  mesh.geometry.setAttribute('uv', uv);
+  mesh.geometry.setAttribute('stoneUvPrev', uv);
+  room.stone.push(mesh);
+  room.replaced.push(...replaced);
 }
 
 function disposeRoom(group) {
@@ -906,6 +934,9 @@ function applyRoomState(S) {
   if (S.room > 0 && !room) room = buildRoom(productGroup);
   if (room) {
     room.group.visible = S.room > 0;
+    const stoneInRoom = S.room >= 0.5;
+    room.stone.forEach(m => { m.visible = stoneInRoom; });
+    room.replaced.forEach(m => { m.visible = !stoneInRoom; });
     Object.entries(room.materials).forEach(([role, m]) => { m.opacity = role === 'glow' ? S.room * S.glow : S.room; });
     room.group.children.forEach(m => { if (m.userData.role === 'glow') m.visible = S.glow > 0; });
     paintFacades(room.materials, S.front);

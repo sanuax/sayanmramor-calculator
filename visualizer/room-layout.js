@@ -9,7 +9,10 @@
 //
 // Pure (no three.js): boxes in layout space (metres; wall = -X, room = +X,
 // run = Z, up = +Y) by role, and where the evening lamps hang. Sizes are
-// usual furniture sizes, not anything the client entered.
+// usual furniture sizes, not anything the client entered. One role is the
+// product's own stone: a bar counter's stone end panels, which stop at the
+// worktop in the studio, go on down to the room's floor (`replaces`: the
+// index of the layout part they stand in for).
 (function (root, factory) {
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = factory();
@@ -60,6 +63,8 @@
   const FRONT_M = 0.018;
   const GAP_M = 0.0015;            // half the gap between two fronts
   const MODULE_M = 0.6;
+  // A bar stool: its seat 300 mm under the bar top, one every 550 mm.
+  const STOOL_SEAT_M = 0.36, STOOL_DROP_M = 0.3, STOOL_PITCH_M = 0.55;
 
   const box = (role, x0, x1, y0, y1, z0, z1) => ({ role, min: [x0, y0, z0], max: [x1, y1, z1] });
 
@@ -134,9 +139,62 @@
         boxes.push(box('front', m0 + GAP_M, m1 - GAP_M, floor + PLINTH_M + 0.003, bottom - 0.003, f0, f1));
       });
     });
+    island(boxes, layout, floor);
+    bar(boxes, layout, floor, wings, (e.z0 + e.z1) / 2);
     const cx = (e.x0 + e.x1) / 2, len = e.z1 - e.z0, cz = (e.z0 + e.z1) / 2;
     (len > 1.2 ? [cz - len / 4, cz + len / 4] : [cz]).forEach(z => lamps.push({ kind: 'pendant', position: [cx, top + 0.75, z] }));
     return { boxes, lamps, hasFacades: true, floorY: floor };
+  }
+
+  // An island: base cabinets on a plinth under it, set back under the top,
+  // with fronts on both long sides (along Z). Under a rounded («фигурный»)
+  // island the cabinets stop short of the rounded ends.
+  function island(boxes, layout, floor) {
+    const part = layout.parts.find(p => p.name === 'island' && p.role === 'stone');
+    if (!part) return;
+    const e = extentOf(part.outline), bottom = part.y0;
+    const rounded = part.outline.length > 4;
+    const inset = rounded ? Math.min(e.x1 - e.x0, e.z1 - e.z0) * 0.3 : FRONT_SETBACK_M;
+    const x0 = e.x0 + FRONT_SETBACK_M, x1 = e.x1 - FRONT_SETBACK_M, z0 = e.z0 + inset, z1 = e.z1 - inset;
+    if (x1 - x0 < 0.2 || z1 - z0 < 0.2) return;
+    boxes.push(box('plinth', x0 + 0.04, x1 - 0.04, floor, floor + PLINTH_M, z0 + 0.04, z1 - 0.04));
+    boxes.push(box('carcass', x0, x1, floor + PLINTH_M, bottom, z0, z1));
+    modules(z0, z1).forEach(([m0, m1]) => [[x1, x1 + FRONT_M], [x0 - FRONT_M, x0]].forEach(([f0, f1]) => {
+      boxes.push(box('front', f0, f1, floor + PLINTH_M + 0.003, bottom - 0.003, m0 + GAP_M, m1 - GAP_M));
+    }));
+  }
+
+  // A bar counter (the owner, 2026-10-23: it must read as a bar): its stone
+  // end panels go on down to the floor, and bar stools stand along it on
+  // its outer side -- away from the middle of the kitchen run, where the
+  // guests sit (and in view: on the inner side the counter hides them) --
+  // unless a wing is close there.
+  function bar(boxes, layout, floor, wings, runMid) {
+    const top = layout.parts.find(p => p.name === 'bar' && p.role === 'stone');
+    if (!top) return;
+    const legs = layout.parts.filter(p => p.name === 'bar-leg' && p.kind === 'box');
+    legs.forEach(leg => {
+      const half = leg.size.map(v => v / 2);
+      boxes.push(Object.assign(box('stone', leg.center[0] - half[0], leg.center[0] + half[0], floor, leg.center[1] + half[1], leg.center[2] - half[2], leg.center[2] + half[2]),
+        { replaces: layout.parts.indexOf(leg) }));
+    });
+    const e = extentOf(top.outline);
+    const xs = legs.map(l => l.center[0]);
+    const from = (xs.length ? Math.min(...xs) : e.x0) + 0.35, to = (xs.length ? Math.max(...xs) : e.x1) - 0.35;
+    if (to < from) return;
+    const n = Math.max(1, Math.min(3, Math.floor((to - from) / STOOL_PITCH_M) + 1));
+    const near = side => wings.some(w => w.x1 > e.x0 && (side > 0 ? w.z0 >= e.z1 - 1e-6 && w.z0 - e.z1 < 0.8 : w.z1 <= e.z0 + 1e-6 && e.z0 - w.z1 < 0.8));
+    let side = (e.z0 + e.z1) / 2 < runMid ? -1 : 1;
+    if (near(side)) side = -side;
+    const z = side > 0 ? e.z1 + 0.12 : e.z0 - 0.12;
+    const seat = top.y1 - STOOL_DROP_M, r = STOOL_SEAT_M / 2;
+    for (let i = 0; i < n; i++) {
+      const x = n === 1 ? (from + to) / 2 : from + (to - from) * i / (n - 1);
+      boxes.push(box('stool', x - r, x + r, seat - 0.05, seat, z - r, z + r));                     // seat
+      boxes.push(box('stool', x - 0.02, x + 0.02, floor + 0.02, seat - 0.05, z - 0.02, z + 0.02));  // column
+      boxes.push(box('stool', x - 0.15, x + 0.15, floor + 0.28, floor + 0.3, z - 0.15, z + 0.15));  // footrest
+      boxes.push(box('stool', x - 0.17, x + 0.17, floor, floor + 0.02, z - 0.17, z + 0.17));        // base
+    }
   }
 
   // Bathroom: a wall-hung vanity with two drawers per module, the floor
@@ -150,12 +208,27 @@
     const boxes = [], lamps = [];
     const mirrorY0 = top + 0.25, mirrorY1 = mirrorY0 + 0.8;
     backWallAndFloor(boxes, wallX, floor, mirrorY1 + 0.5, layout.bounds);
-    const frontX = e.x1 - 0.03, z0 = e.z0 + 0.02, z1 = e.z1 - 0.02, y0 = bottom - VANITY_UNIT_M;
+    const wings = layout.parts.filter(p => p.name === 'wing' && p.role === 'stone').map(w => extentOf(w.outline));
+    const atEnd = z => wings.some(w => Math.abs(w.z0 - z) < 1e-6 || Math.abs(w.z1 - z) < 1e-6);
+    const frontX = e.x1 - 0.03, z0 = e.z0 + (atEnd(e.z0) ? 0 : 0.02), z1 = e.z1 - (atEnd(e.z1) ? 0 : 0.02), y0 = bottom - VANITY_UNIT_M;
     carcass(boxes, layout, e.x0, frontX, y0, bottom, z0, z1);
     const mid = (y0 + bottom) / 2;
-    modules(z0, z1).forEach(([m0, m1]) => [[y0, mid], [mid, bottom]].forEach(([d0, d1]) => {
+    without(z0, z1, wings.map(w => [w.z0, w.z1])).forEach(([a, b]) => modules(a, b).forEach(([m0, m1]) => [[y0, mid], [mid, bottom]].forEach(([d0, d1]) => {
       boxes.push(box('front', frontX, frontX + FRONT_M, d0 + 0.003, d1 - 0.003, m0 + GAP_M, m1 - GAP_M));
-    }));
+    })));
+    // Г / П: a wall-hung unit under every wing too, its drawers facing the
+    // room between the wings (-Z for a wing at the +Z end), as in a kitchen.
+    wings.forEach(w => {
+      const facesMinusZ = w.z1 > e.z0 + (e.z1 - e.z0) / 2;
+      const x1 = w.x1 - 0.02;
+      const zf = facesMinusZ ? w.z0 + 0.03 : w.z1 - 0.03;
+      const [c0, c1] = facesMinusZ ? [zf, w.z1] : [w.z0, zf];
+      const [f0, f1] = facesMinusZ ? [zf - FRONT_M, zf] : [zf, zf + FRONT_M];
+      boxes.push(box('carcass', frontX, x1, y0, bottom, c0, c1));
+      modules(e.x1, x1).forEach(([m0, m1]) => [[y0, mid], [mid, bottom]].forEach(([d0, d1]) => {
+        boxes.push(box('front', m0 + GAP_M, m1 - GAP_M, d0 + 0.003, d1 - 0.003, f0, f1));
+      }));
+    });
     const cz = (e.z0 + e.z1) / 2, half = Math.min(0.45, (e.z1 - e.z0) * 0.4);
     boxes.push(box('glow', wallX, wallX + 0.004, mirrorY0 - 0.02, mirrorY1 + 0.02, cz - half - 0.02, cz + half + 0.02));
     boxes.push(box('mirror', wallX, wallX + 0.01, mirrorY0, mirrorY1, cz - half, cz + half));
