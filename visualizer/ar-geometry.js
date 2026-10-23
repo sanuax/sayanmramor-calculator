@@ -13,11 +13,25 @@
   }
 })(typeof window !== 'undefined' ? window : globalThis, function () {
 
-  // Hung on a wall; everything else stands on the floor or on a surface
-  // (a countertop on the client's own cabinets or a table).
+  // Hung on a wall: walls, panels and every facade piece but a column
+  // (the owner, 2026-10-23). Everything else stands on the floor or on a
+  // surface (a countertop on the client's own cabinets or a table; a
+  // fireplace, a column, stairs on the floor).
   const WALL_PRODUCTS = ['stena', 'panno'];
-  function anchorFor(productKey) {
+  function anchorFor(productKey, model) {
+    if (productKey === 'fasad') return model && model.facade && model.facade.type === 'column' ? 'floor' : 'wall';
     return WALL_PRODUCTS.includes(productKey) ? 'wall' : 'floor';
+  }
+
+  // AR Quick Look hangs a model on a wall in the wall anchor's own frame,
+  // where Y points out of the wall (as Y points up from a floor): a wall
+  // piece standing upright came out of the wall like a shelf (the owner's
+  // iPhone, 2026-10-23: walls and panels lay flat). So for Quick Look it
+  // goes in lying face up -- its front (+Z after placeFor) turned to +Y, its
+  // top to -Z. WebXR places in the room's own frame and needs no turn.
+  const QUICK_LOOK_WALL_TURN_X = -Math.PI / 2;
+  function quickLookTurnX(anchor) {
+    return anchor === 'wall' ? QUICK_LOOK_WALL_TURN_X : 0;
   }
 
   // The layout's front -- the room side -- is +X (VisualizerConstants); in AR
@@ -157,5 +171,5 @@
     return { positions: new Float32Array(P), normals: new Float32Array(N) };
   }
 
-  return { anchorFor, placeFor, transformUvs, tilePick, cutByTiles, seamBars, WALL_PRODUCTS, SEAM_WIDTH_M };
+  return { anchorFor, placeFor, quickLookTurnX, transformUvs, tilePick, cutByTiles, seamBars, WALL_PRODUCTS, SEAM_WIDTH_M };
 });

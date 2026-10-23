@@ -144,10 +144,23 @@ test('a desktop: no AR, and WebXR is not even asked', async () => {
 
 // ---- the AR model -----------------------------------------------------------
 
-test('walls and panels hang on a wall; everything else stands on a surface', () => {
+test('walls, panels and facade pieces hang on a wall; the rest stands on the floor or a surface', () => {
   assert.equal(ArGeometry.anchorFor('stena'), 'wall');
   assert.equal(ArGeometry.anchorFor('panno'), 'wall');
   ['stoleshnitsa_kuhnya', 'stoleshnitsa_vannaya', 'podokonnik', 'pol', 'lestnitsa', 'stupeni', 'kaminy'].forEach(k => assert.equal(ArGeometry.anchorFor(k), 'floor', k));
+  // Every facade type: a column stands, the rest is on the wall.
+  const FacadeModel = require('../facade-model.js');
+  FacadeModel.FACADE_TYPES.forEach(t => {
+    assert.equal(ArGeometry.anchorFor('fasad', { facade: { type: t.key } }), t.key === 'column' ? 'floor' : 'wall', t.key);
+  });
+});
+
+test('Quick Look: a wall piece goes in face up (the wall anchor has Y out of the wall), the rest as it stands', () => {
+  assert.equal(ArGeometry.quickLookTurnX('floor'), 0);
+  const a = ArGeometry.quickLookTurnX('wall'), c = Math.cos(a), s = Math.sin(a);
+  const turn = ([x, y, z]) => [x, y * c - z * s, y * s + z * c];   // about X, as three.js
+  near(turn([0, 0, 1]), [0, 1, 0]);    // the front (+Z after placeFor) out of the wall
+  near(turn([0, 1, 0]), [0, 0, -1]);   // the top
 });
 
 // The layout's front (the room side) is +X; in AR the front faces the

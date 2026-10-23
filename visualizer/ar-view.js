@@ -129,13 +129,14 @@ let quickLookUrl = null;
 
 export async function quickLook(product) {
   const { USDZExporter } = await import('../vendor/three/USDZExporter.js');
-  const anchor = ArGeometry.anchorFor(product.productKey);
+  const anchor = ArGeometry.anchorFor(product.productKey, product.model);
   const materials = new Map();
   const meshes = productMeshes(product);
   // The 3D's seam colour (the stone's mean x 0.62) at its 0.7 opacity over the stone.
   const seamMaterial = new THREE.MeshStandardMaterial({ color: product.materials.seam.color.clone().multiplyScalar(0.7 + 0.3 / 0.62), roughness: 0.8 });
   materials.set(product.materials.seam, seamMaterial);
   const root = new THREE.Group();
+  root.rotation.x = ArGeometry.quickLookTurnX(anchor);
   root.add(placed(meshes.concat(seamLines(product)), boundsOf(meshes), anchor, obj => {
     if (obj.isLineSegments) {
       const bars = ArGeometry.seamBars(obj.geometry.attributes.position.array);
@@ -194,7 +195,7 @@ function fillOverlay(overlay, session) {
 }
 
 export async function webXr(session, product, overlay, rendering) {
-  const anchor = ArGeometry.anchorFor(product.productKey);
+  const anchor = ArGeometry.anchorFor(product.productKey, product.model);
   const meshes = productMeshes(product);
   const bounds = boundsOf(meshes);
   const size = Math.max(...bounds.max.map((v, i) => v - bounds.min[i]));

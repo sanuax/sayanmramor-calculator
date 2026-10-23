@@ -1520,11 +1520,11 @@ function dispose() {
 //
 // Everything of AR is in ar-view.js (and the USDZ exporter it loads for
 // Quick Look), imported only here, on the tap: until then AR costs the page
-// nothing -- not a file, not a line in a frame.
-const NO_AR_PRODUCTS = ['fasad'];   // a building's facade: house-sized
-
+// nothing -- not a file, not a line in a frame. Every product, facades too
+// (the owner, 2026-10-23) -- but not one still drawn at placeholder sizes.
 function canShowAr() {
-  return hasModel && !NO_AR_PRODUCTS.includes(lastProductKey);
+  if (!hasModel || !lastModel) return false;
+  return !(lastModel.facade && lastModel.facade.placeholder) && !(lastModel.fireplace && lastModel.fireplace.placeholder);
 }
 
 // The product as configured, for AR, once its stone photo is on: the sizes
@@ -1538,7 +1538,7 @@ function arProduct() {
   const photo = desc && desc.source === 'image' ? loadStonePhoto(desc) : Promise.resolve();
   return photo.then(() => {
     if (materials.fade && !materials.pending) finishFade(materials);
-    return { group: productGroup, productKey: lastProductKey, materials, environment: buildEnvironment };
+    return { group: productGroup, productKey: lastProductKey, model: lastModel, materials, environment: buildEnvironment };
   });
 }
 
