@@ -5224,9 +5224,16 @@
   function webStore(name) {
     try { return window[name] || null; } catch (e) { return null; }
   }
+  // The passport's libraries and fonts may come down a slow line: the way waits this long at most.
+  const PASSPORT_WAIT_MS = 10000;
   function sendToRequest() {
     const data = currentResultData();
     if (!data || resultCtaBtn.disabled) return;
+    // The site's file did not load (the two are published apart, a few minutes): the request still opens.
+    if (typeof OfferHandoff === 'undefined') {
+      location.assign('/sayanmramor-site/index.html#offer');
+      return;
+    }
     const query = currentPassportQuery();
     const view = ResultModel.buildResultView(data.configuration);
     const stone = selectedStoneId ? STONES_BY_ID[selectedStoneId] : null;
@@ -5238,7 +5245,10 @@
     });
     resultCtaBtn.disabled = true;
     resultCtaBtn.textContent = 'Готовим паспорт...';
-    buildPassportFile()
+    const tooLong = new Promise((resolve, reject) => setTimeout(() => reject(new Error('the passport took too long')), PASSPORT_WAIT_MS));
+    // A passport left from before must not stand in for this one if this one fails.
+    Promise.all([OfferHandoff.blobs.remove('passport'), OfferHandoff.blobs.remove('passport-preview')])
+      .then(() => Promise.race([buildPassportFile(), tooLong]))
       .then(({ file, preview }) => Promise.all([
         OfferHandoff.blobs.put('passport', { query, file }),
         OfferHandoff.blobs.put('passport-preview', { query, image: preview }),

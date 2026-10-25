@@ -490,3 +490,21 @@ test('Firefox: product scenes and stone photos grow smoothly on hover, at rest t
   assert.match(html, /\.product-card:hover \.product-card-scene svg \{ transform: scale\(1\.035\); \}/);
   assert.match(html, /\.stone-card:hover \.stone-card-image img \{ transform: scale\(1\.06\); \}/);
 });
+
+// Final review (2026-10-26): the way to the request never hangs, never dies on a missing hand-off,
+// never shows an older passport.
+test('«Получить расчёт» waits for the passport at most a few seconds, then goes on without it', () => {
+  const send = html.slice(html.indexOf('function sendToRequest('), html.indexOf('function sendToRequest(') + 2600);
+  assert.match(send, /Promise\.race\(\[/);
+  assert.match(html, /const PASSPORT_WAIT_MS = \d{4,5};/);
+});
+test('«Получить расчёт» without the site\'s hand-off file still opens the request', () => {
+  const send = html.slice(html.indexOf('function sendToRequest('), html.indexOf('function sendToRequest(') + 2600);
+  assert.match(send, /typeof OfferHandoff === 'undefined'\) \{\s*location\.assign\('\/sayanmramor-site\/index\.html#offer'\);/);
+});
+test('«Получить расчёт» drops the passport left from before, so a failed one never shows an older one', () => {
+  const send = html.slice(html.indexOf('function sendToRequest('), html.indexOf('function sendToRequest(') + 2600);
+  const drop = send.indexOf("OfferHandoff.blobs.remove('passport')");
+  assert.ok(drop > 0 && drop < send.indexOf('buildPassportFile()'), 'removed before the new one is built');
+  assert.match(send, /OfferHandoff\.blobs\.remove\('passport-preview'\)/);
+});
