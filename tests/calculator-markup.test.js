@@ -190,7 +190,7 @@ test('the stone picker in glass: the chrome over the scrolling stones, the filte
 // built -- one card per step, each with its own «Изменить» -- and the texture note last.
 test("the result column: the price on the stone first, then the actions, the price's make-up, the cards and the texture note", () => {
   const review = html.slice(html.indexOf('<section class="step" data-step-id="review"'), html.indexOf('</section>', html.indexOf('data-step-id="review"')));
-  const order = ['id="resultHero"', 'id="resultTotal"', 'id="resultPriceNote"', 'id="leadArea"', 'id="resultCtaBtn"', 'id="passportBtn"', 'id="resultShowroomLink"',
+  const order = ['id="resultHero"', 'id="resultTotal"', 'id="resultPriceNote"', 'id="leadArea"', 'id="resultCtaBtn"', 'class="lead-note"', 'id="passportBtn"', 'id="resultShowroomLink"',
     'class="result-price-parts"', 'id="resultLines"', 'class="result-built-title">Что вы собрали', 'id="resultCards"', 'id="resultScopeNote"',
     'class="stone-texture-note result-texture-note"'].map(part => {
     const at = review.indexOf(part);
@@ -198,7 +198,6 @@ test("the result column: the price on the stone first, then the actions, the pri
     return at;
   });
   order.reduce((prev, at) => { assert.ok(prev < at, 'in this order'); return at; });
-  assert.ok(review.indexOf('id="leadForm"') > review.indexOf('id="resultShowroomLink"'), 'the form opens under the actions');
   ['Конфигурация готова', 'Изменить конфигурацию', 'result-eyebrow', 'id="resultSpecs"', 'id="resultEditActions"'].forEach(old => assert.ok(!review.includes(old), old));
 });
 
@@ -225,10 +224,6 @@ test('phone: steps scroll to their start, no keyboard unless a field is tapped',
   assert.match(open, /if \(finePointer\(\)\) searchInput\.focus\(\);\s*else overlay\.focus\(\{ preventScroll: true \}\);/);
   assert.match(picker, /matchMedia\('\(hover: hover\) and \(pointer: fine\)'\)/);
   assert.match(html, /<div class="picker-overlay" id="pickerOverlay" hidden role="dialog" aria-modal="true" aria-label="Выбор камня" tabindex="-1">/);
-
-  const lead = html.slice(html.indexOf('function applyLeadMode('), html.indexOf('function showLeadErrors('));
-  assert.match(lead, /leadMode === 'form' \? \(finePointer\(\) \? leadFields\.name\.input : leadForm\)/, 'the form itself, not «Имя», on a touch screen');
-  assert.match(html, /<form class="lead-form" id="leadForm" novalidate hidden tabindex="-1">/);
 
   const apply = html.slice(html.indexOf('function applyStep('), html.indexOf('function updateStepUI('));
   assert.match(apply, /if \(transitionDirection\) \{\s*releaseFieldIn\(fromEl\);\s*if \(!enteringResult\) bringStepIntoView\(\);/, 'the Result keeps its own scroll to the columns');
@@ -338,7 +333,7 @@ test('every edge card carries its profile, so a link can pick it the way a click
 
 // ---- The passport download (2026-10-20, the owner): on the Result, no contacts needed ----
 test('«Скачать паспорт» sits in the lead area beside «Получить расчёт», outside the contact form, styled like its neighbours', () => {
-  const area = html.slice(html.indexOf('<div class="lead" id="leadArea">'), html.indexOf('<form class="lead-form" id="leadForm"'));
+  const area = html.slice(html.indexOf('<div class="lead" id="leadArea">'), html.indexOf('<details class="result-price-parts"'));
   assert.match(area, /<button type="button" class="lead-secondary-btn passport-btn" id="passportBtn">Скачать паспорт<\/button>/);
 });
 
@@ -353,9 +348,28 @@ test('the price snapshot keeps what the passport\'s table needs: the rates, the 
   assert.match(html, /return \{ state: constructorState, outcome: \{ kind: 'ok', result, message \}, pricingInputs: \{ rates, mainAreaM2: job\.mainAreaM2, complexEnabled \} \};/);
 });
 
-test('applyLeadMode never hides the passport button', () => {
-  const fn = html.slice(html.indexOf('function applyLeadMode('), html.indexOf('function showLeadErrors('));
-  assert.doesNotMatch(fn, /passportBtn/);
+// ---- One request (2026-10-26, the owner): the site's «Получить расчёт» is where contacts are left ----
+// docs/superpowers/specs/2026-10-26-offer-calculator-link-design.md in the site's repository.
+test('«Получить расчёт» takes the piece and its passport into the site\'s request; the calculator has no form of its own', () => {
+  assert.match(html, /<script src="\/sayanmramor-site\/js\/offer-handoff\.js"><\/script>/);
+  assert.ok(html.indexOf('offer-handoff.js') < html.indexOf('function currentResultData('), 'loaded before the page\'s own script');
+  ['id="leadForm"', 'id="leadSuccess"', 'lead-payload.js', 'function applyLeadMode', 'function submitLead', 'getLastLeadPayload', '.lead-form'].forEach(gone => assert.ok(!html.includes(gone), gone));
+  const area = html.slice(html.indexOf('<div class="lead" id="leadArea">'), html.indexOf('<details class="result-price-parts"'));
+  assert.match(area, /<button type="button" class="cta-btn" id="resultCtaBtn">Получить расчёт<\/button>\s*<p class="lead-note">Откроется заявка на расчёт, изделие уже будет в ней\.<\/p>/);
+  assert.match(area, /id="passportBtn">Скачать паспорт</);
+  assert.match(area, /id="resultShowroomLink"/);
+  const send = html.slice(html.indexOf('function sendToRequest('), html.indexOf('function sendToRequest(') + 2600);
+  assert.match(send, /buildPassportFile\(\)/);
+  assert.match(send, /OfferHandoff\.blobs\.put\('passport', \{ query, file/, 'the PDF of this very configuration');
+  assert.match(send, /OfferHandoff\.blobs\.put\('passport-preview', \{ query, image/);
+  assert.match(send, /OfferHandoff\.putCalcPiece\(webStore\('localStorage'\)/);
+  assert.match(send, /location\.assign\(OfferHandoff\.returnUrl\(webStore\('sessionStorage'\), query\)\)/);
+  assert.match(send, /Готовим паспорт\.\.\./);
+  assert.match(send, /\.catch\(/, 'a passport that fails does not stop the way to the request');
+  assert.match(html, /resultCtaBtn\.addEventListener\('click', sendToRequest\)/);
+  // «Скачать паспорт» and the request make the PDF the same way.
+  const download = html.slice(html.indexOf('function downloadPassport('), html.indexOf('function downloadPassport(') + 1500);
+  assert.match(download, /buildPassportFile\(\)/);
 });
 
 // ---- Final review fixes (2026-10-20) ----
@@ -373,12 +387,16 @@ test('the link leaves out the hidden mirrors of the visible count fields (shorte
 });
 
 test('the passport button never sticks: everything after it turns busy runs inside the promise chain', () => {
+  // The PDF is made by buildPassportFile (2026-10-26: «Скачать паспорт» and «Получить расчёт» share it).
   const fn = html.slice(html.indexOf('function downloadPassport('), html.indexOf("passportBtn.addEventListener('click', downloadPassport);"));
   const busy = fn.indexOf("passportBtn.textContent = 'Готовим паспорт...';");
-  const chain = fn.indexOf('Promise.resolve().then(');
-  assert.ok(chain > busy, 'a chain after the busy state');
-  assert.ok(fn.indexOf('PassportModel.buildPassport') > chain, 'buildPassport inside it');
-  assert.ok(fn.indexOf('ThreeScene.capture') > chain, 'the shots inside it');
+  assert.ok(busy > 0 && fn.indexOf('buildPassportFile()') > busy, 'the chain starts after the busy state');
+  assert.match(fn, /\.catch\([\s\S]*\.finally\(/);
+  const build = html.slice(html.indexOf('function buildPassportFile('), html.indexOf('function downloadPassport('));
+  const chain = build.indexOf('Promise.resolve().then(');
+  assert.ok(chain > 0, 'one chain');
+  assert.ok(build.indexOf('PassportModel.buildPassport') > chain, 'buildPassport inside it');
+  assert.ok(build.indexOf('ThreeScene.capture') > chain, 'the shots inside it');
 });
 
 test('a stone photo that never loads or loads empty gives the placeholder, not a failed passport', () => {
@@ -414,7 +432,7 @@ test('passport on an iPhone: the first tap prepares, the second saves within the
   const handler = code.slice(code.indexOf('function downloadPassport('));
   const save = handler.indexOf('savePassportFile(preparedPassport.file)');
   assert.ok(save > 0, 'a prepared passport is saved straight from the tap');
-  assert.ok(save < handler.indexOf('Promise.resolve()'), 'before anything waits');
+  assert.ok(save < handler.indexOf('buildPassportFile()'), 'before anything waits');
 });
 
 test('passport saving: the share sheet with the file where there is one, a download otherwise', () => {

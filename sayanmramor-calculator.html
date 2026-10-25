@@ -1311,7 +1311,8 @@
 
   .result-secondary { display: flex; gap: 10px; margin-top: 10px; }
   .result-secondary > * { flex: 1 1 0; }
-  .lead > .lead-form, .lead > .lead-success { margin-top: 12px; }
+  .lead-note { margin: 8px 0 0; font-size: var(--configurator-muted); color: var(--muted); line-height: 1.5; }
+  #resultCtaBtn:disabled { cursor: progress; opacity: 0.7; }
 
   .result-price-parts summary {
     cursor: pointer; list-style: none; font-size: var(--configurator-muted); font-weight: 600; color: var(--accent);
@@ -1353,30 +1354,6 @@
   .result-card-rows li span { flex: 0 1 auto; min-width: 0; text-align: right; overflow-wrap: anywhere; font-size: var(--configurator-muted); font-weight: 400; color: var(--muted); }
   .result-note { margin: 10px 0 0; font-size: var(--configurator-muted); color: var(--muted); line-height: 1.5; }
 
-  .lead-form, .lead-success {
-    background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 22px;
-  }
-  .lead-form { display: flex; flex-direction: column; gap: 16px; }
-  .lead-form[hidden], .lead-success[hidden], #resultCtaBtn[hidden] { display: none; }
-  .lead-form-title { margin: 0 0 4px; font-size: var(--configurator-heading); font-weight: 700; color: var(--ink); }
-  .lead-form-sub { margin: 0; font-size: var(--configurator-muted); color: var(--muted); line-height: 1.5; }
-  .lead-field label {
-    text-transform: none; letter-spacing: 0; font-size: var(--configurator-muted);
-    color: var(--muted); margin-bottom: 6px;
-  }
-  .lead-optional { font-weight: 400; }
-  .lead-field input, .lead-field textarea {
-    width: 100%; padding: 12px 14px; border: 1px solid var(--line); border-radius: 3px;
-    font-family: inherit; font-size: var(--configurator-text); line-height: 1.4;
-    background: var(--card-hover); color: var(--ink);
-  }
-  .lead-field textarea { resize: vertical; min-height: 84px; }
-  .lead-field textarea:focus { outline: none; border-color: var(--accent); background: var(--card); }
-  .lead-field.has-error input, .lead-field.has-error textarea { border-color: var(--accent-ink); }
-  .lead-error { margin-top: 4px; font-size: var(--configurator-muted); color: var(--accent-ink); line-height: 1.5; }
-  .lead-error:empty { display: none; }
-  .lead-actions { display: flex; gap: 10px; align-items: stretch; }
-  .lead-actions .cta-btn { flex: 1; }
   .lead-secondary-btn {
     padding: 12px 18px; border: 1px solid var(--line); border-radius: 6px; background: transparent;
     font-family: inherit; font-size: var(--configurator-text); font-weight: 700; color: var(--muted); cursor: pointer;
@@ -1386,9 +1363,6 @@
   .passport-btn { display: block; width: 100%; }
   .passport-btn:disabled { cursor: progress; opacity: 0.7; }
   .passport-error { margin: 8px 0 0; font-size: var(--configurator-muted); color: var(--accent-ink); line-height: 1.5; }
-  .lead-success { border-left: 3px solid var(--sage); outline: none; }
-  .lead-success-title { font-size: var(--configurator-heading); font-weight: 700; color: var(--ink); margin-bottom: 6px; }
-  .lead-success p { margin: 0 0 16px; font-size: var(--configurator-text); color: var(--muted); line-height: 1.5; }
 
   .result-showroom-link {
     display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px;
@@ -1402,7 +1376,6 @@
   .lead-secondary-btn:focus-visible, .cta-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   @media (max-width: 480px) {
     .result-cards { grid-template-columns: 1fr; }
-    .lead-actions { flex-direction: column; }
   }
   /* Phones: the 3D gets the width (less panel padding) and a square canvas
      in the Result; the title drops to the regular summary size instead of
@@ -2088,6 +2061,7 @@
 
         <div class="lead" id="leadArea">
           <button type="button" class="cta-btn" id="resultCtaBtn">Получить расчёт</button>
+          <p class="lead-note">Откроется заявка на расчёт, изделие уже будет в ней.</p>
           <div class="result-secondary">
             <button type="button" class="lead-secondary-btn passport-btn" id="passportBtn">Скачать паспорт</button>
             <!-- The same product in the site's 3D house. A plain link (URL contract only). -->
@@ -2095,37 +2069,6 @@
           </div>
           <p class="passport-error" id="passportError" hidden>Не удалось подготовить паспорт, попробуйте ещё раз</p>
 
-          <form class="lead-form" id="leadForm" novalidate hidden tabindex="-1">
-            <div class="lead-form-head">
-              <h3 class="lead-form-title">Получить расчёт</h3>
-              <p class="lead-form-sub">Оставьте контакты - параметры изделия уже собраны в запрос, повторно их вводить не нужно.</p>
-            </div>
-            <div class="lead-field">
-              <label for="leadName">Имя</label>
-              <input type="text" id="leadName" name="name" autocomplete="name" maxlength="100" aria-describedby="leadNameError">
-              <div class="lead-error" id="leadNameError"></div>
-            </div>
-            <div class="lead-field">
-              <label for="leadPhone">Телефон</label>
-              <input type="tel" id="leadPhone" name="phone" autocomplete="tel" inputmode="tel" placeholder="+7 900 000-00-00" maxlength="30" aria-describedby="leadPhoneError">
-              <div class="lead-error" id="leadPhoneError"></div>
-            </div>
-            <div class="lead-field">
-              <label for="leadComment">Комментарий <span class="lead-optional">- необязательно</span></label>
-              <textarea id="leadComment" name="comment" rows="3" maxlength="1000" aria-describedby="leadCommentError"></textarea>
-              <div class="lead-error" id="leadCommentError"></div>
-            </div>
-            <div class="lead-actions">
-              <button type="submit" class="cta-btn">Подготовить запрос</button>
-              <button type="button" class="lead-secondary-btn" id="leadCancelBtn">Отмена</button>
-            </div>
-          </form>
-
-          <div class="lead-success" id="leadSuccess" hidden tabindex="-1">
-            <div class="lead-success-title">Запрос подготовлен</div>
-            <p>Конфигурация и ваши контакты собраны в один запрос. Онлайн-отправка менеджеру пока не подключена - запрос сохранён только на этой странице.</p>
-            <button type="button" class="lead-secondary-btn" id="leadEditBtn">Изменить контакты</button>
-          </div>
         </div>
 
         <details class="result-price-parts" id="resultPriceParts">
@@ -2275,7 +2218,8 @@
 <script src="dimension-diagram.js"></script>
 <script src="step-engine.js"></script>
 <script src="result-model.js"></script>
-<script src="lead-payload.js"></script>
+<!-- The site's request (2026-10-26): «Получить расчёт» goes there; one contract, the site's own file. -->
+<script src="/sayanmramor-site/js/offer-handoff.js"></script>
 <script src="transition-layer.js"></script>
 <script src="constructor-state.js"></script>
 <script src="visualizer/constants.js"></script>
@@ -2504,13 +2448,6 @@
   // a second read of the form. Declared up here for the same URL-bootstrap
   // TDZ reason as currentStepId above.
   let lastCalcSnapshot = null;
-  // Lead UI mode: 'cta' | 'form' | 'success'. leadPreparedKey is the
-  // configuration+pricing the prepared request was built from; if the
-  // configuration changes afterwards, the success state is no longer true
-  // and the Result falls back to the CTA.
-  let leadMode = 'cta';
-  let leadPreparedKey = null;
-  let lastLeadPayload = null;
   // The passport built on an iPhone / iPad, waiting for the tap that saves it: { key, file }.
   let preparedPassport = null;
   // "Длина"/"Ширина" read as the wrong words for a floor (a room isn't
@@ -4952,16 +4889,8 @@
   const resultLinesEl = document.getElementById('resultLines');
   const resultCtaBtn = document.getElementById('resultCtaBtn');
   const resultShowroomLink = document.getElementById('resultShowroomLink');
-  const leadForm = document.getElementById('leadForm');
-  const leadSuccessEl = document.getElementById('leadSuccess');
-  const leadFields = {
-    name: { input: document.getElementById('leadName'), error: document.getElementById('leadNameError') },
-    phone: { input: document.getElementById('leadPhone'), error: document.getElementById('leadPhoneError') },
-    comment: { input: document.getElementById('leadComment'), error: document.getElementById('leadCommentError') },
-  };
   const EDGE_TITLES = {};
   EDGE_TYPES.forEach(e => { EDGE_TITLES[e.type] = e.title; });
-  const DEBUG_LEAD = bootstrapParams.get('debug') === '1';
 
   // Configuration + pricing for the Result and the lead payload, built only
   // from the last calculate() snapshot (never a second read of the form).
@@ -5153,47 +5082,9 @@
       preparedPassport = null;
       passportBtn.textContent = 'Скачать паспорт';
     }
-
-    // A prepared request describes one exact configuration -- once that
-    // changes, "Запрос подготовлен" would no longer be true.
-    if (leadMode === 'success' && JSON.stringify(data) !== leadPreparedKey) leadMode = 'cta';
-    applyLeadMode(false);
   }
 
-  function applyLeadMode(moveFocus) {
-    resultCtaBtn.hidden = leadMode !== 'cta';
-    leadForm.hidden = leadMode !== 'form';
-    leadSuccessEl.hidden = leadMode !== 'success';
-    if (!moveFocus) return;
-    const target = leadMode === 'form' ? (finePointer() ? leadFields.name.input : leadForm) : leadMode === 'success' ? leadSuccessEl : resultCtaBtn;
-    target.focus({ preventScroll: true });
-    target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }
-
-  function showLeadErrors(errors) {
-    Object.keys(leadFields).forEach(key => {
-      const field = leadFields[key];
-      const message = errors[key] || '';
-      field.error.textContent = message;
-      field.input.parentElement.classList.toggle('has-error', !!message);
-      field.input.setAttribute('aria-invalid', message ? 'true' : 'false');
-    });
-  }
-
-  function readLeadInput() {
-    return { name: leadFields.name.input.value, phone: leadFields.phone.input.value, comment: leadFields.comment.input.value };
-  }
-
-  // The single integration point for a future backend/CRM request. No
-  // endpoint exists yet, so nothing leaves the page: the payload is only
-  // kept in memory (and logged with ?debug=1). Replace the body with the
-  // real request once an API exists; callers already wait on a Promise.
-  function submitLead(payload) {
-    lastLeadPayload = payload;
-    if (DEBUG_LEAD) console.info('[lead payload]', payload);
-    return Promise.resolve({ delivered: false });
-  }
-  window.SayanCalculator = { getLastLeadPayload: () => lastLeadPayload, getPassportQuery: () => currentPassportQuery(), getResultData: () => currentResultData() };
+  window.SayanCalculator = { getPassportQuery: () => currentPassportQuery(), getResultData: () => currentResultData() };
 
   // ---- The product passport (docs/superpowers/specs/2026-10-20-product-passport-design.md) ----
   // A PDF made here in the browser: the libraries and fonts load on the
@@ -5276,22 +5167,14 @@
     }
     downloadPassportFile(file);
   }
-  function downloadPassport() {
-    const data = currentResultData();
-    if (!data || passportBtn.disabled) return;
-    const key = JSON.stringify(data);
-    if (preparedPassport && preparedPassport.key === key) {
-      savePassportFile(preparedPassport.file);
-      return;
-    }
-    passportBtn.disabled = true;
-    passportBtn.textContent = 'Готовим паспорт...';
-    passportError.hidden = true;
-    const stone = selectedStoneId ? STONES_BY_ID[selectedStoneId] : null;
+  // The PDF of what the client sees now, and its main shot (the site's request shows it small).
+  // Everything is in the chain, so any failure ends in its .catch.
+  function buildPassportFile() {
     let passport, shots;
-    // Everything after the button turns busy is in the chain, so any failure
-    // ends in the error line and the button comes back.
-    Promise.resolve().then(() => {
+    return Promise.resolve().then(() => {
+      const data = currentResultData();
+      if (!data) throw new Error('no result yet');
+      const stone = selectedStoneId ? STONES_BY_ID[selectedStoneId] : null;
       const random4 = crypto.getRandomValues(new Uint32Array(1))[0] % 10000;
       passport = PassportModel.buildPassport(Object.assign({}, data, {
         view: ResultModel.buildResultView(data.configuration), stone, createdAt: new Date(), random4,
@@ -5307,7 +5190,21 @@
       ]);
     }).then(([, , fonts, stonePhoto]) => {
       const bytes = PassportPdf.renderPassportPdf(passport, { fonts, shots, stonePhoto }, { jsPDF: window.jspdf.jsPDF, qrcode: window.qrcode });
-      const file = new File([bytes], passport.fileName, { type: 'application/pdf' });
+      return { file: new File([bytes], passport.fileName, { type: 'application/pdf' }), preview: shots[0] || null };
+    });
+  }
+  function downloadPassport() {
+    const data = currentResultData();
+    if (!data || passportBtn.disabled) return;
+    const key = JSON.stringify(data);
+    if (preparedPassport && preparedPassport.key === key) {
+      savePassportFile(preparedPassport.file);
+      return;
+    }
+    passportBtn.disabled = true;
+    passportBtn.textContent = 'Готовим паспорт...';
+    passportError.hidden = true;
+    buildPassportFile().then(({ file }) => {
       if (appleTouch()) preparedPassport = { key, file };
       else downloadPassportFile(file);
     }).catch(err => {
@@ -5320,46 +5217,44 @@
   }
   passportBtn.addEventListener('click', downloadPassport);
 
-  resultCtaBtn.addEventListener('click', () => { leadMode = 'form'; applyLeadMode(true); });
-  document.getElementById('leadCancelBtn').addEventListener('click', () => { leadMode = 'cta'; showLeadErrors({}); applyLeadMode(true); });
-  document.getElementById('leadEditBtn').addEventListener('click', () => { leadMode = 'form'; applyLeadMode(true); });
-  leadForm.addEventListener('keydown', e => {
-    if (e.key === 'Escape') { leadMode = 'cta'; showLeadErrors({}); applyLeadMode(true); }
-  });
-  // Errors appear on submit; after that, each field clears its own error as
-  // soon as it becomes valid (no aggressive validation while typing).
-  Object.keys(leadFields).forEach(key => {
-    leadFields[key].input.addEventListener('input', () => {
-      if (!leadFields[key].error.textContent) return;
-      const errors = LeadPayload.validateContact(readLeadInput()).errors;
-      const current = {};
-      Object.keys(leadFields).forEach(k => { if (leadFields[k].error.textContent) current[k] = errors[k]; });
-      showLeadErrors(current);
-    });
-  });
-  leadForm.addEventListener('submit', e => {
-    e.preventDefault();
-    const contact = LeadPayload.validateContact(readLeadInput());
-    showLeadErrors(contact.errors);
-    if (!contact.ok) {
-      const firstInvalid = Object.keys(leadFields).find(k => contact.errors[k]);
-      leadFields[firstInvalid].input.focus();
-      return;
-    }
+  // «Получить расчёт» (2026-10-26, the owner): the contacts are left in the site's request --
+  // on the page the client started it from, else the home page (js/offer-handoff.js, the
+  // site's own file). The piece goes there as a card and its passport with it, made here as
+  // «Скачать паспорт» makes it; a passport that fails does not stop the way.
+  function webStore(name) {
+    try { return window[name] || null; } catch (e) { return null; }
+  }
+  function sendToRequest() {
     const data = currentResultData();
-    if (!data) return;
-    const payload = LeadPayload.buildLeadPayload({
-      configuration: data.configuration, pricing: data.pricing, contact: contact.value, createdAt: new Date().toISOString(),
+    if (!data || resultCtaBtn.disabled) return;
+    const query = currentPassportQuery();
+    const view = ResultModel.buildResultView(data.configuration);
+    const stone = selectedStoneId ? STONES_BY_ID[selectedStoneId] : null;
+    OfferHandoff.putCalcPiece(webStore('localStorage'), {
+      kind: 'calc', query, product: data.configuration.product.label || '', stone: stone ? stone.name : '',
+      stoneImage: stone && stone.image ? '/sayanmramor-calculator/data/' + stone.image : '',
+      sizes: (view.specs.find(spec => spec.key === 'dimensions') || view.specs[0] || {}).value || '',
+      price: resultTotalEl.textContent, priced: data.pricing.status === 'ok',
     });
-    submitLead(payload).then(() => {
-      leadPreparedKey = JSON.stringify(data);
-      leadMode = 'success';
-      applyLeadMode(true);
-    });
+    resultCtaBtn.disabled = true;
+    resultCtaBtn.textContent = 'Готовим паспорт...';
+    buildPassportFile()
+      .then(({ file, preview }) => Promise.all([
+        OfferHandoff.blobs.put('passport', { query, file }),
+        OfferHandoff.blobs.put('passport-preview', { query, image: preview }),
+      ]))
+      .catch(err => console.error('[passport]', err))
+      .then(() => { location.assign(OfferHandoff.returnUrl(webStore('sessionStorage'), query)); });
+  }
+  resultCtaBtn.addEventListener('click', sendToRequest);
+  // Back here from the request (the browser's Back, a page kept in memory): the button is free again.
+  window.addEventListener('pageshow', () => {
+    resultCtaBtn.disabled = false;
+    resultCtaBtn.textContent = 'Получить расчёт';
   });
 
-  // Summary CTA (visible while configuring): leads to the Result with the
-  // form open, or to the first step still missing required data.
+  // Summary CTA (visible while configuring): leads to the Result and its
+  // «Получить расчёт», or to the first step still missing required data.
   ctaBtn.addEventListener('click', () => {
     if (!selectedProductKey) {
       productGrid.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -5376,8 +5271,8 @@
       return;
     }
     goToStep('review');
-    if (leadMode !== 'success') leadMode = 'form';
-    applyLeadMode(true);
+    resultCtaBtn.focus({ preventScroll: true });
+    resultCtaBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   });
 </script>
 </body>
