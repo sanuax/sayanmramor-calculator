@@ -508,3 +508,7 @@ test('«Получить расчёт» drops the passport left from before, so 
   assert.ok(drop > 0 && drop < send.indexOf('buildPassportFile()'), 'removed before the new one is built');
   assert.match(send, /OfferHandoff\.blobs\.remove\('passport-preview'\)/);
 });
+
+test('the product cards carry their names only, no second line (the owner, 2026-10-26)', () => {
+  ['PRODUCT_HINTS', 'product-card-hint', 'Раковина, отверстия, бортик', 'Мойка, варочная панель, остров'].forEach(gone => assert.ok(!html.includes(gone), gone));
+});
