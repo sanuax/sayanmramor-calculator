@@ -92,6 +92,16 @@ test('applyTones: each stone takes its place from the index; a stone the index d
   assert.deepEqual(list.map(s => s.tone), [null, null]);
 });
 
+test('«Моя подборка» in the picker: only the marked stones, with search and sort as usual; none marked, none shown', () => {
+  const list = [{ id: 'a', name: 'Ann', tone: 1 }, { id: 'b', name: 'Bob', tone: 0 }, { id: 'c', name: 'Cid', tone: 2 }];
+  const ids = options => MaterialPicker.filterAndSort(list, Object.assign({ query: '', sortKey: 'tone-asc' }, options)).map(s => s.id);
+  assert.deepEqual(ids({ only: ['c', 'a'] }), ['a', 'c']);
+  assert.deepEqual(ids({ only: ['c', 'a'], query: 'cid' }), ['c']);
+  assert.deepEqual(ids({ only: [] }), []);
+  assert.deepEqual(ids({}), ['b', 'a', 'c'], 'not asked: every stone');
+  assert.equal(!!MaterialPicker.hasActiveFilters({ query: '', countries: [], categories: [], colors: [], onlyPicks: true }), true);
+});
+
 test('sortStones by name-asc sorts alphabetically A-Z', () => {
   const sorted = MaterialPicker.sortStones(stones, 'name-asc');
   assert.deepEqual(sorted.map(s => s.id), ['b', 'c', 'a', 'd']);

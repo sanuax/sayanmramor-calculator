@@ -88,9 +88,10 @@
     stones.forEach(stone => { stone.tone = places.has(stone.id) ? places.get(stone.id) : null; });
   }
 
-  function filterAndSort(stones, { query, countries, categories, colors, price, sortKey }) {
+  function filterAndSort(stones, { query, countries, categories, colors, price, sortKey, only }) {
     const filtered = stones.filter(s =>
-      matchesSearch(s, query)
+      (!only || only.includes(s.id))
+      && matchesSearch(s, query)
       && matchesCountryFilter(s, countries)
       && matchesCategoryFilter(s, categories)
       && matchesColorFilter(s, colors)
@@ -103,8 +104,9 @@
   // action) should be shown/enabled -- true the moment any search text or
   // any filter selection exists, regardless of whether it actually excludes
   // anything yet.
-  function hasActiveFilters({ query, countries, categories, colors, price }) {
-    return !!query
+  function hasActiveFilters({ query, countries, categories, colors, price, onlyPicks }) {
+    return !!onlyPicks
+      || !!query
       || (countries && countries.length > 0)
       || (categories && categories.length > 0)
       || (colors && colors.length > 0)
@@ -211,6 +213,24 @@
     const sentinel = document.getElementById('pickerSentinel');
     const emptyMessage = document.getElementById('pickerEmpty');
     const metaEl = document.getElementById('pickerMeta');
+    // «Моя подборка»: in the glass over the stones, at the end of the filter row, in view however
+    // far the list is scrolled. It shows the marked stones right here and never leaves the page:
+    // the piece and the sizes already entered live only in this page.
+    const Picks = typeof window !== 'undefined' ? window.Picks : null;
+    const picksButton = Picks ? Picks.link(document, { button: true, kind: Picks.STONES }) : null;
+    let onlyPicks = false;
+    function setOnlyPicks(on) {
+      onlyPicks = on;
+      if (picksButton) picksButton.setAttribute('aria-pressed', String(on));
+    }
+    if (picksButton) {
+      setOnlyPicks(false);
+      document.querySelector('.picker-filters').appendChild(picksButton);
+      picksButton.addEventListener('click', () => {
+        setOnlyPicks(!onlyPicks);
+        resetAndRender();
+      });
+    }
     const resetFiltersBtn = document.getElementById('pickerResetFilters');
     const emptyResetBtn = document.getElementById('pickerEmptyReset');
     const lightboxOverlay = document.getElementById('lightboxOverlay');
@@ -354,6 +374,10 @@
         imageWrap.appendChild(badge);
       }
 
+      // «Моя подборка» (js/picks.js of the site): not for a stone that cannot be ordered.
+      const picks = typeof window !== 'undefined' && window.Picks;
+      if (picks && stone.available !== false) imageWrap.appendChild(picks.heart(document, picks.STONES, stone.id, stone.name));
+
       const name = document.createElement('div');
       name.className = 'stone-card-name';
       name.textContent = stone.name;
@@ -394,6 +418,7 @@
     }
 
     function resetAllFilters() {
+      setOnlyPicks(false);
       currentQuery = '';
       searchInput.value = '';
       currentCountries = []; countryDropdown.reset();
@@ -408,10 +433,14 @@
         query: currentQuery, countries: currentCountries,
         categories: currentCategories, colors: currentColors,
         price: currentPrice, sortKey: currentSortKey,
+        only: onlyPicks ? Picks.read(Picks.storage(window))[Picks.STONES] : null,
       });
       grid.innerHTML = '';
       renderedCount = 0;
       emptyMessage.hidden = filteredList.length > 0;
+      const noPicksYet = onlyPicks && Picks.read(Picks.storage(window))[Picks.STONES].length === 0;
+      emptyMessage.querySelector('p').textContent = noPicksYet ? 'В подборке пока нет камней. Отмечайте понравившиеся сердечком.' : 'Материалы не найдены';
+      emptyResetBtn.textContent = noPicksYet ? 'Показать все камни' : 'Сбросить фильтры';
       sentinel.hidden = filteredList.length === 0;
       // A real, computed count -- not shown at all while a search/filter
       // combination has wiped out every result (the empty state already
@@ -419,7 +448,7 @@
       metaEl.textContent = filteredList.length > 0 ? pluralizeMaterials(filteredList.length) : '';
       resetFiltersBtn.hidden = !hasActiveFilters({
         query: currentQuery, countries: currentCountries, categories: currentCategories, colors: currentColors,
-        price: currentPrice,
+        price: currentPrice, onlyPicks,
       });
       results.scrollTop = 0;
       renderNextBatch();
@@ -498,6 +527,7 @@
       currentCategories = [];
       currentColors = [];
       currentSortKey = 'tone-asc';
+      setOnlyPicks(false);
       searchInput.value = '';
       countryDropdown.reset();
       categoryDropdown.reset();
