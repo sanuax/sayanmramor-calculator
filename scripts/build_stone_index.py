@@ -7,13 +7,18 @@ in the source's order, as data/stone-index.json:
 
     {"updated_at": "<copied from slabs.json>",
      "stones": [{"id": ..., "name": ..., "category_label_ru": ..., "image": ..., "price_from": ...,
-                 "countries": [{"label_ru": ...}], "colors": [{"label_ru": ...}]}, ...]}
+                 "countries": [{"label_ru": ...}], "colors": [{"label_ru": ...}], "tone": ...}, ...]}
 
 price_from: the stone's lowest price per m2 among its slabs, whole roubles
 (null when no slab has a price) -- the price the stone galleries filter by
 («Цена от … до …») and the configurator's card shows as «от … ₽/м²».
 countries / colors: as in slabs.json, each item with its Russian label only --
 the galleries' «Страна» and «Цвет» filters (an empty list when the stone has none).
+tone: the stone's place in the galleries' colour gradient (0, 1, 2, ...; the sort
+«Цвет»), worked out from its photo each time this script runs, so a stone the
+parser has just added takes its place by itself. It is an order only, never shown
+and never a property of the stone. null: no photo, or the supplier's placeholder
+picture (the galleries put such a stone last). Reading photos needs Pillow.
 
 Stones with `available` set to False are left out; every other stone must
 have an id (unique) and a name. The input is validated before anything is
@@ -25,6 +30,7 @@ Usage:
 """
 import argparse
 import json
+import math
 import os
 import sys
 import tempfile
@@ -33,7 +39,16 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_INPUT_PATH = PROJECT_ROOT / 'data' / 'slabs.json'
 DEFAULT_OUTPUT_PATH = PROJECT_ROOT / 'data' / 'stone-index.json'
-FIELDS = ('id', 'name', 'category_label_ru', 'image', 'price_from', 'countries', 'colors')
+FIELDS = ('id', 'name', 'category_label_ru', 'image', 'price_from', 'countries', 'colors', 'tone')
+TONE_SIZE = (48, 28)          # a photo is judged at this size: fast, and the veins do not decide
+LIKENESS_SIZE = (16, 10)      # ... and compared with the others at this one
+PLACEHOLDER_REPEATS = 3       # this many stones with one and the same picture: not a photo of them
+CHROMA_NEUTRAL = 9.0          # Lab chroma below this: white, grey or black, not a colour
+LIGHT_WHITE = 78.0            # a neutral at least this light is white
+LIGHT_BLACK = 30.0            # a neutral darker than this is black
+# The gradient: each family in turn, light first (-1) or dark first (1), so that each ends about
+# where the next begins: white, beige to brown, dark red up to pink, violet, blue, green, grey, black.
+TONE_FAMILIES = (('white', -1), ('warm', -1), ('red', 1), ('violet', -1), ('blue', 1), ('green', -1), ('grey', -1), ('black', -1))
 
 
 class StoneIndexError(ValueError):
@@ -95,8 +110,82 @@ def build_stone_index(data):
             'price_from': _price_from(stone),
             'countries': _labels(stone.get('countries')),
             'colors': _labels(stone.get('colors')),
+            'tone': None,
         })
     return {'updated_at': data.get('updated_at'), 'stones': index}
+
+
+def _srgb_to_lab(r, g, b):
+    """One sRGB pixel (0-255) -> CIE Lab (D65): lightness and two colour axes, closer to what the eye sees than RGB."""
+    def linear(c):
+        c /= 255
+        return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+    def f(t):
+        return t ** (1 / 3) if t > 0.008856 else 7.787 * t + 16 / 116
+
+    r, g, b = linear(r), linear(g), linear(b)
+    x = f((0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047)
+    y = f(0.2126 * r + 0.7152 * g + 0.0722 * b)
+    z = f((0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883)
+    return 116 * y - 16, 500 * (x - y), 200 * (y - z)
+
+
+def read_photo(path):
+    """A stone photo -> (its colour as a median Lab, so veins do not shift it; a coarse likeness to compare photos by)."""
+    from PIL import Image
+    with Image.open(path) as im:
+        rgb = im.convert('RGB')
+        small = rgb.resize(TONE_SIZE, Image.BOX).tobytes()
+        likeness = bytes(v // 6 for v in rgb.resize(LIKENESS_SIZE, Image.BOX).tobytes())
+    labs = [_srgb_to_lab(small[i], small[i + 1], small[i + 2]) for i in range(0, len(small), 3)]
+    return tuple(sorted(channel)[len(channel) // 2] for channel in zip(*labs)), likeness
+
+
+def tone_family(lab):
+    """The family of the gradient a Lab colour belongs to (TONE_FAMILIES)."""
+    light, a, b = lab
+    if math.hypot(a, b) < CHROMA_NEUTRAL:
+        return 'white' if light >= LIGHT_WHITE else 'black' if light < LIGHT_BLACK else 'grey'
+    hue = math.degrees(math.atan2(b, a)) % 360
+    if 60 <= hue < 112:
+        return 'warm'
+    if hue < 60 or hue >= 330:
+        return 'red'
+    if hue >= 270:
+        return 'violet'
+    return 'blue' if hue >= 180 else 'green'
+
+
+def tone_order(colors):
+    """{stone id: Lab} -> {stone id: its place in the gradient}, from 0; the same colours always give the same order."""
+    ordered = []
+    for family, direction in TONE_FAMILIES:
+        members = [stone_id for stone_id, lab in colors.items() if tone_family(lab) == family]
+        ordered += sorted(members, key=lambda stone_id: (direction * colors[stone_id][0], stone_id))
+    return {stone_id: place for place, stone_id in enumerate(ordered)}
+
+
+def add_tones(index, base_dir):
+    """Fill `tone` from the photos under base_dir. A stone stays at null without a readable
+    photo, or when its picture is the one several stones share. Returns how many stayed so."""
+    photos = {}
+    for stone in index['stones']:
+        path = Path(base_dir) / stone['image'] if stone['image'] else None
+        if path is None or not path.is_file():
+            continue
+        try:
+            photos[stone['id']] = read_photo(path)
+        except OSError as e:
+            print(f'WARNING: {path} cannot be read ({e}); this stone goes last in the gradient', file=sys.stderr)
+    repeats = {}
+    for _, likeness in photos.values():
+        repeats[likeness] = repeats.get(likeness, 0) + 1
+    colors = {stone_id: lab for stone_id, (lab, likeness) in photos.items() if repeats[likeness] < PLACEHOLDER_REPEATS}
+    order = tone_order(colors)
+    for stone in index['stones']:
+        stone['tone'] = order.get(stone['id'])
+    return len(index['stones']) - len(order)
 
 
 def serialize(index):
@@ -135,6 +224,10 @@ def main(argv=None):
         with open(input_path, encoding='utf-8') as f:
             data = json.load(f)
         index = build_stone_index(data)
+        without_tone = add_tones(index, input_path.parent)
+    except ImportError:
+        print('ERROR: reading the stone photos needs Pillow (python -m pip install pillow); nothing written', file=sys.stderr)
+        return 1
     except (json.JSONDecodeError, UnicodeDecodeError) as e:
         print(f'ERROR: {input_path} is not valid JSON ({e}); nothing written', file=sys.stderr)
         return 1
@@ -145,7 +238,7 @@ def main(argv=None):
     payload = serialize(index)
     write_atomically(args.output, payload)
     total = len(data['stones'])
-    print(f'Wrote {args.output}: {len(index["stones"])} of {total} stones, {len(payload)} bytes')
+    print(f'Wrote {args.output}: {len(index["stones"])} of {total} stones, {len(payload)} bytes, {without_tone} without a place in the colour gradient')
     return 0
 
 

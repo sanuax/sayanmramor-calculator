@@ -2188,7 +2188,8 @@
     <p class="picker-supplier">Камень в нашей коллекции закупается у Venezia Stone. <a href="https://veneziastone.com/" target="_blank" rel="noopener">Подробнее о коллекции и материалах - на сайте Venezia Stone</a></p>
   </div>
   <div class="picker-sort" id="pickerSort">
-    <button type="button" class="sort-btn active" data-sort-field="name" data-sort-dir="asc">A-Z</button>
+    <button type="button" class="sort-btn active" data-sort-field="tone" data-sort-dir="asc">Цвет</button>
+    <button type="button" class="sort-btn" data-sort-field="name" data-sort-dir="asc">A-Z</button>
     <button type="button" class="sort-btn" data-sort-field="price" data-sort-dir="asc">Цена ↑</button>
   </div>
   </div><!-- /.picker-chrome -->
@@ -3304,11 +3305,15 @@
     }
   }
 
-  fetch('data/slabs.json')
-    .then(r => r.json())
-    .then(data => {
+  Promise.all([
+    fetch('data/slabs.json').then(r => r.json()),
+    // Only for the order of the stones (the sort «Цвет»): the calculator works without it.
+    fetch('data/stone-index.json').then(r => r.json()).catch(() => null),
+  ])
+    .then(([data, stoneIndex]) => {
       UPDATED_AT = data.updated_at;
       (data.stones || []).forEach(stone => { STONES_BY_ID[stone.id] = stone; });
+      MaterialPicker.applyTones(data.stones || [], stoneIndex);
       picker = MaterialPicker.init({ stones: data.stones || [], onSelect: handleMaterialSelected });
       materialField.disabled = false;
       materialFieldText.textContent = 'Выберите камень';

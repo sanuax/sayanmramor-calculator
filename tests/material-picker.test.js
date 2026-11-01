@@ -75,6 +75,23 @@ test('matchesCountryFilter treats a stone with no countries as matching nothing 
   assert.equal(MaterialPicker.matchesCountryFilter({}, []), true);
 });
 
+test('sortStones by tone: the gradient, either way, a stone without a place always last', () => {
+  const list = [
+    { id: 'none', name: 'Aaa', tone: null }, { id: 'dark', name: 'Bbb', tone: 2 },
+    { id: 'light', name: 'Ccc', tone: 0 }, { id: 'unknown', name: 'Ddd' }, { id: 'mid', name: 'Eee', tone: 1 },
+  ];
+  assert.deepEqual(MaterialPicker.sortStones(list, 'tone-asc').map(s => s.id), ['light', 'mid', 'dark', 'none', 'unknown']);
+  assert.deepEqual(MaterialPicker.sortStones(list, 'tone-desc').map(s => s.id), ['dark', 'mid', 'light', 'none', 'unknown']);
+});
+
+test('applyTones: each stone takes its place from the index; a stone the index does not know yet, or no index, has none', () => {
+  const list = [{ id: 'a', name: 'A' }, { id: 'new-from-the-parser', name: 'N' }];
+  MaterialPicker.applyTones(list, { stones: [{ id: 'a', tone: 7 }, { id: 'gone', tone: 8 }] });
+  assert.deepEqual(list.map(s => s.tone), [7, null]);
+  MaterialPicker.applyTones(list, null);
+  assert.deepEqual(list.map(s => s.tone), [null, null]);
+});
+
 test('sortStones by name-asc sorts alphabetically A-Z', () => {
   const sorted = MaterialPicker.sortStones(stones, 'name-asc');
   assert.deepEqual(sorted.map(s => s.id), ['b', 'c', 'a', 'd']);

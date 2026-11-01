@@ -50,7 +50,19 @@
     const copy = stones.slice();
     const [field, direction] = (sortKey || 'name-asc').split('-');
     const mult = direction === 'desc' ? -1 : 1;
-    if (field === 'price') {
+    if (field === 'tone') {
+      // The colour gradient (data/stone-index.json, built from the photos): a
+      // stone without a place goes last whichever way it runs.
+      const place = s => (typeof s.tone === 'number' ? s.tone : null);
+      copy.sort((a, b) => {
+        const pa = place(a);
+        const pb = place(b);
+        if (pa === null && pb === null) return a.name.localeCompare(b.name, 'ru');
+        if (pa === null) return 1;
+        if (pb === null) return -1;
+        return (pa - pb) * mult;
+      });
+    } else if (field === 'price') {
       copy.sort((a, b) => {
         const pa = minPricePerM2(a);
         const pb = minPricePerM2(b);
@@ -67,6 +79,13 @@
       copy.sort((a, b) => a.name.localeCompare(b.name, 'ru') * mult);
     }
     return copy;
+  }
+
+  // data/stone-index.json carries each stone's place in the gradient; slabs.json,
+  // the parser's own file, does not. Without the index every stone is simply placeless.
+  function applyTones(stones, index) {
+    const places = new Map(((index && index.stones) || []).map(s => [s.id, s.tone]));
+    stones.forEach(stone => { stone.tone = places.has(stone.id) ? places.get(stone.id) : null; });
   }
 
   function filterAndSort(stones, { query, countries, categories, colors, price, sortKey }) {
@@ -207,6 +226,7 @@
     if (chrome && typeof ResizeObserver !== 'undefined') new ResizeObserver(measureChrome).observe(chrome);
 
     const SORT_LABELS = {
+      'tone-asc': 'Цвет', 'tone-desc': 'Цвет ↓',
       'name-asc': 'A-Z', 'name-desc': 'Z-A',
       'price-asc': 'Цена ↑', 'price-desc': 'Цена ↓',
     };
@@ -216,7 +236,7 @@
     let currentCategories = [];
     let currentColors = [];
     let currentPrice = null;
-    let currentSortKey = 'name-asc';
+    let currentSortKey = 'tone-asc';
     let filteredList = [];
     let renderedCount = 0;
     let isLoadingBatch = false;
@@ -477,7 +497,7 @@
       currentCountries = [];
       currentCategories = [];
       currentColors = [];
-      currentSortKey = 'name-asc';
+      currentSortKey = 'tone-asc';
       searchInput.value = '';
       countryDropdown.reset();
       categoryDropdown.reset();
@@ -485,7 +505,7 @@
       priceDropdown.reset();
       sortButtons.forEach(b => {
         b.dataset.sortDir = 'asc';
-        b.classList.toggle('active', b.dataset.sortField === 'name');
+        b.classList.toggle('active', b.dataset.sortField === 'tone');
       });
       applySortButtonLabels();
       resetAndRender();
@@ -502,6 +522,6 @@
 
   return {
     minPricePerM2, matchesSearch, matchesCountryFilter, matchesCategoryFilter, matchesColorFilter, matchesPriceFilter,
-    sortStones, filterAndSort, hasActiveFilters, pluralizeMaterials, init,
+    sortStones, applyTones, filterAndSort, hasActiveFilters, pluralizeMaterials, init,
   };
 });
