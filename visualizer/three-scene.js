@@ -612,16 +612,105 @@ function buildBasin(group, part, material) {
   });
 }
 
+// An induction hob as one is (2026-11-04, the owner: «чуть реалистичнее»): a thin black glass
+// plate with rounded corners and a polished bevel, its zones printed as fine rings -- two large,
+// two small -- and the touch controls along the front edge (+X, away from the wall): the power
+// key, a slider 0..9, a timer. The print is a canvas drawn once at the plate's size.
+const COOKTOP_PX_PER_M = 1800;
+const COOKTOP_CORNER_M = 0.008;
+const COOKTOP_BEVEL_M = 0.0012;
+const cooktopPrints = new Map();   // 'sx x sz' -> its texture, for the page's life
+function cooktopPrint(sx, sz) {
+  const key = sx.toFixed(3) + 'x' + sz.toFixed(3);
+  if (cooktopPrints.has(key)) return cooktopPrints.get(key);
+  // The canvas as seen from the front: across it the run (left to right), down it the depth (wall to front).
+  const k = COOKTOP_PX_PER_M, w = Math.round(sz * k), h = Math.round(sx * k);
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  const g = canvas.getContext('2d');
+  g.fillStyle = '#0a0a0b';
+  g.fillRect(0, 0, w, h);
+  const m = v => v * k;
+  // The zones: large front-left and back-right, small back-left and front-right.
+  // [across the run 0..1, from the wall in m, radius in m]
+  const zones = [[0.27, 0.315, 0.095], [0.27, 0.115, 0.07], [0.73, 0.115, 0.095], [0.73, 0.315, 0.07]];
+  zones.forEach(([u, d, r]) => {
+    const x = u * w, y = m(d), R = m(r);
+    g.strokeStyle = 'rgba(150, 150, 146, 0.55)';
+    g.lineWidth = m(0.0022);
+    g.beginPath(); g.arc(x, y, R, 0, Math.PI * 2); g.stroke();
+    g.strokeStyle = 'rgba(150, 150, 146, 0.22)';
+    g.lineWidth = m(0.0012);
+    g.beginPath(); g.arc(x, y, R * 0.62, 0, Math.PI * 2); g.stroke();
+    // Four short ticks at the ring's quarters, as hobs mark a zone's middle.
+    g.strokeStyle = 'rgba(150, 150, 146, 0.5)';
+    g.lineWidth = m(0.0018);
+    for (let i = 0; i < 4; i++) {
+      const a = i * Math.PI / 2, c = Math.cos(a), s = Math.sin(a);
+      g.beginPath(); g.moveTo(x + c * (R + m(0.005)), y + s * (R + m(0.005))); g.lineTo(x + c * (R + m(0.011)), y + s * (R + m(0.011))); g.stroke();
+    }
+  });
+  // The controls, a strip along the front edge.
+  const cy = h - m(0.038), ink = 'rgba(205, 205, 200, 0.78)';
+  g.strokeStyle = ink; g.fillStyle = ink; g.lineCap = 'round';
+  // Power: an open ring and its stroke.
+  const px = m(0.055), pr = m(0.0075);
+  g.lineWidth = m(0.0016);
+  g.beginPath(); g.arc(px, cy, pr, -Math.PI / 2 + 0.55, Math.PI * 1.5 - 0.55); g.stroke();
+  g.beginPath(); g.moveTo(px, cy - pr - m(0.002)); g.lineTo(px, cy - m(0.001)); g.stroke();
+  // The slider: a line with its steps, the numbers over it.
+  const s0 = w / 2 - m(0.11), s1 = w / 2 + m(0.11);
+  g.lineWidth = m(0.0012);
+  g.beginPath(); g.moveTo(s0, cy + m(0.004)); g.lineTo(s1, cy + m(0.004)); g.stroke();
+  g.font = '500 ' + Math.round(m(0.0085)) + 'px Arial, sans-serif';
+  g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+  for (let i = 0; i <= 9; i++) {
+    const x = s0 + (s1 - s0) * i / 9;
+    g.beginPath(); g.moveTo(x, cy + m(0.001)); g.lineTo(x, cy + m(0.007)); g.stroke();
+    g.fillText(String(i), x, cy - m(0.003));
+  }
+  // Timer: a dial with two hands.
+  const tx = w - m(0.055), tr = m(0.0075);
+  g.lineWidth = m(0.0016);
+  g.beginPath(); g.arc(tx, cy, tr, 0, Math.PI * 2); g.stroke();
+  g.beginPath(); g.moveTo(tx, cy - tr * 0.6); g.lineTo(tx, cy); g.lineTo(tx + tr * 0.45, cy + tr * 0.2); g.stroke();
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 8;
+  cooktopPrints.set(key, texture);
+  return texture;
+}
+function roundedRect(sx, sz, r) {
+  const shape = new THREE.Shape(), x = sx / 2, y = sz / 2;
+  shape.moveTo(-x + r, -y);
+  shape.lineTo(x - r, -y); shape.quadraticCurveTo(x, -y, x, -y + r);
+  shape.lineTo(x, y - r); shape.quadraticCurveTo(x, y, x - r, y);
+  shape.lineTo(-x + r, y); shape.quadraticCurveTo(-x, y, -x, y - r);
+  shape.lineTo(-x, -y + r); shape.quadraticCurveTo(-x, -y, -x + r, -y);
+  return shape;
+}
 function buildCooktop(group, part, materials) {
   const [cx, top, cz] = part.center;
   const [sx, sy, sz] = part.size;
-  addMesh(group, new THREE.BoxGeometry(sx, sy, sz), materials.glass, [cx, top + sy / 2, cz]);
-  const r = Math.min(sx, sz) * 0.17;
-  [[-1, -1, 1], [1, -1, 0.78], [-1, 1, 0.78], [1, 1, 1]].forEach(([ix, iz, scale]) => {
-    const ring = new THREE.RingGeometry(r * scale * 0.82, r * scale, 48);
-    ring.rotateX(-Math.PI / 2);
-    addMesh(group, ring, materials.burner, [cx + ix * sx / 4, top + sy + 0.0006, cz + iz * sz / 4], false);
-  });
+  // The plate: its flat top the shape, the bevel round it out to the full size.
+  const b = COOKTOP_BEVEL_M, flat = roundedRect(sx - 2 * b, sz - 2 * b, COOKTOP_CORNER_M);
+  const plate = new THREE.ExtrudeGeometry(flat, { depth: Math.max(0.001, sy - 2 * b), bevelEnabled: true, bevelThickness: b, bevelSize: b, bevelSegments: 2, curveSegments: 6 });
+  plate.rotateX(-Math.PI / 2);
+  plate.translate(0, b, 0);
+  addMesh(group, plate, materials.glass, [cx, top, cz]);
+  // The print on its top, just over the glass, its own glossy black.
+  if (!materials.cooktop) {
+    materials.cooktop = new THREE.MeshPhysicalMaterial({
+      color: '#ffffff', map: cooktopPrint(sx, sz), roughness: 0.06, metalness: 0, envMapIntensity: 1.1,
+    });
+  }
+  const print = new THREE.ShapeGeometry(flat, 6);
+  print.rotateX(-Math.PI / 2);
+  // Seen from the front (+X): the canvas's left is +Z, its top the wall side (-X).
+  const pos = print.attributes.position, uv = print.attributes.uv;
+  for (let i = 0; i < pos.count; i++) uv.setXY(i, (sz / 2 - pos.getZ(i)) / sz, 1 - (pos.getX(i) + sx / 2) / sx);
+  uv.needsUpdate = true;
+  addMesh(group, print, materials.cooktop, [cx, top + sy + 0.0004, cz], false);
 }
 
 function buildFloor(group, layout, materials) {
