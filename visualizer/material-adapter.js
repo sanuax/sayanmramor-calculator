@@ -37,6 +37,7 @@
   const HIGH_GLOSS = { finish: 'polished', roughness: 0.28, metalness: 0, clearcoat: 0.55, clearcoatRoughness: 0.12 };
   const HONED = { finish: 'honed', roughness: 0.66, metalness: 0, clearcoat: 0.04, clearcoatRoughness: 0.4 };
   const MATTE = { finish: 'matte', roughness: 0.82, metalness: 0, clearcoat: 0, clearcoatRoughness: 0.5 };
+  const TRANSLUCENT_CATEGORIES = ['oniks', 'agate'];
   const CATEGORY_BASE = {
     marble: POLISHED, granite: POLISHED, quartzite: POLISHED, 'artificial-marble': POLISHED,
     'quartz-agglomerate': HIGH_GLOSS, quartz: HIGH_GLOSS,
@@ -120,6 +121,8 @@
 
     return {
       stoneId: (stone && stone.id) || null,
+      // Onyx and agate let light through: the scene lends them a faint glow of their own.
+      translucent: !!(stone && TRANSLUCENT_CATEGORIES.includes(stone.category)),
       source: imageUrl ? 'image' : 'procedural',
       imageUrl,
       imageCrop: IMAGE_CROP,

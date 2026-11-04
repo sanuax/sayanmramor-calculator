@@ -18,7 +18,7 @@ const ArGeometry = window.ArGeometry;
 
 // The product's own materials (three-scene.js buildMaterials); the rest --
 // context, the floor disc, the room, the dimension lines -- stays out.
-const PRODUCT_MATERIALS = ['stone', 'metal', 'steel', 'chrome', 'hole', 'glass', 'cooktop', 'body', 'burner', 'light'];
+const PRODUCT_MATERIALS = ['stone', 'metal', 'steel', 'chrome', 'hole', 'glass', 'cooktop', 'firebox', 'body', 'burner', 'light'];
 
 function productMeshes(product) {
   const keep = new Set(PRODUCT_MATERIALS.map(k => product.materials[k]));

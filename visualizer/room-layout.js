@@ -68,6 +68,19 @@
 
   const box = (role, x0, x1, y0, y1, z0, z1) => ({ role, min: [x0, y0, z0], max: [x1, y1, z1] });
 
+  // A front with its pull (2026-11-04, the owner: the audit's «ручки на фасадах»): a profile pull
+  // along the front's top edge, standing out of the face it shows to the room (`side`: the
+  // face's outward axis). The fronts themselves are the same boxes as before.
+  const PULL_OUT_M = 0.014, PULL_H_M = 0.022, PULL_INSET_M = 0.03;
+  function frontWithPull(boxes, x0, x1, y0, y1, z0, z1, side) {
+    boxes.push(box('front', x0, x1, y0, y1, z0, z1));
+    const o = PULL_OUT_M, h = PULL_H_M, m = PULL_INSET_M, yy = y1 - h;
+    if (side === '+x') boxes.push(box('handle', x1, x1 + o, yy, y1, z0 + m, z1 - m));
+    else if (side === '-x') boxes.push(box('handle', x0 - o, x0, yy, y1, z0 + m, z1 - m));
+    else if (side === '+z') boxes.push(box('handle', x0 + m, x1 - m, yy, y1, z1, z1 + o));
+    else boxes.push(box('handle', x0 + m, x1 - m, yy, y1, z0 - o, z0));
+  }
+
   function extentOf(outline) {
     const xs = outline.map(p => p[0]), zs = outline.map(p => p[1]);
     return { x0: Math.min(...xs), x1: Math.max(...xs), z0: Math.min(...zs), z1: Math.max(...zs) };
@@ -86,6 +99,42 @@
       parts = [].concat(...parts.map(([s, e]) => [[s, Math.min(e, c0)], [Math.max(s, c1), e]].filter(([x, y]) => y - x > 0.05)));
     });
     return parts;
+  }
+
+  // Things on the top for scale (2026-11-04, the owner: the audit's «пара предметов»): in the
+  // room only, in the longest free stretch of the main run -- clear of the sink, the hob, the
+  // taps, the sockets and the wings. A kitchen: a board, a vase and, with room to spare, a bowl
+  // of lemons; a bathroom: a vase and a folded towel. They are no part of the product.
+  function topProps(layout, e, top, wings, kind) {
+    const cut = [];
+    layout.parts.forEach(p => {
+      if (!p.center) return;
+      if (p.size && (p.name === 'sink' || p.name === 'cooktop')) cut.push([p.center[2] - p.size[2] / 2 - 0.12, p.center[2] + p.size[2] / 2 + 0.12]);
+      else if (p.name === 'faucet' || p.name === 'dispenser' || p.name === 'socket') cut.push([p.center[2] - 0.13, p.center[2] + 0.13]);
+    });
+    wings.forEach(w => cut.push([w.z0 - 0.05, w.z1 + 0.05]));
+    const free = without(e.z0 + 0.1, e.z1 - 0.1, cut).sort((a, b) => (b[1] - b[0]) - (a[1] - a[0]));
+    if (!free.length) return [];
+    const [a, b] = free[0], len = b - a, depth = e.x1 - e.x0, mid = e.x0 + depth / 2, near = e.x0 + 0.1;
+    if (len < 0.25) return [];
+    if (kind === 'bath') {
+      const props = [{ kind: 'vase', center: [near, top, a + 0.08], r: 0.045, h: 0.2 }];
+      if (len >= 0.5) props.push({ kind: 'towel', center: [mid, top + 0.03, a + 0.3], size: [0.2, 0.06, 0.3] });
+      return props;
+    }
+    if (len < 0.55) return [{ kind: 'vase', center: [near, top, (a + b) / 2], r: 0.055, h: 0.24 }];
+    const props = [
+      { kind: 'board', center: [mid, top + 0.01, a + 0.25], size: [0.26, 0.02, 0.4] },
+      { kind: 'vase', center: [near, top, Math.min(b - 0.07, a + 0.52)], r: 0.055, h: 0.24 },
+    ];
+    if (len >= 1.0) props.push({ kind: 'bowl', center: [mid, top, a + 0.82], r: 0.11 });
+    return props;
+  }
+
+  // A soft dark band where the top meets the wall (the room's wall; a backsplash has its own).
+  function wallDecals(layout, e, top) {
+    if (layout.parts.some(p => p.name === 'backsplash')) return [];
+    return [{ x0: e.x0, x1: e.x0 + 0.07, y: top + 0.0008, z0: e.z0, z1: e.z1 }];
   }
 
   // A cabinet body from y0 up to under the top -- hollow where a sink bowl
@@ -124,7 +173,7 @@
     boxes.push(box('plinth', e.x0, frontX - 0.04, floor, floor + PLINTH_M, z0, z1));
     carcass(boxes, layout, e.x0, frontX, floor + PLINTH_M, bottom, z0, z1);
     without(z0, z1, wings.map(w => [w.z0, w.z1])).forEach(([a, b]) => modules(a, b).forEach(([m0, m1]) => {
-      boxes.push(box('front', frontX, frontX + FRONT_M, floor + PLINTH_M + 0.003, bottom - 0.003, m0 + GAP_M, m1 - GAP_M));
+      frontWithPull(boxes, frontX, frontX + FRONT_M, floor + PLINTH_M + 0.003, bottom - 0.003, m0 + GAP_M, m1 - GAP_M, '+x');
     }));
     wings.forEach(w => {
       // The wing's front faces the kitchen: -Z for a wing at the +Z end.
@@ -136,14 +185,15 @@
       boxes.push(box('carcass', x0, x1, floor + PLINTH_M, bottom, c0, c1));
       modules(e.x1, x1).forEach(([m0, m1]) => {
         const [f0, f1] = facesMinusZ ? [zf - FRONT_M, zf] : [zf, zf + FRONT_M];
-        boxes.push(box('front', m0 + GAP_M, m1 - GAP_M, floor + PLINTH_M + 0.003, bottom - 0.003, f0, f1));
+        frontWithPull(boxes, m0 + GAP_M, m1 - GAP_M, floor + PLINTH_M + 0.003, bottom - 0.003, f0, f1, facesMinusZ ? '-z' : '+z');
       });
     });
     island(boxes, layout, floor);
     bar(boxes, layout, floor, wings, (e.z0 + e.z1) / 2);
+    const props = topProps(layout, e, top, wings, 'kitchen'), decals = wallDecals(layout, e, top);
     const cx = (e.x0 + e.x1) / 2, len = e.z1 - e.z0, cz = (e.z0 + e.z1) / 2;
     (len > 1.2 ? [cz - len / 4, cz + len / 4] : [cz]).forEach(z => lamps.push({ kind: 'pendant', position: [cx, top + 0.75, z] }));
-    return { boxes, lamps, hasFacades: true, floorY: floor };
+    return { boxes, lamps, hasFacades: true, floorY: floor, props, decals };
   }
 
   // An island: base cabinets on a plinth under it, set back under the top,
@@ -159,8 +209,8 @@
     if (x1 - x0 < 0.2 || z1 - z0 < 0.2) return;
     boxes.push(box('plinth', x0 + 0.04, x1 - 0.04, floor, floor + PLINTH_M, z0 + 0.04, z1 - 0.04));
     boxes.push(box('carcass', x0, x1, floor + PLINTH_M, bottom, z0, z1));
-    modules(z0, z1).forEach(([m0, m1]) => [[x1, x1 + FRONT_M], [x0 - FRONT_M, x0]].forEach(([f0, f1]) => {
-      boxes.push(box('front', f0, f1, floor + PLINTH_M + 0.003, bottom - 0.003, m0 + GAP_M, m1 - GAP_M));
+    modules(z0, z1).forEach(([m0, m1]) => [[x1, x1 + FRONT_M, '+x'], [x0 - FRONT_M, x0, '-x']].forEach(([f0, f1, side]) => {
+      frontWithPull(boxes, f0, f1, floor + PLINTH_M + 0.003, bottom - 0.003, m0 + GAP_M, m1 - GAP_M, side);
     }));
   }
 
@@ -214,7 +264,7 @@
     carcass(boxes, layout, e.x0, frontX, y0, bottom, z0, z1);
     const mid = (y0 + bottom) / 2;
     without(z0, z1, wings.map(w => [w.z0, w.z1])).forEach(([a, b]) => modules(a, b).forEach(([m0, m1]) => [[y0, mid], [mid, bottom]].forEach(([d0, d1]) => {
-      boxes.push(box('front', frontX, frontX + FRONT_M, d0 + 0.003, d1 - 0.003, m0 + GAP_M, m1 - GAP_M));
+      frontWithPull(boxes, frontX, frontX + FRONT_M, d0 + 0.003, d1 - 0.003, m0 + GAP_M, m1 - GAP_M, '+x');
     })));
     // Г / П: a wall-hung unit under every wing too, its drawers facing the
     // room between the wings (-Z for a wing at the +Z end), as in a kitchen.
@@ -226,14 +276,14 @@
       const [f0, f1] = facesMinusZ ? [zf - FRONT_M, zf] : [zf, zf + FRONT_M];
       boxes.push(box('carcass', frontX, x1, y0, bottom, c0, c1));
       modules(e.x1, x1).forEach(([m0, m1]) => [[y0, mid], [mid, bottom]].forEach(([d0, d1]) => {
-        boxes.push(box('front', m0 + GAP_M, m1 - GAP_M, d0 + 0.003, d1 - 0.003, f0, f1));
+        frontWithPull(boxes, m0 + GAP_M, m1 - GAP_M, d0 + 0.003, d1 - 0.003, f0, f1, facesMinusZ ? '-z' : '+z');
       }));
     });
     const cz = (e.z0 + e.z1) / 2, half = Math.min(0.45, (e.z1 - e.z0) * 0.4);
     boxes.push(box('glow', wallX, wallX + 0.004, mirrorY0 - 0.02, mirrorY1 + 0.02, cz - half - 0.02, cz + half + 0.02));
     boxes.push(box('mirror', wallX, wallX + 0.01, mirrorY0, mirrorY1, cz - half, cz + half));
     lamps.push({ kind: 'mirror', position: [wallX + 0.25, mirrorY1 - 0.1, cz] });
-    return { boxes, lamps, hasFacades: true, floorY: floor };
+    return { boxes, lamps, hasFacades: true, floorY: floor, props: topProps(layout, e, top, wings, 'bath'), decals: wallDecals(layout, e, top) };
   }
 
   // Stairs and steps: the floor and a wall along the flight's far side.

@@ -136,6 +136,20 @@ function buildEnvironment(target) {
   panel(8, 8, new THREE.Color(1.3, 1.22, 1.1), [0, 4.8, 0], [0, 0, 0]);
   panel(5, 3.5, new THREE.Color(1.1, 1.0, 0.86), [9.8, 2.5, 3], [0, 1, 0]);
   panel(4, 3, new THREE.Color(0.35, 0.38, 0.42), [-9.8, 2, -2], [0, 1, 0]);
+  // A window on the near left (2026-11-04, the audit's «отражения»): a bright field in a dark frame
+  // with two mullions and a transom, so polished stone, steel and chrome reflect a shape, not a blur.
+  {
+    const at = new THREE.Vector3(-7.5, 2.4, 6.5), look = new THREE.Vector3(0, 1, 0);
+    const d = look.clone().sub(at).normalize(), right = new THREE.Vector3().crossVectors(d, new THREE.Vector3(0, 1, 0)).normalize();
+    panel(4.4, 2.8, new THREE.Color(1.5, 1.45, 1.34), at.toArray(), look.toArray());
+    const bar = (w, h, dx, dy) => {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.06, 0.055, 0.05), side: THREE.DoubleSide }));
+      m.position.copy(at).addScaledVector(d, 0.06).addScaledVector(right, dx).add(new THREE.Vector3(0, dy, 0));
+      m.lookAt(look);
+      env.add(m);
+    };
+    bar(0.14, 2.8, -0.75, 0); bar(0.14, 2.8, 0.75, 0); bar(4.4, 0.14, 0, 0.45);
+  }
   const texture = pmrem.fromScene(env, 0.03).texture;
   env.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
   pmrem.dispose();
@@ -377,6 +391,7 @@ function applyStone(materials, desc, fade) {
   stone.bumpMap = desc.bumpScale > 0 ? grain : null;
   stone.bumpScale = desc.bumpScale;
   stone.envMapIntensity = desc.envMapIntensity;
+  stone.userData.tileUniforms.stoneGlow.value = desc.translucent ? 0.24 : 0;
   const current = () => materials.descriptor === desc && productGroup && productGroup.userData.materials === materials;
 
   const cached = desc.source === 'image' && stoneTextures.get(desc.imageUrl);
@@ -422,6 +437,7 @@ uniform mat3 stonePrevTransform;
 varying vec2 vStonePrevUv;
 `;
 const STONE_TILE_FRAGMENT = `
+uniform float stoneGlow;
 uniform float stoneTileOn;
 uniform vec2 stoneTileCell;
 uniform vec2 stoneTileRoom;
@@ -450,6 +466,22 @@ vec4 stoneSample(sampler2D tex, vec2 baseUv, float tileOn, vec2 tileCell, vec2 t
   return textureGrad(tex, stoneUv, stoneGx, stoneGy);
 }
 `;
+// Side faces and the underside of a stone are a little duller than its polished top (the audit's
+// «разная шероховатость»): the roughness up and the clear coat down where the face does not look up.
+const STONE_EDGE_ROUGHNESS = `
+  float stoneUp = dot(normalize(vNormal), normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz));
+  float stoneSide = 1.0 - smoothstep(0.55, 0.9, stoneUp);
+  roughnessFactor = min(1.0, roughnessFactor + 0.18 * stoneSide);
+`;
+const STONE_EDGE_COAT = `
+#ifdef USE_CLEARCOAT
+  material.clearcoat *= 1.0 - 0.6 * stoneSide;
+#endif
+`;
+// A translucent stone (onyx, agate) glows a little from within: its own picture lent back as light.
+const STONE_GLOW = `
+  totalEmissiveRadiance += diffuseColor.rgb * stoneGlow;
+`;
 const STONE_TILE_MAP = `
 #ifdef USE_MAP
   vec4 stoneNow = stoneSample(map, vMapUv, stoneTileOn, stoneTileCell, stoneTileRoom, stoneTileSplit);
@@ -469,6 +501,7 @@ function buildStoneMaterial(desc) {
     stoneTileCell: { value: new THREE.Vector2(1, 1) },
     stoneTileRoom: { value: new THREE.Vector2(0, 0) },
     stoneTileSplit: { value: new THREE.Vector2(1, 1) },
+    stoneGlow: { value: 0 },
     stoneMix: { value: 1 },
     stonePrevMap: { value: null },
     stonePrevTransform: { value: new THREE.Matrix3() },
@@ -483,15 +516,79 @@ function buildStoneMaterial(desc) {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = STONE_TILE_VERTEX + shader.vertexShader.replace('#include <uv_vertex>',
       '#include <uv_vertex>\n  vStoneTile = stoneTile;\n  vStonePrevUv = (stonePrevTransform * vec3(stoneUvPrev, 1.0)).xy;');
-    shader.fragmentShader = STONE_TILE_FRAGMENT + shader.fragmentShader.replace('#include <map_fragment>', STONE_TILE_MAP);
+    shader.fragmentShader = STONE_TILE_FRAGMENT + shader.fragmentShader
+      .replace('#include <map_fragment>', STONE_TILE_MAP)
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>' + String.fromCharCode(10) + STONE_EDGE_ROUGHNESS)
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>' + String.fromCharCode(10) + STONE_GLOW)
+      .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>' + String.fromCharCode(10) + STONE_EDGE_COAT);
   };
   stone.customProgramCacheKey = () => 'stone-tiles';
   return stone;
 }
 
+// A soft dark band for the places where things meet (a top and its backsplash or wall): black,
+// most opaque at its first edge (u = 0), fading to nothing. One texture for the page's life.
+let contactRamp = null;
+function contactRampTexture() {
+  if (contactRamp) return contactRamp;
+  const canvas = document.createElement('canvas');
+  canvas.width = 128; canvas.height = 4;
+  const g = canvas.getContext('2d');
+  const grad = g.createLinearGradient(0, 0, 128, 0);
+  for (let i = 0; i <= 8; i++) grad.addColorStop(i / 8, 'rgba(0,0,0,' + (0.46 * Math.pow(1 - i / 8, 2.2)).toFixed(3) + ')');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 128, 4);
+  contactRamp = new THREE.CanvasTexture(canvas);
+  return contactRamp;
+}
+// The fire's textures, one each for the page's life: a flame (a teardrop, yellow core to orange
+// edge) and a round soft glow.
+let flameTex = null, glowTex = null;
+function flameTexture() {
+  if (flameTex) return flameTex;
+  const c = document.createElement('canvas');
+  c.width = 128; c.height = 256;
+  const g = c.getContext('2d');
+  const body = new Path2D();
+  body.moveTo(64, 4);
+  body.bezierCurveTo(70, 70, 118, 110, 106, 190);
+  body.bezierCurveTo(100, 236, 28, 236, 22, 190);
+  body.bezierCurveTo(14, 130, 54, 100, 64, 4);
+  const grad = g.createRadialGradient(64, 196, 6, 64, 170, 110);
+  grad.addColorStop(0, 'rgba(255,250,200,0.95)');
+  grad.addColorStop(0.35, 'rgba(255,190,70,0.8)');
+  grad.addColorStop(0.75, 'rgba(240,90,20,0.45)');
+  grad.addColorStop(1, 'rgba(200,40,10,0)');
+  g.filter = 'blur(2px)';
+  g.fillStyle = grad;
+  g.fill(body);
+  flameTex = new THREE.CanvasTexture(c);
+  flameTex.colorSpace = THREE.SRGBColorSpace;
+  return flameTex;
+}
+function glowTexture() {
+  if (glowTex) return glowTex;
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  grad.addColorStop(0, 'rgba(255,170,80,0.9)');
+  grad.addColorStop(1, 'rgba(255,90,20,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 128, 128);
+  glowTex = new THREE.CanvasTexture(c);
+  glowTex.colorSpace = THREE.SRGBColorSpace;
+  return glowTex;
+}
+const contactMaterial = () => new THREE.MeshBasicMaterial({
+  color: '#000000', map: contactRampTexture(), transparent: true, depthWrite: false,
+  polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+});
+
 function buildMaterials(desc) {
   const stone = buildStoneMaterial(desc);
   return {
+    contact: contactMaterial(),
     stone,
     metal: new THREE.MeshStandardMaterial({ color: '#9a9ea2', metalness: 0.85, roughness: 0.32, envMapIntensity: 1.1, side: THREE.DoubleSide }),
     glass: new THREE.MeshPhysicalMaterial({ color: '#0d0d0e', roughness: 0.08, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.05, envMapIntensity: 1.2 }),
@@ -500,6 +597,12 @@ function buildMaterials(desc) {
     steel: new THREE.MeshStandardMaterial({ color: '#b4b9be', metalness: 0.7, roughness: 0.38, envMapIntensity: 1.0, side: THREE.DoubleSide }),
     chrome: new THREE.MeshStandardMaterial({ color: '#ffffff', metalness: 0.88, roughness: 0.16, envMapIntensity: 3.2 }),
     hole: new THREE.MeshBasicMaterial({ color: '#08090a' }),
+    // A fireplace's firebox: soot-dark inside (seen through the opening), logs, and the fire.
+    firebox: new THREE.MeshStandardMaterial({ color: '#17120f', roughness: 0.95, metalness: 0, side: THREE.BackSide }),
+    log: new THREE.MeshStandardMaterial({ color: '#3b2619', roughness: 0.9, metalness: 0 }),
+    ember: new THREE.MeshBasicMaterial({ color: '#ff6a1f' }),
+    flame: new THREE.MeshBasicMaterial({ map: flameTexture(), color: new THREE.Color(1.5, 1.05, 0.7), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }),
+    emberGlow: new THREE.MeshBasicMaterial({ map: glowTexture(), color: new THREE.Color(1.3, 0.55, 0.2), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }),
     // Stair structure (concrete) -- visibly not stone, so stone risers read.
     body: new THREE.MeshStandardMaterial({ color: '#66686a', roughness: 0.95, metalness: 0, envMapIntensity: 0.35 }),
     // Warm plaster: lighter than the studio so a wall reads as a wall, darker
@@ -738,6 +841,71 @@ function buildFaucet(group, part, materials) {
   put(lever, materials.chrome);
 }
 
+// A fireplace's firebox (2026-11-04, the audit's «огонь в камине»): the dark box seen from inside
+// through its open front (+X), two logs, a bed of embers and a fire of crossed flames. Lit by its
+// own colour only -- no extra light, so the stone's shaders stay as they are.
+function buildFirebox(group, part, materials) {
+  const [cx, cy, cz] = part.center, [sx, sy, sz] = part.size;
+  addMesh(group, new THREE.BoxGeometry(sx, sy, sz), materials.firebox, [cx, cy, cz], false);
+  const floor = cy - sy / 2, back = cx - sx / 2;
+  const r = Math.min(0.05, sy * 0.1);
+  [-0.17, 0.12].forEach((k, i) => {
+    const log = new THREE.CylinderGeometry(r, r * 0.9, sz * 0.72, 12);
+    log.rotateX(Math.PI / 2);
+    log.rotateY(i ? 0.12 : -0.1);
+    addMesh(group, log, materials.log, [cx + k * sx * 0.5, floor + r, cz], false);
+  });
+  const bed = new THREE.PlaneGeometry(sx * 0.6, sz * 0.6);
+  bed.rotateX(-Math.PI / 2);
+  addMesh(group, bed, materials.emberGlow, [cx, floor + 0.01, cz], false);
+  const back2 = new THREE.PlaneGeometry(sz * 0.8, sy * 0.7);
+  back2.rotateY(Math.PI / 2);
+  addMesh(group, back2, materials.emberGlow, [back + 0.01, floor + sy * 0.3, cz], false);
+  [[-0.22, 0.6], [0, 0.85], [0.22, 0.55]].forEach(([k, h], i) => {
+    const w = Math.min(0.2, sz * 0.3), height = Math.min(0.5, sy * 0.62) * h;
+    [0, Math.PI / 2].forEach(rot => {
+      const flame = new THREE.PlaneGeometry(w, height);
+      flame.translate(0, height / 2, 0);
+      flame.rotateY(rot + 0.35 * (i - 1));
+      addMesh(group, flame, materials.flame, [cx, floor + r * 1.4, cz + k * sz * 0.5], false);
+    });
+  });
+}
+
+// A soap dispenser in its hole: a collar, a chrome post, a pump head and a short spout toward the sink.
+function buildDispenser(group, part, materials) {
+  const [cx, top, cz] = part.center;
+  const turn = Math.atan2(-part.dir[1], part.dir[0]);
+  const put = (geometry, material) => {
+    geometry.rotateY(turn);
+    geometry.translate(cx, top, cz);
+    return addMesh(group, geometry, material, null, true);
+  };
+  const cyl = (rTop, rBottom, h, y) => { const g = new THREE.CylinderGeometry(rTop, rBottom, h, 24); g.translate(0, y + h / 2, 0); return g; };
+  put(cyl(0.0185, 0.02, 0.005, 0), materials.chrome);
+  put(cyl(0.0105, 0.012, 0.08, 0.005), materials.chrome);
+  put(cyl(0.0125, 0.0125, 0.018, 0.085), materials.chrome);
+  const spout = new THREE.CylinderGeometry(0.0045, 0.0045, 0.045, 12);
+  spout.rotateZ(-Math.PI / 2);
+  spout.translate(0.0225, 0.099, 0);
+  put(spout, materials.chrome);
+  const tip = new THREE.CylinderGeometry(0.0045, 0.0045, 0.016, 12);
+  tip.translate(0.045, 0.092, 0);
+  put(tip, materials.chrome);
+}
+
+// A flush socket: a steel round plate a hair over the stone with two dark sockets in it.
+function buildSocket(group, part, materials) {
+  const [cx, top, cz] = part.center;
+  const plate = new THREE.CylinderGeometry(0.0235, 0.0235, 0.003, 36);
+  addMesh(group, plate, materials.chrome, [cx, top + 0.0015, cz], false);
+  [-0.0095, 0.0095].forEach(dz => {
+    const g = new THREE.CircleGeometry(0.0042, 16);
+    g.rotateX(-Math.PI / 2);
+    addMesh(group, g, materials.hole, [cx, top + 0.0033, cz + dz], false);
+  });
+}
+
 // An induction hob as one is (2026-11-04, the owner: «чуть реалистичнее»): a thin black glass
 // plate with rounded corners and a polished bevel, its zones printed as fine rings -- two large,
 // two small -- and the touch controls along the front edge (+X, away from the wall): the power
@@ -916,6 +1084,14 @@ function buildProductGroup(layout, materialDescriptor) {
       });
     }
   });
+  // A soft dark band on the top where the backsplash stands on it.
+  layout.parts.forEach(part => {
+    if (part.name !== 'backsplash' || part.kind !== 'box') return;
+    const [cx, cy, cz] = part.center, [sx, sy, sz] = part.size;
+    const g = new THREE.PlaneGeometry(0.07, sz);
+    g.rotateX(-Math.PI / 2);
+    addMesh(group, g, materials.contact, [cx + sx / 2 + 0.035, cy - sy / 2 + 0.0008, cz], false);
+  });
   if (layout.bounds) buildFloor(group, layout, materials);
   const tiled = group.userData.stoneMeshes.find(m => m.tiling);
   materials.tiled = tiled ? { tiling: tiled.tiling, projection: tiled.projection } : null;
@@ -929,6 +1105,8 @@ function buildPart(group, part, materials) {
     const cast = part.role !== 'context' && part.role !== 'context-glass' && part.role !== 'light';
     if (part.kind === 'prism') {
       addMesh(group, buildPrismGeometry(part), materials[part.role], null, cast);
+    } else if (part.kind === 'box' && part.name === 'firebox') {
+      buildFirebox(group, part, materials);
     } else if (part.kind === 'box') {
       addMesh(group, new THREE.BoxGeometry(...part.size), materials[part.role], part.center, cast);
     } else if (part.kind === 'basin' && part.role === 'stone') {
@@ -939,6 +1117,10 @@ function buildPart(group, part, materials) {
       buildBasin(group, part, materials[part.role]);
     } else if (part.kind === 'faucet') {
       buildFaucet(group, part, materials);
+    } else if (part.kind === 'dispenser') {
+      buildDispenser(group, part, materials);
+    } else if (part.kind === 'socket') {
+      buildSocket(group, part, materials);
     } else if (part.kind === 'cooktop') {
       buildCooktop(group, part, materials);
     } else if (part.kind === 'seams') {
@@ -1002,6 +1184,10 @@ function roomMaterials() {
   return {
     wall: flat(wall, 0.95), floor: flat(floor, 0.7),
     front: flat('#ffffff', 0.6), carcass: flat('#ffffff', 0.88), plinth: flat('#ffffff', 0.88),
+    // Pulls of brushed steel; the things on the top (2026-11-04): a board, ceramic, lemons, leaves, a towel.
+    handle: new THREE.MeshStandardMaterial({ color: '#8d9195', roughness: 0.38, metalness: 0.8, envMapIntensity: 1.0, transparent: true, opacity: 0 }),
+    wood: flat('#a77a4f', 0.55), ceramic: flat('#ebe6dc', 0.3), lemon: flat('#e9c93c', 0.5), plant: flat('#56693f', 0.7), towel: flat('#f2f0ea', 0.95),
+    ao: new THREE.MeshBasicMaterial({ color: '#000000', map: contactRampTexture(), transparent: true, opacity: 0, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }),
     // A mirror reflects the room: the studio's dark surroundings would make it
     // a black panel, so it shows a soft, light reflection instead.
     mirror: new THREE.MeshStandardMaterial({ color: '#e4e7ea', roughness: 0.18, metalness: 0.9, envMapIntensity: 2.4, transparent: true, opacity: 0 }),
@@ -1020,6 +1206,42 @@ function paintFacades(materials, color) {
   materials.plinth.color.copy(c).multiplyScalar(0.55);
 }
 
+// The things on the top (room-layout topProps): a board, a vase with a few stems, a bowl of
+// lemons, a folded towel -- plain, quiet shapes, a little larger than a hand.
+function buildRoomProp(room, p) {
+  const m = room.materials, group = room.group, [cx, cy, cz] = p.center;
+  if (p.kind === 'board') {
+    addMesh(group, new THREE.BoxGeometry(...p.size), m.wood, p.center);
+  } else if (p.kind === 'towel') {
+    [[0, 0.9], [1, 0.8]].forEach(([i, k]) => addMesh(group, new THREE.BoxGeometry(p.size[0] * k, p.size[1] / 2 - 0.002, p.size[2] * k), m.towel, [cx, cy - p.size[1] / 4 + i * (p.size[1] / 2), cz]));
+  } else if (p.kind === 'vase') {
+    const r = p.r, h = p.h;
+    const profile = [[0.001, 0], [0.5, 0], [0.86, 0.08], [1, 0.38], [0.88, 0.66], [0.42, 0.88], [0.36, 0.96], [0.46, 1], [0.38, 1]]
+      .map(([x, y]) => new THREE.Vector2(x * r, y * h));
+    addMesh(group, new THREE.LatheGeometry(profile, 32), m.ceramic, [cx, cy, cz]);
+    [[0, 0.6, 1.5], [0.35, -0.5, 1.3], [-0.3, -0.7, 1.7]].forEach(([tilt, dz, len]) => {
+      const stem = new THREE.CylinderGeometry(0.0025, 0.0025, h * len, 6);
+      stem.translate(0, h * len / 2, 0);
+      stem.rotateZ(tilt * 0.5); stem.rotateX(dz * 0.18);
+      addMesh(group, stem, m.plant, [cx, cy + h * 0.9, cz]);
+      const bud = new THREE.SphereGeometry(0.016, 10, 8);
+      bud.scale(1, 1.3, 1);
+      bud.translate(Math.sin(-tilt * 0.5) * h * len, Math.cos(tilt * 0.5) * h * len, Math.sin(dz * 0.18) * h * len);
+      addMesh(group, bud, m.plant, [cx, cy + h * 0.9, cz]);
+    });
+  } else if (p.kind === 'bowl') {
+    const r = p.r;
+    const profile = [[0.001, 0], [0.3, 0.01], [0.55, 0.08], [0.8, 0.25], [0.95, 0.45], [1, 0.62], [0.97, 0.625], [0.9, 0.46], [0.76, 0.26], [0.52, 0.1], [0.28, 0.04], [0.001, 0.035]]
+      .map(([x, y]) => new THREE.Vector2(x * r, y * r));
+    addMesh(group, new THREE.LatheGeometry(profile, 36), m.ceramic, [cx, cy, cz]);
+    [[0, 0, 0.012], [0.04, 0.028, 0.026], [-0.036, 0.03, 0.03], [0.012, -0.045, 0.03], [-0.016, 0.0, 0.052]].forEach(([dx, dz, up]) => {
+      const lemon = new THREE.SphereGeometry(0.034, 14, 10);
+      lemon.scale(1.25, 0.95, 0.95);
+      addMesh(group, lemon, m.lemon, [cx + dx, cy + 0.02 + up, cz + dz]);
+    });
+  }
+}
+
 function buildRoom(group) {
   const data = window.RoomLayout.buildRoom(lastLayout, lastProductKey);
   const room = { data, group: new THREE.Group(), materials: roomMaterials(), stone: [], replaced: [] };
@@ -1031,6 +1253,12 @@ function buildRoom(group) {
     const flat = b.role === 'wall' || b.role === 'floor' || b.role === 'glow' || b.role === 'mirror';
     const mesh = addMesh(room.group, new THREE.BoxGeometry(...size), room.materials[b.role], center, !flat);
     mesh.userData.role = b.role;
+  });
+  ((data && data.props) || []).forEach(p => buildRoomProp(room, p));
+  ((data && data.decals) || []).forEach(d => {
+    const g = new THREE.PlaneGeometry(d.x1 - d.x0, d.z1 - d.z0);
+    g.rotateX(-Math.PI / 2);
+    addMesh(room.group, g, room.materials.ao, [(d.x0 + d.x1) / 2, d.y, (d.z0 + d.z1) / 2], false);
   });
   group.add(room.group);
   group.userData.room = room;
