@@ -495,6 +495,11 @@ function buildMaterials(desc) {
     stone,
     metal: new THREE.MeshStandardMaterial({ color: '#9a9ea2', metalness: 0.85, roughness: 0.32, envMapIntensity: 1.1, side: THREE.DoubleSide }),
     glass: new THREE.MeshPhysicalMaterial({ color: '#0d0d0e', roughness: 0.08, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.05, envMapIntensity: 1.2 }),
+    // A sink's brushed stainless steel (lighter and less mirror-like than «metal», so its inside
+    // reads under the studio light), a tap's polished chrome, and the dark of a drain's opening.
+    steel: new THREE.MeshStandardMaterial({ color: '#b4b9be', metalness: 0.7, roughness: 0.38, envMapIntensity: 1.0, side: THREE.DoubleSide }),
+    chrome: new THREE.MeshStandardMaterial({ color: '#ffffff', metalness: 0.88, roughness: 0.16, envMapIntensity: 3.2 }),
+    hole: new THREE.MeshBasicMaterial({ color: '#08090a' }),
     // Stair structure (concrete) -- visibly not stone, so stone risers read.
     body: new THREE.MeshStandardMaterial({ color: '#66686a', roughness: 0.95, metalness: 0, envMapIntensity: 0.35 }),
     // Warm plaster: lighter than the studio so a wall reads as a wall, darker
@@ -610,6 +615,127 @@ function buildBasin(group, part, material) {
     const mesh = addMesh(group, wall, material, [cx + dx, top - depth / 2, cz + dz]);
     mesh.rotation.y = rot;
   });
+}
+
+// A steel sink as one is (2026-11-04, the owner: «мойка и смеситель»): a drawn bowl, not a box --
+// rounded corners standing up the walls, a rounded floor, a drain with its basket. The bowl is a
+// loft of rounded rectangles from its rim down: walls straight, then a quarter-round into the floor.
+const SINK_CORNER_M = 0.02;     // the walls' vertical corners
+const SINK_FLOOR_ROUND_M = 0.028;   // where the walls turn into the floor
+const SINK_DRAIN_R_M = 0.036;
+function roundedRectOutline(hw, hl, r, perCorner) {
+  const pts = [];
+  [[1, 1, 0], [-1, 1, 0.5], [-1, -1, 1], [1, -1, 1.5]].forEach(([sx, sz, quarter]) => {
+    for (let i = 0; i <= perCorner; i++) {
+      const a = (quarter + i / perCorner * 0.5) * Math.PI;
+      pts.push([sx * (hw - r) + Math.cos(a) * r, sz * (hl - r) + Math.sin(a) * r]);
+    }
+  });
+  return pts;
+}
+function sinkBowlGeometry(sx, depth, sz) {
+  const hw = sx / 2, hl = sz / 2;
+  const rb = Math.min(SINK_FLOOR_ROUND_M, depth / 2, hw * 0.4, hl * 0.4);
+  const levels = [[0, 0], [0, -(depth - rb)]];
+  for (let k = 1; k <= 5; k++) {
+    const a = k / 5 * Math.PI / 2;
+    levels.push([rb * (1 - Math.cos(a)), -(depth - rb) - rb * Math.sin(a)]);
+  }
+  const rings = levels.map(([inset]) => roundedRectOutline(hw - inset, hl - inset, Math.max(SINK_CORNER_M - inset, 0.004), 5));
+  const n = rings[0].length;
+  const positions = [], index = [];
+  rings.forEach((ring, i) => ring.forEach(([x, z]) => positions.push(x, levels[i][1], z)));
+  for (let i = 0; i < rings.length - 1; i++) {
+    for (let j = 0; j < n; j++) {
+      const a = i * n + j, b = i * n + (j + 1) % n, c = (i + 1) * n + j, d = (i + 1) * n + (j + 1) % n;
+      index.push(a, c, b, b, c, d);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  g.setIndex(index);
+  g.computeVertexNormals();
+  return { geometry: g, floorInset: rb };
+}
+function buildSteelSink(group, part, materials) {
+  const [cx, top, cz] = part.center;
+  const [sx0, depth, sz0] = part.size;
+  const sx = sx0 - 0.002, sz = sz0 - 0.002;   // a hair inside the opening's walls: no flicker where they meet
+  const { geometry, floorInset } = sinkBowlGeometry(sx, depth, sz);
+  addMesh(group, geometry, materials.steel, [cx, top, cz]);
+  // The floor: its rounded rectangle with the drain's round opening.
+  const hw = sx / 2 - floorInset, hl = sz / 2 - floorInset;
+  const floor = new THREE.Shape(roundedRectOutline(hw, hl, Math.max(SINK_CORNER_M - floorInset, 0.004), 5).map(([x, z]) => new THREE.Vector2(x, z)));
+  const opening = new THREE.Path();
+  opening.absarc(0, 0, SINK_DRAIN_R_M, 0, Math.PI * 2, true);
+  floor.holes.push(opening);
+  const plate = new THREE.ShapeGeometry(floor, 8);
+  plate.rotateX(-Math.PI / 2);
+  const floorY = top - depth;
+  addMesh(group, plate, materials.steel, [cx, floorY, cz], false);
+  // The drain: its dark opening a little below, a polished collar round it, the basket's rings.
+  const dark = new THREE.CircleGeometry(SINK_DRAIN_R_M, 32);
+  dark.rotateX(-Math.PI / 2);
+  addMesh(group, dark, materials.hole, [cx, floorY - 0.012, cz], false);
+  const ring = (r0, r1, y, mat) => {
+    const g = new THREE.RingGeometry(r0, r1, 40);
+    g.rotateX(-Math.PI / 2);
+    addMesh(group, g, mat, [cx, floorY + y, cz], false);
+  };
+  ring(SINK_DRAIN_R_M - 0.004, SINK_DRAIN_R_M + 0.009, 0.0012, materials.chrome);
+  ring(0.0215, 0.0245, -0.004, materials.chrome);
+  ring(0.0105, 0.0125, -0.004, materials.chrome);
+  const knob = new THREE.CircleGeometry(0.0055, 20);
+  knob.rotateX(-Math.PI / 2);
+  addMesh(group, knob, materials.chrome, [cx, floorY - 0.004, cz], false);
+}
+
+// A mixer tap: a round base and body, a gooseneck arching over the sink, an aerator at its tip and a
+// single lever on the side. Built along +X (where its spout points), turned to `dir` and set on
+// the hole; every piece is baked into its own geometry, so the group stays flat for AR.
+function buildFaucet(group, part, materials) {
+  const [cx, top, cz] = part.center;
+  const s = part.scale || 1;
+  const turn = Math.atan2(-part.dir[1], part.dir[0]);
+  const put = (geometry, material) => {
+    geometry.rotateY(turn);
+    geometry.translate(cx, top, cz);
+    return addMesh(group, geometry, material, null, true);
+  };
+  const cylinder = (rTop, rBottom, h, y, material) => {
+    const g = new THREE.CylinderGeometry(rTop * s, rBottom * s, h * s, 32);
+    g.translate(0, (y + h / 2) * s, 0);
+    return put(g, material);
+  };
+  cylinder(0.027, 0.029, 0.007, 0, materials.chrome);       // the base plate over the hole
+  cylinder(0.0185, 0.0215, 0.14, 0.007, materials.chrome);  // the body
+  cylinder(0.0175, 0.0185, 0.006, 0.147, materials.chrome); // its cap
+  // The gooseneck: straight up, then a round arch that comes down over the sink.
+  const R = 0.085, y0 = 0.2;
+  const path = [new THREE.Vector3(0, 0.15 * s, 0), new THREE.Vector3(0, y0 * s, 0)];
+  const end = -20 * Math.PI / 180;
+  for (let i = 1; i <= 22; i++) {
+    const phi = Math.PI + (end - Math.PI) * i / 22;
+    path.push(new THREE.Vector3((R + R * Math.cos(phi)) * s, (y0 + R * Math.sin(phi)) * s, 0));
+  }
+  const neck = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(path, false, 'centripetal'), 72, 0.0105 * Math.sqrt(s), 20, false);
+  put(neck, materials.chrome);
+  // The aerator at the tip, along the arch's direction there.
+  const tip = path[path.length - 1], dirEnd = new THREE.Vector3(Math.sin(end), -Math.cos(end), 0).normalize();
+  const aerator = new THREE.CylinderGeometry(0.0125 * Math.sqrt(s), 0.0125 * Math.sqrt(s), 0.03 * s, 24);
+  aerator.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dirEnd));
+  aerator.translate(tip.x + dirEnd.x * 0.012 * s, tip.y + dirEnd.y * 0.012 * s, 0);
+  put(aerator, materials.chrome);
+  // The lever on the body's side: a boss, then a rounded bar angled a little up.
+  const boss = new THREE.CylinderGeometry(0.0085 * s, 0.0085 * s, 0.024 * s, 20);
+  boss.rotateX(Math.PI / 2);
+  boss.translate(0, 0.118 * s, 0.0205 * s);
+  put(boss, materials.chrome);
+  const lever = new THREE.CapsuleGeometry(0.0058 * s, 0.07 * s, 6, 14);
+  lever.translate(0, (0.035 + 0.0058) * s, 0);
+  lever.rotateX(65 * Math.PI / 180);
+  lever.translate(0, 0.118 * s, 0.032 * s);
+  put(lever, materials.chrome);
 }
 
 // An induction hob as one is (2026-11-04, the owner: «чуть реалистичнее»): a thin black glass
@@ -807,8 +933,12 @@ function buildPart(group, part, materials) {
       addMesh(group, new THREE.BoxGeometry(...part.size), materials[part.role], part.center, cast);
     } else if (part.kind === 'basin' && part.role === 'stone') {
       buildStoneBowl(group, part, materials);
+    } else if (part.kind === 'basin' && part.role === 'metal') {
+      buildSteelSink(group, part, materials);
     } else if (part.kind === 'basin') {
       buildBasin(group, part, materials[part.role]);
+    } else if (part.kind === 'faucet') {
+      buildFaucet(group, part, materials);
     } else if (part.kind === 'cooktop') {
       buildCooktop(group, part, materials);
     } else if (part.kind === 'seams') {

@@ -18,7 +18,7 @@ const ArGeometry = window.ArGeometry;
 
 // The product's own materials (three-scene.js buildMaterials); the rest --
 // context, the floor disc, the room, the dimension lines -- stays out.
-const PRODUCT_MATERIALS = ['stone', 'metal', 'glass', 'cooktop', 'body', 'burner', 'light'];
+const PRODUCT_MATERIALS = ['stone', 'metal', 'steel', 'chrome', 'hole', 'glass', 'cooktop', 'body', 'burner', 'light'];
 
 function productMeshes(product) {
   const keep = new Set(PRODUCT_MATERIALS.map(k => product.materials[k]));
@@ -84,6 +84,7 @@ function exportMaterial(material, materials) {
   // Unlit ones as Quick Look has them: a backlight glows, a burner is matt.
   if (material === materials.light) return new THREE.MeshStandardMaterial({ color: '#000000', emissive: material.color.clone() });
   if (material === materials.burner) return new THREE.MeshStandardMaterial({ color: material.color.clone(), roughness: 0.6 });
+  if (material === materials.hole) return new THREE.MeshStandardMaterial({ color: material.color.clone(), roughness: 0.9 });
   const copy = material.clone();
   copy.side = THREE.FrontSide;
   return copy;

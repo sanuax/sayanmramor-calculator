@@ -21,8 +21,9 @@
 //   box    -- axis-aligned box: center [x,y,z], size [sx,sy,sz]
 //   basin   -- open-top box hanging below yTop: center [x,yTop,z], size [sx,depth,sz]
 //   cooktop -- glass plate sitting on yTop: center [x,yTop,z], size [sx,sy,sz]
+//   faucet  -- a mixer tap standing on yTop: center [x,yTop,z], dir [dx,dz] (where its spout points), scale
 //   seams   -- line segments [[x1,y1,z1,x2,y2,z2],...] drawn on a surface
-// Roles: stone | metal | glass | body (stair structure) | context | context-glass | seam
+// Roles: stone | metal | glass | chrome (a tap -- not part of the bounds) | body (stair structure) | context | context-glass | seam
 // | light (a backlight glow -- not part of the product's bounds).
 // 'context' parts (a wall, a window) help read the product but are not part
 // of it -- they are excluded from the bounds the camera frames.
@@ -222,6 +223,20 @@
         // Undermount: a clean stone opening, the steel bowl fixed underneath.
         parts.push({ kind: 'basin', role: 'metal', center: [x, bottom, z], size: [c.widthM + 0.03, 0.18, c.lengthM + 0.03], name: 'sink' });
       }
+    }
+
+    // The mixer tap stands on its hole and reaches over the sink (2026-11-04, the owner: «мойка и
+    // смеситель»); without a sink it simply points out into the room. A basin's tap is lower.
+    // Its role, «chrome», is no part of the product's bounds: the camera frames the stone.
+    const mixer = m.holes && m.holes.mixer;
+    if (mixer) {
+      const fx = lx(mixer.position.xM), fz = lz(mixer.position.zM);
+      let dx = 1, dz = 0;
+      if (m.sink) {
+        const sx = lx(m.sink.cut.xM) - fx, sz = lz(m.sink.cut.zM) - fz, len = Math.hypot(sx, sz);
+        if (len > 1e-6) { dx = sx / len; dz = sz / len; }
+      }
+      parts.push({ kind: 'faucet', role: 'chrome', center: [fx, top, fz], dir: [dx, dz], scale: m.productKey === 'stoleshnitsa_vannaya' ? 0.62 : 1, name: 'faucet' });
     }
 
     if (m.cooktop) {
