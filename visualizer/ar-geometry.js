@@ -171,5 +171,34 @@
     return { positions: new Float32Array(P), normals: new Float32Array(N) };
   }
 
-  return { anchorFor, placeFor, quickLookTurnX, transformUvs, tilePick, cutByTiles, seamBars, WALL_PRODUCTS, SEAM_WIDTH_M };
+  // ---- sides ----------------------------------------------------------------
+  //
+  // A USDZ has no double-sided materials: AR Quick Look draws each face from
+  // its front only. The steel sinks' bowls are one sheet the 3D draws from
+  // both sides; exported as they were, the inside of the bowl vanished and
+  // the sink read as glass (the owner's iPhone, 2026-11-06). So the side a
+  // material is drawn from goes into the geometry: 'double' adds each
+  // triangle again turned over (the same corners, the other way round, the
+  // normals reversed), 'back' turns each over, 'front' leaves them. Triangles
+  // as they come (non-indexed); uvs may be null.
+  function withSides(positions, normals, uvs, side) {
+    if (side !== 'double' && side !== 'back') return { positions, normals, uvs };
+    const count = positions.length / 9;
+    const copies = side === 'double' ? 2 : 1;
+    const P = new Float32Array(positions.length * copies), N = new Float32Array(normals.length * copies);
+    const U = uvs ? new Float32Array(uvs.length * copies) : null;
+    if (side === 'double') { P.set(positions); N.set(normals); if (U) U.set(uvs); }
+    const at = side === 'double' ? count : 0;
+    for (let t = 0; t < count; t++) {
+      // Corners 0, 2, 1: the other way round.
+      [0, 2, 1].forEach((from, k) => {
+        const src = t * 3 + from, dst = (at + t) * 3 + k;
+        for (let c = 0; c < 3; c++) { P[dst * 3 + c] = positions[src * 3 + c]; N[dst * 3 + c] = -normals[src * 3 + c]; }
+        if (U) { U[dst * 2] = uvs[src * 2]; U[dst * 2 + 1] = uvs[src * 2 + 1]; }
+      });
+    }
+    return { positions: P, normals: N, uvs: U };
+  }
+
+  return { anchorFor, placeFor, quickLookTurnX, transformUvs, tilePick, cutByTiles, seamBars, withSides, WALL_PRODUCTS, SEAM_WIDTH_M };
 });

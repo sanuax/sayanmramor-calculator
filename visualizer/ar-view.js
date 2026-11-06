@@ -118,10 +118,16 @@ function stoneGeometry(source, stone) {
   return g;
 }
 
-function plainGeometry(source) {
+// A USDZ is one-sided (ArGeometry.withSides): the material's side -- the
+// steel sinks' bowls are drawn from both, a firebox from inside -- goes into
+// the geometry; the exported material is front-sided (exportMaterial).
+const SIDE_OF = { [THREE.DoubleSide]: 'double', [THREE.BackSide]: 'back', [THREE.FrontSide]: 'front' };
+
+function plainGeometry(source, side) {
   const flat = source.index ? source.toNonIndexed() : source;
   const { position, normal, uv } = flat.attributes;
-  const g = attributesOnly(position.array.slice(), normal.array.slice(), uv ? uv.array.slice() : null);
+  const sided = ArGeometry.withSides(position.array.slice(), normal.array.slice(), uv ? uv.array.slice() : null, SIDE_OF[side]);
+  const g = attributesOnly(sided.positions, sided.normals, sided.uvs);
   if (flat !== source) flat.dispose();
   return g;
 }
@@ -144,7 +150,7 @@ export async function quickLook(product) {
       return new THREE.Mesh(attributesOnly(bars.positions, bars.normals, null), seamMaterial);
     }
     if (!materials.has(obj.material)) materials.set(obj.material, exportMaterial(obj.material, product.materials));
-    const geometry = obj.material === product.materials.stone ? stoneGeometry(obj.geometry, obj.material) : plainGeometry(obj.geometry);
+    const geometry = obj.material === product.materials.stone ? stoneGeometry(obj.geometry, obj.material) : plainGeometry(obj.geometry, obj.material.side);
     return new THREE.Mesh(geometry, materials.get(obj.material));
   }));
   root.updateMatrixWorld(true);

@@ -273,3 +273,58 @@ test('seams: each line becomes a thin bar around it, every side facing out', () 
     assert.ok(c[0] * n[0] + c[1] * n[1] + c[2] * n[2] > 0, 'front face outward (counter-clockwise)');
   }
 });
+
+// ---- one-sided USDZ ---------------------------------------------------------
+//
+// A USDZ has no double-sided materials (AR Quick Look draws every face one
+// side only). The steel sinks' bowls are one sheet the 3D draws from both
+// sides: exported as they were, their inside vanished and the sink read as
+// glass (the owner's iPhone, 2026-11-06). The side a material is drawn from
+// goes into the geometry instead.
+
+const winding = (p, t) => {
+  const q = p.slice(t * 9, t * 9 + 9);
+  const e1 = [q[3] - q[0], q[4] - q[1], q[5] - q[2]], e2 = [q[6] - q[0], q[7] - q[1], q[8] - q[2]];
+  return [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+};
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+// One triangle in the XZ plane, counter-clockwise from above, its normal up.
+const TRI = {
+  positions: new Float32Array([0, 0, 0, 0, 0, 1, 1, 0, 0]),
+  normals: new Float32Array([0, 1, 0, 0, 1, 0, 0, 1, 0]),
+  uvs: new Float32Array([0, 0, 0, 1, 1, 0]),
+};
+
+test('one-sided USDZ: a double-sided face becomes two, one facing each way', () => {
+  const out = ArGeometry.withSides(TRI.positions, TRI.normals, TRI.uvs, 'double');
+  assert.equal(out.positions.length, 2 * 9);
+  assert.equal(out.normals.length, 2 * 9);
+  assert.equal(out.uvs.length, 2 * 6);
+  assert.deepEqual([...out.positions.slice(0, 9)], [...TRI.positions], 'the front as it is');
+  assert.deepEqual([...out.normals.slice(9)].map(v => v + 0), [0, -1, 0, 0, -1, 0, 0, -1, 0], 'the back faces down');
+  [0, 1].forEach(t => {
+    const n = out.normals.slice(t * 9, t * 9 + 3);
+    assert.ok(dot(winding(out.positions, t), n) > 0, 'each one counter-clockwise from the side it faces');
+  });
+  // Each corner keeps its UV.
+  const key = (p, u, i) => [p[i * 3], p[i * 3 + 1], p[i * 3 + 2], u[i * 2], u[i * 2 + 1]].join();
+  const front = new Set([0, 1, 2].map(i => key(out.positions, out.uvs, i)));
+  [3, 4, 5].forEach(i => assert.ok(front.has(key(out.positions, out.uvs, i))));
+});
+
+test('one-sided USDZ: a back-side face is turned over; a front-side one is left alone', () => {
+  const back = ArGeometry.withSides(TRI.positions, TRI.normals, null, 'back');
+  assert.equal(back.positions.length, 9);
+  assert.equal(back.uvs, null);
+  assert.deepEqual([...back.normals].map(v => v + 0), [0, -1, 0, 0, -1, 0, 0, -1, 0]);
+  assert.ok(dot(winding(back.positions, 0), [0, -1, 0]) > 0);
+  const front = ArGeometry.withSides(TRI.positions, TRI.normals, TRI.uvs, 'front');
+  assert.deepEqual([...front.positions], [...TRI.positions]);
+  assert.deepEqual([...front.normals], [...TRI.normals]);
+});
+
+test('the Quick Look export gives a material its side through the geometry, never a double-sided material', () => {
+  const src = read('visualizer/ar-view.js');
+  assert.match(src, /ArGeometry\.withSides\(/);
+  assert.doesNotMatch(src, /side\s*=\s*THREE\.DoubleSide/);
+});
