@@ -25,7 +25,7 @@
   // (Android: Chrome's immersive-ar session) or null -- then there is no AR
   // button. Cheap checks and nothing loaded; off Android WebXR is never asked.
   const OTHER_IOS_BROWSERS = /CriOS\/|FxiOS\/|EdgiOS\/|YaBrowser\/|OPiOS\/|GSA\/|DuckDuckGo\/|Telegram/;
-  function arMode(win) {
+  function arMode(win, now) {
     const w = win || window;
     const nav = w.navigator || {};
     const ua = nav.userAgent || '';
@@ -37,10 +37,34 @@
       return Promise.resolve(a.relList && a.relList.supports && a.relList.supports('ar') ? 'quicklook' : null);
     }
     if (/android/i.test(ua) && nav.xr && nav.xr.isSessionSupported) {
+      if (knownWithoutAr(w, now === undefined ? Date.now() : now)) return Promise.resolve(null);
       return nav.xr.isSessionSupported('immersive-ar').then(ok => (ok ? 'webxr' : null), () => null);
     }
     return Promise.resolve(null);
   }
 
-  return { isWebglAvailable, arMode };
+  // Chrome on Android says immersive-ar is supported on phones without
+  // Google ARCore too, and refuses the session only when it is asked for
+  // (NotSupportedError; the owner's Vivo, 2026-11-06). Why a session did
+  // not open: 'unsupported' (no AR on this phone), 'denied' (the camera not
+  // allowed) or 'failed'. A phone found without AR is remembered for 30
+  // days: no button there meanwhile (it may get ARCore later).
+  const AR_UNSUPPORTED_KEY = 'sayanmramor.arUnsupportedAt';
+  const AR_UNSUPPORTED_DAYS = 30;
+  function arFailure(error) {
+    const name = error && error.name;
+    if (name === 'NotSupportedError') return 'unsupported';
+    if (name === 'NotAllowedError' || name === 'SecurityError') return 'denied';
+    return 'failed';
+  }
+  function rememberArUnsupported(win, now) {
+    try { (win || window).localStorage.setItem(AR_UNSUPPORTED_KEY, String(now === undefined ? Date.now() : now)); } catch (e) { /* no storage: asked again next time */ }
+  }
+  function knownWithoutAr(w, now) {
+    let at = null;
+    try { at = w.localStorage ? Number(w.localStorage.getItem(AR_UNSUPPORTED_KEY)) : null; } catch (e) { return false; }
+    return !!at && now - at < AR_UNSUPPORTED_DAYS * 864e5;
+  }
+
+  return { isWebglAvailable, arMode, arFailure, rememberArUnsupported };
 });

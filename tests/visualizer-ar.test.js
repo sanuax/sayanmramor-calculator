@@ -9,7 +9,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const { arMode } = require('../visualizer/webgl-support.js');
+const { arMode, arFailure, rememberArUnsupported } = require('../visualizer/webgl-support.js');
 const ArGeometry = require('../visualizer/ar-geometry.js');
 
 const root = path.join(__dirname, '..');
@@ -140,6 +140,60 @@ test('a desktop: no AR, and WebXR is not even asked', async () => {
   const { win, calls } = fakeWin({ ua: DESKTOP, xr: true });
   assert.equal(await arMode(win), null);
   assert.deepEqual(calls, []);
+});
+
+// Chrome on Android says immersive-ar is supported on phones without Google
+// ARCore too, then refuses the session (NotSupportedError) -- the owner's
+// Vivo, 2026-11-06: the button was there, a tap said «Не получилось открыть
+// AR». Such a phone is told why, and the button is not offered there again
+// for 30 days.
+
+function fakeStorage(initial) {
+  const data = Object.assign({}, initial);
+  return { data, getItem: k => (k in data ? data[k] : null), setItem: (k, v) => { data[k] = String(v); } };
+}
+
+test('why AR did not open: a phone without AR, no camera allowed, anything else', () => {
+  const err = name => Object.assign(new Error(name), { name });
+  assert.equal(arFailure(err('NotSupportedError')), 'unsupported');
+  assert.equal(arFailure(err('NotAllowedError')), 'denied');
+  assert.equal(arFailure(err('SecurityError')), 'denied');
+  assert.equal(arFailure(new TypeError('x')), 'failed');
+  assert.equal(arFailure(undefined), 'failed');
+});
+
+test('an Android phone found without AR: no button there for 30 days, WebXR not even asked', async () => {
+  const now = Date.UTC(2026, 10, 6);
+  const storage = fakeStorage();
+  const { win, calls } = fakeWin({ ua: ANDROID, xr: true });
+  win.localStorage = storage;
+  rememberArUnsupported(win, now);
+  assert.equal(await arMode(win, now + 29 * 864e5), null);
+  assert.deepEqual(calls, []);
+  assert.equal(await arMode(win, now + 31 * 864e5), 'webxr', 'asked again after 30 days');
+});
+
+test('the remembered phone without AR does not hide AR on an iPhone; storage that throws changes nothing', async () => {
+  const now = Date.UTC(2026, 10, 6);
+  const storage = fakeStorage();
+  const iphone = fakeWin({ ua: IPHONE, quickLook: true }).win;
+  iphone.localStorage = storage;
+  rememberArUnsupported(iphone, now);
+  assert.equal(await arMode(iphone, now), 'quicklook');
+  const broken = { getItem() { throw new Error('denied'); }, setItem() { throw new Error('denied'); } };
+  const { win } = fakeWin({ ua: ANDROID, xr: true });
+  win.localStorage = broken;
+  assert.doesNotThrow(() => rememberArUnsupported(win, now));
+  assert.equal(await arMode(win, now), 'webxr');
+});
+
+test('the page tells a phone without AR why, in a note of its own, and drops the button', () => {
+  const note = html.match(/<div[^>]*id="viewerArUnsupported"[^>]*>([\s\S]*?)<\/div>/);
+  assert.ok(note && /\shidden[\s>]/.test(note[0]), 'a hidden note #viewerArUnsupported');
+  assert.match(note[1], /ARCore/);
+  assert.ok(!note[1].includes('—'), 'a plain dash');
+  assert.match(html, /WebglSupport\.arFailure\(/);
+  assert.match(html, /WebglSupport\.rememberArUnsupported\(/);
 });
 
 // ---- the AR model -----------------------------------------------------------

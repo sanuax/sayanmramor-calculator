@@ -2135,6 +2135,9 @@
                   <span>AR на iPhone открывается в Safari. Скопируйте ссылку на это изделие и откройте её в Safari.</span>
                   <button type="button" id="viewerArCopy">Скопировать ссылку</button>
                 </div>
+                <div class="viewer-ar-note" id="viewerArUnsupported" role="status" hidden>
+                  <span>На этом телефоне примерка в комнате недоступна: для неё нужна поддержка Google ARCore («Сервисы Google Play для AR»). 3D-модель выше работает как обычно.</span>
+                </div>
               </div>
             </div>
 
@@ -3159,8 +3162,21 @@
       window.ThreeScene.startAr(viewerArMode).then(() => {
         btn.disabled = false;
         label.textContent = VIEWER_AR_LABEL;
-      }, () => {
-        label.textContent = 'Не получилось открыть AR';
+      }, error => {
+        // Chrome on Android offers AR on phones without ARCore too and
+        // refuses only now (WebglSupport.arFailure): such a phone is told
+        // why, the button goes and stays away (the owner's Vivo, 2026-11-06).
+        const why = WebglSupport.arFailure(error);
+        if (why === 'unsupported') {
+          WebglSupport.rememberArUnsupported();
+          viewerArMode = null;
+          btn.disabled = false;
+          label.textContent = VIEWER_AR_LABEL;
+          updateViewerAr();
+          document.getElementById('viewerArUnsupported').hidden = false;
+          return;
+        }
+        label.textContent = why === 'denied' ? 'Разрешите доступ к камере' : 'Не получилось открыть AR' + (error && error.name ? ' (' + error.name + ')' : '');
         setTimeout(() => { btn.disabled = false; label.textContent = VIEWER_AR_LABEL; }, 3000);
       });
     });
