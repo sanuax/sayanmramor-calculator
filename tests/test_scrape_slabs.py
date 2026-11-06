@@ -672,6 +672,74 @@ class ReplaceStoneImageFileTests(unittest.TestCase):
             self.assertTrue((images_dir / 'other-stone.jpg').exists())
 
 
+NEW_MARKUP_FIXTURE_PATH = Path(__file__).resolve().parent / 'fixtures' / 'delicato-brown-slabs-2026-11.html'
+
+
+class ExtractSlabsFromNewMarkupTests(unittest.TestCase):
+    # The site's markup as of 2026-11-06: each party is a `.party` block that
+    # holds its own `.party-title` ("Партия #N") and `table.party-table`
+    # (rows `tr.party-tr`, cells `td.party-td`), and the "Продано" /
+    # "В резерве" status is a `span.product-status`. The fixture is the live
+    # Delicato Brown page cut down to its first two parties.
+    def setUp(self):
+        with open(NEW_MARKUP_FIXTURE_PATH, encoding='utf-8') as f:
+            self.html = f.read()
+
+    def test_stone_metadata_and_characteristics(self):
+        stone, _, image_url = scrape_slabs.extract_slabs_from_html(self.html, FIXTURE_URL)
+        self.assertEqual(stone['name'], 'Delicato Brown')
+        self.assertEqual(stone['category_label_ru'], 'Мрамор')
+        self.assertEqual(stone['colors'], [{'label_ru': 'Бежевый', 'segment': 'beige'}])
+        self.assertEqual(stone['countries'], [{'label_ru': 'Оман', 'segment': 'oman'}])
+        self.assertTrue(image_url.endswith('/textures1710/00354.JPG'))
+
+    def test_keeps_available_slabs_with_correct_fields(self):
+        stone, _, _ = scrape_slabs.extract_slabs_from_html(self.html, FIXTURE_URL)
+        self.assertEqual(len(stone['slabs']), 17)
+        by_article = {s['article']: s for s in stone['slabs']}
+        slab = by_article['K0449938']
+        self.assertEqual(slab['party'], '13163')
+        self.assertEqual(slab['pachka'], 'BLK08367')
+        self.assertEqual(slab['city'], 'Краснодар')
+        self.assertEqual(slab['width_cm'], 288)
+        self.assertEqual(slab['length_cm'], 179)
+        self.assertEqual(slab['price_per_m2_rub'], 8262.0)
+        self.assertEqual(slab['price_total_rub'], 41926.0)
+        self.assertEqual(by_article['P0517523']['party'], '14012')
+
+    def test_excludes_reserved_and_sold_rows(self):
+        stone, skipped, _ = scrape_slabs.extract_slabs_from_html(self.html, FIXTURE_URL)
+        kept_articles = {s['article'] for s in stone['slabs']}
+        self.assertNotIn('P0517494', kept_articles)  # В резерве
+        self.assertNotIn('P0517504', kept_articles)  # Продано
+        self.assertEqual({row['status'] for row in skipped}, {'В резерве', 'Продано'})
+        self.assertEqual(len(skipped), 7)
+
+    def test_status_span_alone_marks_a_row_unavailable(self):
+        html = '''
+        <html><body>
+        <h1>Мрамор Test Stone в слэбах</h1>
+        <div class="party"><div class="party-title">Партия #7</div>
+          <table class="party-table"><tbody>
+            <tr class="party-tr">
+              <td class="party-td"></td>
+              <td class="party-td"><button>ART4</button><span class="product-status">По запросу</span></td>
+              <td class="party-td">BLK1</td><td class="party-td">Москва</td>
+              <td class="party-td">2,00 x 1,00</td><td class="party-td">—</td>
+              <td class="party-td">2,00</td><td class="party-td">—</td>
+              <td class="party-td"><div>10000 ₽</div></td>
+              <td class="party-td"><div>20000 ₽</div></td>
+              <td class="party-td"><button aria-label="В корзину">В корзину</button></td>
+            </tr>
+          </tbody></table>
+        </div>
+        </body></html>
+        '''
+        stone, skipped, _ = scrape_slabs.extract_slabs_from_html(html, 'https://example.test/marble/x/slabs/')
+        self.assertEqual(stone['slabs'], [])
+        self.assertEqual(skipped[0]['status'], 'По запросу')
+
+
 class FakeImageResponse:
     def __init__(self, ok, status, content_type, body_bytes):
         self.ok = ok

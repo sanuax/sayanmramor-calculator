@@ -220,6 +220,35 @@ def download_stone_image(browser, image_url, images_dir, stone_id, max_attempts=
     raise last_error
 
 
+def party_number(text):
+    match = re.search(r'Партия\s*#(\d+)', text or '')
+    return match.group(1) if match else None
+
+
+def party_tables(soup):
+    """(party number, slab rows, cell class) for each party on the page.
+
+    Reads both of the site's markups:
+    - since 2026-11: a `.party` block holding its own `.party-title` and
+      `table.party-table` (rows `tr.party-tr`, cells `td.party-td`);
+    - before it: a `.prt-container` card whose parent holds
+      `table.pr-table` (rows `tr.pr-tr`, cells `td.pr-td`).
+    """
+    for block in soup.select('.party'):
+        table = block.find('table', class_='party-table')
+        if not table:
+            continue
+        title = block.select_one('.party-title')
+        yield party_number(title.get_text() if title else ''), table.select('tbody tr.party-tr'), 'party-td'
+
+    for card in soup.select('.prt-container'):
+        wrapper = card.parent
+        table = wrapper.find('table', class_='pr-table') if wrapper else None
+        if not table:
+            continue
+        yield party_number(card.get_text()), table.select('tbody tr.pr-tr'), 'pr-td'
+
+
 def extract_slabs_from_html(html, source_url):
     soup = BeautifulSoup(html, 'html.parser')
     image_url = extract_main_image_url(soup, source_url)
@@ -229,18 +258,9 @@ def extract_slabs_from_html(html, source_url):
 
     slabs = []
     skipped = []
-    for card in soup.select('.prt-container'):
-        wrapper = card.parent
-        card_text = card.get_text()
-        party_match = re.search(r'Партия\s*#(\d+)', card_text)
-        party = party_match.group(1) if party_match else None
-
-        table = wrapper.find('table', class_='pr-table') if wrapper else None
-        if not table:
-            continue
-
-        for row in table.select('tbody tr.pr-tr'):
-            cells = row.find_all('td', class_='pr-td')
+    for party, rows, cell_class in party_tables(soup):
+        for row in rows:
+            cells = row.find_all('td', class_=cell_class)
             if len(cells) < 10:
                 continue
 
@@ -248,7 +268,9 @@ def extract_slabs_from_html(html, source_url):
             article_btn = article_cell.find('button')
             article = article_btn.get_text().strip() if article_btn else None
 
-            status_span = article_cell.find('span', class_='font-bold')
+            # 'product-status' in the site's markup since 2026-11,
+            # 'font-bold' before it.
+            status_span = article_cell.find('span', class_=['product-status', 'font-bold'])
             status_text = status_span.get_text().strip() if status_span else None
 
             last_cell = cells[-1]
