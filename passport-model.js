@@ -102,6 +102,9 @@
         { name: 'Полировка', unit: 'м²', qty: area, priceRub: perM2(rates.polishRatePerM2), amount: money(result.polish) },
         { name: 'Подступенки - работы', unit: null, qty: null, priceRub: null, amount: money(result.groupWork) },
       ] },
+      { title: 'Подсветка', rows: [
+        { name: 'Подсветка камня', unit: 'м²', qty: area, priceRub: perM2(rates.lightingRatePerM2), amount: money(result.lighting) },
+      ] },
       { title: 'Монтаж', rows: [
         { name: 'Монтаж', unit: 'м²', qty: area, priceRub: perM2(rates.installationRatePerM2), amount: money(result.installation) },
       ] },

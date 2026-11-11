@@ -51,6 +51,7 @@
   const OPTION_LABELS = {
     complexEnabled: 'Сложная форма / фигурный рез',
     polishEnabled: 'Дополнительная полировка',
+    lightEnabled: 'Подсветка камня',
     installEnabled: 'Монтаж на объекте',
   };
 
@@ -285,6 +286,7 @@
       ['fabrication', 'Изготовление', r.fabrication],
       ['installation', 'Монтаж', r.installation],
       ['polish', 'Полировка', r.polish],
+      ['lighting', 'Подсветка камня', r.lighting],
       ['works', 'Кромка и дополнительные работы', (r.extras || 0) + (r.catalogExtras || 0)],
       // Parts with their own rates (подступенки): 0 until the company sets them.
       ['parts', 'Подступенки - работы', r.groupWork || 0],

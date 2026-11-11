@@ -212,7 +212,7 @@
       };
     }
 
-    return {
+    const state = {
       product: product ? {
         key: selectedProductKey, label: product.label, type: product.type, capabilities,
         // A piece of this product may be split with a seam (PRODUCTS[key].allowSeam).
@@ -251,8 +251,10 @@
       bookmatchMode: 'none',
       options: {
         complexEnabled: optionsSupported && d.getElementById('opt-complex').checked,
-        polishEnabled: optionsSupported && d.getElementById('opt-polish').checked,
+        // Set below: the boxes only count where the type has the work.
+        polishEnabled: false,
         installEnabled: optionsSupported && d.getElementById('opt-install').checked,
+        lightEnabled: false,
       },
       subcategory: {
         id: d.getElementById('productSubcategory').value || null,
@@ -308,6 +310,31 @@
           : null,
       },
     };
+
+    // A ticked box a type has no rate / no place for is as good as unticked
+    // (it is hidden on the page, but a stale tick must never reach the price).
+    state.options.polishEnabled = optionsSupported && polishAvailable(state) && !!d.getElementById('opt-polish').checked;
+    state.options.lightEnabled = lightIsAutomatic(state)
+      || (lightToggleAvailable(selectedProductKey) && !!d.getElementById('opt-light').checked);
+    return state;
+  }
+
+  // «Дополнительная полировка» exists only for a type with a polish rate
+  // (ступени, лестницы and some facades have none -- the box is not shown).
+  function polishAvailable(state) {
+    return Catalog().hasPolishRate(resolveTypeId(state));
+  }
+
+  // «Подсветка камня» is a choice only on a kitchen or a bath countertop.
+  const LIGHT_TOGGLE_PRODUCTS = ['stoleshnitsa_kuhnya', 'stoleshnitsa_vannaya'];
+  function lightToggleAvailable(productKey) {
+    return LIGHT_TOGGLE_PRODUCTS.includes(productKey);
+  }
+
+  // The lit panel (PANEL-04) and the lit wall (WALL-05) are lit by their type.
+  const LIT_TYPES = ['PANEL-04', 'WALL-05'];
+  function lightIsAutomatic(state) {
+    return LIT_TYPES.includes(resolveTypeId(state));
   }
 
   // The catalog row of the chosen type (rate-catalog.js): a countertop's type
@@ -359,6 +386,8 @@
       fabricationRatePerM2: times(typeRates.fabricationRatePerM2, k),
       installationRatePerM2: typeRates.installationRatePerM2,
       polishRatePerM2: typeRates.polishRatePerM2,
+      // LIGHT-01, per m² of the main area; no stone coefficient.
+      lightingRatePerM2: catalog.getAdditionalWorkRate('LIGHT-01'),
       complexShapeMultiplier: catalog.MISC.complexShapeMultiplier,
       landingRates: landing ? {
         fabricationRatePerM2: times(landing.fabricationRatePerM2, k),
@@ -442,5 +471,5 @@
     return { rates, extraLineItems, areaM2, job, groupRates };
   }
 
-  return { readConstructorState, buildPricingInputs, resolveTypeId, STEP_COUNT_RANGE, STEP_COUNT_DEFAULTS, stepCountRange, isValidStepCount };
+  return { readConstructorState, buildPricingInputs, resolveTypeId, polishAvailable, lightToggleAvailable, STEP_COUNT_RANGE, STEP_COUNT_DEFAULTS, stepCountRange, isValidStepCount };
 });

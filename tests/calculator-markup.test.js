@@ -553,3 +553,11 @@ test('stair risers are the hidden #stair-risers box, not a second id on the type
   assert.doesNotMatch(html, /ids: \['STAIR-0\d', 'STAIR-0\d'\]/);
   assert.doesNotMatch(html, /STAIR_WITH_RISERS|ids\[stairRisers/);
 });
+
+test('the «Опции» step has rows for polish and lighting with ids', () => {
+  const step = html.slice(html.indexOf('data-step-id="options"'));
+  const section = step.slice(0, step.indexOf('</section>'));
+  assert.match(section, /<label class="checkbox-row" id="opt-polish-row">\s*<input type="checkbox" id="opt-polish">/);
+  assert.match(section, /<label class="checkbox-row" id="opt-light-row">\s*<input type="checkbox" id="opt-light"> Подсветка камня/);
+  assert.match(html, /\.checkbox-row\[hidden\]\s*\{\s*display:\s*none/);
+});

@@ -124,7 +124,8 @@ SCENARIOS.forEach(({ name, productKey, typeId, values }) => {
     const state = ConstructorState.readConstructorState({ doc, selectedProductKey: productKey, product, stone, hasAdditionalWork });
     const fresh = ConstructorState.buildPricingInputs(state, { catalog: RateCatalog });
 
-    assert.deepEqual(fresh.rates, legacy.rates);
+    // LIGHT-01 is new in the company's v2 rates -- the legacy inputs know no lighting.
+    assert.deepEqual(fresh.rates, Object.assign({}, legacy.rates, { lightingRatePerM2: RateCatalog.getAdditionalWorkRate('LIGHT-01') }));
     assert.deepEqual(fresh.extraLineItems, legacy.extraLineItems);
 
     const priceParams = {

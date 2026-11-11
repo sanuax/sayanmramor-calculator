@@ -489,7 +489,7 @@
 
   // What the client reads when some of the product's own work has no rate:
   // «Стоимость изготовления уточнит менеджер.»
-  const UNPRICED_WORK_NAMES = { fabrication: 'изготовления', installation: 'монтажа', polish: 'полировки', extras: 'дополнительных работ' };
+  const UNPRICED_WORK_NAMES = { fabrication: 'изготовления', installation: 'монтажа', polish: 'полировки', lighting: 'подсветки', extras: 'дополнительных работ' };
   function unpricedWorkNote(unpriced) {
     const names = (unpriced || []).map(k => UNPRICED_WORK_NAMES[k]).filter(Boolean);
     if (!names.length) return null;
@@ -529,6 +529,14 @@
     const fabrication = sum('fabrication');
     const installation = sum('installation');
     const polish = sum('polish');
+    // Подсветка (LIGHT-01): per m² of the main area (the area of the type's
+    // own rate), no stone coefficient; asked for without a rate it is the
+    // manager's, never 0 ₽.
+    let lighting = 0;
+    if (options.lightEnabled && area > 0) {
+      if (isRateSet(rates.lightingRatePerM2)) lighting = rates.lightingRatePerM2 * area;
+      else { unpriced.push('lighting'); lighting = null; }
+    }
     // «Прочее» (MISC-01..05) is not charged yet.
     const misc = 0;
     // The rate-catalog-backed additional works (cuts, holes, edge treatment,
@@ -541,9 +549,9 @@
       (s, item) => s + (isRateSet(item.rate) ? Math.max(0, item.quantity) * item.rate : 0),
       0
     );
-    const work = unpriced.length ? null : fabrication + installation + polish + misc + catalogExtras;
+    const work = unpriced.length ? null : fabrication + installation + polish + lighting + misc + catalogExtras;
     const total = work === null ? null : subtotal + work;
-    return { fabrication, installation, polish, misc, catalogExtras, landing, work, total, unpriced };
+    return { fabrication, installation, polish, lighting, misc, catalogExtras, landing, work, total, unpriced };
   }
 
   // The online estimate's limits: a product past them is a project for a
@@ -587,7 +595,7 @@
   function calculatePrice(params) {
     const {
       stone, widthM, lengthM, productType, marginCm,
-      rates, installEnabled = false, polishEnabled = false, complexEnabled = false,
+      rates, installEnabled = false, polishEnabled = false, complexEnabled = false, lightEnabled = false,
       extraLineItems = [], allowSeam = true,
       // Optional, Type B only: the priced area when it is not width x length
       // (a facade's cladded surface -- see ConstructorState.buildPricingInputs).
@@ -605,7 +613,7 @@
     const job = givenJob || defaultJob(productType, widthM, lengthM, allowSeam, explicitArea ? areaM2 : null);
 
     const empty = {
-      subtotal: null, fabrication: null, installation: null, polish: null, misc: null,
+      subtotal: null, fabrication: null, installation: null, polish: null, lighting: null, misc: null,
       catalogExtras: null, work: null, total: null, nSlabs: 0, remainderM2: null, matchedSlab: null, matchedSlabs: [],
       material: null, groups: [], unpriced: [], workNote: null
     };
@@ -639,7 +647,7 @@
     // its main parts; a stair's landings (pieces 'landing') at their own
     // rates (rates.landingRates, STAIR-11); parts with their own rates are
     // counted separately.
-    const options = { installEnabled, polishEnabled, complexEnabled };
+    const options = { installEnabled, polishEnabled, complexEnabled, lightEnabled };
     const landingArea = job.pieces
       ? job.pieces.filter(p => p.key === 'landing' && (p.group || 'main') === 'main')
         .reduce((s, p) => s + p.areaM2 * Math.max(0, Math.round(p.count || 1)), 0)
@@ -676,7 +684,7 @@
     const single = job.pieces && material.nSlabs === 1 && material.seams === 0 && job.pieces.length === 1 && job.pieces[0].count === 1;
     return {
       ok: true, reason: null, subtotal,
-      fabrication: base.fabrication, installation: base.installation, polish: base.polish, misc: base.misc,
+      fabrication: base.fabrication, installation: base.installation, polish: base.polish, lighting: base.lighting, misc: base.misc,
       catalogExtras: base.catalogExtras, landing: base.landing, groupWork, work, total: work === null ? null : subtotal + work,
       unpriced: base.unpriced, workNote: unpricedWorkNote(base.unpriced),
       nSlabs: material.nSlabs,

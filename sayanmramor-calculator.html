@@ -424,6 +424,7 @@
     color: var(--ink);
     cursor: pointer;
   }
+  .checkbox-row[hidden] { display: none; }
   .checkbox-row input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
 
   /* Тип изделия: карточка = мини-сцена изделия + подпись. Концепт
@@ -2032,8 +2033,11 @@
         <label class="checkbox-row">
           <input type="checkbox" id="opt-complex"> Сложная форма / фигурный рез
         </label>
-        <label class="checkbox-row">
+        <label class="checkbox-row" id="opt-polish-row">
           <input type="checkbox" id="opt-polish"> Дополнительная полировка
+        </label>
+        <label class="checkbox-row" id="opt-light-row">
+          <input type="checkbox" id="opt-light"> Подсветка камня
         </label>
         <label class="checkbox-row">
           <input type="checkbox" id="opt-install"> Монтаж на объекте
@@ -4359,6 +4363,26 @@
     if (currentStepId === 'review') renderResult();
   }
 
+  // «Опции»: the polish box exists only where the chosen type has a polish
+  // rate (ступени, лестницы and some facades have none), the lighting box only
+  // on a kitchen or bath countertop. A hidden box is never left ticked.
+  // Runs on every calculate(), so a change of product, type or countertop
+  // shape is always picked up.
+  function updateOptionRows() {
+    const typeState = {
+      product: selectedProductKey ? { key: selectedProductKey } : null,
+      shape: productShapeSelect.value,
+      subcategory: { id: productSubcategorySelect.value || null },
+    };
+    [
+      ['opt-polish', ConstructorState.polishAvailable(typeState)],
+      ['opt-light', ConstructorState.lightToggleAvailable(selectedProductKey)],
+    ].forEach(([id, available]) => {
+      document.getElementById(id + '-row').hidden = !available;
+      if (!available) document.getElementById(id).checked = false;
+    });
+  }
+
   // Returns { state, outcome } -- outcome.kind is 'incomplete' | 'manual' |
   // 'ok' (see ResultModel.summarizePricing) -- from every exit point.
   function computeAndRenderSummary() {
@@ -4374,6 +4398,7 @@
     // updateAdditionalWorkGroupsVisibility() are a finer grain (which FIELDS
     // inside the shape/additionalWorks steps show) and are untouched.
     updateWingVisibility();
+    updateOptionRows();
     updateAdditionalWorkGroupsVisibility(product);
     renumberVisibleSteps();
     updateStepUI(selectedProductKey);
@@ -4466,11 +4491,15 @@
     }
 
     const complexEnabled = document.getElementById('opt-complex').checked;
-    const polishEnabled = document.getElementById('opt-polish').checked;
+    // What the page prices: a tick the type has no place for is already off
+    // in the state (ConstructorState.readConstructorState).
+    const polishEnabled = constructorState.options.polishEnabled;
+    const lightEnabled = constructorState.options.lightEnabled;
     const installEnabled = document.getElementById('opt-install').checked;
     const optionLabels = [];
     if (complexEnabled) optionLabels.push('сложная форма');
     if (polishEnabled) optionLabels.push('полировка');
+    if (lightEnabled) optionLabels.push('подсветка');
     if (installEnabled) optionLabels.push('монтаж');
 
     // The company's rates (rate-catalog.js): the chosen type's work x the
@@ -4516,6 +4545,7 @@
       installEnabled,
       polishEnabled,
       complexEnabled,
+      lightEnabled,
       extraLineItems,
       marginCm: SAW_MARGIN_CM,
       allowSeam: product.allowSeam !== false,

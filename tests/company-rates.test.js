@@ -31,6 +31,7 @@ function price(state, catalog) {
   const r = Pricing.calculatePrice({
     stone: state.stone, productType: state.product.type, rates: inputs.rates,
     installEnabled: state.options.installEnabled, polishEnabled: state.options.polishEnabled, complexEnabled: state.options.complexEnabled,
+    lightEnabled: state.options.lightEnabled,
     extraLineItems: inputs.extraLineItems, marginCm: SAW_MARGIN_CM, usageLimit: SLAB_USAGE_LIMIT,
     job: inputs.job, groupRates: inputs.groupRates,
   });
@@ -164,4 +165,79 @@ test('a type id with no catalog row leaves the work unpriced, never another type
   const { rates } = ConstructorState.buildPricingInputs(state, { catalog: RateCatalog });
   assert.equal(rates.fabricationRatePerM2, null);
   assert.equal(rates.installationRatePerM2, null);
+});
+
+// ===== Lighting (LIGHT-01) and polish only where the type has a polish rate =====
+const stepsValues = extra => Object.assign({
+  width: { value: '1000' }, length: { value: '300' }, productSubcategory: { value: 'STEP-01' }, 'step-count': { value: '3' },
+}, extra || {});
+
+test('polish is unavailable for types without a polish rate', () => {
+  const avail = (key, values) => ConstructorState.polishAvailable(stateFor(key, values, 'marble'));
+  assert.equal(avail('stupeni', stepsValues({ productSubcategory: { value: 'STEP-02' } })), false);
+  assert.equal(avail('lestnitsa', { width: { value: '1000' }, length: { value: '3000' }, productSubcategory: { value: 'STAIR-01' }, 'step-count': { value: '6' } }), false);
+  assert.equal(avail('fasad', { productSubcategory: { value: 'FACADE-07' } }), false);
+  assert.equal(avail('pol', { width: { value: '1000' }, length: { value: '1000' }, productSubcategory: { value: 'FLOOR-03' } }), true);
+  assert.equal(avail('fasad', { productSubcategory: { value: 'FACADE-01' } }), true);
+  assert.equal(avail('stoleshnitsa_kuhnya', kitchenL()), true);
+  assert.equal(avail('stoleshnitsa_kuhnya', { width: { value: '600' }, length: { value: '2400' }, productShape: { value: 'ushape' } }), true);
+  assert.equal(ConstructorState.polishAvailable(null), false);
+});
+
+test('a checked polish box on a type without polish adds nothing', () => {
+  const state = stateFor('stupeni', stepsValues({ 'opt-polish': on }), 'marble');
+  assert.equal(state.options.polishEnabled, false);
+  const { r } = price(state);
+  assert.equal(r.polish, 0);
+  assert.ok(!r.unpriced.includes('polish'));
+  assert.notEqual(r.total, null);
+});
+
+test('a checked polish box on a type with polish still counts', () => {
+  const { r, inputs } = price(stateFor('stoleshnitsa_kuhnya', kitchenL({ 'opt-polish': on }), 'marble'));
+  close(r.polish, 18000 * inputs.job.mainAreaM2, 'polish');
+});
+
+test('lightToggleAvailable: only kitchen and bath countertops', () => {
+  assert.equal(ConstructorState.lightToggleAvailable('stoleshnitsa_kuhnya'), true);
+  assert.equal(ConstructorState.lightToggleAvailable('stoleshnitsa_vannaya'), true);
+  ['podokonnik', 'stupeni', 'lestnitsa', 'pol', 'stena', 'panno', 'fasad', 'kaminy', null].forEach(k => {
+    assert.equal(ConstructorState.lightToggleAvailable(k), false, String(k));
+  });
+});
+
+test('panel with lighting adds LIGHT-01 on its area', () => {
+  const dims = { width: { value: '1000' }, length: { value: '2000' } };
+  const lit = price(stateFor('panno', Object.assign({ productSubcategory: { value: 'PANEL-04' } }, dims), 'marble'));
+  assert.equal(lit.inputs.rates.lightingRatePerM2, 110000);
+  close(lit.r.lighting, 110000 * lit.inputs.job.mainAreaM2, 'lighting');
+  assert.ok(lit.r.lighting > 0);
+  close(lit.r.work, lit.r.fabrication + lit.r.installation + lit.r.polish + lit.r.catalogExtras + lit.r.lighting, 'work includes lighting');
+  const plain = price(stateFor('panno', Object.assign({ productSubcategory: { value: 'PANEL-01' } }, dims), 'marble'));
+  assert.equal(plain.r.lighting, 0);
+});
+
+test('wall with lighting adds LIGHT-01', () => {
+  const { r, inputs } = price(stateFor('stena', { width: { value: '3000' }, length: { value: '2500' }, productSubcategory: { value: 'WALL-05' } }, 'marble'));
+  close(r.lighting, 110000 * inputs.job.mainAreaM2, 'lighting');
+  const plain = price(stateFor('stena', { width: { value: '3000' }, length: { value: '2500' }, productSubcategory: { value: 'WALL-01' } }, 'marble'));
+  assert.equal(plain.r.lighting, 0);
+});
+
+test('lighting lives without the stone coefficient', () => {
+  const a = price(stateFor('panno', { width: { value: '1000' }, length: { value: '1000' }, productSubcategory: { value: 'PANEL-04' } }, 'marble'));
+  const b = price(stateFor('panno', { width: { value: '1000' }, length: { value: '1000' }, productSubcategory: { value: 'PANEL-04' } }, 'quartzite'));
+  close(a.r.lighting, b.r.lighting, 'same lighting for any stone');
+});
+
+test('countertop lighting toggle', () => {
+  const lit = price(stateFor('stoleshnitsa_kuhnya', kitchenL({ 'opt-light': on, 'extra-ostrov-width': { value: '600' }, 'extra-ostrov-length': { value: '1000' } }), 'marble'));
+  close(lit.r.lighting, 110000 * lit.inputs.job.mainAreaM2, 'main + wing, no island');
+  const off = price(stateFor('stoleshnitsa_kuhnya', kitchenL(), 'marble'));
+  assert.equal(off.r.lighting, 0);
+  const sill = stateFor('podokonnik', { width: { value: '300' }, length: { value: '1500' }, 'opt-light': on }, 'marble');
+  assert.equal(sill.options.lightEnabled, false);
+  assert.equal(price(sill).r.lighting, 0);
+  const bath = stateFor('stoleshnitsa_vannaya', { width: { value: '500' }, length: { value: '1200' }, 'opt-light': on }, 'marble');
+  assert.equal(bath.options.lightEnabled, true);
 });
