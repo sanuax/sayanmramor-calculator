@@ -98,7 +98,7 @@ test('dimensions are shown as "2400 × 650 мм" with the product\'s own axis la
 
 test('floor/panel/wall/facade: no edge, shape, riser or additional-works rows, even with stale values in those fields', () => {
   const stale = {
-    'edge-straight': { value: '3000' }, 'cut-sink-undermount': { value: '1' }, 'extra-ostrov-width': { value: '900' },
+    'edge-type': { value: 'straight' }, 'cut-sink-undermount': { value: '1' }, 'extra-ostrov-width': { value: '900' },
     'extra-ostrov-length': { value: '1800' }, productShape: { value: 'lshape' }, 'stupeni-riser': { checked: true },
   };
   ['pol', 'panno', 'stena', 'fasad'].forEach(key => {
@@ -113,7 +113,7 @@ test('floor/panel/wall/facade: no edge, shape, riser or additional-works rows, e
 
 test('no spec row ever carries an empty, "undefined", "null" or "-" value', () => {
   Object.keys(PRODUCTS).forEach(key => {
-    ResultModel.buildResultView(configFor(key, { 'edge-round': { value: '2000' }, 'opt-install': { checked: true } })).specs.forEach(spec => {
+    ResultModel.buildResultView(configFor(key, { 'edge-type': { value: 'rounding' }, 'opt-install': { checked: true } })).specs.forEach(spec => {
       assert.ok(spec.value && !/undefined|null|^-$/.test(spec.value), key + ': ' + spec.key);
       assert.doesNotMatch(spec.detail, /undefined|null/);
     });
@@ -143,11 +143,13 @@ test('an unavailable stone is never presented as available', () => {
 
 // --- 6. edge -----------------------------------------------------------------
 
-test('edge row uses the edge cards\' own title and length, and only for products that support edge work', () => {
-  const view = ResultModel.buildResultView(configFor('podokonnik', { 'edge-round': { value: '1500' } }));
+test('edge row uses the edge cards\' own title, and only for products that support edge work', () => {
+  const view = ResultModel.buildResultView(configFor('podokonnik', { 'edge-type': { value: 'rounding' } }));
   const edge = view.specs.find(s => s.key === 'edge');
   assert.equal(edge.value, 'Скругление');
-  assert.equal(edge.detail, '1500 мм');
+  // No entered length any more: the edge is every open edge, measured on the
+  // 3D scene for the price (edge-length.js); the row shows the profile.
+  assert.equal(edge.detail, '');
   assert.equal(configFor('podokonnik', {}).edge, null, 'no edge selected -> no row');
 });
 
@@ -213,7 +215,7 @@ test('manual/incomplete pricing never produces a number', () => {
 // --- 9-15. payload -----------------------------------------------------------
 
 test('buildLeadPayload has product, full configuration, pricing and contact', () => {
-  const p = payloadFor('stoleshnitsa_kuhnya', { 'cut-sink-undermount': { value: '1' }, 'edge-straight': { value: '2400' } });
+  const p = payloadFor('stoleshnitsa_kuhnya', { 'cut-sink-undermount': { value: '1' }, 'edge-type': { value: 'straight' } });
   assert.equal(p.schemaVersion, 1);
   assert.deepEqual(p.product, { key: 'stoleshnitsa_kuhnya', label: 'Столешницы на кухню' });
   assert.deepEqual(p.configuration.material, {
@@ -300,7 +302,7 @@ test('normalizePhone: common Russian spellings normalise, garbage is rejected', 
 test('kitchen result: L-shape with wing, edge, every countertop extra incl. cooktop/island/bar', () => {
   const c = configFor('stoleshnitsa_kuhnya', {
     productShape: { value: 'lshape' }, 'shape-corner': { value: 'right' }, 'wing-width': { value: '600' }, 'wing-length': { value: '1200' },
-    'edge-straight': { value: '3600' }, 'cut-sink-integrated': { value: '1' }, 'cut-cooktop': { value: '1' },
+    'edge-type': { value: 'straight' }, 'cut-sink-integrated': { value: '1' }, 'cut-cooktop': { value: '1' },
     'hole-socket': { value: '1' }, 'extra-wallpanel-width': { value: '900' }, 'extra-wallpanel-length': { value: '2400' },
     'extra-ostrov-figured-width': { value: '900' }, 'extra-ostrov-figured-length': { value: '1800' },
     'extra-bar-complex-width': { value: '500' }, 'extra-bar-complex-length': { value: '1200' },
@@ -324,7 +326,7 @@ test('bathroom result: no cooktop/island/bar even when those fields hold values,
 });
 
 test('steps result: type row from the subcategory, riser row, edge -- and no additional-works block', () => {
-  const c = configFor('stupeni', { 'stupeni-riser': { checked: true }, 'edge-chamfer': { value: '1200' } }, {
+  const c = configFor('stupeni', { 'stupeni-riser': { checked: true }, 'edge-type': { value: 'bevel' } }, {
     subcategory: { id: 'STEP-02', label: 'Ступень - Забежная', unit: 'м²' },
   });
   const view = ResultModel.buildResultView(c);
@@ -346,7 +348,7 @@ test('a type row with a "шт." unit shows the real quantity only when one was e
 // --- 20. state persistence / edit shortcuts ----------------------------------
 
 test('editing one field changes only that part of the result; everything else is preserved', () => {
-  const base = { 'edge-round': { value: '2400' }, 'cut-sink-undermount': { value: '1' }, 'opt-polish': { checked: true } };
+  const base = { 'edge-type': { value: 'rounding' }, 'cut-sink-undermount': { value: '1' }, 'opt-polish': { checked: true } };
   const before = configFor('stoleshnitsa_kuhnya', base);
   assert.deepEqual(configFor('stoleshnitsa_kuhnya', base), before, 'rebuilding from the same state is identical');
   const after = configFor('stoleshnitsa_kuhnya', Object.assign({}, base, { length: { value: '3000' } }));

@@ -31,44 +31,23 @@
     return parseFloat(doc.getElementById(id).value) || 0;
   }
 
-  // Same 5 legacy fields the real calculator's #edgeWork block reads today,
-  // in a fixed priority order used both to pick the single `edge` view and
-  // to label each raw `edgeLineItems` entry. Order/ids/rateIds match
-  // EDGE_LINE_ITEMS in sayanmramor-calculator.html exactly.
+  // The five edge profiles (the «Кромка» step, #edge-type) and the
+  // company rate each is priced at, per running metre of open edge
+  // (edge-length.js measures it on the 3D scene -- see buildPricingInputs).
   const EDGE_FIELDS = [
-    { elId: 'edge-straight', rateId: 'EDGE-01', type: 'straight' },
-    { elId: 'edge-figured', rateId: 'EDGE-03', type: 'figured' },
-    { elId: 'edge-round', rateId: 'EDGE-04', type: 'rounding' },
-    { elId: 'edge-chamfer', rateId: 'EDGE-05', type: 'bevel' },
-    { elId: 'edge-stonefold', rateId: 'EDGE-06', type: 'stone-wrap' },
+    { rateId: 'EDGE-01', type: 'straight' },
+    { rateId: 'EDGE-03', type: 'figured' },
+    { rateId: 'EDGE-04', type: 'rounding' },
+    { rateId: 'EDGE-05', type: 'bevel' },
+    { rateId: 'EDGE-06', type: 'stone-wrap' },
   ];
 
-  function readEdgeLineItems(doc) {
-    const items = [];
-    EDGE_FIELDS.forEach(({ elId, rateId, type }) => {
-      const lengthMm = numFromField(doc, elId);
-      if (lengthMm > 0) items.push({ rateId, type, lengthMm });
-    });
-    return items;
-  }
-
-  // The edge step is a single profile choice: the calculator's UI stores the
-  // chosen profile in #edge-type and has no length input (a typed length
-  // never changed the model -- the profile is applied to the whole edge).
-  // There is no automatic edge-length rule yet, so such a selection carries
-  // lengthMm: null and adds no priced edgeLineItems; the legacy per-type
-  // length fields above are still read for pricing, unchanged.
+  // The edge step is a single profile choice: the chosen profile is the
+  // edge of the whole product. Its length is not entered -- it is every
+  // open edge of the product (EdgeLength.openEdgeLengthM).
   function readSelectedEdgeType(doc) {
     const value = doc.getElementById('edge-type').value;
     return EDGE_FIELDS.some(f => f.type === value) ? value : null;
-  }
-
-  // Fixed priority order, not magnitude -- see docs/superpowers/specs/2026-09-21-3d-visualizer-design.md.
-  function deriveSingleEdge(edgeLineItems, selectedType) {
-    if (edgeLineItems.length === 0) return { type: selectedType || null, lengthMm: null };
-    const winner = EDGE_FIELDS.find(f => edgeLineItems.some(item => item.type === f.type));
-    const item = edgeLineItems.find(i => i.type === winner.type);
-    return { type: item.type, lengthMm: item.lengthMm };
   }
 
   function readSinkCounts(doc, hasCapability) {
@@ -156,12 +135,6 @@
     };
     const corner = supportsShapeSelection ? (d.getElementById('shape-corner').value || 'left') : 'left';
 
-    // Unconditional, matching sayanmramor-calculator.html's calculate(): the
-    // real app's `const edgeResult = readLengthLineItems(EDGE_LINE_ITEMS);`
-    // has no capability gate (unlike the countertop-extras block below it),
-    // so a stale edge value left over from a previously selected product is
-    // still priced today. See task-4-fix-report.md for the ruling on this.
-    const edgeLineItems = readEdgeLineItems(d);
     const sinkCounts = readSinkCounts(d, capabilities && capabilities.sinkCutout);
     const cooktopCount = capabilities && capabilities.cooktopCutout ? numFromField(d, 'cut-cooktop') : 0;
     const holeCounts = capabilities && capabilities.holes
@@ -234,7 +207,6 @@
       shape,
       wing,
       corner,
-      edgeLineItems,
       sinkCounts,
       cooktopCount,
       holeCounts,
@@ -243,7 +215,7 @@
       wallPanel,
       island,
       barCounter,
-      edge: deriveSingleEdge(edgeLineItems, readSelectedEdgeType(d)),
+      edge: { type: readSelectedEdgeType(d), lengthMm: null },
       additionalWorks: {
         sink: deriveSingleSink(sinkCounts),
         cooktop: { count: cooktopCount, position: null },
@@ -400,13 +372,17 @@
       } : null,
     };
 
-    // Edge fields are read for every product (a leftover value survives a
-    // product switch -- see readConstructorState), but edge work is only
-    // charged on a product that actually supports it.
+    // Кромка: the chosen profile's rate (EDGE-01..06, no stone coefficient)
+    // x the length of every open edge -- config.edgeLengthM, measured by
+    // EdgeLength.openEdgeLengthM on the product's 3D scene. Only on a product
+    // with edge work and only once a profile is chosen.
+    const extraLineItems = [];
     const edgeSupported = !!(state.product && state.product.capabilities && state.product.capabilities.supportsEdgeWork);
-    const extraLineItems = edgeSupported
-      ? state.edgeLineItems.map(item => ({ rate: catalog.getAdditionalWorkRate(item.rateId), quantity: mmToM(item.lengthMm) }))
-      : [];
+    const edgeField = edgeSupported && state.edge ? EDGE_FIELDS.find(f => f.type === state.edge.type) : null;
+    const edgeLengthM = Number(config && config.edgeLengthM) || 0;
+    if (edgeField && edgeLengthM > 0) {
+      extraLineItems.push({ rate: catalog.getAdditionalWorkRate(edgeField.rateId), quantity: edgeLengthM, edge: edgeField.type });
+    }
 
     // Cuts and holes: the rate x the count, without the stone coefficient.
     const QUANTITY_ITEMS = [

@@ -1789,18 +1789,10 @@
         <label id="edgeLabel" class="visually-hidden-label">Кромка</label>
         <div class="card-grid" id="edgeCardGrid" role="radiogroup" aria-labelledby="edgeLabel"></div>
         <!-- The chosen profile (constructor-state.js reads it as state.edge).
-             There is no edge-length input: a typed length never changed the
-             3D model -- the profile is applied to the whole edge. -->
+             There is no edge-length input: the profile is applied to every
+             open edge of the product, and that length is measured on the 3D
+             scene for the price (edge-length.js). -->
         <input type="hidden" id="edge-type" value="">
-        <!-- Legacy per-type edge length fields, still read by
-             constructor-state.js for pricing (edgeLineItems). No UI writes
-             them any more; they stay empty until an automatic edge-length
-             rule exists. -->
-        <input type="number" id="edge-straight" hidden>
-        <input type="number" id="edge-figured" hidden>
-        <input type="number" id="edge-round" hidden>
-        <input type="number" id="edge-chamfer" hidden>
-        <input type="number" id="edge-stonefold" hidden>
       </div>
     </section>
 
@@ -2247,6 +2239,7 @@
 <script src="visualizer/room-layout.js"></script>
 <script src="visualizer/dimensions-3d.js"></script>
 <script src="visualizer/scene-layout.js"></script>
+<script src="edge-length.js"></script>
 <script src="visualizer/camera-framing.js"></script>
 <script src="visualizer/webgl-support.js"></script>
 <script src="visualizer/camera-preset-tracker.js"></script>
@@ -2969,21 +2962,21 @@
   // stone-wrap): обработка на верхнем И нижнем углу торца.
   const EDGE_TYPES = [
     // Прямая: прямой вертикальный торец.
-    { type: 'straight', elId: 'edge-straight', title: 'Прямая', desc: 'Чёткий прямой край',
+    { type: 'straight', title: 'Прямая', desc: 'Чёткий прямой край',
       icon: svgIcon('<path d="M10 10 H64 V28 H10 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5" stroke-linejoin="round"/>', '4 4 66 46') },
     // Скругление: плавный радиус на обоих углах (в 3D -- 12 мм на 40 мм).
-    { type: 'rounding', elId: 'edge-round', title: 'Скругление', desc: 'Мягкий закруглённый край',
+    { type: 'rounding', title: 'Скругление', desc: 'Мягкий закруглённый край',
       icon: svgIcon('<path d="M10 10 H57 A7 7 0 0 1 64 17 V21 A7 7 0 0 1 57 28 H10 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5" stroke-linejoin="round"/>', '4 4 66 46') },
     // Скос: один прямой срез на каждом углу (в 3D -- фаска 8 мм).
-    { type: 'bevel', elId: 'edge-chamfer', title: 'Скос (фаска)', desc: 'Срез под углом',
+    { type: 'bevel', title: 'Скос (фаска)', desc: 'Срез под углом',
       icon: svgIcon('<path d="M10 10 H58 L64 16 V22 L58 28 H10 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5" stroke-linejoin="round"/>', '4 4 66 46') },
     // Фигурная: многогранный профиль -- в 3D кромка из трёх граней на каждом
     // углу; грани видны, чем профиль и отличается от гладкого скругления.
-    { type: 'figured', elId: 'edge-figured', title: 'Фигурная', desc: 'Декоративный профиль',
+    { type: 'figured', title: 'Фигурная', desc: 'Декоративный профиль',
       icon: svgIcon('<path d="M10 10 H55 L59.5 11.2 L62.8 14.5 L64 19 L62.8 23.5 L59.5 26.8 L55 28 H10 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5" stroke-linejoin="round"/>', '4 4 66 46') },
     // Подгиб камнем: камень возвращается вниз по торцу (в 3D -- каменный
     // фартук высотой в толщину плиты под передним краем), торец вдвое выше.
-    { type: 'stone-wrap', elId: 'edge-stonefold', title: 'Подгиб камнем', desc: 'Визуально толстый торец',
+    { type: 'stone-wrap', title: 'Подгиб камнем', desc: 'Визуально толстый торец',
       icon: svgIcon('<path d="M10 10 H64 V46 H57 V28 H10 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5" stroke-linejoin="round"/>', '4 4 66 46') },
   ];
 
@@ -4383,6 +4376,15 @@
     });
   }
 
+  // The length of every open edge of the product (edge-length.js), measured
+  // on the same scene the 3D draws: only where it is priced -- a product with
+  // edge work and a chosen profile.
+  function openEdgeLengthM(state) {
+    const caps = state.product && state.product.capabilities;
+    if (!(caps && caps.supportsEdgeWork && state.edge && state.edge.type)) return 0;
+    return EdgeLength.openEdgeLengthM(SceneLayout.buildSceneLayout(GeometryModel.buildGeometryModel(state)));
+  }
+
   // Returns { state, outcome } -- outcome.kind is 'incomplete' | 'manual' |
   // 'ok' (see ResultModel.summarizePricing) -- from every exit point.
   function computeAndRenderSummary() {
@@ -4434,6 +4436,10 @@
       stone: selectedStoneId ? STONES_BY_ID[selectedStoneId] : null,
       hasAdditionalWork,
     });
+    // The open edge length (м.п.) the edge is priced on -- always, not only
+    // when the 3D viewer is up; 0 until the product has one (no profile, no
+    // edge work, sizes not in).
+    const edgeLengthM = openEdgeLengthM(constructorState);
     if (viewerReady) {
       const geometryModel = GeometryModel.buildGeometryModel(constructorState);
       const materialDescriptor = MaterialAdapter.resolveMaterial(constructorState.stone, constructorState.bookmatchMode);
@@ -4504,14 +4510,16 @@
 
     // The company's rates (rate-catalog.js): the chosen type's work x the
     // stone coefficient -- see ConstructorState.buildPricingInputs.
-    const { rates, extraLineItems, job, groupRates, seamRate, shape } = ConstructorState.buildPricingInputs(constructorState, { catalog: RateCatalog });
+    // Кромка: the chosen profile on every open edge (edge-length.js), the
+    // length measured on the product's 3D scene.
+    const { rates, extraLineItems, job, groupRates, seamRate, shape } = ConstructorState.buildPricingInputs(constructorState, { catalog: RateCatalog, edgeLengthM });
 
     // Breakdown labels are UI text, not pricing -- built from the same
-    // constructorState so the displayed text and the priced quantities can
+    // priced line items so the displayed text and the priced quantities can
     // never drift apart.
-    if (product.supportsEdgeWork) constructorState.edgeLineItems.forEach(item => {
+    extraLineItems.filter(item => item.edge).forEach(item => {
       const labels = { straight: 'кромка прямая', figured: 'кромка фигурная/сложная', rounding: 'скругление', bevel: 'скос/фаска', 'stone-wrap': 'подгиб камнем' };
-      optionLabels.push(`${labels[item.type]}: ${decimal2(mmToM(item.lengthMm))} м.п.`);
+      optionLabels.push(`${labels[item.edge]}: ${decimal2(item.quantity)} м.п.`);
     });
     if (constructorState.curbLengthM > 0) optionLabels.push(`бортик: ${decimal2(constructorState.curbLengthM)} м.п.`);
     const fartukAreaM2 = constructorState.backsplash.widthM * constructorState.backsplash.lengthM;

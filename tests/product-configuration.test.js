@@ -29,7 +29,7 @@ function readState(productKey, values) {
 
 test('every one of the 9 products has a working state contract: dimensions, product identity, and a stable set of top-level keys', () => {
   const expectedKeys = [
-    'product', 'stone', 'dimensions', 'shape', 'wing', 'corner', 'edgeLineItems',
+    'product', 'stone', 'dimensions', 'shape', 'wing', 'corner',
     'sinkCounts', 'cooktopCount', 'holeCounts', 'curbLengthM', 'backsplash', 'wallPanel',
     'island', 'barCounter', 'edge', 'additionalWorks', 'bookmatchMode', 'options',
     'subcategory', 'stepCount', 'productConfig',
@@ -98,8 +98,8 @@ test('material (stone) flows into state for every product the same way -- one sh
 });
 
 test('edge selection is saved to state for a product with real edge capability (podokonnik)', () => {
-  const state = readState('podokonnik', { 'edge-round': { value: '800' } });
-  assert.deepEqual(state.edge, { type: 'rounding', lengthMm: 800 });
+  const state = readState('podokonnik', { 'edge-type': { value: 'rounding' } });
+  assert.deepEqual(state.edge, { type: 'rounding', lengthMm: null });
 });
 
 test('additional-works fields (sink/holes/curb/backsplash/wallPanel) are saved for bathroom, and island/barCounter never leak in (bathroom lacks those two capabilities)', () => {

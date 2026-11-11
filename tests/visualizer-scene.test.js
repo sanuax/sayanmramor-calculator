@@ -412,9 +412,9 @@ test('every product default camera preset exists', () => {
   });
 });
 
-test('edge is a geometry parameter only for products that support edge work (a leftover edge value never bevels a floor)', () => {
-  assert.equal(modelFor('pol', { 'edge-round': { value: '2000' } }).edge.type, null);
-  assert.equal(modelFor('podokonnik', { 'edge-round': { value: '2000' } }).edge.type, 'rounding');
+test('edge is a geometry parameter only for products that support edge work (a leftover edge profile never bevels a floor)', () => {
+  assert.equal(modelFor('pol', { 'edge-type': { value: 'rounding' } }).edge.type, null);
+  assert.equal(modelFor('podokonnik', { 'edge-type': { value: 'rounding' } }).edge.type, 'rounding');
 });
 
 test('integrated sink: the stone bowl carries the slab edge profile and thickness (so its cavity is flush with the opening)', () => {
@@ -913,4 +913,44 @@ test('the room and the fronts fade in and out; shaders are ready before a fade s
   const fade = src.slice(start, src.indexOf('\n}\n', start));
   assert.match(fade, /if \(reducedMotion\.matches \|\| !hasModel\)/);
   assert.match(fade, /compileAsync/);
+});
+
+// The edge length (edge-length.js) reads which edge of a tread or landing is
+// its open front: `openEdges`, metadata only -- the same edge the stone wrap
+// is laid under, the rest of the part untouched.
+test('treads and landings name their open front edge (openEdges), where the stone wrap goes', () => {
+  const sameEdge = (part, i, other) => {
+    const a = part.outline[i], b = part.outline[(i + 1) % part.outline.length];
+    return [a, b].every(([x, z]) => other.outline.some(([ox, oz]) => Math.hypot(ox - x, oz - z) < 1e-9));
+  };
+  [
+    ['lestnitsa', { width: { value: '1000' }, length: { value: '3000' }, 'step-count': { value: '5' }, productSubcategory: { value: 'STAIR-03' } }],
+    ['lestnitsa', { width: { value: '1000' }, length: { value: '3000' }, 'step-count': { value: '12' }, productSubcategory: { value: 'STAIR-07' } }],
+    ['stupeni', { width: { value: '300' }, length: { value: '1200' }, 'step-count': { value: '3' }, productSubcategory: { value: 'STEP-02' } }],
+    ['stupeni', { width: { value: '300' }, length: { value: '1200' }, 'step-count': { value: '3' }, productSubcategory: { value: 'STEP-03' } }],
+  ].forEach(([key, values]) => {
+    const wrapped = layoutFor(key, Object.assign({ 'edge-type': { value: 'stone-wrap' } }, values));
+    const parts = wrapped.parts.filter(p => p.name === 'tread' || p.name === 'landing');
+    const wraps = named(wrapped, 'wrap');
+    assert.equal(wraps.length, parts.length, key + ': one wrap per tread/landing');
+    parts.forEach((p, k) => {
+      assert.ok(Array.isArray(p.openEdges) && p.openEdges.length > 0, key + ' ' + p.name + ' has openEdges');
+      p.openEdges.forEach(i => assert.ok(wraps.some(w => sameEdge(p, i, w)), key + ' ' + p.name + ' ' + k + ': edge ' + i + ' lies on its wrap'));
+    });
+    // Metadata only: with another profile the parts are the same, openEdges included.
+    const plain = layoutFor(key, Object.assign({ 'edge-type': { value: 'straight' } }, values));
+    const strip = p => ({ outline: p.outline, y0: p.y0, y1: p.y1, openEdges: p.openEdges });
+    assert.deepEqual(plain.parts.filter(p => p.name === 'tread' || p.name === 'landing').map(strip), parts.map(strip), key);
+  });
+});
+
+test('the П landing: only the part of its front the upper march does not start on is open (openLengthM)', () => {
+  const layout = layoutFor('lestnitsa', { width: { value: '1000' }, length: { value: '3000' }, 'step-count': { value: '5' }, productSubcategory: { value: 'STAIR-05' } });
+  const [landing] = named(layout, 'landing');
+  const [i] = landing.openEdges;
+  const a = landing.outline[i], b = landing.outline[(i + 1) % landing.outline.length];
+  assert.ok(Math.abs(Math.hypot(b[0] - a[0], b[1] - a[1]) - 2.1) < 1e-9, 'the whole front is 2.1');
+  assert.ok(Math.abs(landing.openLengthM - 1.1) < 1e-9, 'open: the arriving march 1.0 + the 0.1 gap');
+  const lLanding = named(layoutFor('lestnitsa', { width: { value: '1000' }, length: { value: '3000' }, 'step-count': { value: '5' }, productSubcategory: { value: 'STAIR-03' } }), 'landing')[0];
+  assert.equal(lLanding.openLengthM, undefined, 'a Г landing\'s front is open over its whole width');
 });

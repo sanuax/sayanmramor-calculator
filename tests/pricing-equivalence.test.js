@@ -6,6 +6,9 @@ const Pricing = require('../pricing.js');
 const ProductTypes = require('../product-types.js');
 const RateCatalog = require('../rate-catalog.js');
 const ConstructorState = require('../constructor-state.js');
+const GeometryModel = require('../visualizer/geometry-model.js');
+const SceneLayout = require('../visualizer/scene-layout.js');
+const EdgeLength = require('../edge-length.js');
 
 const { PRODUCTS, hasAdditionalWork, SAW_MARGIN_CM, SLAB_USAGE_LIMIT } = ProductTypes;
 const { getAdditionalWorkRate, getAdditionalWorkInstallRate, getProductRates, stoneCoefficient, MISC } = RateCatalog;
@@ -17,20 +20,18 @@ function num(doc, id) { return parseFloat(doc.getElementById(id).value) || 0; }
 // docs/superpowers/specs/2026-11-08-company-rates-v2-design.md) straight
 // from the page fields, for characterization purposes only. Deliberately NOT
 // calling into constructor-state.js. `typeId` -- the type chosen for the
-// product (a countertop's is its shape), `k` -- the stone coefficient.
-function legacyBuildPricingInputs(doc, product, typeId, k) {
-  const EDGE_LINE_ITEMS = [
-    { rateId: 'EDGE-01', elId: 'edge-straight' }, { rateId: 'EDGE-03', elId: 'edge-figured' },
-    { rateId: 'EDGE-04', elId: 'edge-round' }, { rateId: 'EDGE-05', elId: 'edge-chamfer' },
-    { rateId: 'EDGE-06', elId: 'edge-stonefold' },
-  ];
+// product (a countertop's is its shape), `k` -- the stone coefficient,
+// `edgeLengthM` -- the product's open edge, hand-measured for the scenario.
+function legacyBuildPricingInputs(doc, product, typeId, k, edgeLengthM) {
+  const EDGE_RATE_IDS = { straight: 'EDGE-01', figured: 'EDGE-03', rounding: 'EDGE-04', bevel: 'EDGE-05', 'stone-wrap': 'EDGE-06' };
   let extraLineItems = [];
   // Edge is charged only where the product supports edge work (Block 7
-  // capability-safety fix); a leftover edge field on e.g. a floor is not priced.
-  if (product.supportsEdgeWork) EDGE_LINE_ITEMS.forEach(({ rateId, elId }) => {
-    const lengthM = mmToM(num(doc, elId));
-    if (lengthM > 0) extraLineItems.push({ rate: getAdditionalWorkRate(rateId), quantity: lengthM });
-  });
+  // capability-safety fix); a leftover profile on e.g. a floor is not priced.
+  // The chosen profile's rate x the open edge length, no stone coefficient.
+  const edgeType = doc.getElementById('edge-type').value;
+  if (product.supportsEdgeWork && EDGE_RATE_IDS[edgeType] && edgeLengthM > 0) {
+    extraLineItems.push({ rate: getAdditionalWorkRate(EDGE_RATE_IDS[edgeType]), quantity: edgeLengthM, edge: edgeType });
+  }
 
   if (product.supportsCountertopExtras) {
     // Cuts and holes: rate x count, no stone coefficient (no integrated sink here).
@@ -87,11 +88,12 @@ const stone = {
 
 const SCENARIOS = [
   {
-    name: 'kitchen countertop, two simultaneous edge types + sink + cooktop + curb + backsplash, all options on',
-    productKey: 'stoleshnitsa_kuhnya', typeId: 'KITCHEN-11',
+    name: 'kitchen countertop, a bevel edge + sink + cooktop + curb + backsplash, all options on',
+    // 2000 deep x 600 along the wall: front 0.6 + two ends 2.0.
+    productKey: 'stoleshnitsa_kuhnya', typeId: 'KITCHEN-11', edgeLengthM: 4.6,
     values: {
       width: { value: '2000' }, length: { value: '600' },
-      'edge-straight': { value: '2000' }, 'edge-chamfer': { value: '500' },
+      'edge-type': { value: 'bevel' },
       'cut-sink-overlay': { value: '1' }, 'cut-cooktop': { value: '1' }, 'hole-mixer': { value: '1' },
       'extra-bortik': { value: '500' }, 'extra-fartuk-width': { value: '600' }, 'extra-fartuk-length': { value: '2000' },
       'opt-complex': { checked: true }, 'opt-polish': { checked: true }, 'opt-install': { checked: true },
@@ -99,8 +101,9 @@ const SCENARIOS = [
   },
   {
     name: 'windowsill: edge work but no countertop extras',
-    productKey: 'podokonnik', typeId: 'SILL-01',
-    values: { width: { value: '1200' }, length: { value: '300' }, 'edge-round': { value: '1200' }, productSubcategory: { value: 'SILL-01' } },
+    // 1200 deep x 300 along the window: the room side, 0.3.
+    productKey: 'podokonnik', typeId: 'SILL-01', edgeLengthM: 0.3,
+    values: { width: { value: '1200' }, length: { value: '300' }, 'edge-type': { value: 'rounding' }, productSubcategory: { value: 'SILL-01' } },
   },
   {
     name: 'floor: no edge work, no countertop extras, all zero',
@@ -108,21 +111,23 @@ const SCENARIOS = [
     values: { width: { value: '3000' }, length: { value: '2000' }, productSubcategory: { value: 'FLOOR-01' } },
   },
   {
-    name: 'floor: no supportsEdgeWork capability -- a stale edge field is NOT priced',
-    productKey: 'pol', typeId: 'FLOOR-01',
-    values: { width: { value: '3000' }, length: { value: '2000' }, 'edge-straight': { value: '500' }, productSubcategory: { value: 'FLOOR-01' } },
+    name: 'floor: no supportsEdgeWork capability -- a stale edge profile is NOT priced',
+    productKey: 'pol', typeId: 'FLOOR-01', edgeLengthM: 0,
+    values: { width: { value: '3000' }, length: { value: '2000' }, 'edge-type': { value: 'straight' }, productSubcategory: { value: 'FLOOR-01' } },
   },
 ];
 
-SCENARIOS.forEach(({ name, productKey, typeId, values }) => {
+SCENARIOS.forEach(({ name, productKey, typeId, values, edgeLengthM }) => {
   test(`legacy vs constructor-state pricing inputs match: ${name}`, () => {
     const doc = createFakeDoc(values);
     const product = PRODUCTS[productKey];
 
-    const legacy = legacyBuildPricingInputs(doc, product, typeId, stoneCoefficient(stone.category));
+    const legacy = legacyBuildPricingInputs(doc, product, typeId, stoneCoefficient(stone.category), edgeLengthM || 0);
 
     const state = ConstructorState.readConstructorState({ doc, selectedProductKey: productKey, product, stone, hasAdditionalWork });
-    const fresh = ConstructorState.buildPricingInputs(state, { catalog: RateCatalog });
+    const measured = EdgeLength.openEdgeLengthM(SceneLayout.buildSceneLayout(GeometryModel.buildGeometryModel(state)));
+    if (product.supportsEdgeWork) assert.equal(measured, edgeLengthM || 0, 'the open edge, as hand-measured');
+    const fresh = ConstructorState.buildPricingInputs(state, { catalog: RateCatalog, edgeLengthM: measured });
 
     // LIGHT-01 is new in the company's v2 rates -- the legacy inputs know no lighting.
     assert.deepEqual(fresh.rates, Object.assign({}, legacy.rates, { lightingRatePerM2: RateCatalog.getAdditionalWorkRate('LIGHT-01') }));

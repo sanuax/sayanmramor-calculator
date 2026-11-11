@@ -18,36 +18,18 @@ test('readConstructorState reads dimensions and converts mm to m', () => {
   assert.equal(state.dimensions.thicknessM, null);
 });
 
-test('readConstructorState.edge picks the first non-zero legacy field by fixed priority, not by length', () => {
-  // edge-round (300) is numerically larger than edge-straight (100), but
-  // straight has higher priority -- straight must win.
-  const doc = createFakeDoc({
-    width: { value: '1000' }, length: { value: '600' },
-    'edge-straight': { value: '100' }, 'edge-round': { value: '300' },
-  });
-  const state = ConstructorState.readConstructorState({
-    doc, selectedProductKey: 'stoleshnitsa_kuhnya', product: PRODUCTS.stoleshnitsa_kuhnya,
-    stone: null, hasAdditionalWork,
-  });
-  assert.deepEqual(state.edge, { type: 'straight', lengthMm: 100 });
-});
-
-test('readConstructorState.edge maps all 5 legacy field ids to the new type enum', () => {
-  const cases = [
-    ['edge-straight', 'straight'], ['edge-figured', 'figured'], ['edge-round', 'rounding'],
-    ['edge-chamfer', 'bevel'], ['edge-stonefold', 'stone-wrap'],
-  ];
-  for (const [elId, expectedType] of cases) {
-    const doc = createFakeDoc({ width: { value: '1000' }, length: { value: '600' }, [elId]: { value: '500' } });
+test('readConstructorState.edge is the profile chosen in #edge-type, for each of the 5 profiles (no entered length)', () => {
+  ['straight', 'figured', 'rounding', 'bevel', 'stone-wrap'].forEach(type => {
+    const doc = createFakeDoc({ width: { value: '1000' }, length: { value: '600' }, 'edge-type': { value: type } });
     const state = ConstructorState.readConstructorState({
       doc, selectedProductKey: 'stoleshnitsa_kuhnya', product: PRODUCTS.stoleshnitsa_kuhnya,
       stone: null, hasAdditionalWork,
     });
-    assert.deepEqual(state.edge, { type: expectedType, lengthMm: 500 });
-  }
+    assert.deepEqual(state.edge, { type, lengthMm: null });
+  });
 });
 
-test('readConstructorState.edge is null/null when no legacy field is set', () => {
+test('readConstructorState.edge is null/null when no profile is chosen', () => {
   const doc = createFakeDoc({ width: { value: '1000' }, length: { value: '600' } });
   const state = ConstructorState.readConstructorState({
     doc, selectedProductKey: 'pol', product: PRODUCTS.pol, stone: null, hasAdditionalWork,
@@ -55,32 +37,13 @@ test('readConstructorState.edge is null/null when no legacy field is set', () =>
   assert.deepEqual(state.edge, { type: null, lengthMm: null });
 });
 
-test('readConstructorState.edgeLineItems keeps EVERY non-zero legacy field, not just the priority winner (pricing fidelity)', () => {
-  const doc = createFakeDoc({
-    width: { value: '1000' }, length: { value: '600' },
-    'edge-straight': { value: '100' }, 'edge-chamfer': { value: '50' },
-  });
+test('the old per-type edge length fields are gone: a value in one neither sets the edge nor reaches the state', () => {
+  const doc = createFakeDoc({ width: { value: '1000' }, length: { value: '600' }, 'edge-straight': { value: '500' } });
   const state = ConstructorState.readConstructorState({
-    doc, selectedProductKey: 'stoleshnitsa_kuhnya', product: PRODUCTS.stoleshnitsa_kuhnya,
-    stone: null, hasAdditionalWork,
+    doc, selectedProductKey: 'stoleshnitsa_kuhnya', product: PRODUCTS.stoleshnitsa_kuhnya, stone: null, hasAdditionalWork,
   });
-  assert.deepEqual(state.edgeLineItems, [
-    { rateId: 'EDGE-01', type: 'straight', lengthMm: 100 },
-    { rateId: 'EDGE-05', type: 'bevel', lengthMm: 50 },
-  ]);
-});
-
-test('readConstructorState reads edge-length fields unconditionally, even for a product without supportsEdgeWork (matches sayanmramor-calculator.html\'s current unconditional read)', () => {
-  const doc = createFakeDoc({
-    width: { value: '1000' }, length: { value: '600' },
-    'edge-straight': { value: '500' }, // stale value left over from a previously selected product
-  });
-  const state = ConstructorState.readConstructorState({
-    doc, selectedProductKey: 'pol', product: PRODUCTS.pol, stone: null, hasAdditionalWork,
-  });
-  assert.equal(PRODUCTS.pol.supportsEdgeWork, undefined); // sanity: pol genuinely lacks the capability
-  assert.deepEqual(state.edgeLineItems, [{ rateId: 'EDGE-01', type: 'straight', lengthMm: 500 }]);
-  assert.deepEqual(state.edge, { type: 'straight', lengthMm: 500 });
+  assert.deepEqual(state.edge, { type: null, lengthMm: null });
+  assert.equal('edgeLineItems' in state, false);
 });
 
 test('readConstructorState.additionalWorks.sink is derived by the same fixed-priority rule (overlay > undermount > integrated)', () => {
@@ -135,20 +98,15 @@ function baseRatesConfig() {
   return { catalog: RateCatalog };
 }
 
-test('buildPricingInputs assembles one extraLineItems entry per edge field, using rate-catalog rates', () => {
-  const doc = createFakeDoc({
-    width: { value: '1000' }, length: { value: '600' },
-    'edge-straight': { value: '100' }, 'edge-chamfer': { value: '50' },
-  });
+test('buildPricingInputs: one edge line, the chosen profile rate x the open edge length (config.edgeLengthM)', () => {
+  const doc = createFakeDoc({ width: { value: '1000' }, length: { value: '600' }, 'edge-type': { value: 'bevel' } });
   const state = ConstructorState.readConstructorState({
     doc, selectedProductKey: 'stoleshnitsa_kuhnya', product: PRODUCTS.stoleshnitsa_kuhnya, stone: null, hasAdditionalWork,
   });
-  const { extraLineItems } = ConstructorState.buildPricingInputs(state, baseRatesConfig());
-  assert.equal(extraLineItems.length, 2);
-  assert.equal(extraLineItems[0].rate, RateCatalog.getAdditionalWorkRate('EDGE-01'));
-  assert.equal(extraLineItems[0].quantity, 0.1); // 100mm -> 0.1m
-  assert.equal(extraLineItems[1].rate, RateCatalog.getAdditionalWorkRate('EDGE-05'));
-  assert.equal(extraLineItems[1].quantity, 0.05);
+  const { extraLineItems } = ConstructorState.buildPricingInputs(state, Object.assign(baseRatesConfig(), { edgeLengthM: 2.2 }));
+  assert.deepEqual(extraLineItems, [{ rate: RateCatalog.getAdditionalWorkRate('EDGE-05'), quantity: 2.2, edge: 'bevel' }]);
+  // No length measured (an incomplete product): nothing to charge.
+  assert.deepEqual(ConstructorState.buildPricingInputs(state, baseRatesConfig()).extraLineItems, []);
 });
 
 test('buildPricingInputs sums BOTH sink counts as independent line items when more than one is non-zero (pricing must not collapse to one type)', () => {
@@ -238,23 +196,23 @@ test('readConstructorState forces shape to "straight" and zeroes wing for a prod
   assert.equal(state.corner, 'left');
 });
 
-test('readConstructorState.edge: a profile chosen in #edge-type is the edge (no length), and adds no priced edge line', () => {
+test('readConstructorState.edge: a profile chosen in #edge-type is the edge (no length), and adds no priced edge line without a measured length', () => {
   const doc = createFakeDoc({ width: { value: '600' }, length: { value: '2000' }, 'edge-type': { value: 'rounding' } });
   const state = ConstructorState.readConstructorState({
     doc, selectedProductKey: 'stoleshnitsa_kuhnya', product: PRODUCTS.stoleshnitsa_kuhnya,
     stone: null, hasAdditionalWork,
   });
   assert.deepEqual(state.edge, { type: 'rounding', lengthMm: null });
-  assert.deepEqual(state.edgeLineItems, []);
+  assert.deepEqual(ConstructorState.buildPricingInputs(state, baseRatesConfig()).extraLineItems, []);
 });
 
-test('readConstructorState.edge: an unknown #edge-type value is ignored, and legacy length fields keep priority', () => {
+test('readConstructorState.edge: an unknown #edge-type value is ignored', () => {
   const read = values => ConstructorState.readConstructorState({
     doc: createFakeDoc(Object.assign({ width: { value: '600' }, length: { value: '2000' } }, values)),
     selectedProductKey: 'podokonnik', product: PRODUCTS.podokonnik, stone: null, hasAdditionalWork,
   });
   assert.deepEqual(read({ 'edge-type': { value: 'nonsense' } }).edge, { type: null, lengthMm: null });
-  assert.deepEqual(read({ 'edge-type': { value: 'bevel' }, 'edge-straight': { value: '800' } }).edge, { type: 'straight', lengthMm: 800 });
+  assert.deepEqual(read({ 'edge-type': { value: 'bevel' }, 'edge-straight': { value: '800' } }).edge, { type: 'bevel', lengthMm: null });
 });
 
 test('stair risers come from #stair-risers, not from the type id', () => {

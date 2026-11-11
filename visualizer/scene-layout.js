@@ -395,6 +395,13 @@
       ? [prism('stone', plan.outline, -m.visualThicknessM / 2, m.visualThicknessM / 2, { edge: m.edge ? m.edge.type : null, closed: sillClosed(plan, m.widthM, m.lengthM), name: 'main' })]
         .concat(wrapped ? sillWrap(plan, m.widthM, m.lengthM, m.visualThicknessM) : [])
       : countertopParts(Object.assign({}, m, { sink: null, cooktop: null, holes: null, backsplash: null, wallPanel: null, curb: null, island: null, barCounter: null, wing: null, wings: null }));
+    // A straight sill is drawn as the countertop's slab; its priced edge
+    // (edge-length.js) is the shaped sills' rule all the same: the room side
+    // only, not the ends at the reveals. Metadata -- the drawing is unchanged.
+    if (!plan) {
+      const isOpen = sillOpenEdges({ outline: parts[0].outline }, m.widthM, m.lengthM);
+      parts[0].openEdges = parts[0].outline.map((_, i) => i).filter(isOpen);
+    }
     const W = m.widthM, L = m.lengthM, T = m.visualThicknessM;
     const wallT = 0.14, x = -W / 2 - wallT / 2;
     const openZ = Math.max(L / 2 - 0.06, L * 0.4);
@@ -903,7 +910,11 @@
     for (let k = 0; k < count; k++) {
       const topY = (level + k + 1) * RISE;
       const a0 = k * depth, a1 = (k + 1) * depth;
-      parts.push(prism('stone', stepFootprint(origin, dir, across, halfW, a0, a1, bulge), topY - T, topY, { edge: o.edge, name: 'tread' }));
+      const footprint = stepFootprint(origin, dir, across, halfW, a0, a1, bulge);
+      // openEdges: the front edge (the arc of a radius step), where the wrap
+      // goes -- what edge-length.js prices; metadata, the renderer ignores it.
+      const front = footprint.slice(2).map((_, j) => j + 2).slice(0, -1);
+      parts.push(prism('stone', footprint, topY - T, topY, { edge: o.edge, name: 'tread', openEdges: front }));
       if (risers) {
         parts.push(prism('stone', bandOutline(stepFootprint(origin, dir, across, halfW, a0, a0 + RISER_T, bulge), bulge),
           (level + k) * RISE, topY - T, { name: 'riser' }));
@@ -953,7 +964,9 @@
       }
       const di1 = u(a1), di0 = u(a0);
       pts.push([di1[0] * rIn, di1[1] * rIn], [di0[0] * rIn, di0[1] * rIn]);
-      parts.push(prism('stone', pts, topY - T, topY, { edge: o.edge, name: 'tread' }));
+      // openEdges: the front (radial) edge at a0 -- the outline's closing edge,
+      // inner point back to the outer one -- where the wrap goes (edge-length.js).
+      parts.push(prism('stone', pts, topY - T, topY, { edge: o.edge, name: 'tread', openEdges: [pts.length - 1] }));
       if (risers) {
         const d = u(a0), t = [-Math.sin(a0), Math.cos(a0)];
         const band = [
@@ -1049,7 +1062,15 @@
     const band = (l, a0, a1) => wound([at(l, a0, l.acrossMin), at(l, a1, l.acrossMin), at(l, a1, l.acrossMax), at(l, a0, l.acrossMax)]);
     path.landings.forEach(l => {
       const topY = l.top * RISE, belowY = (l.top - 1) * RISE;
-      parts.push(prism('stone', l.outline, topY - T, topY, { edge, name: 'landing', index: l.index }));
+      // openEdges: the landing's front edge (along = 0), where the march below
+      // arrives and the wrap goes (edge-length.js). On a П landing the upper
+      // march starts on `width` of that front: only the rest is open
+      // (openLengthM -- the arriving march and the gap over the well).
+      const along = ([x, z]) => (x - l.edge[0]) * l.dir[0] + (z - l.edge[1]) * l.dir[1];
+      const frontEdge = l.outline.findIndex((pt, i) => Math.abs(along(pt)) < 1e-9 && Math.abs(along(l.outline[(i + 1) % l.outline.length])) < 1e-9);
+      const meta = { edge, name: 'landing', index: l.index, openEdges: [frontEdge] };
+      if (l.turn === 'u') meta.openLengthM = (l.acrossMax - l.acrossMin) - width;
+      parts.push(prism('stone', l.outline, topY - T, topY, meta));
       if (s.risers) {
         // The riser across the width of the march that arrives here.
         const front = wound([at(l, 0, -width / 2), at(l, RISER_T, -width / 2), at(l, RISER_T, width / 2), at(l, 0, width / 2)]);

@@ -35,7 +35,7 @@ const LEFTOVERS = {
   productShape: { value: 'lshape' }, 'wing-width': { value: '600' }, 'wing-length': { value: '1200' },
   'extra-bortik': { value: '3000' }, 'extra-fartuk-width': { value: '600' }, 'extra-fartuk-length': { value: '2400' },
   'cut-sink-overlay': { value: '1' }, 'cut-cooktop': { value: '1' }, 'hole-mixer': { value: '2' },
-  'edge-straight': { value: '2400' },
+  'edge-type': { value: 'straight' },
   'opt-complex': { checked: true }, 'opt-polish': { checked: true }, 'opt-install': { checked: true },
 };
 

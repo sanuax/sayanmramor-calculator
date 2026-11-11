@@ -26,8 +26,8 @@ function stateFor(key, values, category) {
   });
 }
 
-function price(state, catalog) {
-  const inputs = ConstructorState.buildPricingInputs(state, { catalog: catalog || RateCatalog });
+function price(state, catalog, edgeLengthM) {
+  const inputs = ConstructorState.buildPricingInputs(state, { catalog: catalog || RateCatalog, edgeLengthM });
   const r = Pricing.calculatePrice({
     stone: state.stone, productType: state.product.type, rates: inputs.rates,
     installEnabled: state.options.installEnabled, polishEnabled: state.options.polishEnabled, complexEnabled: state.options.complexEnabled,
@@ -329,4 +329,31 @@ test('a seam without a SEAM-01 rate leaves the work to the manager', () => {
   // A straight countertop that needs no seam stays priced without the rate.
   const straight = price(stateFor('stoleshnitsa_kuhnya', { width: { value: '600' }, length: { value: '2400' } }, 'marble'), stub).r;
   assert.ok(straight.work > 0);
+});
+
+test('edge priced by the chosen profile', () => {
+  const kitchen = extra => Object.assign({ width: { value: '600' }, length: { value: '3000' } }, extra);
+  const state = stateFor('stoleshnitsa_kuhnya', kitchen({ 'edge-type': { value: 'bevel' } }), 'marble');
+  const inputs = ConstructorState.buildPricingInputs(state, { catalog: RateCatalog, edgeLengthM: 4.2 });
+  assert.deepEqual(inputs.extraLineItems.filter(i => i.edge), [{ rate: 1000, quantity: 4.2, edge: 'bevel' }]);
+  // Every profile at its own EDGE rate, without the stone coefficient.
+  [['straight', 5000], ['figured', 20000], ['rounding', 10000], ['stone-wrap', 15000]].forEach(([type, rate]) => {
+    const s = stateFor('stoleshnitsa_kuhnya', kitchen({ 'edge-type': { value: type } }), 'quartzite');
+    assert.deepEqual(ConstructorState.buildPricingInputs(s, { catalog: RateCatalog, edgeLengthM: 4.2 }).extraLineItems.filter(i => i.edge),
+      [{ rate, quantity: 4.2, edge: type }], type);
+  });
+  // No profile chosen: no edge line.
+  const none = stateFor('stoleshnitsa_kuhnya', kitchen({}), 'marble');
+  assert.deepEqual(ConstructorState.buildPricingInputs(none, { catalog: RateCatalog, edgeLengthM: 4.2 }).extraLineItems.filter(i => i.edge), []);
+  // A product without edge work: no edge line, whatever the length.
+  const floor = stateFor('pol', { width: { value: '3000' }, length: { value: '3000' }, 'edge-type': { value: 'bevel' } }, 'marble');
+  assert.deepEqual(ConstructorState.buildPricingInputs(floor, { catalog: RateCatalog, edgeLengthM: 4.2 }).extraLineItems.filter(i => i.edge), []);
+});
+
+test('the edge adds rate x open length to the price, through the additional works', () => {
+  const kitchen = extra => Object.assign({ width: { value: '600' }, length: { value: '3000' } }, extra);
+  const withEdge = price(stateFor('stoleshnitsa_kuhnya', kitchen({ 'edge-type': { value: 'straight' } }), 'quartzite'), null, 4.2).r;
+  const without = price(stateFor('stoleshnitsa_kuhnya', kitchen({}), 'quartzite'), null, 4.2).r;
+  close(withEdge.total - without.total, 5000 * 4.2, 'total');
+  close(withEdge.catalogExtras - without.catalogExtras, 5000 * 4.2, 'catalogExtras');
 });

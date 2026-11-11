@@ -378,8 +378,8 @@ test('installation of the countertop extras: its own rate per element (EXTRA-02.
   // the countertop's installation rate.
   const noInstall = Object.assign({}, RateCatalog, { getAdditionalWorkInstallRate: id => (id === 'EXTRA-02' ? null : RateCatalog.getAdditionalWorkInstallRate(id)) });
   assert.deepEqual(inputsWith(true, noInstall).extraLineItems.filter(i => i.install).map(i => i.install), ['wallPanel', 'island', 'barCounter']);
-  // The page passes the catalog in.
-  assert.match(html, /buildPricingInputs\(constructorState, \{ catalog: RateCatalog \}\)/);
+  // The page passes the catalog in (and the measured open edge length).
+  assert.match(html, /buildPricingInputs\(constructorState, \{ catalog: RateCatalog, edgeLengthM \}\)/);
 });
 
 test('an intermediate landing is one march width deep; the client has no landing-depth field', () => {
