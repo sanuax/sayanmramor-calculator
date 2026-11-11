@@ -512,3 +512,13 @@ test('«Получить расчёт» drops the passport left from before, so 
 test('the product cards carry their names only, no second line (the owner, 2026-10-26)', () => {
   ['PRODUCT_HINTS', 'product-card-hint', 'Раковина, отверстия, бортик', 'Мойка, варочная панель, остров'].forEach(gone => assert.ok(!html.includes(gone), gone));
 });
+
+test('stair risers are the hidden #stair-risers box, not a second id on the type cards', () => {
+  const tags = inputTags('stair-risers');
+  assert.equal(tags.length, 1);
+  assert.match(tags[0], /type="checkbox"/);
+  assert.match(tags[0], /\bhidden\b/);
+  [['STAIR-01'], ['STAIR-03'], ['STAIR-05'], ['STAIR-07']].forEach(([id]) => assert.ok(html.includes("{ ids: ['" + id + "'],"), id));
+  assert.doesNotMatch(html, /ids: \['STAIR-0\d', 'STAIR-0\d'\]/);
+  assert.doesNotMatch(html, /STAIR_WITH_RISERS|ids\[stairRisers/);
+});

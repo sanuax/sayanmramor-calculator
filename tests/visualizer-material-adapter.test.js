@@ -352,8 +352,8 @@ test('steps: every tread is cut along its width, fits one photo, and neighbours 
 });
 
 test('stairs: treads, risers and landings of every stair type project to finite UVs with a unit grain', () => {
-  ['STAIR-01', 'STAIR-02', 'STAIR-03', 'STAIR-05', 'STAIR-07'].forEach(type => {
-    const parts = stoneParts(layoutFor('lestnitsa', { width: { value: '1000' }, length: { value: '3000' }, productSubcategory: { value: type } }));
+  [['STAIR-01', false], ['STAIR-01', true], ['STAIR-03', false], ['STAIR-05', false], ['STAIR-07', false]].forEach(([type, risers]) => {
+    const parts = stoneParts(layoutFor('lestnitsa', { width: { value: '1000' }, length: { value: '3000' }, productSubcategory: { value: type }, 'stair-risers': { checked: risers } }));
     assert.ok(parts.length > 0, type);
     parts.forEach((p, i) => {
       assertFinite(uvsFor(p, MARBLE, i), type + ' ' + p.name);

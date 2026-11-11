@@ -41,12 +41,12 @@
   // fall back to the plain shape rather than a guessed one.
   const STEP_VARIANTS = { 'STEP-02': 'winder', 'STEP-03': 'radius' };
   const STAIR_SHAPES = {
-    'STAIR-03': 'l', 'STAIR-04': 'l',
-    'STAIR-05': 'u', 'STAIR-06': 'u',
-    'STAIR-07': 'spiral', 'STAIR-08': 'spiral',
+    'STAIR-03': 'l',
+    'STAIR-05': 'u',
+    'STAIR-07': 'spiral',
   };
-  // "Ступени + подступенки" rows, plus the full-cladding/entrance rows.
-  const STAIR_WITH_RISERS = ['STAIR-02', 'STAIR-04', 'STAIR-06', 'STAIR-08', 'STAIR-12', 'STAIR-13'];
+  // A stair's risers are NOT part of its type id: they are their own flag,
+  // productConfig.lestnitsa.risers (the #stair-risers box).
   // Every type a client can pick draws differently: a joint layout
   // (pattern/moduleM), a floor motif (border/medallion), a wall/facade form
   // or a backlight. Presentation only -- none of this affects the price.
@@ -338,8 +338,8 @@
       // Type B: the entered size is the cladded flight (width x run).
       const shape = STAIR_SHAPES[id] || 'straight';
       const cfg = state.productConfig && state.productConfig.lestnitsa;
-      const risers = STAIR_WITH_RISERS.includes(id);
-      const riserHeightM = risers && cfg ? cfg.riserHeightM || 0 : 0;
+      const risers = !!(cfg && cfg.risers);
+      const riserHeightM = risers ? cfg.riserHeightM || 0 : 0;
       return {
         kind: 'flight', shape, risers, riserHeightM, riseM: riseFor(risers, riserHeightM), count: state.stepCount,
         plan: stairPlan('flight', shape, state.dimensions.lengthM, state.dimensions.widthM, state.stepCount, cfg ? cfg.marches : undefined),
@@ -618,6 +618,6 @@
   return {
     buildGeometryModel, stairPlan, stairPath, marchesFor, sillPlan, radiusWallPlan, polygonArea,
     fireplacePlan, FIREBOX_DEPTH_M,
-    STAIR_SHAPES, STEP_VARIANTS, SILL_VARIANTS, STAIR_MARCHES, MARCH_RANGE, STAIR_WITH_RISERS, U_FLIGHT_GAP_M, MIN_TREAD_DEPTH_M,
+    STAIR_SHAPES, STEP_VARIANTS, SILL_VARIANTS, STAIR_MARCHES, MARCH_RANGE, U_FLIGHT_GAP_M, MIN_TREAD_DEPTH_M,
   };
 });

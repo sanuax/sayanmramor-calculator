@@ -1514,7 +1514,7 @@
          facade it decides the sizes and so the cladded area -- facade-model.js). For a
          staircase the type is the flight's SHAPE only -- risers are their own
          question below (the hidden select then holds the catalog row for
-         shape + risers). Kitchen/bath never get this step (their form choice
+         shape; the risers are the hidden #stair-risers box). Kitchen/bath never get this step (their form choice
          is the 'shape' step). -->
     <section class="step" data-step-id="type" id="productSubcategoryField" style="display:none">
       <div class="step-head"><span class="step-num">1</span><h2 class="step-title" id="typeStepTitle">Тип</h2></div>
@@ -1523,6 +1523,8 @@
         <div class="choice-group" id="stairRiserField" hidden>
           <div class="choice-title" id="stairRiserTitle">Подступенки</div>
           <div class="card-grid" id="stairRiserGrid" role="radiogroup" aria-labelledby="stairRiserTitle"></div>
+          <!-- Real field constructor-state.js reads (productConfig.lestnitsa.risers); the cards above drive it. -->
+          <input type="checkbox" id="stair-risers" hidden>
         </div>
         <!-- «Фасады»: the chosen type's form (Круглая / Квадратная колонна,
              Окно / Дверь) as visual cards -- shown only for a type with more
@@ -2284,8 +2286,8 @@
   // Типы изделий -- что выбирает клиент: чистое название, короткое пояснение
   // и иконка в общей сетке (viewBox 64x40, ось x = 32). `ids` -- строки
   // PRODUCT_SUBCATEGORIES (rate-catalog.js не меняется); у лестницы тип --
-  // это форма марша, и `ids` = [без подступенков, с подступенками]: вторая
-  // половина выбора -- отдельный вопрос «Подступенки». Строки каталога,
+  // это форма марша, а подступенки -- отдельный признак (#stair-risers),
+  // не часть id типа. Строки каталога,
   // которые не являются самостоятельным выбором клиента (STAIR-09..13 --
   // элементы облицовки, STEP-04 -- подступенок), здесь не показываются.
   // Объявлено здесь, а не рядом с renderSubcategoryOptions(): URL-bootstrap
@@ -2345,10 +2347,10 @@
   const facadeFieldsOwner = { typeId: null };
   const TYPE_CARDS = {
     lestnitsa: [
-      { ids: ['STAIR-01', 'STAIR-02'], title: 'Прямая', desc: 'Один марш', icon: typeIcon('<rect x="24" y="5" width="16" height="30" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M24 10 H40 M24 15 H40 M24 20 H40 M24 25 H40 M24 30 H40" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/>') },
-      { ids: ['STAIR-03', 'STAIR-04'], title: 'Г-образная', desc: 'Поворот через площадку', icon: typeIcon('<rect x="17" y="16" width="12" height="19" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="17" y="5" width="12" height="11" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="29" y="5" width="18" height="11" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M17 20 H29 M17 24 H29 M17 28 H29 M17 32 H29 M33 5 V16 M37 5 V16 M41 5 V16" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/>') },
-      { ids: ['STAIR-05', 'STAIR-06'], title: 'П-образная', desc: 'Два марша и площадка', icon: typeIcon('<rect x="14" y="15" width="12" height="20" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="38" y="15" width="12" height="20" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="14" y="5" width="36" height="10" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M14 19 H26 M14 23 H26 M14 27 H26 M14 31 H26 M38 19 H50 M38 23 H50 M38 27 H50 M38 31 H50" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/>') },
-      { ids: ['STAIR-07', 'STAIR-08'], title: 'Винтовая', desc: 'Ступени вокруг опоры', icon: typeIcon('<circle cx="32" cy="20" r="15" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M35.5 20.0 L47.0 20.0 M34.8 22.1 L44.1 28.8 M33.1 23.3 L36.6 34.3 M30.9 23.3 L27.4 34.3 M29.2 22.1 L19.9 28.8 M28.5 20.0 L17.0 20.0 M29.2 17.9 L19.9 11.2 M30.9 16.7 L27.4 5.7 M33.1 16.7 L36.6 5.7 M34.8 17.9 L44.1 11.2" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/><circle cx="32" cy="20" r="3.5" fill="var(--card)" stroke="var(--stone-line)" stroke-width="1.1"/>') },
+      { ids: ['STAIR-01'], title: 'Прямая', desc: 'Один марш', icon: typeIcon('<rect x="24" y="5" width="16" height="30" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M24 10 H40 M24 15 H40 M24 20 H40 M24 25 H40 M24 30 H40" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/>') },
+      { ids: ['STAIR-03'], title: 'Г-образная', desc: 'Поворот через площадку', icon: typeIcon('<rect x="17" y="16" width="12" height="19" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="17" y="5" width="12" height="11" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="29" y="5" width="18" height="11" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M17 20 H29 M17 24 H29 M17 28 H29 M17 32 H29 M33 5 V16 M37 5 V16 M41 5 V16" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/>') },
+      { ids: ['STAIR-05'], title: 'П-образная', desc: 'Два марша и площадка', icon: typeIcon('<rect x="14" y="15" width="12" height="20" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="38" y="15" width="12" height="20" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="14" y="5" width="36" height="10" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M14 19 H26 M14 23 H26 M14 27 H26 M14 31 H26 M38 19 H50 M38 23 H50 M38 27 H50 M38 31 H50" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/>') },
+      { ids: ['STAIR-07'], title: 'Винтовая', desc: 'Ступени вокруг опоры', icon: typeIcon('<circle cx="32" cy="20" r="15" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><path d="M35.5 20.0 L47.0 20.0 M34.8 22.1 L44.1 28.8 M33.1 23.3 L36.6 34.3 M30.9 23.3 L27.4 34.3 M29.2 22.1 L19.9 28.8 M28.5 20.0 L17.0 20.0 M29.2 17.9 L19.9 11.2 M30.9 16.7 L27.4 5.7 M33.1 16.7 L36.6 5.7 M34.8 17.9 L44.1 11.2" fill="none" stroke="var(--stone-line)" stroke-width="1.1"/><circle cx="32" cy="20" r="3.5" fill="var(--card)" stroke="var(--stone-line)" stroke-width="1.1"/>') },
     ],
     panno: [
       { ids: ['PANEL-01'], title: 'Стеновое', desc: 'Цельная плита на стене', icon: typeIcon('<rect x="22" y="5" width="20" height="30" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/>') },
@@ -2402,9 +2404,9 @@
     }
     return null;
   }
-  // Выбор на шаге «Тип»: индекс карточки + подступенки (только у лестницы).
+  // Выбор на шаге «Тип»: индекс карточки. Подступенки лестницы -- отдельный
+  // признак: скрытый чекбокс #stair-risers (его читает constructor-state.js).
   let typeCardIndex = 0;
-  let stairRisers = false;
 
   const { SAW_MARGIN_CM, SLAB_USAGE_LIMIT, WORK_RATES, RISER_WORK_RATES, MISC_FLAT_SUM, MISC_RATE_PER_M2, COMPLEX_SHAPE_MULTIPLIER, COUNTERTOP_EXTRAS_RATES, COUNTERTOP_EXTRAS_INSTALL_RATES } = ProductTypes;
 
@@ -3073,6 +3075,7 @@
   const stepCountByProduct = Object.assign({}, ConstructorState.STEP_COUNT_DEFAULTS);
   const stairRiserField = document.getElementById('stairRiserField');
   const stairRiserGrid = document.getElementById('stairRiserGrid');
+  const stairRisersInput = document.getElementById('stair-risers');
   const subcategoryQtyInput = document.getElementById('subcategoryQty');
   const typeStepTitleEl = document.getElementById('typeStepTitle');
   const summaryTitleEl = document.getElementById('summaryTitle');
@@ -3423,10 +3426,11 @@
 
   // Название типа для клиента -- то же, что на карточке (без каталожных
   // приписок «- Стандартный» и т.п.); у лестницы подступенки дописываются
-  // как часть описания конфигурации, а не как отдельный тип.
-  function subcategoryLabel(row) {
+  // как часть описания конфигурации (`withRisers`, признак #stair-risers),
+  // а не как отдельный тип.
+  function subcategoryLabel(row, withRisers) {
     const card = typeCardFor(row.id);
-    if (card) return card.title + (card.ids.length > 1 && card.ids[1] === row.id ? ', с подступенками' : '');
+    if (card) return card.title + (withRisers && selectedProductKey === 'lestnitsa' ? ', с подступенками' : '');
     return row.shape === 'Любая' ? row.variant : row.shape;
   }
 
@@ -3778,10 +3782,10 @@
     if (productKey === 'lestnitsa') {
       stairRiserField.hidden = false;
       stairRiserGrid.innerHTML = '';
-      RISER_CARDS.forEach(r => stairRiserGrid.appendChild(choiceCard(r, () => { stairRisers = r.value; applyTypeSelection(true); })));
+      RISER_CARDS.forEach(r => stairRiserGrid.appendChild(choiceCard(r, () => { stairRisersInput.checked = r.value; applyTypeSelection(true); })));
     }
     typeCardIndex = 0;
-    stairRisers = false;
+    stairRisersInput.checked = false;
     applyTypeSelection(false);
   }
 
@@ -3813,10 +3817,12 @@
     const cards = TYPE_CARDS[selectedProductKey] || [];
     const card = cards[typeCardIndex];
     if (!card) return;
-    productSubcategorySelect.value = card.ids.length > 1 ? card.ids[stairRisers ? 1 : 0] : card.ids[0];
+    productSubcategorySelect.value = card.ids[0];
+    // Only a stair has risers; a stale tick never outlives its product.
+    if (selectedProductKey !== 'lestnitsa') stairRisersInput.checked = false;
     applyStepCountLimit();
     markSelected(typeCardGrid, typeCardIndex);
-    if (!stairRiserField.hidden) markSelected(stairRiserGrid, stairRisers ? 1 : 0);
+    if (!stairRiserField.hidden) markSelected(stairRiserGrid, stairRisersInput.checked ? 1 : 0);
     renderFacadeForms();
     renderFireplaceForms();
     // The size fields/labels follow the new type BEFORE the change event
@@ -4256,7 +4262,7 @@
   // «Высота подступенка»: on the «Подступенок» step for «Ступени» (shown
   // once risers are chosen), on the sizes step for a «+ подступенки» stair.
   function placeRiserHeightField() {
-    const stairRisers = selectedProductKey === 'lestnitsa' && GeometryModel.STAIR_WITH_RISERS.includes(productSubcategorySelect.value);
+    const stairRisers = selectedProductKey === 'lestnitsa' && stairRisersInput.checked;
     const stepRisers = selectedProductKey === 'stupeni' && stupeniRiserBox.checked;
     const host = selectedProductKey === 'stupeni' ? riserStepHost : riserDimsHost;
     if (riserHeightField.parentNode !== host) host.appendChild(riserHeightField);
@@ -4616,7 +4622,7 @@
     html += `Изделие: <span>${product.label}</span>`;
     const subcategoryRow = currentSubcategoryRow();
     if (subcategoryRow && !facadeInfo && !fireplaceInfo) {
-      html += `<br>Вариант: <span>${escapeHtml(subcategoryLabel(subcategoryRow))}</span>`;
+      html += `<br>Вариант: <span>${escapeHtml(subcategoryLabel(subcategoryRow, stairRisersInput.checked))}</span>`;
       const subcategoryQty = constructorState.subcategory.qty;
       if (subcategoryRow.unit === 'шт.' && subcategoryQty > 0) {
         html += ` (${subcategoryQty} шт.)`;
@@ -4915,7 +4921,7 @@
     const configuration = ResultModel.buildConfiguration({
       state: snap.state,
       productLabel: product.label,
-      subcategory: row ? { id: row.id, label: subcategoryLabel(row), unit: row.unit } : null,
+      subcategory: row ? { id: row.id, label: subcategoryLabel(row, stairRisersInput.checked), unit: row.unit } : null,
       edgeTitles: EDGE_TITLES,
       dimensionLabels: currentDimLabels,
     });
@@ -4942,7 +4948,6 @@
       const index = cards.findIndex(c => c.ids.includes(fields.productSubcategory));
       if (index >= 0) {
         typeCardIndex = index;
-        stairRisers = cards[index].ids.indexOf(fields.productSubcategory) === 1;
         applyTypeSelection(true);
       }
     }
@@ -4962,6 +4967,10 @@
         return;
       }
       if (id === 'productShape') { selectShapeCard(value); return; }
+      if (id === 'stair-risers') {
+        if (selectedProductKey === 'lestnitsa') stairRiserGrid.children[value === '1' ? 1 : 0].click();
+        return;
+      }
       if (id === 'stupeni-riser') {
         document.getElementById('stupeniRiserGrid').children[value === '1' ? 1 : 0].click();
         return;

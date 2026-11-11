@@ -64,9 +64,9 @@ const CASES = [
   ['steps with risers', 'stupeni', type('STEP-01', STEPS), ['length', 'width', 'riser-height']],
   ['steps, other type', 'stupeni', type('STEP-02', STEPS), ['length', 'width', 'riser-height']],
   ['steps, third type', 'stupeni', type('STEP-03', STEPS), ['length', 'width', 'riser-height']],
-  ...['STAIR-01', 'STAIR-02', 'STAIR-03', 'STAIR-04', 'STAIR-05', 'STAIR-06'].map(id => [
-    'stair ' + id, 'lestnitsa', type(id, STAIR),
-    ['width', 'length'].concat(GeometryModel.STAIR_WITH_RISERS.includes(id) ? ['riser-height'] : []),
+  ...['STAIR-01', 'STAIR-03', 'STAIR-05'].flatMap(id => [
+    ['stair ' + id, 'lestnitsa', type(id, STAIR), ['width', 'length']],
+    ['stair ' + id + ' with risers', 'lestnitsa', type(id, Object.assign({ 'stair-risers': { checked: true } }, STAIR)), ['width', 'length', 'riser-height']],
   ]),
   ['stair, spiral', 'lestnitsa', type('STAIR-07', STAIR), ['length', 'width']],
   ['facade wall', 'fasad', type('FACADE-01', FACADE), ['facade-length', 'facade-height']],

@@ -222,10 +222,10 @@ test('the size diagram and its tread-depth hint use the same stair as the 3D: ma
 });
 
 test('a stair with risers: every step and the landing edge; the height is required', t => {
-  const { r, inputs } = priceState({ slabs: REAL.slabs }, 'lestnitsa', dims(1000, 3000, Object.assign(type('STAIR-04'), cnt(6), { 'riser-height': { value: '170' } })));
+  const { r, inputs } = priceState({ slabs: REAL.slabs }, 'lestnitsa', dims(1000, 3000, Object.assign(type('STAIR-03'), cnt(6), { 'stair-risers': { checked: true }, 'riser-height': { value: '170' } })));
   assert.equal(inputs.job.pieces.find(p => p.group === 'riser').count, 13);
   report(t, 'Г stair 2x6 + risers', r);
-  assert.deepEqual(inputsFor(stateFor('lestnitsa', dims(1000, 3000, Object.assign(type('STAIR-04'), cnt(6))))).job.missing, ['riserHeight']);
+  assert.deepEqual(inputsFor(stateFor('lestnitsa', dims(1000, 3000, Object.assign(type('STAIR-03'), cnt(6), { 'stair-risers': { checked: true } })))).job.missing, ['riserHeight']);
 });
 
 test('wedge steps are cut in pairs head to tail: (narrow + 3 x wide) / 2 per pair, an odd one alone', () => {
@@ -382,7 +382,7 @@ test('impossible layouts are named, never priced: too wide, too big for the rese
 
 test('the layout is fast on the real stock (668 slabs), even for 60 pieces', () => {
   const t0 = Date.now();
-  const r = priceState({ slabs: REAL.slabs }, 'lestnitsa', dims(1200, 5000, Object.assign(type('STAIR-06'), cnt(30), { 'riser-height': { value: '170' } }))).r;
+  const r = priceState({ slabs: REAL.slabs }, 'lestnitsa', dims(1200, 5000, Object.assign(type('STAIR-05'), cnt(30), { 'stair-risers': { checked: true }, 'riser-height': { value: '170' } }))).r;
   assert.equal(r.ok, true);
   assert.ok(Date.now() - t0 < 1500, (Date.now() - t0) + ' ms');
 });

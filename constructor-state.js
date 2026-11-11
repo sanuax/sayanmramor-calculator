@@ -201,7 +201,8 @@
       // «Количество маршей»: only a number this shape can be built with
       // (GeometryModel.MARCH_RANGE), otherwise the shape's default.
       const marches = G.marchesFor(shape, d.getElementById('stair-marches').value);
-      const risers = G.STAIR_WITH_RISERS.includes(typeIdValue);
+      // Risers are their own flag (the hidden #stair-risers box), not part of the type id.
+      const risers = !!d.getElementById('stair-risers').checked;
       stairTotal = marches > 0 ? enteredSteps * marches : enteredSteps;
       stairConfig = {
         shape, marches, stepsPerMarch: marches > 0 ? enteredSteps : null,

@@ -227,14 +227,14 @@ test('the marches the UI offers are exactly the ones that build: straight 1-6, Ð
 });
 
 test('the 3D builds exactly that stair: every tread and landing at its level, landings = marches - 1, risers at every landing edge', () => {
-  [['STAIR-02', 'straight'], ['STAIR-04', 'l'], ['STAIR-06', 'u']].forEach(([id, shape]) => {
+  [['STAIR-01', 'straight'], ['STAIR-03', 'l'], ['STAIR-05', 'u']].forEach(([id, shape]) => {
     [2, 3, 4, 5, 6].forEach(M => {
       const range = GeometryModel.MARCH_RANGE[shape];
       if (M < range.min) return;
       const W = 1, n = 4;
       const g1 = shape === 'straight' ? M : Math.ceil(M / 2);
       const L = g1 * n * 0.3 + (shape === 'straight' ? M - 1 : g1) * W;
-      const state = stateFor('lestnitsa', dims(1000, Math.round(L * 1000), Object.assign(type(id), { 'step-count': { value: String(n) }, 'stair-marches': { value: String(M) }, 'riser-height': { value: '170' } })));
+      const state = stateFor('lestnitsa', dims(1000, Math.round(L * 1000), Object.assign(type(id), { 'stair-risers': { checked: true }, 'step-count': { value: String(n) }, 'stair-marches': { value: String(M) }, 'riser-height': { value: '170' } })));
       assert.equal(state.productConfig.lestnitsa.marches, M);
       assert.equal(state.productConfig.lestnitsa.landings, M - 1);
       assert.equal(state.stepCount, M * n);

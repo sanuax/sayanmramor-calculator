@@ -253,3 +253,29 @@ test('readConstructorState.edge: an unknown #edge-type value is ignored, and leg
   assert.deepEqual(read({ 'edge-type': { value: 'nonsense' } }).edge, { type: null, lengthMm: null });
   assert.deepEqual(read({ 'edge-type': { value: 'bevel' }, 'edge-straight': { value: '800' } }).edge, { type: 'straight', lengthMm: 800 });
 });
+
+test('stair risers come from #stair-risers, not from the type id', () => {
+  const read = values => ConstructorState.readConstructorState({
+    doc: createFakeDoc(Object.assign({ width: { value: '1000' }, length: { value: '3000' }, productSubcategory: { value: 'STAIR-03' }, 'riser-height': { value: '170' } }, values)),
+    selectedProductKey: 'lestnitsa', product: PRODUCTS.lestnitsa, stone: null, hasAdditionalWork,
+  });
+  const on = read({ 'stair-risers': { checked: true } }).productConfig.lestnitsa;
+  assert.equal(on.risers, true);
+  assert.equal(on.riserHeightM, 0.17);
+  const off = read({ 'stair-risers': { checked: false } }).productConfig.lestnitsa;
+  assert.equal(off.risers, false);
+  assert.equal(off.riserHeightM, 0);
+  // The flag, not the shape's id, decides: every shape takes it.
+  ['STAIR-01', 'STAIR-03', 'STAIR-05', 'STAIR-07'].forEach(id => {
+    assert.equal(read({ productSubcategory: { value: id }, 'stair-risers': { checked: true } }).productConfig.lestnitsa.risers, true, id);
+    assert.equal(read({ productSubcategory: { value: id }, 'stair-risers': { checked: false } }).productConfig.lestnitsa.risers, false, id);
+  });
+});
+
+test('a stale #stair-risers tick never reaches another product', () => {
+  const state = ConstructorState.readConstructorState({
+    doc: createFakeDoc({ width: { value: '1000' }, length: { value: '600' }, 'stair-risers': { checked: true } }),
+    selectedProductKey: 'stoleshnitsa_kuhnya', product: PRODUCTS.stoleshnitsa_kuhnya, stone: null, hasAdditionalWork,
+  });
+  assert.equal(state.productConfig.lestnitsa, null);
+});
