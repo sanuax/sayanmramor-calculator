@@ -61,9 +61,24 @@ test('island: full perimeter', () => {
   near(lengthOf('stoleshnitsa_kuhnya', kitchen({ 'extra-ostrov-figured-width': v(800), 'extra-ostrov-figured-length': v(1200) })), 4.2 + 3.582);
 });
 
-test('bar counter: full perimeter (it stands a step above the worktop, every edge in view)', () => {
-  near(lengthOf('stoleshnitsa_kuhnya', kitchen({ 'extra-bar-standard-width': v(500), 'extra-bar-standard-length': v(1500) })), 4.2 + 4.0);
-  near(lengthOf('stoleshnitsa_kuhnya', kitchen({ 'extra-bar-complex-width': v(500), 'extra-bar-complex-length': v(1500) })), 4.2 + 3.782);
+test('bar counter: its two long sides, no edge on its ends (the owner, 2026-11-11)', () => {
+  near(lengthOf('stoleshnitsa_kuhnya', kitchen({ 'extra-bar-standard-width': v(500), 'extra-bar-standard-length': v(1500) })), 4.2 + 3.0);
+  // «Сложная»: the half-round end is an end too -- the long sides stop where the round starts (1.5 - 0.25).
+  near(lengthOf('stoleshnitsa_kuhnya', kitchen({ 'extra-bar-complex-width': v(500), 'extra-bar-complex-length': v(1500) })), 4.2 + 2.5);
+});
+
+test('the 3D draws the profile where the price counts it: bar ends and straight sill ends are closed', () => {
+  const closedLength = part => part.closed.reduce((s, i) => {
+    const a = part.outline[i], b = part.outline[(i + 1) % part.outline.length];
+    return s + Math.hypot(b[0] - a[0], b[1] - a[1]);
+  }, 0);
+  const bar = layoutOf('stoleshnitsa_kuhnya', kitchen({ 'extra-bar-standard-width': v(500), 'extra-bar-standard-length': v(1500) }))
+    .parts.find(p => p.name === 'bar');
+  assert.ok(Array.isArray(bar.closed), 'the bar names its closed ends');
+  near(closedLength(bar), 1.0, 'the bar\'s two 0.5 m ends');
+  const sill = layoutOf('podokonnik', { width: v(300), length: v(1500), 'edge-type': v('straight') }).parts.find(p => p.name === 'main');
+  assert.equal(sill.openEdges, undefined, 'a straight sill uses `closed`, like the shaped ones');
+  near(closedLength(sill), 1.5 + 0.3 + 0.3, 'the window side and both ends at the reveals');
 });
 
 test('stone wrap: the same open edges as any other profile; the apron strips are not counted again', () => {

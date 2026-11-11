@@ -5,12 +5,13 @@
 // «Кромка»). The length is read from the same scene layout the 3D draws
 // (visualizer/scene-layout.js), so the price and the 3D agree on which edges
 // are open:
-//   - a part with `openEdges` (a tread, a landing, a straight sill): those
-//     outline edges -- or `openLengthM` where only part of such an edge is
-//     open (a П landing, where the upper march starts on its front);
-//   - a part with `closed` (a countertop's main run and wings, a shaped
-//     sill): every outline edge not listed in `closed`;
-//   - an island or a bar counter: its whole outline;
+//   - a part with `openEdges` (a tread, a landing): those outline edges --
+//     or `openLengthM` where only part of such an edge is open (a П landing,
+//     where the upper march starts on its front);
+//   - a part with `closed` (a countertop's main run and wings, every sill,
+//     a bar counter whose ends have no edge): every outline edge not listed
+//     in `closed`;
+//   - an island: its whole outline;
 //   - anything else (a stone wrap strip, a riser, a sink, a backsplash, a
 //     floor, a wall...): no edge.
 // Holes (a sink, a tap) are not outline edges and are never counted. A
@@ -27,7 +28,7 @@
   'use strict';
 
   const EDGED_PARTS = ['main', 'wing', 'island', 'bar', 'tread', 'landing'];
-  const WHOLE_OUTLINE = ['island', 'bar'];
+  const WHOLE_OUTLINE = ['island'];
 
   function edgeLength(outline, i) {
     const a = outline[i], b = outline[(i + 1) % outline.length];
@@ -40,8 +41,8 @@
     const all = outline.map((_, i) => i);
     let open;
     if (Array.isArray(part.openEdges)) open = part.openEdges;
-    else if (WHOLE_OUTLINE.includes(part.name)) open = all;
     else if (Array.isArray(part.closed)) open = all.filter(i => !part.closed.includes(i));
+    else if (WHOLE_OUTLINE.includes(part.name)) open = all;
     else open = [];
     return open.reduce((sum, i) => sum + (i >= 0 && i < outline.length ? edgeLength(outline, i) : 0), 0);
   }

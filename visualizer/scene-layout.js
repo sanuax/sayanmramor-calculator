@@ -294,7 +294,15 @@
       const outline = b.variant === 'complex'
         ? roundEndRectX(b.x0M, b.x1M, b.z0M, b.z1M, b.depthM / 2)
         : rect(b.x0M, b.x1M, b.z0M, b.z1M);
-      parts.push(prism('stone', outline, y0, y1, { edge, name: 'bar' }));
+      // No profile on its ends (the owner, 2026-11-11): only the two long
+      // sides along the run (the edges of constant z) are open; the near end
+      // at the worktop, the far end on its stone panel and a «Сложная»
+      // half-round are closed -- for the 3D and the price (edge-length.js).
+      const barClosed = outline.map((_, i) => i).filter(i => {
+        const a = outline[i], c = outline[(i + 1) % outline.length];
+        return Math.abs(a[1] - c[1]) > 1e-9;
+      });
+      parts.push(prism('stone', outline, y0, y1, { edge, closed: barClosed, name: 'bar' }));
       const legH = y0 - bottom, legY = bottom + legH / 2, zc = (b.z0M + b.z1M) / 2;
       const farX = b.variant === 'complex' ? b.x1M - b.depthM / 2 : b.x1M;
       [b.x0M + T / 2, farX - T / 2].forEach(x => {
@@ -395,13 +403,12 @@
       ? [prism('stone', plan.outline, -m.visualThicknessM / 2, m.visualThicknessM / 2, { edge: m.edge ? m.edge.type : null, closed: sillClosed(plan, m.widthM, m.lengthM), name: 'main' })]
         .concat(wrapped ? sillWrap(plan, m.widthM, m.lengthM, m.visualThicknessM) : [])
       : countertopParts(Object.assign({}, m, { sink: null, cooktop: null, holes: null, backsplash: null, wallPanel: null, curb: null, island: null, barCounter: null, wing: null, wings: null }));
-    // A straight sill is drawn as the countertop's slab; its priced edge
-    // (edge-length.js) is the shaped sills' rule all the same: the room side
-    // only, not the ends at the reveals. Metadata -- the drawing is unchanged.
-    if (!plan) {
-      const isOpen = sillOpenEdges({ outline: parts[0].outline }, m.widthM, m.lengthM);
-      parts[0].openEdges = parts[0].outline.map((_, i) => i).filter(isOpen);
-    }
+    // A straight sill is drawn as the countertop's slab, with the shaped
+    // sills' rule all the same: the profile only on the room (front) side,
+    // never on the ends at the reveals (the owner, 2026-11-11: «кромка
+    // только у лицевой стороны»). The 3D and the price (edge-length.js) both
+    // read this `closed`.
+    if (!plan) parts[0].closed = sillClosed({ outline: parts[0].outline }, m.widthM, m.lengthM);
     const W = m.widthM, L = m.lengthM, T = m.visualThicknessM;
     const wallT = 0.14, x = -W / 2 - wallT / 2;
     const openZ = Math.max(L / 2 - 0.06, L * 0.4);
