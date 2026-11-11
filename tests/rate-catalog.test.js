@@ -167,3 +167,129 @@ test('MISC: the company values', () => {
     complexShapeMultiplier: 1.5, minOrder: 20000,
   });
 });
+
+// Literal copy of the spec tables (2026-11-08-company-rates-v2-design.md), typed from the
+// spec and NOT from rate-catalog.js: this test exists to catch a typo in the catalog.
+// Row: [id, fabrication, installation, polish]; null = the company has no rate («-»).
+const SPEC_PRODUCT_RATES = [
+  ['KITCHEN-11', 40000, 20000, 18000],
+  ['KITCHEN-12', 40000, 20000, 18000],
+  ['KITCHEN-13', 40000, 20000, 18000],
+  ['BATH-01', 40000, 20000, 18000],
+  ['BATH-02', 40000, 20000, 18000],
+  ['BATH-03', 40000, 20000, 18000],
+  ['SILL-01', 30000, 15000, 18000],
+  ['SILL-02', 30000, 20000, 18000],
+  ['SILL-03', 40000, 25000, 18000],
+  ['SILL-04', 45000, 30000, 18000],
+  ['SILL-05', 50000, 30000, 18000],
+  ['STEP-01', 50000, 25000, null],
+  ['STEP-02', 60000, 35000, null],
+  ['STEP-03', 90000, 40000, null],
+  ['STAIR-01', 50000, 25000, null],
+  ['STAIR-03', 50000, 25000, null],
+  ['STAIR-05', 50000, 25000, null],
+  ['STAIR-07', 90000, 40000, null],
+  ['STAIR-11', 50000, 25000, null],
+  ['FLOOR-01', 15000, 18000, 18000],
+  ['FLOOR-02', 15000, 18000, 18000],
+  ['FLOOR-03', 25000, 30000, 18000],
+  ['FLOOR-04', 35000, 40000, 20000],
+  ['FLOOR-05', 60000, 50000, 20000],
+  ['WALL-01', 25000, 25000, 20000],
+  ['WALL-02', 25000, 35000, 20000],
+  ['WALL-03', 25000, 40000, 20000],
+  ['WALL-04', 45000, 50000, 25000],
+  ['WALL-05', 30000, 40000, 20000],
+  ['PANEL-01', 25000, 40000, 20000],
+  ['PANEL-02', 40000, 40000, 20000],
+  ['PANEL-03', 60000, 60000, 20000],
+  ['PANEL-04', 40000, 40000, 20000],
+  ['FACADE-01', 50000, 25000, 25000],
+  ['FACADE-04', 50000, 25000, 25000],
+  ['FACADE-02', 120000, 40000, null],
+  ['FACADE-03', 150000, 40000, 30000],
+  ['FACADE-06', 150000, 50000, null],
+  ['FACADE-07', 150000, 50000, null],
+  ['FACADE-08', 150000, 50000, null],
+  ['FACADE-05', 200000, 50000, null],
+  ['FIREPLACE-01', 40000, 60000, 30000],
+  ['FIREPLACE-02', 40000, 60000, 30000],
+  ['FIREPLACE-03', 25000, 30000, 20000],
+];
+
+// Row: [id, unit, rate, installRate]
+const SPEC_ADDITIONAL_WORKS = [
+  ['CUT-01', 'шт.', 8000, null],
+  ['CUT-02', 'шт.', 20000, null],
+  ['CUT-03', 'м.п.', 70000, null],
+  ['CUT-04', 'шт.', 6000, null],
+  ['CUT-05', 'шт.', 1500, null],
+  ['CUT-06', 'шт.', 1000, null],
+  ['CUT-07', 'шт.', 1000, null],
+  ['EDGE-01', 'м.п.', 5000, null],
+  ['EDGE-03', 'м.п.', 20000, null],
+  ['EDGE-04', 'м.п.', 10000, null],
+  ['EDGE-05', 'м.п.', 1000, null],
+  ['EDGE-06', 'м.п.', 15000, null],
+  ['EXTRA-01', 'м.п.', 25000, null],
+  ['EXTRA-02', 'м²', 15000, 18000],
+  ['EXTRA-03', 'м²', 15000, 20000],
+  ['EXTRA-04', 'м²', 40000, 50000],
+  ['EXTRA-05', 'м²', 60000, 50000],
+  ['EXTRA-06', 'м²', 40000, 50000],
+  ['EXTRA-07', 'м²', 60000, 50000],
+  ['SEAM-01', 'шт.', 25000, null],
+  ['LIGHT-01', 'м²', 110000, null],
+];
+
+test('every product row equals the spec table «Ставки изделий» (all 44 ids)', () => {
+  assert.equal(SPEC_PRODUCT_RATES.length, 44);
+  const catalogIds = RateCatalog.PRODUCT_SUBCATEGORIES.map(r => r.id);
+  assert.deepEqual([...catalogIds].sort(), SPEC_PRODUCT_RATES.map(r => r[0]).sort(), 'same set of ids');
+  SPEC_PRODUCT_RATES.forEach(([id, fab, inst, pol]) => {
+    assert.deepEqual(
+      RateCatalog.getProductRates(id),
+      { fabricationRatePerM2: fab, installationRatePerM2: inst, polishRatePerM2: pol },
+      id,
+    );
+  });
+});
+
+test('every additional work equals the spec table «Доп. работы» (all 21 rows)', () => {
+  assert.equal(SPEC_ADDITIONAL_WORKS.length, 21);
+  assert.deepEqual(RateCatalog.ADDITIONAL_WORKS.map(r => r.id), SPEC_ADDITIONAL_WORKS.map(r => r[0]));
+  SPEC_ADDITIONAL_WORKS.forEach(([id, unit, rate, installRate]) => {
+    const row = RateCatalog.ADDITIONAL_WORKS.find(r => r.id === id);
+    assert.equal(row.unit, unit, `${id} unit`);
+    assert.equal(row.rate, rate, `${id} rate`);
+    assert.equal(row.installRate, installRate, `${id} installRate`);
+    assert.equal(RateCatalog.getAdditionalWorkRate(id), rate, `${id} getAdditionalWorkRate`);
+    assert.equal(RateCatalog.getAdditionalWorkInstallRate(id), installRate, `${id} getAdditionalWorkInstallRate`);
+  });
+});
+
+test('risers, MISC and the 15 stone coefficients equal the spec tables', () => {
+  assert.deepEqual(RateCatalog.RISER_RATES, { id: 'RISER-00', fabricationRatePerM2: 5000, installationRatePerM2: 5000, polishRatePerM2: null });
+  assert.deepEqual(RateCatalog.MISC, {
+    measure: 15000, delivery: 12000, unloadingPerM2: 3500, consumablesPerM2: 2500,
+    complexShapeMultiplier: 1.5, minOrder: 20000,
+  });
+  assert.deepEqual(RateCatalog.STONE_COEFFICIENTS, {
+    'marble': 1,
+    'travertin': 1,
+    'granite': 1.3,
+    'quartz-agglomerate': 1.3,
+    'oniks': 1.5,
+    'quartzite': 2,
+    'agate': 3,
+    'kvarc': 2,
+    'labradorite': 2,
+    'limestone': 1,
+    'specennyi-kamen': 1.3,
+    'petrified-wood': 1.3,
+    'artificial-marble': 1,
+    'obsidian': 2,
+    'soapstone': 2,
+  });
+});

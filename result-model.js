@@ -53,6 +53,8 @@
     polishEnabled: 'Дополнительная полировка',
     lightEnabled: 'Подсветка камня',
     installEnabled: 'Монтаж на объекте',
+    measureEnabled: 'Замер на объекте',
+    deliveryEnabled: 'Доставка',
   };
 
   function mToMm(m) {

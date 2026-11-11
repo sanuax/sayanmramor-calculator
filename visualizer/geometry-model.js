@@ -35,10 +35,11 @@
   }
 
   // The selected 'type' row (rate-catalog.js PRODUCT_SUBCATEGORIES) decides
-  // HOW the stone is drawn for stairs/steps/floors/walls/facades -- it carries
-  // no rate (that catalog is display-only; a facade's area comes from its
-  // own sizes, facade-model.js), and ids not listed here
-  // fall back to the plain shape rather than a guessed one.
+  // HOW the stone is drawn for stairs/steps/floors/walls/facades. The same
+  // row also carries the company's rates (the price reads them in
+  // constructor-state.js); this model only reads the id and never a rate --
+  // a facade's area comes from its own sizes (facade-model.js). Ids not
+  // listed here fall back to the plain shape rather than a guessed one.
   const STEP_VARIANTS = { 'STEP-02': 'winder', 'STEP-03': 'radius' };
   const STAIR_SHAPES = {
     'STAIR-03': 'l',

@@ -450,6 +450,24 @@ test('options row lists exactly the checked options with the checkbox wording', 
   ]);
 });
 
+test('measure and delivery are options too: the Result card and the lead name them, never "Без опций"', () => {
+  const values = { 'opt-measure': { checked: true }, 'opt-delivery': { checked: true } };
+  const c = configFor('pol', values);
+  assert.deepEqual(c.options, [
+    { key: 'measure', label: 'Замер на объекте' },
+    { key: 'delivery', label: 'Доставка' },
+  ]);
+  const view = ResultModel.buildResultView(c);
+  const cards = ResultModel.buildResultCards(view, StepEngine.getSteps('pol'), StepEngine.STEP_LABELS);
+  const card = cards.find(x => x.stepId === 'options');
+  assert.equal(card.empty, null);
+  assert.deepEqual(card.items.map(i => i.value), ['Замер на объекте, Доставка']);
+  assert.deepEqual(payloadFor('pol', values).configuration.options, [
+    { key: 'measure', label: 'Замер на объекте' },
+    { key: 'delivery', label: 'Доставка' },
+  ]);
+});
+
 test('П-shaped countertop: the shape and both wings reach the Result', () => {
   const c = configFor('stoleshnitsa_kuhnya', { productShape: { value: 'ushape' }, 'wing-width': { value: '600' }, 'wing-length': { value: '1200' } });
   assert.equal(c.shape.type, 'ushape');

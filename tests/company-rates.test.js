@@ -430,7 +430,17 @@ test('the minimum order counts everything ticked: measure and delivery can lift 
 });
 
 test('an unpriced total stays null: the minimum order does not invent a price', () => {
-  const r = Pricing.computeWorkAndTotal(1000, 0.06, { fabricationRatePerM2: null, installationRatePerM2: 1, polishRatePerM2: 1, complexShapeMultiplier: 1.5, misc: { measure: 15000, delivery: 12000, perM2: 6000, minOrder: 20000 } },
-    { installEnabled: false, polishEnabled: false, complexEnabled: false }, [], 0, 0.06);
+  // The company has no fabrication rate for the type: the work, and so the total, is the manager's.
+  // The stone alone (5000 rub slab) is far below the minimum, so a Math.max(total, minOrder)
+  // refactor would turn the null total into 20 000 here.
+  const noFabrication = Object.assign({}, RateCatalog, {
+    getProductRates: id => Object.assign({}, RateCatalog.getProductRates(id), { fabricationRatePerM2: null }),
+  });
+  const state = cheapState('podokonnik', { width: { value: '300' }, length: { value: '200' }, productSubcategory: { value: 'SILL-01' } });
+  const { r } = price(state, noFabrication);
+  assert.ok(r.subtotal > 0 && r.subtotal < 20000, 'the stone is priced and below the minimum');
+  assert.equal(r.work, null);
   assert.equal(r.total, null);
+  assert.equal(r.minOrderApplied, false);
+  assert.equal(r.minOrderTopUp, 0);
 });

@@ -250,9 +250,9 @@
       // product" convention as island/barCounter/etc. above, so the state
       // contract never changes shape between products. The sizes of each
       // product's own shape live here: the risers of «Ступени» and of a stair
-      // (their parts and stone -- product-parts.js; their work has its own,
-      // not yet set, rates), a stair's marches, a sill's arm or bay, a
-      // radius wall's radius, a facade's type and sizes.
+      // (their parts and stone -- product-parts.js; their work is priced at
+      // RISER_RATES, RISER-00, in buildPricingInputs), a stair's marches, a
+      // sill's arm or bay, a radius wall's radius, a facade's type and sizes.
       productConfig: {
         stupeni: {
           riser: selectedProductKey === 'stupeni' && !!d.getElementById('stupeni-riser').checked,
