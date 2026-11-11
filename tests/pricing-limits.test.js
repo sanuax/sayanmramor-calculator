@@ -7,6 +7,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const Pricing = require('../pricing.js');
 const ProductTypes = require('../product-types.js');
+const RateCatalog = require('../rate-catalog.js');
 
 const { PRICING_LIMITS } = Pricing;
 
@@ -18,7 +19,7 @@ const STONE = {
 function price(productType, widthM, lengthM, extra) {
   return Pricing.calculatePrice(Object.assign({
     stone: STONE, widthM, lengthM, productType,
-    rates: ProductTypes.WORK_RATES.stoleshnitsa_kuhnya,
+    rates: Object.assign({}, RateCatalog.getProductRates('KITCHEN-11'), { complexShapeMultiplier: RateCatalog.MISC.complexShapeMultiplier }),
     marginCm: ProductTypes.SAW_MARGIN_CM, usageLimit: ProductTypes.SLAB_USAGE_LIMIT,
   }, extra || {}));
 }

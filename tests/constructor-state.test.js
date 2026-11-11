@@ -131,15 +131,8 @@ test('readConstructorState.product is null when no product is selected', () => {
 
 const RateCatalog = require('../rate-catalog.js');
 
-function baseRatesConfig(productKey) {
-  return {
-    productRates: ProductTypes.WORK_RATES[productKey],
-    miscFlatSum: ProductTypes.MISC_FLAT_SUM,
-    miscRatePerM2: ProductTypes.MISC_RATE_PER_M2,
-    complexShapeMultiplier: ProductTypes.COMPLEX_SHAPE_MULTIPLIER,
-    countertopExtrasRates: ProductTypes.COUNTERTOP_EXTRAS_RATES,
-    getAdditionalWorkRate: RateCatalog.getAdditionalWorkRate,
-  };
+function baseRatesConfig() {
+  return { catalog: RateCatalog };
 }
 
 test('buildPricingInputs assembles one extraLineItems entry per edge field, using rate-catalog rates', () => {
@@ -150,7 +143,7 @@ test('buildPricingInputs assembles one extraLineItems entry per edge field, usin
   const state = ConstructorState.readConstructorState({
     doc, selectedProductKey: 'stoleshnitsa_kuhnya', product: PRODUCTS.stoleshnitsa_kuhnya, stone: null, hasAdditionalWork,
   });
-  const { extraLineItems } = ConstructorState.buildPricingInputs(state, baseRatesConfig('stoleshnitsa_kuhnya'));
+  const { extraLineItems } = ConstructorState.buildPricingInputs(state, baseRatesConfig());
   assert.equal(extraLineItems.length, 2);
   assert.equal(extraLineItems[0].rate, RateCatalog.getAdditionalWorkRate('EDGE-01'));
   assert.equal(extraLineItems[0].quantity, 0.1); // 100mm -> 0.1m
@@ -166,12 +159,12 @@ test('buildPricingInputs sums BOTH sink counts as independent line items when mo
   const state = ConstructorState.readConstructorState({
     doc, selectedProductKey: 'stoleshnitsa_kuhnya', product: PRODUCTS.stoleshnitsa_kuhnya, stone: null, hasAdditionalWork,
   });
-  const { extraLineItems } = ConstructorState.buildPricingInputs(state, baseRatesConfig('stoleshnitsa_kuhnya'));
+  const { extraLineItems } = ConstructorState.buildPricingInputs(state, baseRatesConfig());
   const cutItems = extraLineItems.filter(i => i.rate === RateCatalog.getAdditionalWorkRate('CUT-01') || i.rate === RateCatalog.getAdditionalWorkRate('CUT-02'));
   assert.equal(cutItems.length, 2);
 });
 
-test('buildPricingInputs.extraDimensions carries bortik/fartuk/ostrov, zero when capability absent', () => {
+test('buildPricingInputs: bortik and fartuk are EXTRA-01 / EXTRA-02 line items, nothing when the capability is absent', () => {
   const doc = createFakeDoc({
     width: { value: '1000' }, length: { value: '600' },
     'extra-bortik': { value: '500' },
@@ -180,20 +173,30 @@ test('buildPricingInputs.extraDimensions carries bortik/fartuk/ostrov, zero when
   const state = ConstructorState.readConstructorState({
     doc, selectedProductKey: 'stoleshnitsa_kuhnya', product: PRODUCTS.stoleshnitsa_kuhnya, stone: null, hasAdditionalWork,
   });
-  const { extraDimensions } = ConstructorState.buildPricingInputs(state, baseRatesConfig('stoleshnitsa_kuhnya'));
-  assert.equal(extraDimensions.bortikLengthM, 0.5);
-  assert.ok(Math.abs(extraDimensions.fartukAreaM2 - 1.2) < 1e-9);
-  assert.equal(extraDimensions.ostrovAreaM2, 0);
+  const inputs = ConstructorState.buildPricingInputs(state, baseRatesConfig());
+  assert.equal(inputs.extraDimensions, undefined);
+  assert.equal(inputs.extraLineItems.length, 2);
+  assert.deepEqual(inputs.extraLineItems[0], { rate: RateCatalog.getAdditionalWorkRate('EXTRA-01'), quantity: 0.5 });
+  assert.equal(inputs.extraLineItems[1].rate, RateCatalog.getAdditionalWorkRate('EXTRA-02'));
+  assert.ok(Math.abs(inputs.extraLineItems[1].quantity - 1.2) < 1e-9);
+
+  const floorDoc = createFakeDoc({ width: { value: '1000' }, length: { value: '600' }, 'extra-bortik': { value: '500' } });
+  const floor = ConstructorState.readConstructorState({ doc: floorDoc, selectedProductKey: 'pol', product: PRODUCTS.pol, stone: null, hasAdditionalWork });
+  assert.deepEqual(ConstructorState.buildPricingInputs(floor, baseRatesConfig()).extraLineItems, []);
 });
 
-test('buildPricingInputs.rates carries the product\'s own fabrication/installation/polish rates', () => {
-  const doc = createFakeDoc({ width: { value: '1000' }, length: { value: '600' } });
+test('buildPricingInputs.rates carries the fabrication/installation/polish rates of the chosen type (rate-catalog.js)', () => {
+  const doc = createFakeDoc({ width: { value: '1000' }, length: { value: '600' }, productSubcategory: { value: 'FLOOR-03' } });
   const state = ConstructorState.readConstructorState({
     doc, selectedProductKey: 'pol', product: PRODUCTS.pol, stone: null, hasAdditionalWork,
   });
-  const { rates } = ConstructorState.buildPricingInputs(state, baseRatesConfig('pol'));
-  assert.equal(rates.fabricationRatePerM2, ProductTypes.WORK_RATES.pol.fabricationRatePerM2);
-  assert.equal(rates.installationRatePerM2, ProductTypes.WORK_RATES.pol.installationRatePerM2);
+  assert.equal(ConstructorState.resolveTypeId(state), 'FLOOR-03');
+  const { rates } = ConstructorState.buildPricingInputs(state, baseRatesConfig());
+  assert.equal(rates.fabricationRatePerM2, RateCatalog.getProductRates('FLOOR-03').fabricationRatePerM2);
+  assert.equal(rates.installationRatePerM2, RateCatalog.getProductRates('FLOOR-03').installationRatePerM2);
+  assert.equal(rates.polishRatePerM2, RateCatalog.getProductRates('FLOOR-03').polishRatePerM2);
+  assert.equal(rates.complexShapeMultiplier, RateCatalog.MISC.complexShapeMultiplier);
+  assert.equal(rates.landingRates, null);
 });
 
 test('readConstructorState.shape defaults to "straight" with a zeroed wing when the shape select is untouched', () => {

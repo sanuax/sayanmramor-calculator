@@ -12,11 +12,12 @@ const Pricing = require('../pricing.js');
 const ProductTypes = require('../product-types.js');
 const ProductParts = require('../product-parts.js');
 const ConstructorState = require('../constructor-state.js');
+const RateCatalog = require('../rate-catalog.js');
 const GeometryModel = require('../visualizer/geometry-model.js');
 const SceneLayout = require('../visualizer/scene-layout.js');
 const DATA = require('../data/slabs.json');
 
-const { SLAB_USAGE_LIMIT: LIMIT, SAW_MARGIN_CM: MARGIN, PRODUCTS, WORK_RATES } = ProductTypes;
+const { SLAB_USAGE_LIMIT: LIMIT, SAW_MARGIN_CM: MARGIN, PRODUCTS } = ProductTypes;
 const ZERO = { fabricationRatePerM2: 0, installationRatePerM2: 0, polishRatePerM2: 0, miscFlatSum: 0, miscRatePerM2: 0, complexShapeMultiplier: 1 };
 const close = (a, b, msg, eps) => assert.ok(Math.abs(a - b) < (eps || 1e-6), (msg || '') + ': ' + a + ' vs ' + b);
 
@@ -28,19 +29,16 @@ const REAL = DATA.stones.find(s => s.id === 'delicato-brown');
 function stateFor(key, values) {
   return ConstructorState.readConstructorState({ doc: createFakeDoc(values), selectedProductKey: key, product: PRODUCTS[key], stone: null, hasAdditionalWork: ProductTypes.hasAdditionalWork });
 }
-function inputsFor(state, riserRates) {
-  return ConstructorState.buildPricingInputs(state, {
-    productRates: WORK_RATES[state.product.key], miscFlatSum: null, miscRatePerM2: null, complexShapeMultiplier: 1.5,
-    countertopExtrasRates: ProductTypes.COUNTERTOP_EXTRAS_RATES, getAdditionalWorkRate: () => null,
-    riserRates: riserRates || ProductTypes.RISER_WORK_RATES,
-  });
+// `catalog` -- RateCatalog unless a test gives its own (e.g. other riser rates).
+function inputsFor(state, catalog) {
+  return ConstructorState.buildPricingInputs(state, { catalog: catalog || RateCatalog });
 }
 function priceJob(stone, job, extra) {
   return Pricing.calculatePrice(Object.assign({ stone, productType: 'A', rates: ZERO, marginCm: MARGIN, usageLimit: LIMIT, job }, extra || {}));
 }
 function priceState(stone, key, values, extra) {
   const state = stateFor(key, values);
-  const inputs = inputsFor(state, extra && extra.riserRates);
+  const inputs = inputsFor(state, extra && extra.catalog);
   const r = priceJob(stone, inputs.job, Object.assign({ rates: inputs.rates, groupRates: inputs.groupRates }, extra || {}));
   return { state, inputs, r };
 }
@@ -113,8 +111,8 @@ test('«Ступени»: 1 step -- one piece, one slab, the step\'s own area', 
 
 test('«Ступени»: 4 steps on ONE slab; the price is one step x 4 for the work and the real layout for the stone', t => {
   const stone = stock(3, 300, 180);
-  const one = priceState(stone, 'stupeni', dims(300, 1200, Object.assign(type('STEP-01'), cnt(1))), { rates: WORK_RATES.stupeni });
-  const four = priceState(stone, 'stupeni', dims(300, 1200, Object.assign(type('STEP-01'), cnt(4))), { rates: WORK_RATES.stupeni });
+  const one = priceState(stone, 'stupeni', dims(300, 1200, Object.assign(type('STEP-01'), cnt(1))));
+  const four = priceState(stone, 'stupeni', dims(300, 1200, Object.assign(type('STEP-01'), cnt(4))));
   const m = report(t, 'step x4', four.r);
   assert.equal(m.nSlabs, 1, 'all 4 from one slab');
   close(four.r.fabrication, 4 * one.r.fabrication, 'fabrication = one step x 4');
@@ -130,10 +128,10 @@ test('«Ступени»: a count that needs 2+ slabs -- each slab within the re
   close(m.productAreaM2, 7.2);
 });
 
-test('«Ступени» + подступенки: risers are their own parts -- in the same layout, their own (unset) rates, never the step\'s', t => {
+test('«Ступени» + подступенки: risers are their own parts -- in the same layout, their own rates (RISER-00), never the step\'s', t => {
   const stone = stock(4, 300, 180);
   const values = dims(300, 1200, Object.assign(type('STEP-01'), cnt(4), { 'stupeni-riser': { checked: true }, 'riser-height': { value: '170' } }));
-  const { r, inputs } = priceState(stone, 'stupeni', values, { rates: WORK_RATES.stupeni, installEnabled: true });
+  const { r, inputs } = priceState(stone, 'stupeni', values, { installEnabled: true });
   const m = report(t, 'step x4 + risers', r);
   const riser = inputs.job.pieces.find(p => p.group === 'riser');
   assert.equal(riser.count, 4);
@@ -142,15 +140,20 @@ test('«Ступени» + подступенки: risers are their own parts --
   assert.equal(m.pieceCount, 8);
   assert.equal(m.nSlabs, 1, 'the risers fit the steps\' slab');
   // Work: the steps at the step rate on the steps' area only.
-  close(r.fabrication, WORK_RATES.stupeni.fabricationRatePerM2 * 1.44);
+  close(r.fabrication, RateCatalog.getProductRates('STEP-01').fabricationRatePerM2 * 1.44);
   const g = r.groups.find(x => x.key === 'riser');
-  assert.deepEqual(g.unpriced, ['fabrication', 'installation'], 'no company rate for risers yet');
-  assert.equal(g.work, 0);
+  assert.deepEqual(g.unpriced, []);
+  close(g.work, (5000 + 5000) * 4 * 1.2 * 0.17, 'RISER-00: fabrication + installation on the risers\' area');
   assert.ok(g.stone >= 0);
-  // With a riser rate: exactly that rate x the risers' area.
-  const rated = priceState(stone, 'stupeni', values, { rates: WORK_RATES.stupeni, riserRates: { fabricationRatePerM2: 10000, installationRatePerM2: null, polishRatePerM2: null } }).r;
+  // With other riser rates: exactly those rates x the risers' area.
+  const withRisers = riserRates => Object.assign({}, RateCatalog, { RISER_RATES: riserRates });
+  const rated = priceState(stone, 'stupeni', values, { catalog: withRisers({ fabricationRatePerM2: 10000, installationRatePerM2: null, polishRatePerM2: null }) }).r;
   close(rated.groups[0].fabrication, 10000 * 4 * 1.2 * 0.17);
-  close(rated.total, rated.subtotal + rated.fabrication + rated.misc + rated.groupWork + rated.extras + rated.catalogExtras + rated.installation + rated.polish);
+  close(rated.total, rated.subtotal + rated.fabrication + rated.misc + rated.groupWork + rated.catalogExtras + rated.installation + rated.polish);
+  // No riser rate: the risers' work is the manager's, never the step's.
+  const unset = priceState(stone, 'stupeni', values, { installEnabled: true, catalog: withRisers({ fabricationRatePerM2: null, installationRatePerM2: null, polishRatePerM2: null }) }).r;
+  assert.deepEqual(unset.groups[0].unpriced, ['fabrication', 'installation']);
+  assert.equal(unset.groups[0].work, 0);
   // Risers chosen without a height: no price for a made-up riser.
   const noHeight = inputsFor(stateFor('stupeni', dims(300, 1200, Object.assign(type('STEP-01'), cnt(4), { 'stupeni-riser': { checked: true } }))));
   assert.deepEqual(noHeight.job.missing, ['riserHeight']);
@@ -245,7 +248,7 @@ test('wedge steps are cut in pairs head to tail: (narrow + 3 x wide) / 2 per pai
 });
 
 test('винтовая лестница: the count changes the area, the stone and the price -- not "diameter x width"', t => {
-  const price = n => priceState({ slabs: REAL.slabs }, 'lestnitsa', dims(800, 2000, Object.assign(type('STAIR-07'), cnt(n))), { rates: WORK_RATES.lestnitsa });
+  const price = n => priceState({ slabs: REAL.slabs }, 'lestnitsa', dims(800, 2000, Object.assign(type('STAIR-07'), cnt(n))));
   const p12 = price(12), p24 = price(24);
   const plan = GeometryModel.stairPlan('flight', 'spiral', 2, 0.8, 12);
   const wedge = plan.angle / 2 * (plan.rOut * plan.rOut - plan.rIn * plan.rIn);
@@ -265,10 +268,10 @@ test('винтовая лестница: the count changes the area, the stone a
 
 test('Г-образная столешница: one product, the main run + the wing -- one area; the wing is its own piece (joined by a seam)', t => {
   const wing = { 'wing-width': { value: '600' }, 'wing-length': { value: '1400' } };
-  const { r, inputs } = priceState({ slabs: REAL.slabs }, 'stoleshnitsa_kuhnya', dims(600, 2400, Object.assign({ productShape: { value: 'lshape' } }, wing)), { rates: WORK_RATES.stoleshnitsa_kuhnya });
+  const { r, inputs } = priceState({ slabs: REAL.slabs }, 'stoleshnitsa_kuhnya', dims(600, 2400, Object.assign({ productShape: { value: 'lshape' } }, wing)));
   close(inputs.job.mainAreaM2, 1.44 + 0.84);
   assert.equal(inputs.job.pieces.length, 2);
-  close(r.fabrication, WORK_RATES.stoleshnitsa_kuhnya.fabricationRatePerM2 * 2.28, 'the work on the whole area');
+  close(r.fabrication, RateCatalog.getProductRates('KITCHEN-12').fabricationRatePerM2 * 2.28, 'the work on the whole area');
   report(t, 'Г countertop', r);
 });
 

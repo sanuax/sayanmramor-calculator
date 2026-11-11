@@ -27,16 +27,10 @@ function kitchen(values) {
   const state = ConstructorState.readConstructorState({
     doc, selectedProductKey: 'stoleshnitsa_kuhnya', product: PRODUCTS.stoleshnitsa_kuhnya, stone: STONE, hasAdditionalWork,
   });
-  const inputs = ConstructorState.buildPricingInputs(state, {
-    productRates: ProductTypes.WORK_RATES.stoleshnitsa_kuhnya,
-    miscFlatSum: ProductTypes.MISC_FLAT_SUM, miscRatePerM2: ProductTypes.MISC_RATE_PER_M2,
-    complexShapeMultiplier: ProductTypes.COMPLEX_SHAPE_MULTIPLIER,
-    countertopExtrasRates: ProductTypes.COUNTERTOP_EXTRAS_RATES,
-    getAdditionalWorkRate: RateCatalog.getAdditionalWorkRate,
-  });
+  const inputs = ConstructorState.buildPricingInputs(state, { catalog: RateCatalog });
   const result = Pricing.calculatePrice({
     stone: state.stone, widthM: state.dimensions.widthM, lengthM: state.dimensions.lengthM,
-    productType: PRODUCTS.stoleshnitsa_kuhnya.type, rates: inputs.rates, extraLineItems: inputs.extraLineItems, extraDimensions: inputs.extraDimensions,
+    productType: PRODUCTS.stoleshnitsa_kuhnya.type, rates: inputs.rates, extraLineItems: inputs.extraLineItems,
     installEnabled: state.options.installEnabled, polishEnabled: state.options.polishEnabled, complexEnabled: state.options.complexEnabled,
     marginCm: ProductTypes.SAW_MARGIN_CM, usageLimit: ProductTypes.SLAB_USAGE_LIMIT,
   });
@@ -92,7 +86,7 @@ test('fabrication: square metres and the rate; a complex shape at its multiplier
   const fab = PassportModel.buildSpecification(k).sections.find(s => s.title === 'Изготовление');
   assert.equal(fab.rows[0].unit, 'м²');
   assert.equal(fab.rows[0].qty, 1.56);
-  assert.equal(fab.rows[0].priceRub, 37500 * 1.5);
+  assert.equal(fab.rows[0].priceRub, 40000 * 1.5); // KITCHEN-11, marble x1, complex x1.5
   assert.equal(fab.rows[0].amountRub, Math.round(k.result.fabrication));
   const polish = fab.rows.find(r => r.name === 'Полировка');
   assert.equal(polish.amountRub, Math.round(k.result.polish));
@@ -131,7 +125,7 @@ test('the rows add up to the total exactly, even when each row rounds up', () =>
 test("the area is shown precisely enough that rate x area gives the row's sum", () => {
   const k = kitchen({ 'opt-install': { checked: true } });
   const area = 0.792;
-  const result = Object.assign({}, k.result, { fabrication: 37500 * area, installation: 17500 * area });
+  const result = Object.assign({}, k.result, { fabrication: 40000 * area, installation: 20000 * area });
   result.total = result.subtotal + result.fabrication + result.installation;
   const pricing = Object.assign({}, k.pricing, { total: Math.round(result.total) });
   const spec = PassportModel.buildSpecification(Object.assign({}, k, { result, pricing, pricingInputs: Object.assign({}, k.pricingInputs, { mainAreaM2: area }) }));

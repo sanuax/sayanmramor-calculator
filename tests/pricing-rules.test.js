@@ -12,15 +12,16 @@ const { createFakeDoc } = require('./helpers/fake-dom.js');
 const Pricing = require('../pricing.js');
 const ProductTypes = require('../product-types.js');
 const ConstructorState = require('../constructor-state.js');
+const RateCatalog = require('../rate-catalog.js');
 const GeometryModel = require('../visualizer/geometry-model.js');
 const SceneLayout = require('../visualizer/scene-layout.js');
 const C = require('../visualizer/constants.js');
 const DATA = require('../data/slabs.json');
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'sayanmramor-calculator.html'), 'utf8');
-const { SLAB_USAGE_LIMIT: LIMIT, SAW_MARGIN_CM: MARGIN, PRODUCTS, WORK_RATES } = ProductTypes;
+const { SLAB_USAGE_LIMIT: LIMIT, SAW_MARGIN_CM: MARGIN, PRODUCTS } = ProductTypes;
 const REAL = DATA.stones.find(s => s.id === 'delicato-brown');
-const ZERO = { fabricationRatePerM2: 0, installationRatePerM2: 0, polishRatePerM2: 0, miscFlatSum: 0, miscRatePerM2: 0, complexShapeMultiplier: 1 };
+const ZERO = { fabricationRatePerM2: 0, installationRatePerM2: 0, polishRatePerM2: 0, complexShapeMultiplier: 1 };
 const close = (a, b, msg, eps) => assert.ok(Math.abs(a - b) < (eps || 1e-6), (msg || '') + ': ' + a + ' vs ' + b);
 const stock = (n, w, l) => ({ slabs: Array.from({ length: n }, (_, i) => ({ article: 'S' + i, width_cm: w, length_cm: l, price_total_rub: 50000 + i })) });
 const dims = (w, l, extra) => Object.assign({ width: { value: String(w) }, length: { value: String(l) } }, extra || {});
@@ -30,15 +31,12 @@ function stateFor(key, values) {
   return ConstructorState.readConstructorState({ doc: createFakeDoc(values), selectedProductKey: key, product: PRODUCTS[key], stone: null, hasAdditionalWork: ProductTypes.hasAdditionalWork });
 }
 function inputsFor(state) {
-  return ConstructorState.buildPricingInputs(state, {
-    productRates: WORK_RATES[state.product.key], miscFlatSum: null, miscRatePerM2: null, complexShapeMultiplier: 1.5,
-    countertopExtrasRates: ProductTypes.COUNTERTOP_EXTRAS_RATES, getAdditionalWorkRate: () => null, riserRates: ProductTypes.RISER_WORK_RATES,
-  });
+  return ConstructorState.buildPricingInputs(state, { catalog: RateCatalog });
 }
 function price(stone, state, extra) {
   const inputs = inputsFor(state);
   const r = Pricing.calculatePrice(Object.assign({ stone, productType: state.product.type, rates: inputs.rates, marginCm: MARGIN, usageLimit: LIMIT,
-    job: inputs.job, groupRates: inputs.groupRates, extraDimensions: inputs.extraDimensions, extraLineItems: inputs.extraLineItems }, extra || {}));
+    job: inputs.job, groupRates: inputs.groupRates, extraLineItems: inputs.extraLineItems }, extra || {}));
   return { r, inputs };
 }
 const one = (lengthM, widthM, seam, count) => ({ pieces: [{ key: 'p', group: 'main', lengthM, widthM, areaM2: lengthM * widthM, count: count || 1, seam }] });
@@ -127,7 +125,7 @@ test('radius step: the entered depth is the deepest point; the real shape is pri
 });
 
 test('spiral stair: the fixed 300 mm walking step; the count changes pieces, area, slabs and price', () => {
-  const at = n => price({ slabs: REAL.slabs }, stateFor('lestnitsa', dims(800, 2000, Object.assign(type('STAIR-07'), { 'step-count': { value: String(n) } }))), { rates: WORK_RATES.lestnitsa });
+  const at = n => price({ slabs: REAL.slabs }, stateFor('lestnitsa', dims(800, 2000, Object.assign(type('STAIR-07'), { 'step-count': { value: String(n) } }))));
   const runs = [6, 12, 24].map(at);
   const plan = GeometryModel.stairPlan('flight', 'spiral', 2, 0.8, 12);
   close(plan.treadDepthM, C.VISUAL_STAIR_TREAD_DEPTH_M, 'the walking step on the middle line', 1e-9);
@@ -272,16 +270,16 @@ test('a length too short for the marches and landings: no price, the page says w
 
 // ---- 1. risers ---------------------------------------------------------------------------
 
-test('risers: their stone in the one layout; their own rate; an unset rate is never the step\'s', () => {
+test('risers: their stone in the one layout; their own rate (RISER-00), never the step\'s', () => {
   const state = stateFor('stupeni', dims(300, 1200, Object.assign(type('STEP-01'), { 'step-count': { value: '4' }, 'stupeni-riser': { checked: true }, 'riser-height': { value: '170' } })));
-  const { r, inputs } = price(stock(4, 300, 180), state, { rates: WORK_RATES.stupeni, installEnabled: true });
+  const { r, inputs } = price(stock(4, 300, 180), state, { installEnabled: true });
   assert.equal(r.material.pieceCount, 8, 'steps and risers in the same layout');
   const g = r.groups.find(x => x.key === 'riser');
-  assert.equal(g.fabrication, 0);
-  assert.equal(g.installation, 0);
-  assert.deepEqual(g.unpriced, ['fabrication', 'installation']);
-  close(r.fabrication, WORK_RATES.stupeni.fabricationRatePerM2 * inputs.job.mainAreaM2, 'the step rate on the steps only');
-  assert.deepEqual(ProductTypes.RISER_WORK_RATES, { fabricationRatePerM2: null, installationRatePerM2: null, polishRatePerM2: null });
+  close(g.fabrication, RateCatalog.RISER_RATES.fabricationRatePerM2 * inputs.job.riserAreaM2, 'riser fabrication');
+  close(g.installation, RateCatalog.RISER_RATES.installationRatePerM2 * inputs.job.riserAreaM2, 'riser installation');
+  assert.deepEqual(g.unpriced, []);
+  close(r.fabrication, RateCatalog.getProductRates('STEP-01').fabricationRatePerM2 * inputs.job.mainAreaM2, 'the step rate on the steps only');
+  // A riser rate the company leaves empty is still the manager's, never the step's.
   assert.match(html, /стоимость работ по подступенкам \(' \+ list \+ '\) уточнит менеджер/);
 });
 
@@ -350,44 +348,38 @@ test('each extra on its own: backsplash, wall panel, island, bar -- the configur
 
 // ---- the business decisions after the audit ----------------------------------------
 
-const RateCatalog = require('../rate-catalog.js');
 
-test('product-types.js keeps its own old rates null (risers, extras); the company rates live only in rate-catalog.js (v2)', () => {
-  assert.deepEqual(ProductTypes.RISER_WORK_RATES, { fabricationRatePerM2: null, installationRatePerM2: null, polishRatePerM2: null });
-  assert.equal(ProductTypes.COUNTERTOP_EXTRAS_RATES.fartukRatePerM2, null);
-  assert.equal(ProductTypes.COUNTERTOP_EXTRAS_RATES.ostrovRatePerM2, null);
-  // The company's rates (table v2) are in rate-catalog.js; nothing else is made up.
-  assert.deepEqual(['EXTRA-03', 'EXTRA-05', 'EXTRA-06', 'EXTRA-07'].map(id => RateCatalog.getAdditionalWorkRate(id)), [15000, 60000, 40000, 60000]);
-  assert.deepEqual(ProductTypes.COUNTERTOP_EXTRAS_INSTALL_RATES, { backsplash: null, wallPanel: null, island: null, barCounter: null });
+test('product-types.js keeps no rates; the company rates live only in rate-catalog.js (v2)', () => {
+  ['WORK_RATES', 'RISER_WORK_RATES', 'COUNTERTOP_EXTRAS_RATES', 'COUNTERTOP_EXTRAS_INSTALL_RATES'].forEach(name => assert.equal(ProductTypes[name], undefined, name));
+  assert.deepEqual(['EXTRA-01', 'EXTRA-02', 'EXTRA-03', 'EXTRA-04', 'EXTRA-05', 'EXTRA-06', 'EXTRA-07'].map(id => RateCatalog.getAdditionalWorkRate(id)),
+    [25000, 15000, 15000, 40000, 60000, 40000, 60000]);
+  assert.deepEqual(['EXTRA-02', 'EXTRA-03', 'EXTRA-04', 'EXTRA-06'].map(id => RateCatalog.getAdditionalWorkInstallRate(id)), [18000, 20000, 50000, 50000]);
 });
 
-test('installation of the countertop extras: its own rate per element; null adds nothing, a set rate adds rate x area only with «Монтаж»', () => {
+test('installation of the countertop extras: its own rate per element (EXTRA-02..07 «Монтаж»), rate x area only with «Монтаж»; no rate adds nothing', () => {
   const values = Object.assign(dims(600, 2400), KITCHEN);
-  const inputsWith = (install, installRates) => {
+  const inputsWith = (install, catalog) => {
     const state = stateFor('stoleshnitsa_kuhnya', Object.assign({}, values, { 'opt-install': { checked: install } }));
-    return ConstructorState.buildPricingInputs(state, {
-      productRates: WORK_RATES.stoleshnitsa_kuhnya, miscFlatSum: null, miscRatePerM2: null, complexShapeMultiplier: 1.5,
-      countertopExtrasRates: ProductTypes.COUNTERTOP_EXTRAS_RATES, getAdditionalWorkRate: () => null,
-      riserRates: ProductTypes.RISER_WORK_RATES, extrasInstallRates: installRates,
-    });
+    return ConstructorState.buildPricingInputs(state, { catalog: catalog || RateCatalog });
   };
-  // Today (null rates): «Монтаж» adds no line and nothing to the price.
-  const off = inputsWith(false, ProductTypes.COUNTERTOP_EXTRAS_INSTALL_RATES);
-  const on = inputsWith(true, ProductTypes.COUNTERTOP_EXTRAS_INSTALL_RATES);
-  assert.deepEqual(on.extraLineItems, off.extraLineItems);
-  assert.ok(!on.extraLineItems.some(i => i.install));
-  // The architecture: a rate the company sets (a test value here, not product
-  // data) is charged on that element's area, only with «Монтаж».
-  const rates = { backsplash: 1000, wallPanel: null, island: 2000, barCounter: null };
-  const priced = inputsWith(true, rates).extraLineItems.filter(i => i.install);
-  assert.deepEqual(priced.map(i => i.install), ['backsplash', 'island']);
+  const off = inputsWith(false);
+  const on = inputsWith(true);
+  assert.ok(!off.extraLineItems.some(i => i.install));
+  const priced = on.extraLineItems.filter(i => i.install);
+  assert.deepEqual(priced.map(i => [i.install, i.rate]), [['backsplash', 18000], ['wallPanel', 20000], ['island', 50000], ['barCounter', 50000]]);
   close(priced[0].quantity, 0.6 * 2.4);
-  close(priced[1].quantity, 0.9 * 1.8);
-  assert.equal(inputsWith(false, rates).extraLineItems.filter(i => i.install).length, 0);
+  close(priced[1].quantity, 0.9 * 1.2);
+  close(priced[2].quantity, 0.9 * 1.8);
+  close(priced[3].quantity, 0.5 * 1.2);
+  assert.deepEqual(on.extraLineItems.filter(i => !i.install), off.extraLineItems, 'the elements\' own work is the same either way');
   const r = Pricing.calculatePrice({ stone: { slabs: REAL.slabs }, productType: 'A', rates: ZERO, marginCm: MARGIN, usageLimit: LIMIT, extraLineItems: priced, job: on.job, groupRates: on.groupRates });
-  close(r.catalogExtras, 1000 * 1.44 + 2000 * 1.62);
-  // The page passes the rates in.
-  assert.match(html, /extrasInstallRates: COUNTERTOP_EXTRAS_INSTALL_RATES/);
+  close(r.catalogExtras, 18000 * 1.44 + 20000 * 1.08 + 50000 * 1.62 + 50000 * 0.6);
+  // An element whose installation the company leaves empty: no line, never
+  // the countertop's installation rate.
+  const noInstall = Object.assign({}, RateCatalog, { getAdditionalWorkInstallRate: id => (id === 'EXTRA-02' ? null : RateCatalog.getAdditionalWorkInstallRate(id)) });
+  assert.deepEqual(inputsWith(true, noInstall).extraLineItems.filter(i => i.install).map(i => i.install), ['wallPanel', 'island', 'barCounter']);
+  // The page passes the catalog in.
+  assert.match(html, /buildPricingInputs\(constructorState, \{ catalog: RateCatalog \}\)/);
 });
 
 test('an intermediate landing is one march width deep; the client has no landing-depth field', () => {

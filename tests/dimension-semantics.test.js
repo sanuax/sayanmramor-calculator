@@ -10,6 +10,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { createFakeDoc } = require('./helpers/fake-dom.js');
 const ConstructorState = require('../constructor-state.js');
+const RateCatalog = require('../rate-catalog.js');
 const ProductTypes = require('../product-types.js');
 const GeometryModel = require('../visualizer/geometry-model.js');
 const SceneLayout = require('../visualizer/scene-layout.js');
@@ -28,10 +29,7 @@ function stateFor(key, values) {
 // The area the product's work is priced on: its main parts as they are cut
 // (the job product-parts.js builds for pricing.js).
 function pricedArea(state) {
-  const inputs = ConstructorState.buildPricingInputs(state, {
-    productRates: ProductTypes.WORK_RATES[state.product.key], miscFlatSum: null, miscRatePerM2: null,
-    complexShapeMultiplier: 1.5, countertopExtrasRates: ProductTypes.COUNTERTOP_EXTRAS_RATES, getAdditionalWorkRate: () => null,
-  });
+  const inputs = ConstructorState.buildPricingInputs(state, { catalog: RateCatalog });
   return inputs.job.mainAreaM2;
 }
 

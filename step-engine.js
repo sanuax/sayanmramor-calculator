@@ -49,12 +49,10 @@
   //     the same PRODUCT_SUBCATEGORIES/getSubcategoriesForProduct() data and
   //     the same #productSubcategory/#subcategoryQty fields constructor-
   //     state.js already reads -- for the 7 products that have a
-  //     subcategory catalog but NO real geometry/pricing connection to it
-  //     yet (rate-catalog.js documents PRODUCT_SUBCATEGORIES as
-  //     display-only; buildPricingInputs() never reads state.subcategory).
-  //     It is a real, working control (picks and stores a real value), just
-  //     not yet wired to geometry/price -- that gap is intentionally NOT
-  //     papered over with a fake shape/geometry step.
+  //     subcategory catalog. The chosen type is the product's row of the
+  //     company rates: buildPricingInputs() prices the work by it
+  //     (ConstructorState.resolveTypeId). It is not a fake shape/geometry
+  //     step.
   const PRODUCT_STEPS = {
     // Столешницы: форма (прямая/Г-образная) -- самостоятельный шаг с
     // реальной геометрией (supportsShapeSelection), плюс кромка и

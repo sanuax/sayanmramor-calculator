@@ -19,7 +19,7 @@ const ConstructorState = require('../constructor-state.js');
 const Pricing = require('../pricing.js');
 const GeometryModel = require('../visualizer/geometry-model.js');
 
-const { PRODUCTS, WORK_RATES, hasAdditionalWork } = ProductTypes;
+const { PRODUCTS, hasAdditionalWork } = ProductTypes;
 const { PARAM_FIELDS, FORM_FIELD } = FireplaceModel;
 const close = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-9, (msg || '') + ': ' + a + ' vs ' + b);
 
@@ -55,25 +55,18 @@ const NO_OPTIONS = { 'opt-complex': { checked: false }, 'opt-polish': { checked:
 const portalState = extra => stateFor('kaminy', Object.assign({}, LEFTOVERS, fireplaceFields(portal, 'with-shelf', PORTAL), extra || {}));
 
 function inputsFor(state) {
-  return ConstructorState.buildPricingInputs(state, {
-    productRates: WORK_RATES[state.product.key],
-    miscFlatSum: ProductTypes.MISC_FLAT_SUM, miscRatePerM2: ProductTypes.MISC_RATE_PER_M2,
-    complexShapeMultiplier: ProductTypes.COMPLEX_SHAPE_MULTIPLIER,
-    countertopExtrasRates: ProductTypes.COUNTERTOP_EXTRAS_RATES,
-    getAdditionalWorkRate: RateCatalog.getAdditionalWorkRate,
-    riserRates: ProductTypes.RISER_WORK_RATES,
-    extrasInstallRates: ProductTypes.COUNTERTOP_EXTRAS_INSTALL_RATES,
-  });
+  return ConstructorState.buildPricingInputs(state, { catalog: RateCatalog });
 }
 
 const SLABS = Array.from({ length: 12 }, (_, i) => ({ article: 'S' + i, width_cm: 200, length_cm: 320, price_total_rub: 60000 + i }));
 const STONE = { id: 'test-stone', slabs: SLABS };
+const NULL_RATES = { fabricationRatePerM2: null, installationRatePerM2: null, polishRatePerM2: null };
 
 function priceOf(state) {
-  const { rates, extraLineItems, extraDimensions, job, groupRates } = inputsFor(state);
+  const { rates, extraLineItems, job, groupRates } = inputsFor(state);
   return Pricing.calculatePrice({
     stone: STONE, widthM: state.dimensions.widthM, lengthM: state.dimensions.lengthM,
-    productType: state.product.type, rates, extraLineItems, extraDimensions, job, groupRates,
+    productType: state.product.type, rates, extraLineItems, job, groupRates,
     installEnabled: state.options.installEnabled, polishEnabled: state.options.polishEnabled, complexEnabled: state.options.complexEnabled,
     marginCm: ProductTypes.SAW_MARGIN_CM, usageLimit: ProductTypes.SLAB_USAGE_LIMIT,
   });
@@ -363,7 +356,7 @@ test('the 3D gets the entered sizes: state -> buildGeometryModel -> buildSceneLa
   close(wider.widthM, 1.2 + 0.5 + 0.12);
 });
 
-test('the area, the pieces and the price of each variant: the model\'s area, stone priced, work left to the manager', () => {
+test('the area, the pieces and the price of each variant: the model\'s area, the stone and the work of its own type (FIREPLACE-01..03)', () => {
   VARIANTS.forEach(v => {
     const state = variantState(v);
     const job = ProductParts.buildJob(state);
@@ -373,9 +366,11 @@ test('the area, the pieces and the price of each variant: the model\'s area, sto
     // The 30 mm plates are not added to the area paid for.
     close(r.material.productAreaM2, v.area, v.name + ' priced area');
     assert.ok(r.subtotal > 0, v.name);
-    assert.deepEqual([r.fabrication, r.work, r.total, r.unpriced], [null, null, null, ['fabrication']], v.name);
+    close(r.fabrication, RateCatalog.getProductRates(v.type.id).fabricationRatePerM2 * v.area, v.name + ' fabrication');
+    assert.deepEqual(r.unpriced, [], v.name);
+    close(r.total, r.subtotal + r.work, v.name + ' total');
   });
-  // The page never shows such a price as «0 ₽»: the stone and the manager's note.
+  // Without a rate the page never shows such a price as «0 ₽»: the stone and the manager's note.
   const branch = htmlBetween('if (result.total === null) {', '\n    }\n');
   assert.match(branch, /'Камень: ≈ ' \+ formatRub\(result\.subtotal\) \+ '\. ' \+ result\.workNote/);
   assert.match(branch, /outcome: \{ kind: 'manual', reason: 'unpriced_work', message: warningOut\.textContent \}/);
@@ -411,7 +406,7 @@ test('the other 9 products: no fireplace in their configuration, their sizes as 
   // A kitchen countertop 2400 × 600 is priced as before.
   const kitchen = priceOf(stateFor('stoleshnitsa_kuhnya', { width: { value: '600' }, length: { value: '2400' } }));
   assert.equal(kitchen.ok, true);
-  close(kitchen.fabrication, WORK_RATES.stoleshnitsa_kuhnya.fabricationRatePerM2 * 0.6 * 2.4);
+  close(kitchen.fabrication, RateCatalog.getProductRates('KITCHEN-11').fabricationRatePerM2 * 0.6 * 2.4);
   assert.equal(kitchen.total, kitchen.subtotal + kitchen.work);
 });
 
@@ -427,20 +422,16 @@ test('PRODUCT_STEPS.kaminy: type, sizes, stone, the shared options, result', () 
   assert.equal(StepEngine.lastStep('kaminy'), 'review');
 });
 
-// ---- WORK_RATES and the catalog ----------------------------------------------------------------
+// ---- the catalog ----------------------------------------------------------------
 
-test('WORK_RATES.kaminy exists and every rate is null -- not 0, not another product\'s rate', () => {
-  assert.deepEqual(WORK_RATES.kaminy, { fabricationRatePerM2: null, installationRatePerM2: null, polishRatePerM2: null });
-  // Its own object, not a shared or copied rate set.
-  Object.entries(WORK_RATES).filter(([key]) => key !== 'kaminy').forEach(([key, r]) => {
-    assert.notEqual(WORK_RATES.kaminy, r, key);
-    assert.notEqual(r.fabricationRatePerM2, null, key + ' keeps its rate');
+test('a fireplace is priced at the row of its own type in the catalog -- never at another product rate', () => {
+  [[portal, 'with-shelf', PORTAL], [cladding, '', CLADDING], [podium, '', PODIUM]].forEach(([type, form, sizes]) => {
+    const { rates } = inputsFor(stateFor('kaminy', fireplaceFields(type, form, sizes)));
+    const row = RateCatalog.getProductRates(type.id);
+    // No stone chosen: the coefficient is x1.
+    assert.deepEqual([rates.fabricationRatePerM2, rates.installationRatePerM2, rates.polishRatePerM2],
+      [row.fabricationRatePerM2, row.installationRatePerM2, row.polishRatePerM2], type.id);
   });
-  // What pricing gets for a fireplace is exactly these nulls.
-  const { rates } = inputsFor(portalState());
-  assert.equal(rates.fabricationRatePerM2, null);
-  assert.equal(rates.installationRatePerM2, null);
-  assert.equal(rates.polishRatePerM2, null);
 });
 
 test('the catalog: FIREPLACE-01/02/03 by m² of stone (as priced), with the company rates (table v2)', () => {
@@ -489,9 +480,8 @@ test('nothing another product left on the page reaches a fireplace: sizes, quant
   assert.deepEqual(state.holeCounts, { mixer: 0, socket: 0, dispenser: 0 });
   // The options are the shared checkboxes -- read as for every product.
   assert.deepEqual(state.options, { complexEnabled: true, polishEnabled: true, installEnabled: true });
-  const { extraLineItems, extraDimensions } = inputsFor(state);
+  const { extraLineItems } = inputsFor(state);
   assert.deepEqual(extraLineItems, [], 'no edge, cut or extra is priced');
-  assert.deepEqual(extraDimensions, { bortikLengthM: 0, fartukAreaM2: 0, ostrovAreaM2: 0 });
 });
 
 test('switching products: the fireplace is only in a fireplace\'s state, and the other product is read as before', () => {
@@ -505,7 +495,7 @@ test('switching products: the fireplace is only in a fireplace\'s state, and the
   Object.keys(PRODUCTS).filter(k => k !== 'kaminy').forEach(k => assert.equal(stateFor(k, values).productConfig.kaminy, null, k));
 });
 
-test('buildPricingInputs for a fireplace: its null rates, its plates as the job, no extras', () => {
+test('buildPricingInputs for a fireplace: its plates as the job, no extras', () => {
   const state = portalState();
   const { job, areaM2, groupRates } = inputsFor(state);
   const plan = GeometryModel.fireplacePlan(portal, portal.forms[0], state.productConfig.kaminy.params);
@@ -518,7 +508,7 @@ test('buildPricingInputs for a fireplace: its null rates, its plates as the job,
 // ---- pricing with no rate ---------------------------------------------------------------------
 
 test('a fireplace with no rate: the stone is priced; the work and the total are left to the manager', () => {
-  const r = priceOf(portalState(NO_OPTIONS));
+  const r = priceWithRates(portalState(NO_OPTIONS), NULL_RATES);
   assert.equal(r.ok, true);
   // The stone: laid out, priced.
   assert.ok(Number.isFinite(r.subtotal) && r.subtotal > 0);
@@ -540,7 +530,7 @@ test('the same for every type of fireplace', () => {
     stateFor('kaminy', fireplaceFields(podium, '', { length: 1800, depth: 450, height: 200 })),
     stateFor('kaminy', fireplaceFields(portal, 'without-shelf', PORTAL)),
   ].forEach(state => {
-    const r = priceOf(state);
+    const r = priceWithRates(state, NULL_RATES);
     assert.equal(r.ok, true, state.productConfig.kaminy.type);
     assert.ok(r.subtotal > 0);
     assert.deepEqual([r.work, r.total, r.unpriced], [null, null, ['fabrication']]);
@@ -552,12 +542,12 @@ test('the mechanism is the missing rate, not the product: any product with a nul
   const { job } = inputsFor(state);
   const priced = Pricing.calculatePrice({
     stone: STONE, widthM: 2, lengthM: 3, productType: 'B', job,
-    rates: Object.assign({}, WORK_RATES.pol, { miscFlatSum: null, miscRatePerM2: null, complexShapeMultiplier: 1.5 }),
+    rates: Object.assign({}, RateCatalog.getProductRates('FLOOR-01'), { complexShapeMultiplier: 1.5 }),
     marginCm: ProductTypes.SAW_MARGIN_CM, usageLimit: ProductTypes.SLAB_USAGE_LIMIT,
   });
   const unset = Pricing.calculatePrice({
     stone: STONE, widthM: 2, lengthM: 3, productType: 'B', job,
-    rates: { fabricationRatePerM2: null, installationRatePerM2: null, polishRatePerM2: null, miscFlatSum: null, miscRatePerM2: null, complexShapeMultiplier: 1.5 },
+    rates: { fabricationRatePerM2: null, installationRatePerM2: null, polishRatePerM2: null, complexShapeMultiplier: 1.5 },
     marginCm: ProductTypes.SAW_MARGIN_CM, usageLimit: ProductTypes.SLAB_USAGE_LIMIT,
   });
   assert.equal(priced.subtotal, unset.subtotal, 'the same stone either way');
@@ -570,7 +560,7 @@ test('the mechanism is the missing rate, not the product: any product with a nul
 });
 
 test('computeWorkAndTotal: a null rate is never 0 -- only the work asked for is checked', () => {
-  const NULL = { fabricationRatePerM2: null, installationRatePerM2: null, polishRatePerM2: null, miscFlatSum: null, miscRatePerM2: null, complexShapeMultiplier: 1.5 };
+  const NULL = { fabricationRatePerM2: null, installationRatePerM2: null, polishRatePerM2: null, complexShapeMultiplier: 1.5 };
   const off = Pricing.computeWorkAndTotal(100000, 2, NULL, { installEnabled: false, polishEnabled: false, complexEnabled: true });
   assert.deepEqual([off.fabrication, off.installation, off.polish, off.work, off.total, off.unpriced], [null, 0, 0, null, null, ['fabrication']]);
   const all = Pricing.computeWorkAndTotal(100000, 2, NULL, { installEnabled: true, polishEnabled: true, complexEnabled: false });
@@ -601,7 +591,7 @@ test('a product with set rates is priced exactly as before', () => {
   assert.equal(r.ok, true);
   assert.deepEqual(r.unpriced, []);
   assert.equal(r.workNote, null);
-  close(r.fabrication, WORK_RATES.stoleshnitsa_kuhnya.fabricationRatePerM2 * 0.6 * 2.4);
+  close(r.fabrication, RateCatalog.getProductRates('KITCHEN-11').fabricationRatePerM2 * 0.6 * 2.4);
   close(r.total, r.subtotal + r.work);
 });
 
@@ -615,17 +605,16 @@ const ticked = (...keys) => {
 };
 const portalWith = (...keys) => variantState(VARIANTS[0], null, ticked(...keys));
 
-// The same fireplace priced with the rates given (a company's future rates).
+// The same fireplace priced with the rates given for its type: a catalog
+// whose FIREPLACE-xx rows carry these rates (NULL_RATES: no company rate).
 function priceWithRates(state, productRates) {
-  const { rates, extraLineItems, extraDimensions, job, groupRates } = ConstructorState.buildPricingInputs(state, {
-    productRates, miscFlatSum: ProductTypes.MISC_FLAT_SUM, miscRatePerM2: ProductTypes.MISC_RATE_PER_M2,
-    complexShapeMultiplier: ProductTypes.COMPLEX_SHAPE_MULTIPLIER, countertopExtrasRates: ProductTypes.COUNTERTOP_EXTRAS_RATES,
-    getAdditionalWorkRate: RateCatalog.getAdditionalWorkRate, riserRates: ProductTypes.RISER_WORK_RATES,
-    extrasInstallRates: ProductTypes.COUNTERTOP_EXTRAS_INSTALL_RATES,
+  const catalog = Object.assign({}, RateCatalog, {
+    getProductRates: id => (/^FIREPLACE-/.test(id) ? Object.assign({}, productRates) : RateCatalog.getProductRates(id)),
   });
+  const { rates, extraLineItems, job, groupRates } = ConstructorState.buildPricingInputs(state, { catalog });
   return Pricing.calculatePrice({
     stone: STONE, widthM: state.dimensions.widthM, lengthM: state.dimensions.lengthM,
-    productType: state.product.type, rates, extraLineItems, extraDimensions, job, groupRates,
+    productType: state.product.type, rates, extraLineItems, job, groupRates,
     installEnabled: state.options.installEnabled, polishEnabled: state.options.polishEnabled, complexEnabled: state.options.complexEnabled,
     marginCm: ProductTypes.SAW_MARGIN_CM, usageLimit: ProductTypes.SLAB_USAGE_LIMIT,
   });
@@ -657,12 +646,12 @@ test('a ticked option is in the fireplace\'s state, as for every product; step n
 });
 
 test('no company rate: a ticked option is the manager\'s too -- never «0 ₽», never counted twice', () => {
-  const none = priceOf(portalWith());
-  const all = priceOf(portalWith('complex', 'polish', 'install'));
+  const none = priceWithRates(portalWith(), NULL_RATES);
+  const all = priceWithRates(portalWith('complex', 'polish', 'install'), NULL_RATES);
   assert.deepEqual([all.fabrication, all.installation, all.polish, all.work, all.total], [null, null, null, null, null]);
   assert.deepEqual(all.unpriced, ['fabrication', 'installation', 'polish']);
   assert.equal(all.workNote, 'Стоимость изготовления, монтажа и полировки уточнит менеджер.');
-  assert.equal(priceOf(portalWith('install')).workNote, 'Стоимость изготовления и монтажа уточнит менеджер.');
+  assert.equal(priceWithRates(portalWith('install'), NULL_RATES).workNote, 'Стоимость изготовления и монтажа уточнит менеджер.');
   // The stone is the same with or without options -- they are work, not stone.
   assert.equal(all.subtotal, none.subtotal);
   // Монтаж is only the option: no additional work, no «INST-109» line, no extra piece.
@@ -683,7 +672,7 @@ test('with a rate set, each option is priced once, by the shared rule', () => {
   const polish = priceWithRates(portalWith('polish'), RATES);
   close(polish.polish, 10000 * area, 'polish');
   const complex = priceWithRates(portalWith('complex'), RATES);
-  close(complex.fabrication, 40000 * ProductTypes.COMPLEX_SHAPE_MULTIPLIER * area, 'complex shape');
+  close(complex.fabrication, 40000 * RateCatalog.MISC.complexShapeMultiplier * area, 'complex shape');
   const all = priceWithRates(portalWith('complex', 'polish', 'install'), RATES);
   assert.deepEqual(all.unpriced, []);
   close(all.total, all.subtotal + all.work);

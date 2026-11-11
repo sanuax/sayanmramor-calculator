@@ -64,32 +64,29 @@ const SAMPLE_RATES = {
   fabricationRatePerM2: 30000,
   installationRatePerM2: 15000,
   polishRatePerM2: 10000,
-  miscFlatSum: 5000,
-  miscRatePerM2: 2000,
   complexShapeMultiplier: 1.5,
 };
-const ZERO_RATES = { fabricationRatePerM2: 0, installationRatePerM2: 0, polishRatePerM2: 0, miscFlatSum: 0, miscRatePerM2: 0, complexShapeMultiplier: 1 };
+const ZERO_RATES = { fabricationRatePerM2: 0, installationRatePerM2: 0, polishRatePerM2: 0, complexShapeMultiplier: 1 };
 const NO_OPTIONS = { installEnabled: false, polishEnabled: false, complexEnabled: false };
 
-test('computeWorkAndTotal: base case, no options -- work is fabrication plus misc only', () => {
-  // area=2: fabrication=30000*2=60000, misc=5000+2000*2=9000, install/polish off
+test('computeWorkAndTotal: base case, no options -- work is fabrication only (misc is not charged yet)', () => {
+  // area=2: fabrication=30000*2=60000, install/polish off
   const r = Pricing.computeWorkAndTotal(100000, 2, SAMPLE_RATES, NO_OPTIONS);
   assert.equal(r.fabrication, 60000);
   assert.equal(r.installation, 0);
   assert.equal(r.polish, 0);
-  assert.equal(r.misc, 9000);
-  assert.equal(r.work, 69000);
-  assert.equal(r.total, 169000);
+  assert.equal(r.misc, 0);
+  assert.equal(r.work, 60000);
+  assert.equal(r.total, 160000);
 });
 
-test('computeWorkAndTotal: complexEnabled scales fabrication only, not installation/polish/misc', () => {
+test('computeWorkAndTotal: complexEnabled scales fabrication only, not installation/polish', () => {
   const r = Pricing.computeWorkAndTotal(100000, 2, SAMPLE_RATES, { installEnabled: true, polishEnabled: true, complexEnabled: true });
-  // fabrication=30000*1.5*2=90000, installation=15000*2=30000, polish=10000*2=20000, misc=9000
+  // fabrication=30000*1.5*2=90000, installation=15000*2=30000, polish=10000*2=20000
   assert.equal(r.fabrication, 90000);
   assert.equal(r.installation, 30000);
   assert.equal(r.polish, 20000);
-  assert.equal(r.misc, 9000);
-  assert.equal(r.work, 90000 + 30000 + 20000 + 9000);
+  assert.equal(r.work, 90000 + 30000 + 20000);
   assert.equal(r.total, 100000 + r.work);
 });
 
@@ -103,83 +100,52 @@ test('computeWorkAndTotal: installEnabled and polishEnabled toggle independently
   assert.equal(polishOnly.polish, 20000);
 });
 
-test('computeWorkAndTotal: null miscFlatSum/miscRatePerM2 (no real data yet) are treated as 0, not NaN', () => {
-  const ratesWithoutMisc = { fabricationRatePerM2: 0, installationRatePerM2: 0, polishRatePerM2: 0, miscFlatSum: null, miscRatePerM2: null, complexShapeMultiplier: 1 };
-  const r = Pricing.computeWorkAndTotal(100000, 2, ratesWithoutMisc, NO_OPTIONS);
-  assert.equal(r.misc, 0);
-  assert.equal(r.work, 0);
-  assert.equal(r.total, 100000);
-});
-
 test('computeWorkAndTotal: all-zero rates leave total equal to subtotal (isolates geometry tests from the pricing formula)', () => {
   const r = Pricing.computeWorkAndTotal(52673, 0.6, ZERO_RATES, NO_OPTIONS);
   assert.equal(r.work, 0);
   assert.equal(r.total, 52673);
 });
 
-test('computeWorkAndTotal: backward compatible -- omitting extraDimensions defaults extras to 0', () => {
+test('computeWorkAndTotal: no bortik/fartuk/ostrov fields any more -- the countertop elements are extraLineItems', () => {
   const r = Pricing.computeWorkAndTotal(100000, 2, SAMPLE_RATES, NO_OPTIONS);
-  assert.equal(r.extras, 0);
-  assert.equal(r.work, 69000); // unchanged from the base-case test above
+  assert.equal(r.extras, undefined);
+  assert.equal(r.work, 60000);
 });
 
-test('computeWorkAndTotal: bortik/fartuk/ostrov each contribute independently to extras', () => {
-  const ratesWithExtras = Object.assign({}, SAMPLE_RATES, {
-    bortikRatePerM: 4000,
-    fartukRatePerM2: 12000,
-    ostrovRatePerM2: 45000
-  });
-  const bortikOnly = Pricing.computeWorkAndTotal(100000, 2, ratesWithExtras, NO_OPTIONS, { bortikLengthM: 3 });
-  assert.equal(bortikOnly.extras, 12000); // 3 * 4000
-
-  const fartukOnly = Pricing.computeWorkAndTotal(100000, 2, ratesWithExtras, NO_OPTIONS, { fartukAreaM2: 1.5 });
-  assert.equal(fartukOnly.extras, 18000); // 1.5 * 12000
-
-  const ostrovOnly = Pricing.computeWorkAndTotal(100000, 2, ratesWithExtras, NO_OPTIONS, { ostrovAreaM2: 2 });
-  assert.equal(ostrovOnly.extras, 90000); // 2 * 45000
-
-  const allThree = Pricing.computeWorkAndTotal(100000, 2, ratesWithExtras, NO_OPTIONS, { bortikLengthM: 3, fartukAreaM2: 1.5, ostrovAreaM2: 2 });
-  assert.equal(allThree.extras, 12000 + 18000 + 90000);
-  assert.equal(allThree.work, allThree.fabrication + allThree.installation + allThree.polish + allThree.misc + allThree.extras);
-});
-
-test('computeWorkAndTotal: null bortik/fartuk/ostrov rates (no real data yet) are treated as 0, not NaN', () => {
-  const ratesWithoutExtraRates = Object.assign({}, SAMPLE_RATES, {
-    bortikRatePerM: null, fartukRatePerM2: null, ostrovRatePerM2: null
-  });
-  const r = Pricing.computeWorkAndTotal(100000, 2, ratesWithoutExtraRates, NO_OPTIONS, { bortikLengthM: 3, fartukAreaM2: 1.5, ostrovAreaM2: 2 });
-  assert.equal(r.extras, 0);
-});
-
-test('computeWorkAndTotal: negative bortik/fartuk/ostrov dimensions are clamped to 0, never reduce the total', () => {
-  const ratesWithExtras = Object.assign({}, SAMPLE_RATES, {
-    bortikRatePerM: 4000, fartukRatePerM2: 12000, ostrovRatePerM2: 45000
-  });
-  const r = Pricing.computeWorkAndTotal(100000, 2, ratesWithExtras, NO_OPTIONS, { bortikLengthM: -10, fartukAreaM2: -5, ostrovAreaM2: -1 });
-  assert.equal(r.extras, 0);
-});
-
-test('computeWorkAndTotal: explicit null extraDimensions does not throw, defaults extras to 0', () => {
-  const r = Pricing.computeWorkAndTotal(100000, 2, SAMPLE_RATES, NO_OPTIONS, null);
-  assert.equal(r.extras, 0);
+test('computeWorkAndTotal: landings at rates.landingRates, summed into the work lines', () => {
+  const rates = Object.assign({}, SAMPLE_RATES, { landingRates: { fabricationRatePerM2: 1000, installationRatePerM2: 500, polishRatePerM2: 100 } });
+  const r = Pricing.computeWorkAndTotal(100000, 2, rates, { installEnabled: true, polishEnabled: true, complexEnabled: false }, [], 3);
+  assert.equal(r.fabrication, 30000 * 2 + 1000 * 3);
+  assert.equal(r.installation, 15000 * 2 + 500 * 3);
+  assert.equal(r.polish, 10000 * 2 + 100 * 3);
+  assert.deepEqual(r.landing, { fabrication: 3000, installation: 1500, polish: 300 });
+  // A landing without its rates: its work is the manager's.
+  const none = Pricing.computeWorkAndTotal(100000, 2, SAMPLE_RATES, NO_OPTIONS, [], 3);
+  assert.equal(none.fabrication, null);
+  assert.deepEqual(none.unpriced, ['fabrication']);
+  assert.equal(none.total, null);
 });
 
 test('computeWorkAndTotal: extraLineItems sum independently with their own rates', () => {
-  const r = Pricing.computeWorkAndTotal(100000, 2, SAMPLE_RATES, NO_OPTIONS, null, [
+  const r = Pricing.computeWorkAndTotal(100000, 2, SAMPLE_RATES, NO_OPTIONS, [
     { rate: 500, quantity: 3 },
     { rate: 1200, quantity: 2 }
   ]);
   assert.equal(r.catalogExtras, 500 * 3 + 1200 * 2);
-  assert.equal(r.work, r.fabrication + r.installation + r.polish + r.misc + r.extras + r.catalogExtras);
+  assert.equal(r.work, r.fabrication + r.installation + r.polish + r.misc + r.catalogExtras);
 });
 
-test('computeWorkAndTotal: null rate in an extraLineItems entry is treated as 0, not NaN', () => {
-  const r = Pricing.computeWorkAndTotal(100000, 2, SAMPLE_RATES, NO_OPTIONS, null, [{ rate: null, quantity: 5 }]);
+test('computeWorkAndTotal: a null rate in an extraLineItems entry goes to the manager -- the work and the total are unknown, never 0 ₽ for it', () => {
+  const r = Pricing.computeWorkAndTotal(100000, 2, SAMPLE_RATES, NO_OPTIONS, [{ rate: null, quantity: 5 }]);
   assert.equal(r.catalogExtras, 0);
+  assert.deepEqual(r.unpriced, ['extras']);
+  assert.equal(r.work, null);
+  assert.equal(r.total, null);
+  assert.equal(Pricing.unpricedWorkNote(r.unpriced), 'Стоимость дополнительных работ уточнит менеджер.');
 });
 
 test('computeWorkAndTotal: negative quantity in an extraLineItems entry is clamped to 0', () => {
-  const r = Pricing.computeWorkAndTotal(100000, 2, SAMPLE_RATES, NO_OPTIONS, null, [{ rate: 500, quantity: -4 }]);
+  const r = Pricing.computeWorkAndTotal(100000, 2, SAMPLE_RATES, NO_OPTIONS, [{ rate: 500, quantity: -4 }]);
   assert.equal(r.catalogExtras, 0);
 });
 
@@ -189,7 +155,7 @@ test('computeWorkAndTotal: omitting extraLineItems defaults catalogExtras to 0 (
 });
 
 test('computeWorkAndTotal: empty extraLineItems array defaults catalogExtras to 0', () => {
-  const r = Pricing.computeWorkAndTotal(100000, 2, SAMPLE_RATES, NO_OPTIONS, null, []);
+  const r = Pricing.computeWorkAndTotal(100000, 2, SAMPLE_RATES, NO_OPTIONS, []);
   assert.equal(r.catalogExtras, 0);
 });
 
@@ -493,12 +459,11 @@ test('calculatePrice: rates and option flags flow through to the top-level resul
   const fabrication = SAMPLE_RATES.fabricationRatePerM2 * SAMPLE_RATES.complexShapeMultiplier * area;
   const installation = SAMPLE_RATES.installationRatePerM2 * area;
   const polish = SAMPLE_RATES.polishRatePerM2 * area;
-  const misc = SAMPLE_RATES.miscFlatSum + SAMPLE_RATES.miscRatePerM2 * area;
   assert.ok(Math.abs(r.fabrication - fabrication) < 0.001);
   assert.ok(Math.abs(r.installation - installation) < 0.001);
   assert.ok(Math.abs(r.polish - polish) < 0.001);
-  assert.ok(Math.abs(r.misc - misc) < 0.001);
-  assert.ok(Math.abs(r.total - (r.subtotal + fabrication + installation + polish + misc)) < 0.001);
+  assert.equal(r.misc, 0);
+  assert.ok(Math.abs(r.total - (r.subtotal + fabrication + installation + polish)) < 0.001);
 });
 
 test('calculatePrice: installEnabled/polishEnabled/complexEnabled default to false when omitted', () => {
@@ -506,27 +471,6 @@ test('calculatePrice: installEnabled/polishEnabled/complexEnabled default to fal
   assert.equal(r.installation, 0);
   assert.equal(r.polish, 0);
   assert.equal(r.fabrication, SAMPLE_RATES.fabricationRatePerM2 * (1.0 * 0.6));
-});
-
-test('calculatePrice: extraDimensions flow through to the top-level extras field', () => {
-  const ratesWithExtras = Object.assign({}, SAMPLE_RATES, {
-    bortikRatePerM: 4000,
-    fartukRatePerM2: 12000,
-    ostrovRatePerM2: 45000
-  });
-  const r = Pricing.calculatePrice({
-    stone, widthM: 1.0, lengthM: 0.6, productType: 'A',
-    rates: ratesWithExtras, extraDimensions: { bortikLengthM: 3, fartukAreaM2: 1.5, ostrovAreaM2: 2 },
-    marginCm: 4, usageLimit: 0.65
-  });
-  assert.equal(r.ok, true);
-  assert.equal(r.extras, 3 * 4000 + 1.5 * 12000 + 2 * 45000);
-  assert.equal(r.total, r.subtotal + r.fabrication + r.installation + r.polish + r.misc + r.extras);
-});
-
-test('calculatePrice: extraDimensions defaults to zero extras when omitted (backward compatible)', () => {
-  const r = Pricing.calculatePrice({ stone, widthM: 1.0, lengthM: 0.6, productType: 'A', rates: SAMPLE_RATES, marginCm: 4, usageLimit: 0.65 });
-  assert.equal(r.extras, 0);
 });
 
 test('calculatePrice: extraLineItems flow through to the top-level catalogExtras field', () => {
@@ -537,7 +481,7 @@ test('calculatePrice: extraLineItems flow through to the top-level catalogExtras
   });
   assert.equal(r.ok, true);
   assert.equal(r.catalogExtras, 2800);
-  assert.equal(r.total, r.subtotal + r.fabrication + r.installation + r.polish + r.misc + r.extras + r.catalogExtras);
+  assert.equal(r.total, r.subtotal + r.fabrication + r.installation + r.polish + r.misc + r.catalogExtras);
 });
 
 test('calculatePrice: extraLineItems defaults to zero catalogExtras when omitted (backward compatible)', () => {

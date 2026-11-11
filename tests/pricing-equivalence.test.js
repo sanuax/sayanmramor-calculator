@@ -7,16 +7,18 @@ const ProductTypes = require('../product-types.js');
 const RateCatalog = require('../rate-catalog.js');
 const ConstructorState = require('../constructor-state.js');
 
-const { PRODUCTS, hasAdditionalWork, WORK_RATES, MISC_FLAT_SUM, MISC_RATE_PER_M2, COMPLEX_SHAPE_MULTIPLIER, COUNTERTOP_EXTRAS_RATES, SAW_MARGIN_CM, SLAB_USAGE_LIMIT } = ProductTypes;
-const { getAdditionalWorkRate } = RateCatalog;
+const { PRODUCTS, hasAdditionalWork, SAW_MARGIN_CM, SLAB_USAGE_LIMIT } = ProductTypes;
+const { getAdditionalWorkRate, getAdditionalWorkInstallRate, getProductRates, stoneCoefficient, MISC } = RateCatalog;
 
 function mmToM(mm) { return mm / 1000; }
 function num(doc, id) { return parseFloat(doc.getElementById(id).value) || 0; }
 
-// Independent transcription of today's sayanmramor-calculator.html calculate()
-// logic (as of the commit that introduced this test), for characterization
-// purposes only. Deliberately NOT calling into constructor-state.js.
-function legacyBuildPricingInputs(doc, product) {
+// Independent transcription of the pricing rules (the company's rates v2,
+// docs/superpowers/specs/2026-11-08-company-rates-v2-design.md) straight
+// from the page fields, for characterization purposes only. Deliberately NOT
+// calling into constructor-state.js. `typeId` -- the type chosen for the
+// product (a countertop's is its shape), `k` -- the stone coefficient.
+function legacyBuildPricingInputs(doc, product, typeId, k) {
   const EDGE_LINE_ITEMS = [
     { rateId: 'EDGE-01', elId: 'edge-straight' }, { rateId: 'EDGE-03', elId: 'edge-figured' },
     { rateId: 'EDGE-04', elId: 'edge-round' }, { rateId: 'EDGE-05', elId: 'edge-chamfer' },
@@ -30,20 +32,11 @@ function legacyBuildPricingInputs(doc, product) {
     if (lengthM > 0) extraLineItems.push({ rate: getAdditionalWorkRate(rateId), quantity: lengthM });
   });
 
-  let bortikLengthM = 0, fartukAreaM2 = 0, ostrovAreaM2 = 0;
   if (product.supportsCountertopExtras) {
-    bortikLengthM = hasAdditionalWork(product, 'curb') ? mmToM(num(doc, 'extra-bortik')) : 0;
-    const fartukWidthM = hasAdditionalWork(product, 'backsplash') ? mmToM(num(doc, 'extra-fartuk-width')) : 0;
-    const fartukLengthM = hasAdditionalWork(product, 'backsplash') ? mmToM(num(doc, 'extra-fartuk-length')) : 0;
-    fartukAreaM2 = fartukWidthM * fartukLengthM;
-    const ostrovWidthM = hasAdditionalWork(product, 'island') ? mmToM(num(doc, 'extra-ostrov-width')) : 0;
-    const ostrovLengthM = hasAdditionalWork(product, 'island') ? mmToM(num(doc, 'extra-ostrov-length')) : 0;
-    ostrovAreaM2 = ostrovWidthM * ostrovLengthM;
-
+    // Cuts and holes: rate x count, no stone coefficient (no integrated sink here).
     const QUANTITY_LINE_ITEMS = [
       { rateId: 'CUT-01', elId: 'cut-sink-overlay', capability: 'sinkCutout' },
       { rateId: 'CUT-02', elId: 'cut-sink-undermount', capability: 'sinkCutout' },
-      { rateId: 'CUT-03', elId: 'cut-sink-integrated', capability: 'sinkCutout' },
       { rateId: 'CUT-04', elId: 'cut-cooktop', capability: 'cooktopCutout' },
       { rateId: 'CUT-05', elId: 'hole-mixer', capability: 'holes' },
       { rateId: 'CUT-06', elId: 'hole-socket', capability: 'holes' },
@@ -55,31 +48,36 @@ function legacyBuildPricingInputs(doc, product) {
       if (qty > 0) extraLineItems.push({ rate: getAdditionalWorkRate(rateId), quantity: qty });
     });
 
+    // The countertop's elements: work x the stone coefficient.
+    const bortikM = hasAdditionalWork(product, 'curb') ? mmToM(num(doc, 'extra-bortik')) : 0;
+    if (bortikM > 0) extraLineItems.push({ rate: getAdditionalWorkRate('EXTRA-01') * k, quantity: bortikM });
     const AREA_LINE_ITEMS = [
-      { rateId: 'EXTRA-05', widthElId: 'extra-ostrov-figured-width', lengthElId: 'extra-ostrov-figured-length', capability: 'island' },
-      { rateId: 'EXTRA-03', widthElId: 'extra-wallpanel-width', lengthElId: 'extra-wallpanel-length', capability: 'wallPanel' },
-      { rateId: 'EXTRA-06', widthElId: 'extra-bar-standard-width', lengthElId: 'extra-bar-standard-length', capability: 'barCounter' },
-      { rateId: 'EXTRA-07', widthElId: 'extra-bar-complex-width', lengthElId: 'extra-bar-complex-length', capability: 'barCounter' },
+      { rateId: 'EXTRA-02', widthElId: 'extra-fartuk-width', lengthElId: 'extra-fartuk-length', capability: 'backsplash', install: 'backsplash' },
+      { rateId: 'EXTRA-03', widthElId: 'extra-wallpanel-width', lengthElId: 'extra-wallpanel-length', capability: 'wallPanel', install: 'wallPanel' },
+      { rateId: 'EXTRA-04', widthElId: 'extra-ostrov-width', lengthElId: 'extra-ostrov-length', capability: 'island', install: 'island' },
+      { rateId: 'EXTRA-06', widthElId: 'extra-bar-standard-width', lengthElId: 'extra-bar-standard-length', capability: 'barCounter', install: 'barCounter' },
     ];
-    AREA_LINE_ITEMS.forEach(({ rateId, widthElId, lengthElId, capability }) => {
+    const installs = [];
+    AREA_LINE_ITEMS.forEach(({ rateId, widthElId, lengthElId, capability, install }) => {
       if (!hasAdditionalWork(product, capability)) return;
       const areaM2 = mmToM(num(doc, widthElId)) * mmToM(num(doc, lengthElId));
-      if (areaM2 > 0) extraLineItems.push({ rate: getAdditionalWorkRate(rateId), quantity: areaM2 });
+      if (!(areaM2 > 0)) return;
+      extraLineItems.push({ rate: getAdditionalWorkRate(rateId) * k, quantity: areaM2 });
+      if (doc.getElementById('opt-install').checked) installs.push({ rate: getAdditionalWorkInstallRate(rateId), quantity: areaM2, install });
     });
+    extraLineItems = extraLineItems.concat(installs);
   }
 
-  const productRates = WORK_RATES[Object.keys(PRODUCTS).find(k => PRODUCTS[k] === product)];
+  const productRates = getProductRates(typeId);
   const rates = {
-    fabricationRatePerM2: productRates.fabricationRatePerM2,
+    fabricationRatePerM2: productRates.fabricationRatePerM2 * k,
     installationRatePerM2: productRates.installationRatePerM2,
     polishRatePerM2: productRates.polishRatePerM2,
-    miscFlatSum: MISC_FLAT_SUM, miscRatePerM2: MISC_RATE_PER_M2, complexShapeMultiplier: COMPLEX_SHAPE_MULTIPLIER,
-    bortikRatePerM: COUNTERTOP_EXTRAS_RATES.bortikRatePerM,
-    fartukRatePerM2: COUNTERTOP_EXTRAS_RATES.fartukRatePerM2,
-    ostrovRatePerM2: COUNTERTOP_EXTRAS_RATES.ostrovRatePerM2,
+    complexShapeMultiplier: MISC.complexShapeMultiplier,
+    landingRates: null,
   };
 
-  return { rates, extraLineItems, extraDimensions: { bortikLengthM, fartukAreaM2, ostrovAreaM2 } };
+  return { rates, extraLineItems };
 }
 
 const stone = {
@@ -90,7 +88,7 @@ const stone = {
 const SCENARIOS = [
   {
     name: 'kitchen countertop, two simultaneous edge types + sink + cooktop + curb + backsplash, all options on',
-    productKey: 'stoleshnitsa_kuhnya',
+    productKey: 'stoleshnitsa_kuhnya', typeId: 'KITCHEN-11',
     values: {
       width: { value: '2000' }, length: { value: '600' },
       'edge-straight': { value: '2000' }, 'edge-chamfer': { value: '500' },
@@ -101,36 +99,32 @@ const SCENARIOS = [
   },
   {
     name: 'windowsill: edge work but no countertop extras',
-    productKey: 'podokonnik',
-    values: { width: { value: '1200' }, length: { value: '300' }, 'edge-round': { value: '1200' } },
+    productKey: 'podokonnik', typeId: 'SILL-01',
+    values: { width: { value: '1200' }, length: { value: '300' }, 'edge-round': { value: '1200' }, productSubcategory: { value: 'SILL-01' } },
   },
   {
     name: 'floor: no edge work, no countertop extras, all zero',
-    productKey: 'pol',
-    values: { width: { value: '3000' }, length: { value: '2000' } },
+    productKey: 'pol', typeId: 'FLOOR-01',
+    values: { width: { value: '3000' }, length: { value: '2000' }, productSubcategory: { value: 'FLOOR-01' } },
   },
   {
     name: 'floor: no supportsEdgeWork capability -- a stale edge field is NOT priced',
-    productKey: 'pol',
-    values: { width: { value: '3000' }, length: { value: '2000' }, 'edge-straight': { value: '500' } },
+    productKey: 'pol', typeId: 'FLOOR-01',
+    values: { width: { value: '3000' }, length: { value: '2000' }, 'edge-straight': { value: '500' }, productSubcategory: { value: 'FLOOR-01' } },
   },
 ];
 
-SCENARIOS.forEach(({ name, productKey, values }) => {
+SCENARIOS.forEach(({ name, productKey, typeId, values }) => {
   test(`legacy vs constructor-state pricing inputs match: ${name}`, () => {
     const doc = createFakeDoc(values);
     const product = PRODUCTS[productKey];
 
-    const legacy = legacyBuildPricingInputs(doc, product);
+    const legacy = legacyBuildPricingInputs(doc, product, typeId, stoneCoefficient(stone.category));
 
     const state = ConstructorState.readConstructorState({ doc, selectedProductKey: productKey, product, stone, hasAdditionalWork });
-    const fresh = ConstructorState.buildPricingInputs(state, {
-      productRates: WORK_RATES[productKey], miscFlatSum: MISC_FLAT_SUM, miscRatePerM2: MISC_RATE_PER_M2,
-      complexShapeMultiplier: COMPLEX_SHAPE_MULTIPLIER, countertopExtrasRates: COUNTERTOP_EXTRAS_RATES, getAdditionalWorkRate,
-    });
+    const fresh = ConstructorState.buildPricingInputs(state, { catalog: RateCatalog });
 
     assert.deepEqual(fresh.rates, legacy.rates);
-    assert.deepEqual(fresh.extraDimensions, legacy.extraDimensions);
     assert.deepEqual(fresh.extraLineItems, legacy.extraLineItems);
 
     const priceParams = {
@@ -140,7 +134,7 @@ SCENARIOS.forEach(({ name, productKey, values }) => {
     };
     const legacyResult = Pricing.calculatePrice(Object.assign({}, priceParams, legacy));
     // The work inputs are the legacy ones exactly...
-    const { job, groupRates, ...workInputs } = fresh;
+    const { job, groupRates, areaM2, ...workInputs } = fresh;
     const freshResult = Pricing.calculatePrice(Object.assign({}, priceParams, workInputs));
     assert.deepEqual(freshResult, legacyResult);
     // ...and the product's own parts (product-parts.js) change only the stone:

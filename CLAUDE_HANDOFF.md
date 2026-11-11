@@ -169,10 +169,10 @@ python D:\sayanmramor-site\scripts\dev_server.py
 
 | Файл | Роль |
 |---|---|
-| `product-types.js` | `PRODUCTS` (9 изделий, флаги), `WORK_RATES`, `RISER_WORK_RATES`, `COUNTERTOP_EXTRAS_RATES`, `COUNTERTOP_EXTRAS_INSTALL_RATES`, `SLAB_USAGE_LIMIT = 0.65`, `SAW_MARGIN_CM = 4`, `COMPLEX_SHAPE_MULTIPLIER = 1.5`, `MISC_*` = null, `hasAdditionalWork()` |
+| `product-types.js` | `PRODUCTS` (изделия, флаги), `SLAB_USAGE_LIMIT = 0.65`, `SAW_MARGIN_CM = 4`, `hasAdditionalWork()`. Ставок здесь нет (2026-11-11: все ставки -- в `rate-catalog.js`) |
 | `pricing.js` | Раскрой деталей на реальных слэбах (`planPieces`, `cutPieces`, `packSlab`/`shelfPack`, `minCostCover`, `planSurface`), `calculatePrice`, `computeWorkAndTotal`, лимиты `PRICING_LIMITS` |
 | `product-parts.js` | Состояние → «задание»: `{pieces}` или `{surfaceAreaM2}`; формы ступеней (радиусная, клин, пары «валетом») |
-| `constructor-state.js` | Чтение всего ввода, `buildPricingInputs` → `extraLineItems` |
+| `constructor-state.js` | Чтение всего ввода, `resolveTypeId`, `buildPricingInputs(state, { catalog: RateCatalog })` → ставки типа × коэффициент камня, `extraLineItems` |
 | `rate-catalog.js` | `PRODUCT_SUBCATEGORIES` (53), `ADDITIONAL_WORKS` (19), `INSTALLATION_RATES` (9, INST-100…108) — все `rate: null` |
 | `material-picker.js` | Выбор камня: поиск, фильтры **страна / тип / цвет**, сортировка |
 | `facade-model.js` | Доменная модель фасадов |
@@ -230,11 +230,12 @@ python D:\sayanmramor-site\scripts\dev_server.py
   (каждый слэб занят ≤ 65% — запас 35%; +4 см на распил с каждой стороны;
    деталь больше слэба делится швом по длине, если allowSeam)
   → самый дешёвый набор слэбов (minCostCover) → камень = Σ price_total_rub слэбов (слэб продаётся целиком)
-+ работа: WORK_RATES[product] ₽/м² × площадь (изготовление; монтаж и полировка — если выбраны)
-+ extraLineItems (кромка, вырезы, отверстия, стеновая панель, остров, барная стойка — rate-catalog, сейчас null)
-+ COUNTERTOP_EXTRAS_RATES (бортик ₽/м, фартук, остров ₽/м² — null)
-+ подступенки по RISER_WORK_RATES (null → «уточнит менеджер»)
-× 1.5 изготовление при «сложной форме»
++ работа: ставка выбранного типа (rate-catalog.js, KITCHEN-11..13 / BATH-01..03 по форме, у остальных -- тип с шага «Тип»)
+  ₽/м² × площадь; изготовление × коэффициент камня (STONE_COEFFICIENTS); монтаж и полировка -- если выбраны
++ площадки лестницы -- по STAIR-11
++ extraLineItems (кромка, вырезы, отверстия; бортик/фартук/стеновая панель/остров/барная стойка EXTRA-01..07 × коэффициент; их монтаж)
++ подступенки по RISER-00 (изготовление × коэффициент)
+× 1.5 изготовление при «сложной форме» (MISC.complexShapeMultiplier)
 ```
 
 - **`null` значит «ставка компании не задана».** По такой ставке 0 ₽, строка не показывается, страница пишет «уточнит менеджер». **Фиктивные ставки не подставляются.**
@@ -249,7 +250,8 @@ python D:\sayanmramor-site\scripts\dev_server.py
 
 ## E. Ставки
 
-- **`WORK_RATES`** (product-types.js) — **единственные ставки, которые реально идут в цену.** Клиент отдельного поля `fabricationRatePerM2` не видит.
+- **2026-11-11: ставки ниже -- история.** `WORK_RATES` и прочие константы ставок удалены из product-types.js; цена берёт ставки компании v2 из `rate-catalog.js` (см. docs/superpowers/specs/2026-11-08-company-rates-v2-design.md).
+- **`WORK_RATES`** (был в product-types.js) — прежние ставки, по которым шла цена до таблицы v2.
 
   | Продукт | Изготовление | Монтаж | Полировка | Источник |
   |---|---|---|---|---|
@@ -271,7 +273,7 @@ python D:\sayanmramor-site\scripts\dev_server.py
   - «Ставки изделий»: STAIR/PANEL/SILL/FLOOR/WALL/FACADE/BATH/KITCHEN/STEP + INST-100…108. ID совпадают с `rate-catalog.js`.
   - «Дополнительные работы»: CUT-01…07, EDGE-01/03/04/05/06, EXTRA-01…07.
   - «Логика цены»: формулы по строкам.
-- **Также `null`:** `RISER_WORK_RATES`, `COUNTERTOP_EXTRAS_RATES`, `COUNTERTOP_EXTRAS_INSTALL_RATES` (фартук, стеновая панель, остров, барная стойка), `MISC_FLAT_SUM` и `MISC_RATE_PER_M2` (замер, доставка, расходники — 15–25% КП, построчных данных нет).
+- **Были `null` (удалены 2026-11-11):** `RISER_WORK_RATES`, `COUNTERTOP_EXTRAS_RATES`, `COUNTERTOP_EXTRAS_INSTALL_RATES`, `MISC_FLAT_SUM`, `MISC_RATE_PER_M2` -- теперь RISER-00, EXTRA-01..07 и MISC в `rate-catalog.js`.
 - **Не менять структуру ставок без необходимости.** ID строк — общий язык с таблицей компании.
 
 ## G. UI конструктора столешниц

@@ -489,7 +489,7 @@
 
   // What the client reads when some of the product's own work has no rate:
   // «Стоимость изготовления уточнит менеджер.»
-  const UNPRICED_WORK_NAMES = { fabrication: 'изготовления', installation: 'монтажа', polish: 'полировки' };
+  const UNPRICED_WORK_NAMES = { fabrication: 'изготовления', installation: 'монтажа', polish: 'полировки', extras: 'дополнительных работ' };
   function unpricedWorkNote(unpriced) {
     const names = (unpriced || []).map(k => UNPRICED_WORK_NAMES[k]).filter(Boolean);
     if (!names.length) return null;
@@ -497,43 +497,53 @@
     return 'Стоимость ' + list + ' уточнит менеджер.';
   }
 
-  function computeWorkAndTotal(subtotal, area, rates, options, extraDimensions, extraLineItems) {
+  // The product's own work on `area` m² at `rates` (fabrication x the complex
+  // shape multiplier when chosen; installation and polish when chosen). A
+  // line asked for without a rate is null and named in `unpriced`.
+  function ownWork(area, rates, options, complexShapeMultiplier, unpriced) {
     const { installEnabled, polishEnabled, complexEnabled } = options;
-    const { bortikLengthM = 0, fartukAreaM2 = 0, ostrovAreaM2 = 0 } = extraDimensions || {};
+    const r = rates || {};
+    const mark = name => { if (!unpriced.includes(name)) unpriced.push(name); return null; };
+    const fabrication = !isRateSet(r.fabricationRatePerM2) ? mark('fabrication')
+      : r.fabricationRatePerM2 * (complexEnabled ? complexShapeMultiplier : 1) * area;
+    const installation = !installEnabled ? 0 : (!isRateSet(r.installationRatePerM2) ? mark('installation') : r.installationRatePerM2 * area);
+    const polish = !polishEnabled ? 0 : (!isRateSet(r.polishRatePerM2) ? mark('polish') : r.polishRatePerM2 * area);
+    return { fabrication, installation, polish };
+  }
+
+  // `area` -- the main parts at the type's rate; `landingAreaM2` -- a stair's
+  // landings, at rates.landingRates (STAIR-11). Both are summed into the
+  // fabrication / installation / polish lines; `landing` keeps the landings'
+  // own share.
+  function computeWorkAndTotal(subtotal, area, rates, options, extraLineItems, landingAreaM2) {
     // The product's own work that is asked for but has no rate yet: it is
     // not free -- its line, the work and the total stay unknown (null) and
     // `unpriced` names it; the stone (subtotal) is still what it is.
     const unpriced = [];
-    if (!isRateSet(rates.fabricationRatePerM2)) unpriced.push('fabrication');
-    if (installEnabled && !isRateSet(rates.installationRatePerM2)) unpriced.push('installation');
-    if (polishEnabled && !isRateSet(rates.polishRatePerM2)) unpriced.push('polish');
-    const fabrication = unpriced.includes('fabrication') ? null
-      : rates.fabricationRatePerM2 * (complexEnabled ? rates.complexShapeMultiplier : 1) * area;
-    const installation = !installEnabled ? 0 : (unpriced.includes('installation') ? null : rates.installationRatePerM2 * area);
-    const polish = !polishEnabled ? 0 : (unpriced.includes('polish') ? null : rates.polishRatePerM2 * area);
-    // miscFlatSum/miscRatePerM2/bortikRatePerM/fartukRatePerM2/ostrovRatePerM2
-    // are `null` in product-types.js until real КП data is available for
-    // each -- treat that as "not charged yet", not NaN.
-    const miscFlatSum = rates.miscFlatSum || 0;
-    const miscRatePerM2 = rates.miscRatePerM2 || 0;
-    const misc = miscFlatSum + miscRatePerM2 * area;
-    const bortikRatePerM = rates.bortikRatePerM || 0;
-    const fartukRatePerM2 = rates.fartukRatePerM2 || 0;
-    const ostrovRatePerM2 = rates.ostrovRatePerM2 || 0;
-    const extras = Math.max(0, bortikLengthM) * bortikRatePerM
-                 + Math.max(0, fartukAreaM2) * fartukRatePerM2
-                 + Math.max(0, ostrovAreaM2) * ostrovRatePerM2;
-    // Generic sum for the rate-catalog-backed additional works (cuts, holes,
-    // edge treatment, and the expanded "Дополнительно" items) -- each entry
-    // already carries its own resolved rate (or null, until the company
-    // fills in rate-catalog.js), so this needs no lookup of its own.
-    const catalogExtras = (extraLineItems || []).reduce(
-      (sum, item) => sum + Math.max(0, item.quantity) * (item.rate || 0),
+    const main = ownWork(area, rates, options, rates.complexShapeMultiplier, unpriced);
+    const landingArea = Math.max(0, landingAreaM2 || 0);
+    const landing = landingArea > 0
+      ? ownWork(landingArea, rates.landingRates, options, rates.complexShapeMultiplier, unpriced)
+      : { fabrication: 0, installation: 0, polish: 0 };
+    const sum = name => (main[name] === null || landing[name] === null ? null : main[name] + landing[name]);
+    const fabrication = sum('fabrication');
+    const installation = sum('installation');
+    const polish = sum('polish');
+    // «Прочее» (MISC-01..05) is not charged yet.
+    const misc = 0;
+    // The rate-catalog-backed additional works (cuts, holes, edge treatment,
+    // the countertop's elements and their installation) -- each entry carries
+    // its own resolved rate. A line without a rate (null) is the manager's:
+    // the work and the total stay unknown, never 0 ₽ for it.
+    const lines = extraLineItems || [];
+    if (lines.some(item => item.quantity > 0 && !isRateSet(item.rate))) unpriced.push('extras');
+    const catalogExtras = lines.reduce(
+      (s, item) => s + (isRateSet(item.rate) ? Math.max(0, item.quantity) * item.rate : 0),
       0
     );
-    const work = unpriced.length ? null : fabrication + installation + polish + misc + extras + catalogExtras;
+    const work = unpriced.length ? null : fabrication + installation + polish + misc + catalogExtras;
     const total = work === null ? null : subtotal + work;
-    return { fabrication, installation, polish, misc, extras, catalogExtras, work, total, unpriced };
+    return { fabrication, installation, polish, misc, catalogExtras, landing, work, total, unpriced };
   }
 
   // The online estimate's limits: a product past them is a project for a
@@ -578,7 +588,7 @@
     const {
       stone, widthM, lengthM, productType, marginCm,
       rates, installEnabled = false, polishEnabled = false, complexEnabled = false,
-      extraDimensions = {}, extraLineItems = [], allowSeam = true,
+      extraLineItems = [], allowSeam = true,
       // Optional, Type B only: the priced area when it is not width x length
       // (a facade's cladded surface -- see ConstructorState.buildPricingInputs).
       areaM2 = null,
@@ -595,7 +605,7 @@
     const job = givenJob || defaultJob(productType, widthM, lengthM, allowSeam, explicitArea ? areaM2 : null);
 
     const empty = {
-      subtotal: null, fabrication: null, installation: null, polish: null, misc: null, extras: null,
+      subtotal: null, fabrication: null, installation: null, polish: null, misc: null,
       catalogExtras: null, work: null, total: null, nSlabs: 0, remainderM2: null, matchedSlab: null, matchedSlabs: [],
       material: null, groups: [], unpriced: [], workNote: null
     };
@@ -626,9 +636,15 @@
     }
 
     // The product's own work (изготовление, монтаж, полировка) is counted on
-    // its main parts; parts with their own rates are counted separately.
+    // its main parts; a stair's landings (pieces 'landing') at their own
+    // rates (rates.landingRates, STAIR-11); parts with their own rates are
+    // counted separately.
     const options = { installEnabled, polishEnabled, complexEnabled };
-    const mainArea = jobArea(job, 'main');
+    const landingArea = job.pieces
+      ? job.pieces.filter(p => p.key === 'landing' && (p.group || 'main') === 'main')
+        .reduce((s, p) => s + p.areaM2 * Math.max(0, Math.round(p.count || 1)), 0)
+      : 0;
+    const mainArea = jobArea(job, 'main') - landingArea;
     const groups = [];
     if (job.pieces) {
       const otherKeys = Array.from(new Set(job.pieces.map(p => p.group || 'main').filter(g => g !== 'main')));
@@ -650,7 +666,7 @@
       });
     }
     const subtotal = material.subtotal;
-    const base = computeWorkAndTotal(subtotal, mainArea, rates, options, extraDimensions, extraLineItems);
+    const base = computeWorkAndTotal(subtotal, mainArea, rates, options, extraLineItems, landingArea);
     const groupWork = groups.reduce((s, g) => s + g.work, 0);
     // The product's own work without a rate (base.unpriced): the stone is
     // priced, the work and the total are left to the manager -- never a
@@ -661,7 +677,7 @@
     return {
       ok: true, reason: null, subtotal,
       fabrication: base.fabrication, installation: base.installation, polish: base.polish, misc: base.misc,
-      extras: base.extras, catalogExtras: base.catalogExtras, groupWork, work, total: work === null ? null : subtotal + work,
+      catalogExtras: base.catalogExtras, landing: base.landing, groupWork, work, total: work === null ? null : subtotal + work,
       unpriced: base.unpriced, workNote: unpricedWorkNote(base.unpriced),
       nSlabs: material.nSlabs,
       remainderM2: single ? material.slabAreaM2 - material.productAreaM2 : null,

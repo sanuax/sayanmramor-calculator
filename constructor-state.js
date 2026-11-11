@@ -16,6 +16,7 @@
   const Geometry = lazy('./visualizer/geometry-model.js', 'GeometryModel');
   const Parts = lazy('./product-parts.js', 'ProductParts');
   const Fireplace = lazy('./fireplace-model.js', 'FireplaceModel');
+  const Catalog = lazy('./rate-catalog.js', 'RateCatalog');
 
   // Products whose sizes are their own named fields (facade-model.js,
   // fireplace-model.js), not the generic width x length -- a value left in
@@ -309,83 +310,137 @@
     };
   }
 
+  // The catalog row of the chosen type (rate-catalog.js): a countertop's type
+  // is its shape (KITCHEN-11..13 / BATH-01..03), every other product's is the
+  // type picked on its «Тип» step (STAIR-xx, STEP-xx, PANEL-xx, FACADE-xx,
+  // FIREPLACE-xx ...). null -- no type yet.
+  function resolveTypeId(state) {
+    const productKey = state && state.product ? state.product.key : null;
+    return Catalog().countertopTypeId(productKey, state && state.shape)
+      || (state && state.subcategory && state.subcategory.id) || null;
+  }
+
+  const isRate = v => typeof v === 'number' && Number.isFinite(v);
+  // A rate x the stone coefficient; no rate stays no rate (null), never 0.
+  const times = (rate, k) => (isRate(rate) ? rate * k : null);
+  const NO_RATES = { fabricationRatePerM2: null, installationRatePerM2: null, polishRatePerM2: null };
+
+  // The integrated sink is priced per metre of its cut along the countertop
+  // (CUT-03, м.п.): the length the 3D draws (GeometryModel sink.cut.lengthM).
+  // No length -- null (the manager prices it), never 1 m.
+  function integratedSinkCutLengthM(state) {
+    try {
+      const model = Geometry().buildGeometryModel(state);
+      const len = model && model.sink && model.sink.cut ? model.sink.cut.lengthM : null;
+      return isRate(len) && len > 0 ? len : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // config.catalog -- the RateCatalog (rate-catalog.js), the only place the
+  // company's rates live. Work = the chosen type's rate; fabrication x the
+  // stone coefficient (RateCatalog.stoneCoefficient of state.stone.category,
+  // an unknown kind x1); installation and polish without it.
   function buildPricingInputs(state, config) {
-    const { productRates, miscFlatSum, miscRatePerM2, complexShapeMultiplier, countertopExtrasRates, getAdditionalWorkRate } = config;
+    const catalog = (config && config.catalog) || Catalog();
+    const k = catalog.stoneCoefficient(state.stone && state.stone.category);
+    const typeRates = catalog.getProductRates(resolveTypeId(state)) || NO_RATES;
+
+    // The product as it is cut (product-parts.js): its pieces or surface,
+    // the sizes still missing, and the parts with their own rates.
+    const job = state.product ? Parts().buildJob(state) : null;
+    // A stair's landings (pieces 'landing') are priced at STAIR-11, not at
+    // the type's rate (pricing.js calculatePrice).
+    const hasLandings = !!(job && job.pieces && job.pieces.some(p => p.key === 'landing'));
+    const landing = hasLandings ? (catalog.getProductRates('STAIR-11') || NO_RATES) : null;
 
     const rates = {
-      fabricationRatePerM2: productRates.fabricationRatePerM2,
-      installationRatePerM2: productRates.installationRatePerM2,
-      polishRatePerM2: productRates.polishRatePerM2,
-      miscFlatSum, miscRatePerM2, complexShapeMultiplier,
-      bortikRatePerM: countertopExtrasRates.bortikRatePerM,
-      fartukRatePerM2: countertopExtrasRates.fartukRatePerM2,
-      ostrovRatePerM2: countertopExtrasRates.ostrovRatePerM2,
+      fabricationRatePerM2: times(typeRates.fabricationRatePerM2, k),
+      installationRatePerM2: typeRates.installationRatePerM2,
+      polishRatePerM2: typeRates.polishRatePerM2,
+      complexShapeMultiplier: catalog.MISC.complexShapeMultiplier,
+      landingRates: landing ? {
+        fabricationRatePerM2: times(landing.fabricationRatePerM2, k),
+        installationRatePerM2: landing.installationRatePerM2,
+        polishRatePerM2: landing.polishRatePerM2,
+      } : null,
     };
 
     // Edge fields are read for every product (a leftover value survives a
     // product switch -- see readConstructorState), but edge work is only
-    // charged on a product that actually supports it. Today every edge rate
-    // is null, so this changes no price; it keeps a hidden edge from ever
-    // adding to the quote once real rates are filled in.
+    // charged on a product that actually supports it.
     const edgeSupported = !!(state.product && state.product.capabilities && state.product.capabilities.supportsEdgeWork);
-    let extraLineItems = edgeSupported
-      ? state.edgeLineItems.map(item => ({ rate: getAdditionalWorkRate(item.rateId), quantity: mmToM(item.lengthMm) }))
+    const extraLineItems = edgeSupported
+      ? state.edgeLineItems.map(item => ({ rate: catalog.getAdditionalWorkRate(item.rateId), quantity: mmToM(item.lengthMm) }))
       : [];
 
+    // Cuts and holes: the rate x the count, without the stone coefficient.
     const QUANTITY_ITEMS = [
-      ['CUT-01', state.sinkCounts.overlay], ['CUT-02', state.sinkCounts.undermount], ['CUT-03', state.sinkCounts.integrated],
+      ['CUT-01', state.sinkCounts.overlay], ['CUT-02', state.sinkCounts.undermount],
       ['CUT-04', state.cooktopCount],
       ['CUT-05', state.holeCounts.mixer], ['CUT-06', state.holeCounts.socket], ['CUT-07', state.holeCounts.dispenser],
     ];
     QUANTITY_ITEMS.forEach(([rateId, qty]) => {
-      if (qty > 0) extraLineItems.push({ rate: getAdditionalWorkRate(rateId), quantity: qty });
+      if (qty > 0) extraLineItems.push({ rate: catalog.getAdditionalWorkRate(rateId), quantity: qty });
     });
+    if (state.sinkCounts.integrated > 0) {
+      const lengthM = integratedSinkCutLengthM(state);
+      extraLineItems.push(lengthM === null
+        ? { rate: null, quantity: state.sinkCounts.integrated }
+        : { rate: catalog.getAdditionalWorkRate('CUT-03'), quantity: state.sinkCounts.integrated * lengthM });
+    }
 
-    const AREA_ITEMS = [
-      ['EXTRA-05', state.island.figured.widthM * state.island.figured.lengthM],
-      ['EXTRA-03', state.wallPanel.widthM * state.wallPanel.lengthM],
-      ['EXTRA-06', state.barCounter.standard.widthM * state.barCounter.standard.lengthM],
-      ['EXTRA-07', state.barCounter.complex.widthM * state.barCounter.complex.lengthM],
+    // The countertop's elements (EXTRA-01..07): their work x the stone
+    // coefficient, per metre (бортик) or per m² of the element.
+    const area = part => part.widthM * part.lengthM;
+    const ELEMENT_ITEMS = [
+      ['EXTRA-01', state.curbLengthM],
+      ['EXTRA-02', area(state.backsplash)],
+      ['EXTRA-03', area(state.wallPanel)],
+      ['EXTRA-04', area(state.island.standard)],
+      ['EXTRA-05', area(state.island.figured)],
+      ['EXTRA-06', area(state.barCounter.standard)],
+      ['EXTRA-07', area(state.barCounter.complex)],
     ];
-    AREA_ITEMS.forEach(([rateId, areaM2]) => {
-      if (areaM2 > 0) extraLineItems.push({ rate: getAdditionalWorkRate(rateId), quantity: areaM2 });
+    ELEMENT_ITEMS.forEach(([rateId, qty]) => {
+      if (qty > 0) extraLineItems.push({ rate: times(catalog.getAdditionalWorkRate(rateId), k), quantity: qty });
     });
-
-    const extraDimensions = {
-      bortikLengthM: state.curbLengthM,
-      fartukAreaM2: state.backsplash.widthM * state.backsplash.lengthM,
-      ostrovAreaM2: state.island.standard.widthM * state.island.standard.lengthM,
-    };
 
     // The priced area when it is not simply width x length: a facade's
     // cladded surface (all pieces) from facade-model.js. null = width x length.
     const facade = state.productConfig && state.productConfig.fasad;
     const areaM2 = facade ? facade.areaM2 : null;
 
-    // The product as it is cut (product-parts.js): its pieces or surface,
-    // the sizes still missing, and the parts with their own rates.
-    const job = state.product ? Parts().buildJob(state) : null;
-    // Подступенки: their own rates. A countertop's extra stone elements: their
-    // work is already the additional works above (extraDimensions /
-    // extraLineItems), so here only their stone counts.
-    const groupRates = [{ key: 'riser', rates: config.riserRates || null }, { key: 'extra', work: false }];
+    // Подступенки: RISER-00 (fabrication x the stone coefficient). A
+    // countertop's extra stone elements: their work is already the
+    // additional works above (extraLineItems), so here only their stone counts.
+    const riser = catalog.RISER_RATES;
+    const groupRates = [
+      { key: 'riser', rates: { fabricationRatePerM2: times(riser.fabricationRatePerM2, k), installationRatePerM2: riser.installationRatePerM2, polishRatePerM2: riser.polishRatePerM2 } },
+      { key: 'extra', work: false },
+    ];
 
-    // Монтаж of each extra stone element at its own rate
-    // (ProductTypes.COUNTERTOP_EXTRAS_INSTALL_RATES), only when «Монтаж» is on
-    // and the company has set that rate: a null rate adds nothing -- no line,
-    // no 0 ₽ -- and never falls back to the countertop's installation rate.
-    const installRates = config.extrasInstallRates || {};
+    // Монтаж of each extra stone element at its own rate (the «Монтаж»
+    // column of EXTRA-02..07), on the element's stone area, only when
+    // «Монтаж» is on: a missing rate adds nothing and never falls back to
+    // the countertop's installation rate.
+    const pick = (a, b, idA, idB) => (area(a) > 0 ? idA : (area(b) > 0 ? idB : null));
+    const INSTALL_IDS = {
+      backsplash: 'EXTRA-02',
+      wallPanel: 'EXTRA-03',
+      island: pick(state.island.standard, state.island.figured, 'EXTRA-04', 'EXTRA-05'),
+      barCounter: pick(state.barCounter.standard, state.barCounter.complex, 'EXTRA-06', 'EXTRA-07'),
+    };
     if (state.options && state.options.installEnabled && job && job.pieces) {
       job.pieces.filter(p => p.group === 'extra').forEach(p => {
-        const rate = installRates[p.key];
-        if (typeof rate === 'number' && Number.isFinite(rate)) {
-          extraLineItems.push({ rate, quantity: p.areaM2 * p.count, install: p.key });
-        }
+        const rate = INSTALL_IDS[p.key] ? catalog.getAdditionalWorkInstallRate(INSTALL_IDS[p.key]) : null;
+        if (isRate(rate)) extraLineItems.push({ rate, quantity: p.areaM2 * p.count, install: p.key });
       });
     }
 
-    return { rates, extraLineItems, extraDimensions, areaM2, job, groupRates };
+    return { rates, extraLineItems, areaM2, job, groupRates };
   }
 
-  return { readConstructorState, buildPricingInputs, STEP_COUNT_RANGE, STEP_COUNT_DEFAULTS, stepCountRange, isValidStepCount };
+  return { readConstructorState, buildPricingInputs, resolveTypeId, STEP_COUNT_RANGE, STEP_COUNT_DEFAULTS, stepCountRange, isValidStepCount };
 });

@@ -17,18 +17,15 @@ const { PRODUCTS, hasAdditionalWork } = ProductTypes;
 const STONE = { id: 's', name: 'S', slabs: [{ price_total_rub: 50000, width_cm: 320, length_cm: 200 }] };
 
 function pricingFor(productKey, values, getAdditionalWorkRate) {
-  const doc = createFakeDoc(Object.assign({ width: { value: '600' }, length: { value: '2000' } }, values));
+  // The product's first type of the company table (a countertop's type is its shape).
+  const firstType = RateCatalog.getSubcategoriesForProduct(PRODUCTS[productKey].label)[0].id;
+  const doc = createFakeDoc(Object.assign({ width: { value: '600' }, length: { value: '2000' }, productSubcategory: { value: firstType } }, values));
   const state = ConstructorState.readConstructorState({ doc, selectedProductKey: productKey, product: PRODUCTS[productKey], stone: STONE, hasAdditionalWork });
-  const inputs = ConstructorState.buildPricingInputs(state, {
-    productRates: ProductTypes.WORK_RATES[productKey],
-    miscFlatSum: ProductTypes.MISC_FLAT_SUM, miscRatePerM2: ProductTypes.MISC_RATE_PER_M2,
-    complexShapeMultiplier: ProductTypes.COMPLEX_SHAPE_MULTIPLIER,
-    countertopExtrasRates: ProductTypes.COUNTERTOP_EXTRAS_RATES,
-    getAdditionalWorkRate,
-  });
+  const catalog = Object.assign({}, RateCatalog, { getAdditionalWorkRate });
+  const inputs = ConstructorState.buildPricingInputs(state, { catalog });
   const result = Pricing.calculatePrice({
     stone: STONE, widthM: state.dimensions.widthM, lengthM: state.dimensions.lengthM, productType: PRODUCTS[productKey].type,
-    rates: inputs.rates, extraLineItems: inputs.extraLineItems, extraDimensions: inputs.extraDimensions,
+    rates: inputs.rates, extraLineItems: inputs.extraLineItems,
     marginCm: ProductTypes.SAW_MARGIN_CM, usageLimit: ProductTypes.SLAB_USAGE_LIMIT, allowSeam: PRODUCTS[productKey].allowSeam !== false,
   });
   return { inputs, result, state };

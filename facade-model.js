@@ -13,8 +13,8 @@
 // Adding a facade product = one entry in FACADE_TYPES (plus its catalog row
 // in rate-catalog.js, its card icon in the page and its 3D in
 // scene-layout.js). Commercial rates are NOT here: every facade product is
-// priced by the stone and WORK_RATES.fasad per m² of the area below, as
-// before -- no per-type rate exists in the company's data yet.
+// priced by the stone and its own type's row in rate-catalog.js
+// (FACADE-01..08, per m² of the area below).
 (function (root, factory) {
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = factory();

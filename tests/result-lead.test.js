@@ -39,16 +39,10 @@ function configFor(productKey, values, opts) {
 }
 
 function priceFor(productKey, state) {
-  const { rates, extraLineItems, extraDimensions } = ConstructorState.buildPricingInputs(state, {
-    productRates: ProductTypes.WORK_RATES[productKey],
-    miscFlatSum: ProductTypes.MISC_FLAT_SUM, miscRatePerM2: ProductTypes.MISC_RATE_PER_M2,
-    complexShapeMultiplier: ProductTypes.COMPLEX_SHAPE_MULTIPLIER,
-    countertopExtrasRates: ProductTypes.COUNTERTOP_EXTRAS_RATES,
-    getAdditionalWorkRate: RateCatalog.getAdditionalWorkRate,
-  });
+  const { rates, extraLineItems } = ConstructorState.buildPricingInputs(state, { catalog: RateCatalog });
   return Pricing.calculatePrice({
     stone: state.stone, widthM: state.dimensions.widthM, lengthM: state.dimensions.lengthM,
-    productType: PRODUCTS[productKey].type, rates, extraLineItems, extraDimensions,
+    productType: PRODUCTS[productKey].type, rates, extraLineItems,
     installEnabled: state.options.installEnabled, polishEnabled: state.options.polishEnabled, complexEnabled: state.options.complexEnabled,
     marginCm: ProductTypes.SAW_MARGIN_CM, usageLimit: ProductTypes.SLAB_USAGE_LIMIT,
   });
@@ -197,17 +191,14 @@ test('pricing summary comes from the existing pricing engine: same total, only n
   assert.ok(Math.abs(sum - pricing.total) <= pricing.lines.length, 'lines must add up to the total');
 });
 
-test('null-rate additional works add no price line (null rate = 0 contribution, not a fake price)', () => {
+test('an island adds its EXTRA-04 work (x the stone coefficient) and a works line to the price', () => {
   const state = readState('stoleshnitsa_kuhnya', {});
   const pricing = ResultModel.summarizePricing({ kind: 'ok', result: priceFor('stoleshnitsa_kuhnya', state) });
   const withWorks = readState('stoleshnitsa_kuhnya', { 'extra-ostrov-width': { value: '900' }, 'extra-ostrov-length': { value: '1800' } });
   const pricingWorks = ResultModel.summarizePricing({ kind: 'ok', result: priceFor('stoleshnitsa_kuhnya', withWorks) });
-  if (ProductTypes.COUNTERTOP_EXTRAS_RATES.ostrovRatePerM2 == null) {
-    assert.equal(pricingWorks.total, pricing.total);
-    assert.equal(pricingWorks.lines.some(l => l.key === 'works'), false);
-  } else {
-    assert.ok(pricingWorks.total > pricing.total);
-  }
+  // Delicato Brown is marble (x1): 0.9 x 1.8 m at EXTRA-04.
+  assert.equal(pricingWorks.total - pricing.total, Math.round(RateCatalog.getAdditionalWorkRate('EXTRA-04') * 0.9 * 1.8));
+  assert.equal(pricingWorks.lines.some(l => l.key === 'works'), true);
 });
 
 test('manual/incomplete pricing never produces a number', () => {

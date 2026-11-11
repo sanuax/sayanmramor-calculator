@@ -1,37 +1,28 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const ProductTypes = require('../product-types.js');
 const { CAMERA_PRESETS } = require('../visualizer/constants.js');
 
-test('WORK_RATES has an entry for every product type in PRODUCTS', () => {
-  const productKeys = Object.keys(ProductTypes.PRODUCTS);
-  const rateKeys = Object.keys(ProductTypes.WORK_RATES);
-  assert.deepEqual(rateKeys.sort(), productKeys.sort());
+// The company's rates live only in rate-catalog.js (table v2): product-types.js
+// keeps no rate, no complex-shape multiplier and no «Прочее» of its own.
+test('product-types.js carries no rates of its own -- they live only in rate-catalog.js', () => {
+  ['WORK_RATES', 'RISER_WORK_RATES', 'MISC_FLAT_SUM', 'MISC_RATE_PER_M2', 'COMPLEX_SHAPE_MULTIPLIER',
+    'COUNTERTOP_EXTRAS_RATES', 'COUNTERTOP_EXTRAS_INSTALL_RATES'].forEach(name => {
+    assert.equal(ProductTypes[name], undefined, name);
+  });
+  const src = fs.readFileSync(path.join(__dirname, '..', 'product-types.js'), 'utf8');
+  assert.doesNotMatch(src, /RatePerM2\s*:/);
 });
 
-// A rate is either the company's positive number or explicitly null («не
-// задано» -- pricing.js then leaves that work to the manager, never 0).
-// Only «Камины» has no rates yet; the nine products keep theirs.
-test('every WORK_RATES entry is a set positive rate or an explicit null (not set), never 0 or missing', () => {
-  for (const [type, rates] of Object.entries(ProductTypes.WORK_RATES)) {
-    ['fabricationRatePerM2', 'installationRatePerM2', 'polishRatePerM2'].forEach(k => {
-      assert.ok(k in rates, `${type}.${k} is declared`);
-      const v = rates[k];
-      assert.ok(v === null || (typeof v === 'number' && v > 0), `${type}.${k}: ${v}`);
-    });
-  }
-  const unset = Object.entries(ProductTypes.WORK_RATES).filter(([, r]) => r.fabricationRatePerM2 === null).map(([k]) => k);
-  assert.deepEqual(unset, ['kaminy']);
-});
-
-test('MISC_FLAT_SUM and MISC_RATE_PER_M2 are explicitly null until real data is available', () => {
-  assert.equal(ProductTypes.MISC_FLAT_SUM, null);
-  assert.equal(ProductTypes.MISC_RATE_PER_M2, null);
-});
-
-test('COMPLEX_SHAPE_MULTIPLIER is a number greater than 1', () => {
-  assert.equal(typeof ProductTypes.COMPLEX_SHAPE_MULTIPLIER, 'number');
-  assert.ok(ProductTypes.COMPLEX_SHAPE_MULTIPLIER > 1);
+test('every product has a type in rate-catalog.js whose fabrication rate is set', () => {
+  const RateCatalog = require('../rate-catalog.js');
+  Object.values(ProductTypes.PRODUCTS).forEach(product => {
+    const rows = RateCatalog.getSubcategoriesForProduct(product.label);
+    assert.ok(rows.length > 0, product.label);
+    rows.forEach(row => assert.ok(row.fabricationRatePerM2 > 0, row.id));
+  });
 });
 
 test('PRODUCTS entries no longer carry a complexityMultiplier field', () => {
@@ -44,13 +35,6 @@ test('the old multiplier-based constants are removed', () => {
   assert.equal(ProductTypes.WORK_MULTIPLIER, undefined);
   assert.equal(ProductTypes.HARDNESS_WORK_MULTIPLIER, undefined);
   assert.equal(ProductTypes.OPTION_SURCHARGE, undefined);
-});
-
-test('COUNTERTOP_EXTRAS_RATES has exactly the three expected fields, all null until real data is available', () => {
-  assert.deepEqual(Object.keys(ProductTypes.COUNTERTOP_EXTRAS_RATES).sort(), ['bortikRatePerM', 'fartukRatePerM2', 'ostrovRatePerM2']);
-  assert.equal(ProductTypes.COUNTERTOP_EXTRAS_RATES.bortikRatePerM, null);
-  assert.equal(ProductTypes.COUNTERTOP_EXTRAS_RATES.fartukRatePerM2, null);
-  assert.equal(ProductTypes.COUNTERTOP_EXTRAS_RATES.ostrovRatePerM2, null);
 });
 
 test('supportsCountertopExtras is true on exactly stoleshnitsa_kuhnya and stoleshnitsa_vannaya', () => {

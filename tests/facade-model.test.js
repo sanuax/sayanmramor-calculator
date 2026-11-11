@@ -17,7 +17,9 @@ const GeometryModel = require('../visualizer/geometry-model.js');
 const SceneLayout = require('../visualizer/scene-layout.js');
 const CameraFraming = require('../visualizer/camera-framing.js');
 
-const { PRODUCTS, hasAdditionalWork, WORK_RATES } = ProductTypes;
+const { PRODUCTS, hasAdditionalWork } = ProductTypes;
+// The facade type's fabrication rate (rate-catalog.js; STONE is marble, x1).
+const fabRate = id => RateCatalog.getProductRates(id).fabricationRatePerM2;
 const close = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-9, (msg || '') + ': ' + a + ' vs ' + b);
 
 // Plenty of priced stock, so every facade here gets a price.
@@ -45,16 +47,10 @@ function facadeOf(values) {
 }
 
 function priceOf(state) {
-  const { rates, extraLineItems, extraDimensions, areaM2 } = ConstructorState.buildPricingInputs(state, {
-    productRates: WORK_RATES.fasad,
-    miscFlatSum: ProductTypes.MISC_FLAT_SUM, miscRatePerM2: ProductTypes.MISC_RATE_PER_M2,
-    complexShapeMultiplier: ProductTypes.COMPLEX_SHAPE_MULTIPLIER,
-    countertopExtrasRates: ProductTypes.COUNTERTOP_EXTRAS_RATES,
-    getAdditionalWorkRate: RateCatalog.getAdditionalWorkRate,
-  });
+  const { rates, extraLineItems, areaM2 } = ConstructorState.buildPricingInputs(state, { catalog: RateCatalog });
   return Pricing.calculatePrice({
     stone: state.stone, widthM: state.dimensions.widthM, lengthM: state.dimensions.lengthM, areaM2,
-    productType: PRODUCTS.fasad.type, rates, extraLineItems, extraDimensions,
+    productType: PRODUCTS.fasad.type, rates, extraLineItems,
     installEnabled: false, polishEnabled: false, complexEnabled: false,
     marginCm: ProductTypes.SAW_MARGIN_CM, usageLimit: ProductTypes.SLAB_USAGE_LIMIT,
   });
@@ -141,7 +137,7 @@ test('Обрамление проёма: window = frame on 4 sides, door = on 3;
   const p1 = priceOf(stateFor(fields('FACADE-02', 'window', { openingWidth: W, openingHeight: H, frame: b }, 1)));
   const p4 = priceOf(stateFor(fields('FACADE-02', 'window', { openingWidth: W, openingHeight: H, frame: b }, 4)));
   assert.equal(p1.ok, true);
-  close(p1.fabrication, WORK_RATES.fasad.fabricationRatePerM2 * expected);
+  close(p1.fabrication, fabRate('FACADE-02') * expected);
   close(p4.fabrication, 4 * p1.fabrication);
   assert.ok(p4.total > p1.total);
 });
@@ -240,7 +236,7 @@ test('price: a facade is priced by its cladded area (not by leftover width/lengt
   const area = 4 * 2 * Math.PI * 0.2 * 3;
   const r = priceOf(state);
   assert.equal(r.ok, true);
-  close(r.fabrication, WORK_RATES.fasad.fabricationRatePerM2 * area);
+  close(r.fabrication, fabRate('FACADE-03') * area);
   // A round column's cladding is a surface: the slabs cover the area, each
   // used at most 65% (the 35% reserve).
   const surface = Pricing.planSurface(STONE.slabs, area, ProductTypes.SLAB_USAGE_LIMIT);
@@ -251,10 +247,7 @@ test('price: a facade is priced by its cladded area (not by leftover width/lengt
   const wallState = ConstructorState.readConstructorState({
     doc: createFakeDoc({ width: { value: '3000' }, length: { value: '2700' } }), selectedProductKey: 'stena', product: PRODUCTS.stena, stone: STONE, hasAdditionalWork,
   });
-  const inputs = ConstructorState.buildPricingInputs(wallState, {
-    productRates: WORK_RATES.stena, miscFlatSum: null, miscRatePerM2: null, complexShapeMultiplier: 1.5,
-    countertopExtrasRates: ProductTypes.COUNTERTOP_EXTRAS_RATES, getAdditionalWorkRate: RateCatalog.getAdditionalWorkRate,
-  });
+  const inputs = ConstructorState.buildPricingInputs(wallState, { catalog: RateCatalog });
   assert.equal(inputs.areaM2, null);
 });
 
@@ -432,7 +425,7 @@ test('the entablature over a group of columns: the chosen stone, visual-only -- 
   close(f4.areaM2, 4 * 2 * Math.PI * 0.2 * 3);
   const shafts = named(four, 'column').reduce((s, c) => s + 2 * Math.PI * 0.2 * (c.y1 - c.y0), 0);
   close(shafts, f4.areaM2);
-  close(priceOf(stateFor(fields('FACADE-03', 'round', sizes, 4))).fabrication, WORK_RATES.fasad.fabricationRatePerM2 * f4.areaM2);
+  close(priceOf(stateFor(fields('FACADE-03', 'round', sizes, 4))).fabrication, fabRate('FACADE-03') * f4.areaM2);
   // More than 6: still 6 drawn, all counted.
   const twenty = facadeOf(fields('FACADE-03', 'round', sizes, 20));
   close(twenty.areaM2, 20 * 2 * Math.PI * 0.2 * 3);

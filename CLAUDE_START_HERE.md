@@ -27,7 +27,7 @@
 ## Как устроен калькулятор
 
 - `sayanmramor-calculator.html` — шаги из `step-engine.js`, большой встроенный JS.
-- `product-types.js` — 9 `PRODUCTS`, capability flags, `WORK_RATES`.
+- `product-types.js` — `PRODUCTS`, capability flags (ставок нет).
 - `pricing.js` — раскрой на реальных слэбах, запас 35%.
 - `product-parts.js`, `constructor-state.js` — детали изделия и единое состояние.
 - `rate-catalog.js` — строки ставок, все `null`, только UI.
@@ -53,7 +53,7 @@ three.js r160:
 
 ## Где цены
 
-- `product-types.js` → `WORK_RATES`: реальные только у столешниц, пола и частично стен, остальное — оценки.
+- `rate-catalog.js` — единственное место ставок (таблица компании v2): ставка типа × коэффициент камня.
 - Логика — `docs\pricing-logic.md`.
 - Таблица для компании — `D:\calculator\Ставки_для_калькулятора.xlsx`: пустая, не в git.
 - `null` = не задано, фиктивных ставок не делать.
