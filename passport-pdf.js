@@ -204,6 +204,9 @@
     const rowH = r => wrap(r.name, 90).length * LH(TYPE.body) + 2 * CELL_PAD;
     const sectionH = LH(TYPE.body) + 2 * CELL_PAD;
     const totalH = 8;
+    // The note under the total (where the price is valid), in the small type.
+    const noteLines = spec.note ? wrap(spec.note, W) : [];
+    const noteH = noteLines.length ? noteLines.length * LH(TYPE.small) + 2 : 0;
     if (y + LH(TYPE.heading) + GAP / 2 + 6 + sectionH + GAP > BOTTOM - FOOT_H) newPage();
     heading('Спецификация', M);
     y += LH(TYPE.heading) + GAP / 2;
@@ -246,7 +249,7 @@
           font('body', 'normal');
           const lines = wrap(r.name, 90);
           const h = rowH(r);
-          room(r === lastRow ? h + 1.5 + totalH + FOOT_H : h);
+          room(r === lastRow ? h + 1.5 + totalH + noteH + FOOT_H : h);
           const by = y + CELL_PAD + LH(TYPE.body) * 0.75;
           doc.text(one(lines), cols[0].x, by);
           doc.text(r.unit || '', cols[1].x, by);
@@ -258,13 +261,18 @@
           doc.line(M, y, PAGE_W - M, y);
         });
       });
-      room(totalH + 1.5);
+      room(totalH + 1.5 + noteH);
       doc.setFillColor.apply(doc, ACCENT);
       doc.rect(M, y + 1.5, W, totalH, 'F');
       font('heading', 'bold', [255, 255, 255]);
       doc.text('Всего', M + 3, y + 1.5 + totalH / 2 + LH(TYPE.heading) * 0.25);
-      doc.text(rub(spec.totalRub) + NBSP + '₽', PAGE_W - M - 3, y + 1.5 + totalH / 2 + LH(TYPE.heading) * 0.25, { align: 'right' });
+      doc.text(rub(spec.totalRub) + NBSP + '₽' + (noteLines.length ? '*' : ''), PAGE_W - M - 3, y + 1.5 + totalH / 2 + LH(TYPE.heading) * 0.25, { align: 'right' });
       y += totalH + 1.5;
+      if (noteLines.length) {
+        font('small', 'normal', MUTED);
+        doc.text(noteLines, M + 3, y + 1 + LH(TYPE.small) * 0.75);
+        y += noteH;
+      }
     }
 
     // The foot hangs at the page's bottom: the prices' date and the way back to the 3D model.

@@ -151,6 +151,16 @@ test('edge row uses the edge cards\' own title, and only for products that suppo
   // 3D scene for the price (edge-length.js); the row shows the profile.
   assert.equal(edge.detail, '');
   assert.equal(configFor('podokonnik', {}).edge, null, 'no edge selected -> no row');
+  // With the measured open-edge length (EdgeLength, Task 6) the row shows it.
+  const measured = ResultModel.buildResultView(ResultModel.buildConfiguration({
+    state: readState('podokonnik', { 'edge-type': { value: 'rounding' } }), productLabel: PRODUCTS.podokonnik.label,
+    subcategory: null, edgeTitles: EDGE_TITLES, edgeLengthM: 4.2,
+  })).specs.find(s => s.key === 'edge');
+  assert.equal(measured.detail, '4,20 м.п.');
+  assert.equal(ResultModel.buildConfiguration({
+    state: readState('podokonnik', { 'edge-type': { value: 'rounding' } }), productLabel: PRODUCTS.podokonnik.label,
+    subcategory: null, edgeTitles: EDGE_TITLES, edgeLengthM: 4.2,
+  }).edge.lengthM, 4.2);
 });
 
 // --- 7. additional works -----------------------------------------------------
@@ -190,7 +200,71 @@ test('pricing summary comes from the existing pricing engine: same total, only n
   assert.equal(pricing.lines[0].amountRub, 44315);
   pricing.lines.forEach(line => assert.ok(line.amountRub > 0, line.key + ' must not be a 0 ₽ line'));
   const sum = pricing.lines.reduce((s, l) => s + l.amountRub, 0);
-  assert.ok(Math.abs(sum - pricing.total) <= pricing.lines.length, 'lines must add up to the total');
+  assert.equal(sum, pricing.total, 'lines must add up to the total exactly');
+});
+
+// A result with every line of the v2 rates in it; the fractions are the ones
+// that make independently rounded lines drift (the exact sum is 250 156,80).
+function everyLineResult() {
+  return {
+    ok: true, subtotal: 44315, fabrication: 62400.4, installation: 31200.3, polish: 28080.2, lighting: 7800.1,
+    seams: { count: 2, amount: 50000 }, catalogExtras: 4000.45, groupWork: 0,
+    measure: 5000, delivery: 8000, unloading: 9360.35, misc: 22360.35,
+    minOrderApplied: false, minOrderTopUp: 0, total: 250156.8, nSlabs: 1,
+  };
+}
+
+test('summary lists lighting, seams, measure, delivery, unloading, in the order of the rates table, adding up exactly', () => {
+  const pricing = ResultModel.summarizePricing({ kind: 'ok', result: everyLineResult() }, '2026-09-15');
+  assert.deepEqual(pricing.lines.map(l => l.key), [
+    'stone', 'fabrication', 'installation', 'polish', 'lighting', 'seams', 'works', 'measure', 'delivery', 'unloading',
+  ]);
+  assert.deepEqual(pricing.lines.map(l => l.label), [
+    'Камень', 'Изготовление', 'Монтаж', 'Полировка', 'Подсветка', 'Швы (переполировка)',
+    'Кромка и дополнительные работы', 'Замер', 'Доставка', 'Разгрузка и расходные материалы',
+  ]);
+  assert.equal(pricing.total, 250157);
+  // Each line is its exact sum rounded; the 2 rubles the rounding lost go to
+  // the lines whose fractions were the largest (.45 and .4).
+  assert.deepEqual(pricing.lines.map(l => l.amountRub), [44315, 62401, 31200, 28080, 7800, 50000, 4001, 5000, 8000, 9360]);
+  assert.equal(pricing.lines.reduce((s, l) => s + l.amountRub, 0), 250157);
+});
+
+test('the risers work is its own line after the works line; seams never ride in the works line', () => {
+  const result = Object.assign(everyLineResult(), { groupWork: 12000, total: 262156.8 });
+  const pricing = ResultModel.summarizePricing({ kind: 'ok', result }, null);
+  const keys = pricing.lines.map(l => l.key);
+  assert.deepEqual(keys.slice(keys.indexOf('works')), ['works', 'parts', 'measure', 'delivery', 'unloading']);
+  assert.equal(pricing.lines.find(l => l.key === 'works').amountRub, 4001);
+  assert.equal(pricing.lines.find(l => l.key === 'parts').amountRub, 12000);
+  assert.equal(pricing.lines.reduce((s, l) => s + l.amountRub, 0), pricing.total);
+});
+
+test('minimum order top-up line: the last line, the lines add up to 20 000', () => {
+  const result = {
+    ok: true, subtotal: 5000, fabrication: 3000.5, installation: 0, polish: 0, lighting: 0, seams: null,
+    catalogExtras: 0, groupWork: 0, measure: 0, delivery: 0, unloading: 1000.5, misc: 1000.5,
+    minOrderApplied: true, minOrderTopUp: 10999, total: 20000, nSlabs: 1,
+  };
+  const pricing = ResultModel.summarizePricing({ kind: 'ok', result }, null);
+  assert.equal(pricing.total, 20000);
+  const last = pricing.lines[pricing.lines.length - 1];
+  assert.equal(last.key, 'minOrder');
+  assert.equal(last.label, 'Доплата до минимального заказа');
+  assert.equal(last.amountRub, 10999);
+  assert.deepEqual(pricing.lines.map(l => l.key), ['stone', 'fabrication', 'unloading', 'minOrder']);
+  assert.equal(pricing.lines.reduce((s, l) => s + l.amountRub, 0), 20000);
+});
+
+test('the lead payload carries the new lines in its breakdown', () => {
+  const state = readState('stoleshnitsa_kuhnya', {});
+  const configuration = ResultModel.buildConfiguration({ state, productLabel: PRODUCTS.stoleshnitsa_kuhnya.label, subcategory: null, edgeTitles: EDGE_TITLES, edgeLengthM: 2.4 });
+  const pricing = ResultModel.summarizePricing({ kind: 'ok', result: everyLineResult() }, '2026-09-15');
+  const p = LeadPayload.buildLeadPayload({ configuration, pricing, contact: CONTACT, createdAt: '2026-09-23T10:00:00.000Z' });
+  assert.deepEqual(p.pricing.breakdown.map(l => l.key), pricing.lines.map(l => l.key));
+  assert.ok(p.pricing.breakdown.some(l => l.key === 'seams' && l.amountRub === 50000));
+  assert.equal(p.pricing.total, 250157);
+  assert.doesNotThrow(() => JSON.stringify(p));
 });
 
 test('an island adds its EXTRA-04 work (x the stone coefficient) and a works line to the price', () => {

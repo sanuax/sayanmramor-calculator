@@ -26,6 +26,13 @@
     kaminy: 'Камин',
   };
   const MANUAL_TEXT = 'Стоимость рассчитает менеджер';
+  // Under the total (and as an asterisk on it): where the price is valid.
+  const REGION_NOTE = '* Расчёт указан для объектов, находящихся в Москве и Московской области';
+
+  // The result lines' own rounding (result-model.js, loaded before this).
+  const ResultModel = (typeof module !== 'undefined' && module.exports)
+    ? require('./result-model.js')
+    : (typeof window !== 'undefined' ? window : globalThis).ResultModel;
 
   // A flat product seen from the side is a thin line -- no such shot.
   const FLAT_PRODUCTS = ['panno', 'pol', 'stena', 'fasad'];
@@ -75,7 +82,10 @@
 
   function worksName(configuration) {
     const parts = [];
-    if (configuration.edge) parts.push('Кромка: ' + configuration.edge.label);
+    if (configuration.edge) {
+      const length = configuration.edge.lengthM > 0 ? ', ' + configuration.edge.lengthM.toFixed(2).replace('.', ',') + ' м.п.' : '';
+      parts.push('Кромка: ' + configuration.edge.label + length);
+    }
     (configuration.additionalWorks || []).forEach(w => {
       parts.push(w.label + (w.quantity ? ' ' + w.quantity + ' ' + w.unit : ''));
     });
@@ -90,49 +100,57 @@
       return { manual: (pricing && pricing.status !== 'ok' && pricing.message) || MANUAL_TEXT };
     }
     const rates = (pricingInputs && pricingInputs.rates) || {};
+    const miscRates = rates.misc || {};
     const area = pricingInputs && pricingInputs.mainAreaM2 ? areaShown(pricingInputs.mainAreaM2) : null;
     const perM2 = (rate, mult) => (typeof rate === 'number' && rate > 0 ? rate * (mult || 1) : null);
     const complexMult = pricingInputs && pricingInputs.complexEnabled ? rates.complexShapeMultiplier : 1;
     const stoneName = (configuration.material && configuration.material.name) || 'камня';
+    // A stair's landings are at their own rates (STAIR-11): when one of them
+    // differs from the type's, the work is not one rate x one area, and the
+    // row shows the amount that was calculated with no rate per m2 on it.
+    const landingRates = rates.landingRates;
+    const mixed = (work, rateKey) => !!(landingRates && result.landing && result.landing[work] > 0 && landingRates[rateKey] !== rates[rateKey]);
+    const perM2Of = (work, rateKey, mult) => (mixed(work, rateKey) ? null : perM2(rates[rateKey], mult));
+    // The quantity a rate gives the row's sum (the lighting is counted on
+    // the main area, the unloading on the area of all the stone).
+    const qtyOf = (exact, rate) => (rate > 0 ? areaShown(exact / rate) : null);
+
+    const stone = stoneRows(result, stoneName);
+    // Every row after the stone takes the rounded amount of its line: the very
+    // amounts of the Result's lines (ResultModel.summarizePricing).
+    const totalRub = pricing.total;
+    const worked = ResultModel.lineCandidates(result).filter(c => c.key !== 'stone' && typeof c.amount === 'number' && c.amount > 0);
+    const rubles = ResultModel.roundToTotal(worked.map(c => c.amount), totalRub, stone.reduce((s, r) => s + Math.round(r.amount), 0));
+    const amountOf = {};
+    worked.forEach((c, i) => { amountOf[c.key] = rubles[i]; });
+    const row = (key, name, unit, qty, priceRub) => ({ name, unit, qty, priceRub, amountRub: amountOf[key] });
+    const seams = result.seams && result.seams.count > 0 ? result.seams : null;
 
     const sections = [
-      { title: 'Камень', rows: stoneRows(result, stoneName) },
+      { title: 'Камень', rows: stone.map(({ amount, ...r }) => Object.assign(r, { amountRub: Math.round(amount) })) },
       { title: 'Изготовление', rows: [
-        { name: 'Изготовление изделия' + (pricingInputs && pricingInputs.complexEnabled ? ', сложная форма' : ''), unit: 'м²', qty: area, priceRub: perM2(rates.fabricationRatePerM2, complexMult), amount: money(result.fabrication) },
-        { name: 'Полировка', unit: 'м²', qty: area, priceRub: perM2(rates.polishRatePerM2), amount: money(result.polish) },
-        { name: 'Подступенки - работы', unit: null, qty: null, priceRub: null, amount: money(result.groupWork) },
-      ] },
-      { title: 'Подсветка', rows: [
-        { name: 'Подсветка камня', unit: 'м²', qty: area, priceRub: perM2(rates.lightingRatePerM2), amount: money(result.lighting) },
+        row('fabrication', 'Изготовление изделия' + (pricingInputs && pricingInputs.complexEnabled ? ', сложная форма' : ''), 'м²', area, perM2Of('fabrication', 'fabricationRatePerM2', complexMult)),
+        row('polish', 'Полировка', 'м²', area, perM2Of('polish', 'polishRatePerM2')),
+        row('parts', 'Подступенки - работы', null, null, null),
       ] },
       { title: 'Монтаж', rows: [
-        { name: 'Монтаж', unit: 'м²', qty: area, priceRub: perM2(rates.installationRatePerM2), amount: money(result.installation) },
+        row('installation', 'Монтаж', 'м²', area, perM2Of('installation', 'installationRatePerM2')),
+      ] },
+      { title: 'Подсветка', rows: [
+        row('lighting', 'Подсветка камня', 'м²', qtyOf(result.lighting, rates.lightingRatePerM2) || area, perM2(rates.lightingRatePerM2)),
       ] },
       { title: 'Кромка и дополнительные работы', rows: [
-        { name: worksName(configuration), unit: null, qty: null, priceRub: null, amount: money(result.extras) + money(result.catalogExtras) + money(result.seams && result.seams.amount) },
+        row('seams', 'Швы (переполировка)', 'шт.', seams ? seams.count : null, seams && seams.amount > 0 ? seams.amount / seams.count : null),
+        row('works', worksName(configuration), null, null, null),
       ] },
       { title: 'Прочее', rows: [
-        { name: 'Прочие работы', unit: null, qty: null, priceRub: null, amount: money(result.misc) },
-        { name: 'Доплата до минимального заказа', unit: null, qty: null, priceRub: null, amount: money(result.minOrderTopUp) },
+        row('measure', 'Замер', null, null, null),
+        row('delivery', 'Доставка', null, null, null),
+        row('unloading', 'Разгрузка и расходные материалы', 'м²', qtyOf(result.unloading, miscRates.perM2), perM2(miscRates.perM2)),
+        row('minOrder', 'Доплата до минимального заказа', null, null, null),
       ] },
-    ].map(s => ({ title: s.title, rows: s.rows.filter(r => r.amount > 0) })).filter(s => s.rows.length);
-
-    // Largest remainder: the rubles the rounding lost or gained go, one each,
-    // to the rows whose exact sums were closest to rounding the other way --
-    // never to a whole-ruble row (a slab: price x quantity stays exact).
-    const totalRub = pricing.total;
-    const rows = [];
-    sections.forEach(s => s.rows.forEach(r => { r.amountRub = Math.round(r.amount); rows.push(r); }));
-    let left = totalRub - rows.reduce((sum, r) => sum + r.amountRub, 0);
-    const step = Math.sign(left);
-    const candidates = rows.filter(r => r.amount !== Math.round(r.amount))
-      .sort((a, b) => step * ((b.amount - b.amountRub) - (a.amount - a.amountRub)));
-    for (let i = 0; left !== 0 && candidates.length; i = (i + 1) % candidates.length) {
-      candidates[i].amountRub += step;
-      left -= step;
-    }
-    rows.forEach(r => { delete r.amount; });
-    return { sections, totalRub };
+    ].map(s => ({ title: s.title, rows: s.rows.filter(r => r.amountRub > 0) })).filter(s => s.rows.length);
+    return { sections, totalRub, note: REGION_NOTE };
   }
 
   function buildPassport({ configuration, pricing, result, pricingInputs, view, stone, createdAt, random4, link, defaultPreset }) {

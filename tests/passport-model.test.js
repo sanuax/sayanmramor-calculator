@@ -109,7 +109,7 @@ test('the rows add up to the total exactly, even when each row rounds up', () =>
   const k = kitchen({});
   const result = Object.assign({}, k.result, {
     subtotal: 50000, matchedSlabs: [{ price_total_rub: 50000, width_cm: 300, length_cm: 180 }], nSlabs: 1,
-    fabrication: 1000.5, installation: 2000.5, polish: 0, extras: 300.5, catalogExtras: 0, groupWork: 0, misc: 0,
+    fabrication: 1000.5, installation: 2000.5, polish: 0, catalogExtras: 300.5, groupWork: 0, misc: 0, unloading: 0,
   });
   result.total = 50000 + 1000.5 + 2000.5 + 300.5;
   const pricing = Object.assign({}, k.pricing, { total: Math.round(result.total) });
@@ -185,9 +185,11 @@ test('an L countertop\'s seam (SEAM-01) is in the rows, which still add up to th
   assert.equal(pricing.lines.reduce((s, l) => s + l.amountRub, 0), pricing.total, 'result lines add up');
   const spec = PassportModel.buildSpecification({ configuration, pricing, result, pricingInputs: { rates: inputs.rates, mainAreaM2: inputs.job.mainAreaM2 } });
   assert.equal(sumRows(spec), pricing.total);
-  // Until the seams get a row of their own, they ride in the works row.
-  assert.equal(pricing.lines.find(l => l.key === 'works').amountRub, 25000);
-  assert.equal(spec.sections.find(sec => sec.title === 'Кромка и дополнительные работы').rows[0].amountRub, 25000);
+  // The seams have their own line and row (SEAM-01 x 25 000 per seam).
+  assert.equal(pricing.lines.find(l => l.key === 'seams').amountRub, 25000);
+  assert.equal(pricing.lines.some(l => l.key === 'works'), false);
+  const seamRow = spec.sections.find(sec => sec.title === 'Кромка и дополнительные работы').rows[0];
+  assert.deepEqual([seamRow.name, seamRow.unit, seamRow.qty, seamRow.priceRub, seamRow.amountRub], ['Швы (переполировка)', 'шт.', 1, 25000, 25000]);
 });
 
 test('a minimum-order top-up has its own line and row, so lines and rows still add up to the 20 000 total', () => {
@@ -205,8 +207,77 @@ test('a minimum-order top-up has its own line and row, so lines and rows still a
   const pricing = ResultModel.summarizePricing({ kind: 'ok', result }, UPDATED_AT);
   assert.equal(pricing.total, 20000);
   assert.ok(pricing.lines.some(l => l.key === 'minOrder' && l.amountRub > 0));
-  assert.ok(Math.abs(pricing.lines.reduce((s, l) => s + l.amountRub, 0) - 20000) <= pricing.lines.length, 'result lines add up');
+  assert.equal(pricing.lines.reduce((s, l) => s + l.amountRub, 0), 20000, 'result lines add up exactly');
   const spec = PassportModel.buildSpecification({ configuration, pricing, result, pricingInputs: { rates: inputs.rates, mainAreaM2: inputs.job.mainAreaM2 } });
   assert.equal(sumRows(spec), 20000);
   assert.ok(spec.sections.some(sec => sec.rows.some(r => r.name === 'Доплата до минимального заказа')));
+});
+
+// Every line of the v2 rates in one result (the fractions are the ones that
+// make independently rounded rows drift; the exact sum is 250 156,80).
+function everyLine(k) {
+  const result = Object.assign({}, k.result, {
+    subtotal: 44315, matchedSlabs: [{ price_total_rub: 44315, width_cm: 300, length_cm: 180 }], nSlabs: 1,
+    fabrication: 62400.4, installation: 31200.3, polish: 28080.2, lighting: 7800.1,
+    seams: { count: 2, amount: 50000 }, catalogExtras: 4000.45, groupWork: 0,
+    measure: 5000, delivery: 8000, unloading: 9360.35, misc: 22360.35, minOrderApplied: false, minOrderTopUp: 0, total: 250156.8,
+  });
+  const rates = Object.assign({}, k.pricingInputs.rates, { fabricationRatePerM2: 40000, installationRatePerM2: 20000, polishRatePerM2: 18000, lightingRatePerM2: 5000, misc: { perM2: 6000 } });
+  return Object.assign({}, k, { result, pricing: Object.assign({}, k.pricing, { total: 250157 }), pricingInputs: Object.assign({}, k.pricingInputs, { rates }) });
+}
+
+test('specification rows add up to the total with the new lines, the same amounts as the result lines', () => {
+  const k = everyLine(kitchen({ 'opt-install': { checked: true } }));
+  const lines = ResultModel.summarizePricing({ kind: 'ok', result: k.result }, UPDATED_AT).lines;
+  const spec = PassportModel.buildSpecification(k);
+  assert.equal(spec.totalRub, 250157);
+  assert.equal(sumRows(spec), 250157);
+  assert.deepEqual(spec.sections.map(s => s.title), ['Камень', 'Изготовление', 'Монтаж', 'Подсветка', 'Кромка и дополнительные работы', 'Прочее']);
+  const rows = spec.sections.flatMap(s => s.rows);
+  assert.deepEqual(rows.map(r => r.amountRub), [44315, 62401, 28080, 31200, 7800, 50000, 4001, 5000, 8000, 9360]);
+  assert.deepEqual(rows.map(r => r.name).slice(-4), ['Кромка и дополнительные работы', 'Замер', 'Доставка', 'Разгрузка и расходные материалы']);
+  // Row by row the very amounts of the result lines.
+  const byAmount = rows.map(r => r.amountRub).sort((a, b) => a - b);
+  assert.deepEqual(byAmount, lines.map(l => l.amountRub).sort((a, b) => a - b));
+});
+
+test('the unloading row shows the stone area and the MISC rate it is made of', () => {
+  const k = everyLine(kitchen({}));
+  k.result.unloading = 9360; // 6 000 per m2 of the 1,56 m2 of stone
+  k.pricing.total = 250157 - 1;
+  const row = PassportModel.buildSpecification(k).sections.find(s => s.title === 'Прочее').rows.find(r => r.name === 'Разгрузка и расходные материалы');
+  assert.equal(row.unit, 'м²');
+  assert.equal(row.priceRub, 6000);
+  assert.equal(row.qty, 1.56);
+  const measure = PassportModel.buildSpecification(k).sections.find(s => s.title === 'Прочее').rows.find(r => r.name === 'Замер');
+  assert.deepEqual([measure.unit, measure.qty, measure.priceRub, measure.amountRub], [null, null, null, 5000]);
+});
+
+test('a stair fabrication that mixes the type rate and the landing rate shows its real amount and no rate per m2', () => {
+  const k = kitchen({});
+  const mixed = Object.assign({}, k, {
+    result: Object.assign({}, k.result, { fabrication: 100000, polish: 0, installation: 0, lighting: 0, catalogExtras: 0, misc: 0, unloading: 0, measure: 0, delivery: 0, landing: { fabrication: 24000, installation: 0, polish: 0 }, total: k.result.subtotal + 100000 }),
+    pricing: Object.assign({}, k.pricing, { total: Math.round(k.result.subtotal) + 100000 }),
+    pricingInputs: { rates: { fabricationRatePerM2: 50000, landingRates: { fabricationRatePerM2: 30000 } }, mainAreaM2: 2, complexEnabled: false },
+  });
+  const fab = PassportModel.buildSpecification(mixed).sections.find(s => s.title === 'Изготовление').rows[0];
+  assert.equal(fab.amountRub, 100000);
+  assert.equal(fab.priceRub, null, 'no single rate: two are mixed');
+  assert.equal(sumRows(PassportModel.buildSpecification(mixed)), mixed.pricing.total);
+  // The landing at the very same rate: the one rate is still honest.
+  const same = Object.assign({}, mixed, { pricingInputs: { rates: { fabricationRatePerM2: 50000, landingRates: { fabricationRatePerM2: 50000 } }, mainAreaM2: 2, complexEnabled: false } });
+  const fab2 = PassportModel.buildSpecification(same).sections.find(s => s.title === 'Изготовление').rows[0];
+  assert.equal(fab2.priceRub, 50000);
+  assert.equal(fab2.qty, 2);
+});
+
+test('passport carries the Moscow note under the total', () => {
+  const NOTE = '* Расчёт указан для объектов, находящихся в Москве и Московской области';
+  const k = kitchen({ 'opt-install': { checked: true } });
+  assert.equal(PassportModel.buildSpecification(k).note, NOTE);
+  const doc = PassportModel.buildPassport(Object.assign({}, k, {
+    view: ResultModel.buildResultView(k.configuration), stone: STONE, createdAt: new Date(2026, 9, 20), random4: 173, link: 'http://x/?pv=1', defaultPreset: 'iso-eye-level',
+  }));
+  assert.equal(doc.specification.note, NOTE);
+  assert.equal(PassportModel.buildSpecification({ result: null, pricing: { status: 'manual', message: 'm' } }).note, undefined, 'no total, no note');
 });

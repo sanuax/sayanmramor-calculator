@@ -4769,7 +4769,7 @@
       return { state: constructorState, outcome: { kind: 'manual', reason: 'unpriced_work', message: warningOut.textContent } };
     }
     const message = warningOut.textContent || null;
-    return { state: constructorState, outcome: { kind: 'ok', result, message }, pricingInputs: { rates, mainAreaM2: job.mainAreaM2, complexEnabled } };
+    return { state: constructorState, outcome: { kind: 'ok', result, message }, pricingInputs: { rates, mainAreaM2: job.mainAreaM2, complexEnabled }, edgeLengthM };
   }
 
   [widthInput, lengthInput].forEach(el => {
@@ -4993,6 +4993,7 @@
       subcategory: row ? { id: row.id, label: subcategoryLabel(row, stairRisersInput.checked), unit: row.unit } : null,
       edgeTitles: EDGE_TITLES,
       dimensionLabels: currentDimLabels,
+      edgeLengthM: snap.edgeLengthM || 0,
     });
     return {
       configuration, pricing: ResultModel.summarizePricing(snap.outcome, UPDATED_AT),

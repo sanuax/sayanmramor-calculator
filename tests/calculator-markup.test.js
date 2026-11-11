@@ -376,7 +376,9 @@ test('the passport modules load with the page; the PDF / QR libraries only on th
 });
 
 test('the price snapshot keeps what the passport\'s table needs: the rates, the area and the complex-shape choice', () => {
-  assert.match(html, /return \{ state: constructorState, outcome: \{ kind: 'ok', result, message \}, pricingInputs: \{ rates, mainAreaM2: job\.mainAreaM2, complexEnabled \} \};/);
+  assert.match(html, /return \{ state: constructorState, outcome: \{ kind: 'ok', result, message \}, pricingInputs: \{ rates, mainAreaM2: job\.mainAreaM2, complexEnabled \}, edgeLengthM \};/);
+  // The measured open-edge length goes to the Result's edge row.
+  assert.match(html, /edgeLengthM: snap\.edgeLengthM \|\| 0,/);
 });
 
 // ---- One request (2026-10-26, the owner): the site's «Получить расчёт» is where contacts are left ----

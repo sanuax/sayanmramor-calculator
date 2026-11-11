@@ -186,3 +186,20 @@ test('a page never carries the foot alone: when the table does not fit, the spec
   assert.ok(last.includes('Всего'), "the total on the foot's page");
   assert.ok(last.includes('Наименование'), 'and the table with it');
 });
+
+test('the total carries an asterisk and the Moscow note stands under it', () => {
+  const NOTE = '* Расчёт указан для объектов, находящихся в Москве и Московской области';
+  const base = passportDoc();
+  const doc = passportDoc({ specification: Object.assign({}, base.specification, { note: NOTE }) });
+  const { Recording, pages } = recordingJsPDF();
+  const bytes = PassportPdf.renderPassportPdf(doc, assets(), { jsPDF: Recording, qrcode });
+  assert.equal(pageCount(bytes), 1);
+  const lines = pages[0];
+  const totalAt = lines.findIndex(l => /130.115/.test(l));
+  assert.ok(totalAt >= 0 && /₽\*$/.test(lines[totalAt]), 'the total ends with an asterisk: ' + lines[totalAt]);
+  assert.ok(lines.slice(totalAt).some(l => l.includes(NOTE)), 'the note under the total');
+  // Without a note (a manager price has no table at all) there is no asterisk.
+  const plain = recordingJsPDF();
+  PassportPdf.renderPassportPdf(passportDoc(), assets(), { jsPDF: plain.Recording, qrcode });
+  assert.ok(!plain.pages[0].some(l => /130.115/.test(l) && l.includes('*')));
+});

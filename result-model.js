@@ -173,7 +173,9 @@
   //   subcategory      -- { id, label, unit } for the selected 'type' row, or null
   //   edgeTitles       -- { straight: 'Прямая', ... } (the edge cards' own titles)
   //   dimensionLabels  -- { length, width } as shown on the dimensions step
-  function buildConfiguration({ state, productLabel, subcategory, edgeTitles, dimensionLabels }) {
+  //   edgeLengthM      -- the length of every open edge the edge is priced on
+  //                       (EdgeLength.openEdgeLengthM), 0/absent until measured
+  function buildConfiguration({ state, productLabel, subcategory, edgeTitles, dimensionLabels, edgeLengthM }) {
     const product = state.product || {};
     const caps = product.capabilities || {};
     const key = product.key || null;
@@ -200,7 +202,7 @@
       edge = {
         type: state.edge.type,
         label: (edgeTitles && edgeTitles[state.edge.type]) || null,
-        lengthMm: state.edge.lengthMm || null,
+        lengthM: edgeLengthM > 0 ? edgeLengthM : null,
       };
       if (!edge.label) edge = null;
     }
@@ -281,27 +283,56 @@
       }, base);
     }
     const r = outcome.result;
-    const candidates = [
-      ['stone', 'Камень', r.subtotal],
-      ['fabrication', 'Изготовление', r.fabrication],
-      ['installation', 'Монтаж', r.installation],
-      ['polish', 'Полировка', r.polish],
-      ['lighting', 'Подсветка камня', r.lighting],
-      // Швы столешницы (SEAM-01) ride in this line until they get their own.
-      ['works', 'Кромка и дополнительные работы', (r.extras || 0) + (r.catalogExtras || 0) + ((r.seams && r.seams.amount) || 0)],
-      // Parts with their own rates (подступенки): 0 until the company sets them.
-      ['parts', 'Подступенки - работы', r.groupWork || 0],
-      ['misc', 'Прочие работы', r.misc],
-      // What lifts a total below the minimum order (MISC-07) to it; until
-      // the lines are restructured it keeps them adding up to the total.
-      ['minOrder', 'Доплата до минимального заказа', r.minOrderTopUp],
-    ];
-    const lines = candidates
-      .filter(([, , amount]) => typeof amount === 'number' && amount > 0)
-      .map(([key, label, amount]) => ({ key, label, amountRub: Math.round(amount) }));
+    const totalRub = Math.round(r.total);
+    const shown = lineCandidates(r).filter(c => typeof c.amount === 'number' && c.amount > 0);
+    const rubles = roundToTotal(shown.map(c => c.amount), totalRub);
+    const lines = shown.map((c, i) => ({ key: c.key, label: c.label, amountRub: rubles[i] }));
     return Object.assign({
-      status: 'ok', total: Math.round(r.total), lines, nSlabs: r.nSlabs || null, reason: null, message: outcome.message || null,
+      status: 'ok', total: totalRub, lines, nSlabs: r.nSlabs || null, reason: null, message: outcome.message || null,
     }, base);
+  }
+
+  // The money lines of a calculation, in the order they are shown (the
+  // rates table's own): the amount of each is exact, not yet rounded, and 0
+  // or absent when the work is not in the price. Nothing is counted twice:
+  // the seams are not in the works line, the works line (the catalog's edge,
+  // cuts, holes and element works) is not in anything else, and the measure,
+  // the delivery and the unloading are each their own.
+  function lineCandidates(r) {
+    return [
+      { key: 'stone', label: 'Камень', amount: r.subtotal },
+      { key: 'fabrication', label: 'Изготовление', amount: r.fabrication },
+      { key: 'installation', label: 'Монтаж', amount: r.installation },
+      { key: 'polish', label: 'Полировка', amount: r.polish },
+      { key: 'lighting', label: 'Подсветка', amount: r.lighting },
+      { key: 'seams', label: 'Швы (переполировка)', amount: r.seams && r.seams.amount },
+      { key: 'works', label: 'Кромка и дополнительные работы', amount: r.catalogExtras },
+      // Parts with their own rates (подступенки).
+      { key: 'parts', label: 'Подступенки - работы', amount: r.groupWork },
+      { key: 'measure', label: 'Замер', amount: r.measure },
+      { key: 'delivery', label: 'Доставка', amount: r.delivery },
+      { key: 'unloading', label: 'Разгрузка и расходные материалы', amount: r.unloading },
+      // What lifts a total below the minimum order (MISC-07) to it.
+      { key: 'minOrder', label: 'Доплата до минимального заказа', amount: r.minOrderApplied ? r.minOrderTopUp : 0 },
+    ];
+  }
+
+  // Rounds every exact amount to whole rubles so that they add up to
+  // totalRub - fixedRub exactly (fixedRub: whole-ruble rows kept apart, e.g.
+  // the slabs of the passport). Largest remainder: the rubles the rounding
+  // lost or gained go, one each, to the amounts whose exact sums were closest
+  // to rounding the other way -- never to a whole-ruble amount.
+  function roundToTotal(amounts, totalRub, fixedRub) {
+    const rounded = amounts.map(a => Math.round(a));
+    let left = totalRub - (fixedRub || 0) - rounded.reduce((s, a) => s + a, 0);
+    const step = Math.sign(left);
+    const order = amounts.map((a, i) => i).filter(i => amounts[i] !== rounded[i])
+      .sort((a, b) => step * ((amounts[b] - rounded[b]) - (amounts[a] - rounded[a])));
+    for (let i = 0; left !== 0 && order.length; i = (i + 1) % order.length) {
+      rounded[order[i]] += step;
+      left -= step;
+    }
+    return rounded;
   }
 
   function formatRub(n) {
@@ -399,7 +430,7 @@
       specs.push({ key: 'material', label: 'Материал', value: c.material.name, detail: meta.join(' · ') });
     }
     if (c.edge) {
-      specs.push({ key: 'edge', label: 'Кромка', value: c.edge.label, detail: c.edge.lengthMm ? c.edge.lengthMm + ' мм' : '' });
+      specs.push({ key: 'edge', label: 'Кромка', value: c.edge.label, detail: c.edge.lengthM ? c.edge.lengthM.toFixed(2).replace('.', ',') + ' м.п.' : '' });
     }
     if (c.riser !== null) {
       specs.push({ key: 'riser', label: 'Подступенки', value: c.riser ? 'С подступенками' : 'Без подступенков', detail: '' });
@@ -463,7 +494,7 @@
 
   return {
     RESULT_TITLES,
-    resultTitle, buildConfiguration, summarizePricing, buildResultView, buildResultCards, buildEditTargets,
+    resultTitle, buildConfiguration, summarizePricing, lineCandidates, roundToTotal, buildResultView, buildResultCards, buildEditTargets,
     formatRub, formatWorkDetail,
   };
 });
