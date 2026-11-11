@@ -374,7 +374,7 @@ test('the area, the pieces and the price of each variant: the model\'s area, the
   const branch = htmlBetween('if (result.total === null) {', '\n    }\n');
   assert.match(branch, /'Камень: ≈ ' \+ formatRub\(result\.subtotal\) \+ '\. ' \+ result\.workNote/);
   assert.match(branch, /outcome: \{ kind: 'manual', reason: 'unpriced_work', message: warningOut\.textContent \}/);
-  assert.match(html, /setPriceValue\(result\.total === null \? 'Нужно уточнить у менеджера' : '≈ ' \+ formatRub\(result\.total\)\);/);
+  assert.match(html, /setPriceValue\(result\.total === null \? 'Нужно уточнить у менеджера' : '≈ ' \+ formatRub\(result\.total\) \+ '\*'\);/);
   const pricing = ResultModel.summarizePricing({ kind: 'manual', reason: 'unpriced_work', message: 'Камень: ≈ 41 224 ₽. Стоимость изготовления уточнит менеджер.' }, null);
   assert.deepEqual([pricing.status, pricing.total], ['manual', null]);
 });
@@ -479,7 +479,7 @@ test('nothing another product left on the page reaches a fireplace: sizes, quant
   assert.equal(state.cooktopCount, 0);
   assert.deepEqual(state.holeCounts, { mixer: 0, socket: 0, dispenser: 0 });
   // The options are the shared checkboxes -- read as for every product.
-  assert.deepEqual(state.options, { complexEnabled: true, polishEnabled: true, installEnabled: true, lightEnabled: false });
+  assert.deepEqual(state.options, { complexEnabled: true, polishEnabled: true, installEnabled: true, lightEnabled: false, measureEnabled: false, deliveryEnabled: false });
   const { extraLineItems } = inputsFor(state);
   assert.deepEqual(extraLineItems, [], 'no edge, cut or extra is priced');
 });
@@ -623,7 +623,10 @@ function priceWithRates(state, productRates) {
 test('«Опции»: the one shared step -- its boxes, in their order, for a fireplace too', () => {
   assert.equal(PRODUCTS.kaminy.supportsOptions, undefined, 'no opt-out: the default every product has');
   assert.ok(StepEngine.getSteps('kaminy').includes('options'));
-  const step = htmlBetween('data-step-id="options"', '</section>');
+  const wholeStep = htmlBetween('data-step-id="options"', '</section>');
+  // Замер и доставка are a block of their own at the step's end (placeServiceOptions), for every product.
+  assert.match(wholeStep, /<div class="checkboxes service-options">/);
+  const step = wholeStep.slice(0, wholeStep.indexOf('<!-- Замер и доставка'));
   const boxes = [...step.matchAll(/<input type="checkbox" id="([^"]+)"> ([^\n]+)/g)].map(m => [m[1], m[2].trim()]);
   assert.deepEqual(boxes, [
     ['opt-complex', 'Сложная форма / фигурный рез'],
@@ -638,10 +641,10 @@ test('«Опции»: the one shared step -- its boxes, in their order, for a fi
 });
 
 test('a ticked option is in the fireplace\'s state, as for every product; step navigation never clears a box', () => {
-  assert.deepEqual(portalWith().options, { complexEnabled: false, polishEnabled: false, installEnabled: false, lightEnabled: false });
-  assert.deepEqual(portalWith('complex').options, { complexEnabled: true, polishEnabled: false, installEnabled: false, lightEnabled: false });
-  assert.deepEqual(portalWith('polish').options, { complexEnabled: false, polishEnabled: true, installEnabled: false, lightEnabled: false });
-  assert.deepEqual(portalWith('install').options, { complexEnabled: false, polishEnabled: false, installEnabled: true, lightEnabled: false });
+  assert.deepEqual(portalWith().options, { complexEnabled: false, polishEnabled: false, installEnabled: false, lightEnabled: false, measureEnabled: false, deliveryEnabled: false });
+  assert.deepEqual(portalWith('complex').options, { complexEnabled: true, polishEnabled: false, installEnabled: false, lightEnabled: false, measureEnabled: false, deliveryEnabled: false });
+  assert.deepEqual(portalWith('polish').options, { complexEnabled: false, polishEnabled: true, installEnabled: false, lightEnabled: false, measureEnabled: false, deliveryEnabled: false });
+  assert.deepEqual(portalWith('install').options, { complexEnabled: false, polishEnabled: false, installEnabled: true, lightEnabled: false, measureEnabled: false, deliveryEnabled: false });
   // Назад / Далее / the progress strip only switch the step shown.
   const nav = htmlBetween('function updateStepUI(productKey)', 'function renderSubcategoryOptions');
   assert.doesNotMatch(nav, /opt-(complex|polish|install)|\.checked\s*=/);

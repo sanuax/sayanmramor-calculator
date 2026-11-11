@@ -129,8 +129,11 @@ SCENARIOS.forEach(({ name, productKey, typeId, values, edgeLengthM }) => {
     if (product.supportsEdgeWork) assert.equal(measured, edgeLengthM || 0, 'the open edge, as hand-measured');
     const fresh = ConstructorState.buildPricingInputs(state, { catalog: RateCatalog, edgeLengthM: measured });
 
-    // LIGHT-01 is new in the company's v2 rates -- the legacy inputs know no lighting.
-    assert.deepEqual(fresh.rates, Object.assign({}, legacy.rates, { lightingRatePerM2: RateCatalog.getAdditionalWorkRate('LIGHT-01') }));
+    // LIGHT-01 and the «Прочее» (MISC: measure, delivery, unloading + consumables per m², minimum order)
+    // are new in the company's v2 rates -- the legacy inputs know neither.
+    assert.deepEqual(fresh.rates.misc, { measure: 15000, delivery: 12000, perM2: 6000, minOrder: 20000 });
+    assert.deepEqual(fresh.rates, Object.assign({}, legacy.rates, { lightingRatePerM2: RateCatalog.getAdditionalWorkRate('LIGHT-01'), misc: fresh.rates.misc }));
+    legacy.rates = fresh.rates;
     assert.deepEqual(fresh.extraLineItems, legacy.extraLineItems);
 
     const priceParams = {
@@ -146,7 +149,8 @@ SCENARIOS.forEach(({ name, productKey, typeId, values, edgeLengthM }) => {
     // ...and the product's own parts (product-parts.js) change only the stone:
     // a countertop's backsplash / island / bar is now cut from the slabs too.
     const withParts = Pricing.calculatePrice(Object.assign({}, priceParams, fresh));
-    assert.equal(withParts.work, legacyResult.work);
+    // (the unloading is per m² of ALL the stone, so the parts' area adds to it)
+    assert.equal(withParts.work - withParts.misc, legacyResult.work - legacyResult.misc);
     assert.ok(withParts.subtotal >= legacyResult.subtotal);
   });
 });

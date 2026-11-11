@@ -425,6 +425,12 @@
     cursor: pointer;
   }
   .checkbox-row[hidden] { display: none; }
+  /* Замер и доставка: a block of their own, a little apart from the options above it
+     (in «Опции») or from the additional works (in «Доп. работах»). */
+  .service-options { margin-top: 14px; }
+  .price-note { margin: 4px 0 0; font-size: var(--configurator-muted); color: var(--muted); line-height: 1.5; }
+  .price-note[hidden] { display: none; }
+  .result-hero .price-note { margin: 0 0 6px; color: rgba(255, 255, 255, 0.8); }
   .checkbox-row input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
 
   /* Тип изделия: карточка = мини-сцена изделия + подпись. Концепт
@@ -2035,6 +2041,10 @@
           <input type="checkbox" id="opt-install"> Монтаж на объекте
         </label>
       </div>
+      <!-- Замер и доставка (MISC-01/02), on the client's request, for every product. One block,
+           one set of ids: placeServiceOptions() moves it to the end of «Доп. работы» for a
+           countertop and keeps it here for any other product. -->
+      <div class="checkboxes service-options"><label class="checkbox-row"><input type="checkbox" id="opt-measure"> Замер на объекте</label><label class="checkbox-row"><input type="checkbox" id="opt-delivery"> Доставка</label></div>
     </section>
 
     <!-- review: the final step for every product (PRODUCT_STEPS always
@@ -2055,6 +2065,7 @@
           <div class="result-hero-body">
             <div class="result-hero-kicker" id="resultHeroKicker"></div>
             <div class="result-total" id="resultTotal"></div>
+            <p class="price-note" id="resultRegionNote">* Расчёт указан для объектов, находящихся в Москве и Московской области</p>
             <p class="result-price-note" id="resultPriceNote"></p>
           </div>
         </div>
@@ -2145,6 +2156,7 @@
               <div>
                 <div class="result-label">Ориентировочная стоимость</div>
                 <div class="result-price placeholder" id="priceOut">Выберите тип изделия, материал и размеры, чтобы увидеть расчёт</div>
+                <p class="price-note" id="priceRegionNote">* Расчёт указан для объектов, находящихся в Москве и Московской области</p>
                 <div class="warning-box" id="warningOut" style="display:none"></div>
                 <div class="result-breakdown" id="breakdown"></div>
                 <div class="remainder-line" id="remainderOut"></div>
@@ -2914,6 +2926,9 @@
   }
   const dimShapeNote = document.getElementById('dimShapeNote');
   const priceOut = document.getElementById('priceOut');
+  // «* Расчёт указан для объектов ...»: shown only under a real price (its text ends with the asterisk).
+  const priceRegionNote = document.getElementById('priceRegionNote');
+  priceRegionNote.hidden = true;
   const breakdown = document.getElementById('breakdown');
   const ctaBtn = document.getElementById('ctaBtn');
   const warningOut = document.getElementById('warningOut');
@@ -4340,11 +4355,13 @@
   function setPriceHint(text) {
     priceOut.textContent = text;
     priceOut.classList.add('placeholder');
+    priceRegionNote.hidden = true;
   }
 
   function setPriceValue(text) {
     priceOut.textContent = text;
     priceOut.classList.remove('placeholder');
+    priceRegionNote.hidden = !text.endsWith('*');
   }
 
   // The one recalculation entry point every input calls. It renders the
@@ -4376,6 +4393,19 @@
     });
   }
 
+  // «Замер» and «Доставка» (MISC-01/02) are one DOM block with one set of ids.
+  // A countertop (kitchen, bath) has the step «Доп. работы»: the block stands at
+  // its end; any other product has none, so it stands at the end of «Опции».
+  // Moving the node keeps the ids, the listeners and the ticks.
+  function placeServiceOptions(productKey) {
+    const block = document.querySelector('.service-options');
+    const hasExtrasStep = !!(productKey && StepEngine.getSteps(productKey).includes('additionalWorks'));
+    const host = hasExtrasStep
+      ? document.getElementById('countertopExtras')
+      : document.querySelector('[data-step-id="options"]');
+    if (block && host && block.parentNode !== host) host.appendChild(block);
+  }
+
   // The length of every open edge of the product (edge-length.js), measured
   // on the same scene the 3D draws: only where it is priced -- a product with
   // edge work and a chosen profile.
@@ -4401,6 +4431,7 @@
     // inside the shape/additionalWorks steps show) and are untouched.
     updateWingVisibility();
     updateOptionRows();
+    placeServiceOptions(selectedProductKey);
     updateAdditionalWorkGroupsVisibility(product);
     renumberVisibleSteps();
     updateStepUI(selectedProductKey);
@@ -4502,11 +4533,14 @@
     const polishEnabled = constructorState.options.polishEnabled;
     const lightEnabled = constructorState.options.lightEnabled;
     const installEnabled = document.getElementById('opt-install').checked;
+    const { measureEnabled, deliveryEnabled } = constructorState.options;
     const optionLabels = [];
     if (complexEnabled) optionLabels.push('сложная форма');
     if (polishEnabled) optionLabels.push('полировка');
     if (lightEnabled) optionLabels.push('подсветка');
     if (installEnabled) optionLabels.push('монтаж');
+    if (measureEnabled) optionLabels.push('замер на объекте');
+    if (deliveryEnabled) optionLabels.push('доставка');
 
     // The company's rates (rate-catalog.js): the chosen type's work x the
     // stone coefficient -- see ConstructorState.buildPricingInputs.
@@ -4554,6 +4588,8 @@
       polishEnabled,
       complexEnabled,
       lightEnabled,
+      measureEnabled,
+      deliveryEnabled,
       extraLineItems,
       marginCm: SAW_MARGIN_CM,
       allowSeam: product.allowSeam !== false,
@@ -4610,7 +4646,7 @@
 
     infoBlock.style.display = '';
 
-    setPriceValue(result.total === null ? 'Нужно уточнить у менеджера' : '≈ ' + formatRub(result.total));
+    setPriceValue(result.total === null ? 'Нужно уточнить у менеджера' : '≈ ' + formatRub(result.total) + '*');
 
     let html = '';
     const facadeInfo = constructorState.productConfig.fasad ? FacadeModel.describeFacade(constructorState.productConfig.fasad) : null;
@@ -5067,7 +5103,8 @@
     resultHeroKicker.textContent = view.title + (stone ? ' · ' + stone.name : '');
     const pricing = data.pricing;
     const priced = pricing.status === 'ok';
-    resultTotalEl.textContent = priced ? '≈ ' + ResultModel.formatRub(pricing.total) : 'Стоимость уточнит менеджер';
+    resultTotalEl.textContent = priced ? '≈ ' + ResultModel.formatRub(pricing.total) + '*' : 'Стоимость уточнит менеджер';
+    document.getElementById('resultRegionNote').hidden = !priced;
     resultTotalEl.classList.toggle('is-manual', !priced);
     resultPriceNote.textContent = 'Предварительно' + (UPDATED_AT ? ', по ценам на ' + formatDate(UPDATED_AT) : '');
     const manualText = priced ? pricing.message
@@ -5295,7 +5332,8 @@
       kind: 'calc', query, product: data.configuration.product.label || '', stone: stone ? stone.name : '',
       stoneImage: stone && stone.image ? '/sayanmramor-calculator/data/' + stone.image : '',
       sizes: (view.specs.find(spec => spec.key === 'dimensions') || view.specs[0] || {}).value || '',
-      price: resultTotalEl.textContent, priced: data.pricing.status === 'ok',
+      // The site's offer shows the price without the footnote: no dangling asterisk there.
+      price: resultTotalEl.textContent.replace(/\*$/, ''), priced: data.pricing.status === 'ok',
     });
     resultCtaBtn.disabled = true;
     resultCtaBtn.textContent = 'Готовим паспорт...';

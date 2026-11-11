@@ -227,6 +227,11 @@
         polishEnabled: false,
         installEnabled: optionsSupported && d.getElementById('opt-install').checked,
         lightEnabled: false,
+        // Замер и доставка (MISC-01/02), on the client's request: the boxes
+        // live in «Доп. работ» of a countertop and in «Опции» of any other
+        // product -- the step they stand in does not matter for the value.
+        measureEnabled: !!d.getElementById('opt-measure').checked,
+        deliveryEnabled: !!d.getElementById('opt-delivery').checked,
       },
       subcategory: {
         id: d.getElementById('productSubcategory').value || null,
@@ -365,6 +370,14 @@
       // LIGHT-01, per m² of the main area; no stone coefficient.
       lightingRatePerM2: catalog.getAdditionalWorkRate('LIGHT-01'),
       complexShapeMultiplier: catalog.MISC.complexShapeMultiplier,
+      // «Прочее»: measure and delivery (on request), unloading + consumables
+      // per m² of all the stone (automatic), the minimum order.
+      misc: {
+        measure: catalog.MISC.measure,
+        delivery: catalog.MISC.delivery,
+        perM2: catalog.MISC.unloadingPerM2 + catalog.MISC.consumablesPerM2,
+        minOrder: catalog.MISC.minOrder,
+      },
       landingRates: landing ? {
         fabricationRatePerM2: times(landing.fabricationRatePerM2, k),
         installationRatePerM2: landing.installationRatePerM2,

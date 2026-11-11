@@ -32,6 +32,7 @@ function price(state, catalog, edgeLengthM) {
     stone: state.stone, productType: state.product.type, rates: inputs.rates,
     installEnabled: state.options.installEnabled, polishEnabled: state.options.polishEnabled, complexEnabled: state.options.complexEnabled,
     lightEnabled: state.options.lightEnabled,
+    measureEnabled: state.options.measureEnabled, deliveryEnabled: state.options.deliveryEnabled,
     extraLineItems: inputs.extraLineItems, marginCm: SAW_MARGIN_CM, usageLimit: SLAB_USAGE_LIMIT,
     job: inputs.job, groupRates: inputs.groupRates, seamRate: inputs.seamRate, shape: inputs.shape,
   });
@@ -212,7 +213,7 @@ test('panel with lighting adds LIGHT-01 on its area', () => {
   assert.equal(lit.inputs.rates.lightingRatePerM2, 110000);
   close(lit.r.lighting, 110000 * lit.inputs.job.mainAreaM2, 'lighting');
   assert.ok(lit.r.lighting > 0);
-  close(lit.r.work, lit.r.fabrication + lit.r.installation + lit.r.polish + lit.r.catalogExtras + lit.r.lighting, 'work includes lighting');
+  close(lit.r.work, lit.r.fabrication + lit.r.installation + lit.r.polish + lit.r.catalogExtras + lit.r.lighting + lit.r.misc, 'work includes lighting and the unloading');
   const plain = price(stateFor('panno', Object.assign({ productSubcategory: { value: 'PANEL-01' } }, dims), 'marble'));
   assert.equal(plain.r.lighting, 0);
 });
@@ -304,7 +305,7 @@ test('a long sill split in two gets no SEAM-01', () => {
 
 test('seams enter the work, without the stone coefficient', () => {
   const marble = price(stateFor('stoleshnitsa_kuhnya', kitchenL(), 'marble')).r;
-  close(marble.work, marble.fabrication + marble.installation + marble.polish + marble.lighting + marble.catalogExtras + 25000, 'work includes the seam');
+  close(marble.work, marble.fabrication + marble.installation + marble.polish + marble.lighting + marble.catalogExtras + marble.misc + 25000, 'work includes the seam');
   close(marble.total, marble.subtotal + marble.work, 'total');
   const quartzite = price(stateFor('stoleshnitsa_kuhnya', kitchenL(), 'quartzite')).r;
   assert.equal(quartzite.seams.amount, 25000);
@@ -356,4 +357,80 @@ test('the edge adds rate x open length to the price, through the additional work
   const without = price(stateFor('stoleshnitsa_kuhnya', kitchen({}), 'quartzite'), null, 4.2).r;
   close(withEdge.total - without.total, 5000 * 4.2, 'total');
   close(withEdge.catalogExtras - without.catalogExtras, 5000 * 4.2, 'catalogExtras');
+});
+
+// ---- Замер, доставка, разгрузка, расходники, минимальный заказ ----
+
+const allArea = job => job.pieces.reduce((s, p) => s + p.areaM2 * p.count, 0);
+
+test('measure and delivery only when ticked', () => {
+  const plain = price(stateFor('stoleshnitsa_kuhnya', kitchenL(), 'marble'));
+  const S = allArea(plain.inputs.job);
+  assert.equal(plain.inputs.rates.misc.perM2, 6000);
+  close(plain.r.misc, 6000 * S, 'no ticks');
+  const both = price(stateFor('stoleshnitsa_kuhnya', kitchenL({ 'opt-measure': on, 'opt-delivery': on }), 'marble'));
+  close(both.r.misc, 6000 * S + 27000, 'both ticked');
+  close(both.r.total - plain.r.total, 27000, 'total grows by 27000');
+  const measureOnly = price(stateFor('stoleshnitsa_kuhnya', kitchenL({ 'opt-measure': on }), 'marble'));
+  close(measureOnly.r.misc, 6000 * S + 15000, 'measure');
+  assert.equal(measureOnly.r.measure, 15000);
+  assert.equal(measureOnly.r.delivery, 0);
+  const deliveryOnly = price(stateFor('stoleshnitsa_kuhnya', kitchenL({ 'opt-delivery': on }), 'marble'));
+  close(deliveryOnly.r.misc, 6000 * S + 12000, 'delivery');
+  assert.equal(deliveryOnly.r.delivery, 12000);
+  close(deliveryOnly.r.unloading, 6000 * S, 'unloading + consumables');
+  close(deliveryOnly.r.misc, deliveryOnly.r.measure + deliveryOnly.r.delivery + deliveryOnly.r.unloading, 'misc is the sum');
+});
+
+test('the measure and delivery boxes are read for every product', () => {
+  ['stoleshnitsa_kuhnya', 'podokonnik', 'pol', 'stupeni', 'kaminy'].forEach(key => {
+    const state = stateFor(key, { 'opt-measure': on, 'opt-delivery': on }, 'marble');
+    assert.equal(state.options.measureEnabled, true, key);
+    assert.equal(state.options.deliveryEnabled, true, key);
+    const off = stateFor(key, {}, 'marble');
+    assert.equal(off.options.measureEnabled, false, key);
+    assert.equal(off.options.deliveryEnabled, false, key);
+  });
+});
+
+test('unloading and consumables use the whole stone area', () => {
+  const island = { 'extra-ostrov-width': { value: '600' }, 'extra-ostrov-length': { value: '1000' } };
+  const { r, inputs } = price(stateFor('stoleshnitsa_kuhnya', kitchenL(island), 'marble'));
+  const whole = allArea(inputs.job);
+  assert.ok(whole > inputs.job.mainAreaM2 + 0.59, 'the island is part of the stone');
+  close(r.misc, 6000 * whole, 'main + wing + island');
+  const without = price(stateFor('stoleshnitsa_kuhnya', kitchenL(), 'marble'));
+  close(r.misc - without.r.misc, 6000 * 0.6, 'the island adds its area');
+});
+
+// A cheap slab: the whole sill costs less than the minimum order.
+const cheapStone = { id: 'cheap', category: 'marble', slabs: [{ article: 'C1', width_cm: 300, length_cm: 150, price_total_rub: 5000 }] };
+const cheapState = (key, values) => ConstructorState.readConstructorState({
+  doc: createFakeDoc(values), selectedProductKey: key, product: PRODUCTS[key],
+  stone: cheapStone, hasAdditionalWork: ProductTypes.hasAdditionalWork,
+});
+
+test('minimum order lifts a small total to 20 000', () => {
+  const small = price(cheapState('podokonnik', { width: { value: '300' }, length: { value: '200' }, productSubcategory: { value: 'SILL-01' } }));
+  assert.ok(small.r.subtotal + small.r.work < 20000, 'the raw total is below the minimum');
+  assert.equal(small.r.total, 20000);
+  assert.equal(small.r.minOrderApplied, true);
+  close(small.r.minOrderTopUp, 20000 - small.r.subtotal - small.r.work, 'top-up');
+  const big = price(stateFor('stoleshnitsa_kuhnya', kitchenL(), 'marble'));
+  assert.equal(big.r.minOrderApplied, false);
+  assert.equal(big.r.minOrderTopUp, 0);
+  close(big.r.total, big.r.subtotal + big.r.work, 'untouched');
+});
+
+test('the minimum order counts everything ticked: measure and delivery can lift a small order past it', () => {
+  const small = price(cheapState('podokonnik', { width: { value: '300' }, length: { value: '200' }, productSubcategory: { value: 'SILL-01' }, 'opt-measure': on, 'opt-delivery': on }));
+  assert.equal(small.r.minOrderApplied, false);
+  close(small.r.total, small.r.subtotal + small.r.work, 'total');
+  assert.ok(small.r.total > 20000);
+});
+
+test('an unpriced total stays null: the minimum order does not invent a price', () => {
+  const r = Pricing.computeWorkAndTotal(1000, 0.06, { fabricationRatePerM2: null, installationRatePerM2: 1, polishRatePerM2: 1, complexShapeMultiplier: 1.5, misc: { measure: 15000, delivery: 12000, perM2: 6000, minOrder: 20000 } },
+    { installEnabled: false, polishEnabled: false, complexEnabled: false }, [], 0, 0.06);
+  assert.equal(r.total, null);
 });

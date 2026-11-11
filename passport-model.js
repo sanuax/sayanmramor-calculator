@@ -113,6 +113,7 @@
       ] },
       { title: 'Прочее', rows: [
         { name: 'Прочие работы', unit: null, qty: null, priceRub: null, amount: money(result.misc) },
+        { name: 'Доплата до минимального заказа', unit: null, qty: null, priceRub: null, amount: money(result.minOrderTopUp) },
       ] },
     ].map(s => ({ title: s.title, rows: s.rows.filter(r => r.amount > 0) })).filter(s => s.rows.length);
 

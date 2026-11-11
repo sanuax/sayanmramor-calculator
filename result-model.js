@@ -292,6 +292,9 @@
       // Parts with their own rates (подступенки): 0 until the company sets them.
       ['parts', 'Подступенки - работы', r.groupWork || 0],
       ['misc', 'Прочие работы', r.misc],
+      // What lifts a total below the minimum order (MISC-07) to it; until
+      // the lines are restructured it keeps them adding up to the total.
+      ['minOrder', 'Доплата до минимального заказа', r.minOrderTopUp],
     ];
     const lines = candidates
       .filter(([, , amount]) => typeof amount === 'number' && amount > 0)

@@ -61,7 +61,8 @@ test('three different shots: the product\'s own view, then two others; no side v
 test('specification: the sections in order, an empty one left out, never a 0 ₽ row', () => {
   const k = kitchen({ 'opt-install': { checked: true } });
   const spec = PassportModel.buildSpecification(k);
-  assert.deepEqual(spec.sections.map(s => s.title), ['Камень', 'Изготовление', 'Монтаж']);
+  // «Прочее»: the unloading and consumables (6 000 ₽/m²) are in every calculation.
+  assert.deepEqual(spec.sections.map(s => s.title), ['Камень', 'Изготовление', 'Монтаж', 'Прочее']);
   spec.sections.forEach(s => s.rows.forEach(r => assert.ok(r.amountRub > 0, r.name)));
 });
 
@@ -187,4 +188,25 @@ test('an L countertop\'s seam (SEAM-01) is in the rows, which still add up to th
   // Until the seams get a row of their own, they ride in the works row.
   assert.equal(pricing.lines.find(l => l.key === 'works').amountRub, 25000);
   assert.equal(spec.sections.find(sec => sec.title === 'Кромка и дополнительные работы').rows[0].amountRub, 25000);
+});
+
+test('a minimum-order top-up has its own line and row, so lines and rows still add up to the 20 000 total', () => {
+  const cheap = Object.assign({}, STONE, { slabs: [{ article: 'C1', price_total_rub: 5000, width_cm: 300, length_cm: 150 }] });
+  const doc = createFakeDoc({ width: { value: '300' }, length: { value: '200' }, productSubcategory: { value: 'SILL-01' } });
+  const state = ConstructorState.readConstructorState({ doc, selectedProductKey: 'podokonnik', product: PRODUCTS.podokonnik, stone: cheap, hasAdditionalWork });
+  const inputs = ConstructorState.buildPricingInputs(state, { catalog: RateCatalog });
+  const result = Pricing.calculatePrice({
+    stone: cheap, productType: PRODUCTS.podokonnik.type, rates: inputs.rates, extraLineItems: inputs.extraLineItems,
+    marginCm: ProductTypes.SAW_MARGIN_CM, usageLimit: ProductTypes.SLAB_USAGE_LIMIT, job: inputs.job, groupRates: inputs.groupRates,
+  });
+  assert.equal(result.total, 20000);
+  assert.equal(result.minOrderApplied, true);
+  const configuration = ResultModel.buildConfiguration({ state, productLabel: PRODUCTS.podokonnik.label, subcategory: null, edgeTitles: EDGE_TITLES });
+  const pricing = ResultModel.summarizePricing({ kind: 'ok', result }, UPDATED_AT);
+  assert.equal(pricing.total, 20000);
+  assert.ok(pricing.lines.some(l => l.key === 'minOrder' && l.amountRub > 0));
+  assert.ok(Math.abs(pricing.lines.reduce((s, l) => s + l.amountRub, 0) - 20000) <= pricing.lines.length, 'result lines add up');
+  const spec = PassportModel.buildSpecification({ configuration, pricing, result, pricingInputs: { rates: inputs.rates, mainAreaM2: inputs.job.mainAreaM2 } });
+  assert.equal(sumRows(spec), 20000);
+  assert.ok(spec.sections.some(sec => sec.rows.some(r => r.name === 'Доплата до минимального заказа')));
 });

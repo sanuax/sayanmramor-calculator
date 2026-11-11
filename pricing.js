@@ -524,8 +524,9 @@
   // `area` -- the main parts at the type's rate; `landingAreaM2` -- a stair's
   // landings, at rates.landingRates (STAIR-11). Both are summed into the
   // fabrication / installation / polish lines; `landing` keeps the landings'
-  // own share.
-  function computeWorkAndTotal(subtotal, area, rates, options, extraLineItems, landingAreaM2) {
+  // own share. `totalAreaM2` -- the area of ALL the stone of the job (every
+  // piece of every group): «Разгрузка» and «Расходники» are per m² of it.
+  function computeWorkAndTotal(subtotal, area, rates, options, extraLineItems, landingAreaM2, totalAreaM2) {
     // The product's own work that is asked for but has no rate yet: it is
     // not free -- its line, the work and the total stay unknown (null) and
     // `unpriced` names it; the stone (subtotal) is still what it is.
@@ -547,8 +548,14 @@
       if (isRateSet(rates.lightingRatePerM2)) lighting = rates.lightingRatePerM2 * area;
       else { unpriced.push('lighting'); lighting = null; }
     }
-    // «Прочее» (MISC-01..05) is not charged yet.
-    const misc = 0;
+    // «Прочее» (rates.misc, the catalog's MISC): the measure (MISC-01) and the
+    // delivery (MISC-02) only when the client asked for them; the unloading
+    // and the consumables (MISC-04/05) always, per m² of all the stone.
+    const m = rates.misc || {};
+    const measure = options.measureEnabled && isRateSet(m.measure) ? m.measure : 0;
+    const delivery = options.deliveryEnabled && isRateSet(m.delivery) ? m.delivery : 0;
+    const unloading = (isRateSet(m.perM2) ? m.perM2 : 0) * Math.max(0, totalAreaM2 || 0);
+    const misc = measure + delivery + unloading;
     // The rate-catalog-backed additional works (cuts, holes, edge treatment,
     // the countertop's elements and their installation) -- each entry carries
     // its own resolved rate. A line without a rate (null) is the manager's:
@@ -561,7 +568,7 @@
     );
     const work = unpriced.length ? null : fabrication + installation + polish + lighting + misc + catalogExtras;
     const total = work === null ? null : subtotal + work;
-    return { fabrication, installation, polish, lighting, misc, catalogExtras, landing, work, total, unpriced };
+    return { fabrication, installation, polish, lighting, measure, delivery, unloading, misc, catalogExtras, landing, work, total, unpriced };
   }
 
   // Швы столешницы (SEAM-01), the owner's rule: the corner joint where a
@@ -626,6 +633,8 @@
     const {
       stone, widthM, lengthM, productType, marginCm,
       rates, installEnabled = false, polishEnabled = false, complexEnabled = false, lightEnabled = false,
+      // The measure and the delivery on the client's request (MISC-01/02).
+      measureEnabled = false, deliveryEnabled = false,
       extraLineItems = [], allowSeam = true,
       // Optional, Type B only: the priced area when it is not width x length
       // (a facade's cladded surface -- see ConstructorState.buildPricingInputs).
@@ -646,7 +655,8 @@
     const job = givenJob || defaultJob(productType, widthM, lengthM, allowSeam, explicitArea ? areaM2 : null);
 
     const empty = {
-      subtotal: null, fabrication: null, installation: null, polish: null, lighting: null, misc: null,
+      subtotal: null, fabrication: null, installation: null, polish: null, lighting: null,
+      measure: null, delivery: null, unloading: null, misc: null, minOrderApplied: false, minOrderTopUp: 0,
       catalogExtras: null, work: null, total: null, nSlabs: 0, remainderM2: null, matchedSlab: null, matchedSlabs: [],
       material: null, groups: [], seams: null, unpriced: [], workNote: null
     };
@@ -680,7 +690,7 @@
     // its main parts; a stair's landings (pieces 'landing') at their own
     // rates (rates.landingRates, STAIR-11); parts with their own rates are
     // counted separately.
-    const options = { installEnabled, polishEnabled, complexEnabled, lightEnabled };
+    const options = { installEnabled, polishEnabled, complexEnabled, lightEnabled, measureEnabled, deliveryEnabled };
     const landingArea = job.pieces
       ? job.pieces.filter(p => p.key === 'landing' && (p.group || 'main') === 'main')
         .reduce((s, p) => s + p.areaM2 * Math.max(0, Math.round(p.count || 1)), 0)
@@ -707,7 +717,7 @@
       });
     }
     const subtotal = material.subtotal;
-    const base = computeWorkAndTotal(subtotal, mainArea, rates, options, extraLineItems, landingArea);
+    const base = computeWorkAndTotal(subtotal, mainArea, rates, options, extraLineItems, landingArea, jobArea(job));
     const groupWork = groups.reduce((s, g) => s + g.work, 0);
     // Швы столешницы (SEAM-01): per seam, no stone coefficient. Only a
     // countertop (a shape and a seamRate argument given) has them; a seam
@@ -722,12 +732,20 @@
     // priced, the work and the total are left to the manager -- never a
     // total that looks final (see computeWorkAndTotal).
     const work = base.work === null || (seams && seams.amount === null) ? null : base.work + groupWork + (seams ? seams.amount : 0);
+    // The minimum order (MISC-07): a total (stone and all the work chosen)
+    // below it is the minimum; an unknown total stays unknown.
+    const rawTotal = work === null ? null : subtotal + work;
+    const minOrder = rates && rates.misc && isRateSet(rates.misc.minOrder) ? rates.misc.minOrder : 0;
+    const minOrderApplied = rawTotal !== null && rawTotal < minOrder;
+    const minOrderTopUp = minOrderApplied ? minOrder - rawTotal : 0;
     // Only one slab, one uncut piece: how much of that slab is left.
     const single = job.pieces && material.nSlabs === 1 && material.seams === 0 && job.pieces.length === 1 && job.pieces[0].count === 1;
     return {
       ok: true, reason: null, subtotal,
-      fabrication: base.fabrication, installation: base.installation, polish: base.polish, lighting: base.lighting, misc: base.misc,
-      catalogExtras: base.catalogExtras, landing: base.landing, groupWork, seams, work, total: work === null ? null : subtotal + work,
+      fabrication: base.fabrication, installation: base.installation, polish: base.polish, lighting: base.lighting,
+      measure: base.measure, delivery: base.delivery, unloading: base.unloading, misc: base.misc,
+      catalogExtras: base.catalogExtras, landing: base.landing, groupWork, seams, work,
+      total: rawTotal === null ? null : rawTotal + minOrderTopUp, minOrderApplied, minOrderTopUp,
       unpriced: base.unpriced, workNote: unpricedWorkNote(base.unpriced),
       nSlabs: material.nSlabs,
       remainderM2: single ? material.slabAreaM2 - material.productAreaM2 : null,

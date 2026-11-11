@@ -561,3 +561,27 @@ test('the «Опции» step has rows for polish and lighting with ids', () => 
   assert.match(section, /<label class="checkbox-row" id="opt-light-row">\s*<input type="checkbox" id="opt-light"> Подсветка камня/);
   assert.match(html, /\.checkbox-row\[hidden\]\s*\{\s*display:\s*none/);
 });
+
+test('measure and delivery: one block, one set of ids, moved by placeServiceOptions', () => {
+  ['opt-measure', 'opt-delivery'].forEach(id => {
+    const tags = inputTags(id);
+    assert.equal(tags.length, 1, id);
+    assert.match(tags[0], /type="checkbox"/, id);
+  });
+  assert.equal((html.match(/class="checkboxes service-options"/g) || []).length, 1);
+  assert.match(html, /<label class="checkbox-row"><input type="checkbox" id="opt-measure"> Замер на объекте<\/label>/);
+  assert.match(html, /<label class="checkbox-row"><input type="checkbox" id="opt-delivery"> Доставка<\/label>/);
+  assert.match(html, /function placeServiceOptions\(productKey\)/);
+  assert.match(html, /placeServiceOptions\(selectedProductKey\)/);
+  // Into «Доп. работы» for a countertop, else into «Опции».
+  assert.match(html, /getElementById\('countertopExtras'\)/);
+});
+
+test('the Moscow note sits under the price, the asterisk on the price itself', () => {
+  assert.equal((html.match(/id="priceRegionNote"/g) || []).length, 1);
+  assert.match(html, /<p class="price-note" id="priceRegionNote">\* Расчёт указан для объектов, находящихся в Москве и Московской области<\/p>/);
+  assert.equal((html.match(/id="resultRegionNote"/g) || []).length, 1);
+  assert.match(html, /<p class="price-note" id="resultRegionNote">\* Расчёт указан для объектов, находящихся в Москве и Московской области<\/p>/);
+  assert.match(html, /'≈ ' \+ formatRub\(result\.total\) \+ '\*'/);
+  assert.match(html, /'≈ ' \+ ResultModel\.formatRub\(pricing\.total\) \+ '\*'/);
+});
