@@ -165,3 +165,26 @@ test('the passport: number, dates, title, file name, stone, shots and link', () 
   assert.equal(doc.specification.totalRub, k.pricing.total);
   assert.doesNotMatch(JSON.stringify(doc), /—/);
 });
+
+test('an L countertop\'s seam (SEAM-01) is in the rows, which still add up to the total', () => {
+  const doc = createFakeDoc({ width: { value: '600' }, length: { value: '2400' }, productShape: { value: 'lshape' }, 'wing-width': { value: '600' }, 'wing-length': { value: '1200' } });
+  const state = ConstructorState.readConstructorState({
+    doc, selectedProductKey: 'stoleshnitsa_kuhnya', product: PRODUCTS.stoleshnitsa_kuhnya, stone: STONE, hasAdditionalWork,
+  });
+  const inputs = ConstructorState.buildPricingInputs(state, { catalog: RateCatalog });
+  const result = Pricing.calculatePrice({
+    stone: state.stone, productType: PRODUCTS.stoleshnitsa_kuhnya.type, rates: inputs.rates, extraLineItems: inputs.extraLineItems,
+    marginCm: ProductTypes.SAW_MARGIN_CM, usageLimit: ProductTypes.SLAB_USAGE_LIMIT,
+    job: inputs.job, groupRates: inputs.groupRates, seamRate: inputs.seamRate, shape: inputs.shape,
+  });
+  assert.equal(result.ok, true, result.reason);
+  assert.equal(result.seams.amount, 25000);
+  const configuration = ResultModel.buildConfiguration({ state, productLabel: PRODUCTS.stoleshnitsa_kuhnya.label, subcategory: null, edgeTitles: EDGE_TITLES });
+  const pricing = ResultModel.summarizePricing({ kind: 'ok', result }, UPDATED_AT);
+  assert.equal(pricing.lines.reduce((s, l) => s + l.amountRub, 0), pricing.total, 'result lines add up');
+  const spec = PassportModel.buildSpecification({ configuration, pricing, result, pricingInputs: { rates: inputs.rates, mainAreaM2: inputs.job.mainAreaM2 } });
+  assert.equal(sumRows(spec), pricing.total);
+  // Until the seams get a row of their own, they ride in the works row.
+  assert.equal(pricing.lines.find(l => l.key === 'works').amountRub, 25000);
+  assert.equal(spec.sections.find(sec => sec.title === 'Кромка и дополнительные работы').rows[0].amountRub, 25000);
+});

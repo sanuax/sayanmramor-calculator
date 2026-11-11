@@ -4504,7 +4504,7 @@
 
     // The company's rates (rate-catalog.js): the chosen type's work x the
     // stone coefficient -- see ConstructorState.buildPricingInputs.
-    const { rates, extraLineItems, job, groupRates } = ConstructorState.buildPricingInputs(constructorState, { catalog: RateCatalog });
+    const { rates, extraLineItems, job, groupRates, seamRate, shape } = ConstructorState.buildPricingInputs(constructorState, { catalog: RateCatalog });
 
     // Breakdown labels are UI text, not pricing -- built from the same
     // constructorState so the displayed text and the priced quantities can
@@ -4554,6 +4554,9 @@
       job,
       usageLimit: SLAB_USAGE_LIMIT,
       groupRates,
+      // Швы столешницы (SEAM-01): kitchen and bath only (null elsewhere).
+      seamRate,
+      shape,
     });
 
     if (!result.ok) {

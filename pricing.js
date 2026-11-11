@@ -223,6 +223,9 @@
   function cutPieces(pieces, slabs, marginCm, usageLimit) {
     const out = [];
     let seams = 0;
+    // The same splits per piece key (a countertop's run, wings, island...):
+    // SEAM-01 is charged only for some of them (countertopSeams).
+    const seamsByKey = {};
     for (let pi = 0; pi < pieces.length; pi++) {
       const p = pieces[pi];
       const count = Math.max(0, Math.round(p.count || 1));
@@ -260,8 +263,9 @@
         }
       }
       seams += count * (k - 1);
+      if (k > 1) seamsByKey[p.key] = (seamsByKey[p.key] || 0) + count * (k - 1);
     }
-    return { cut: out, seams };
+    return { cut: out, seams, seamsByKey };
   }
 
   // Shelf packing of the given cut pieces on one slab laid X by Y (cm): the
@@ -355,17 +359,23 @@
 
   function planPartsInTurn(slabs, parts, marginCm, usageLimit) {
     let pool = slabs;
-    const merged = { ok: true, used: [], seams: 0, pieceCount: 0 };
+    const merged = { ok: true, used: [], seams: 0, seamsByKey: {}, pieceCount: 0 };
     for (const part of parts) {
       const plan = planPiecesOnce(pool, part, marginCm, usageLimit);
       if (!plan.ok) return plan;
       merged.used = merged.used.concat(plan.used);
       merged.seams += plan.seams;
+      addSeamsByKey(merged.seamsByKey, plan.seamsByKey);
       merged.pieceCount += plan.pieceCount;
       const taken = new Set(plan.used.map(u => u.slab));
       pool = pool.filter(s => !taken.has(s));
     }
     return merged;
+  }
+
+  function addSeamsByKey(into, from) {
+    Object.keys(from || {}).forEach(key => { into[key] = (into[key] || 0) + from[key]; });
+    return into;
   }
 
   function planPiecesOnce(slabs, pieces, marginCm, usageLimit) {
@@ -406,7 +416,7 @@
       if (!progress) return { ok: false, reason: 'insufficient_stock' };
     }
     if (remaining.length) return { ok: false, reason: 'insufficient_stock' };
-    return { ok: true, used, seams: cutResult.seams, pieceCount: cut.length };
+    return { ok: true, used, seams: cutResult.seams, seamsByKey: cutResult.seamsByKey, pieceCount: cut.length };
   }
 
   // A cladded surface: cut freely, so a slab holds up to the reserve budget
@@ -429,7 +439,7 @@
       left -= take;
       return { slab, placements: [], usedAreaM2: take };
     });
-    return { ok: true, used, seams: 0, pieceCount: 0 };
+    return { ok: true, used, seams: 0, seamsByKey: {}, pieceCount: 0 };
   }
 
   function jobArea(job, group) {
@@ -457,7 +467,7 @@
       subtotal: plan.used.reduce((s, u) => s + u.slab.price_total_rub, 0),
       productAreaM2: jobArea(job), slabAreaM2, usedAreaM2,
       utilization: usedAreaM2 / slabAreaM2, waste: 1 - usedAreaM2 / slabAreaM2,
-      seams: plan.seams, pieceCount: plan.pieceCount,
+      seams: plan.seams, seamsByKey: addSeamsByKey({}, plan.seamsByKey), pieceCount: plan.pieceCount,
     };
   }
 
@@ -489,7 +499,7 @@
 
   // What the client reads when some of the product's own work has no rate:
   // «Стоимость изготовления уточнит менеджер.»
-  const UNPRICED_WORK_NAMES = { fabrication: 'изготовления', installation: 'монтажа', polish: 'полировки', lighting: 'подсветки', extras: 'дополнительных работ' };
+  const UNPRICED_WORK_NAMES = { fabrication: 'изготовления', installation: 'монтажа', polish: 'полировки', lighting: 'подсветки', extras: 'дополнительных работ', seams: 'швов' };
   function unpricedWorkNote(unpriced) {
     const names = (unpriced || []).map(k => UNPRICED_WORK_NAMES[k]).filter(Boolean);
     if (!names.length) return null;
@@ -554,6 +564,26 @@
     return { fabrication, installation, polish, lighting, misc, catalogExtras, landing, work, total, unpriced };
   }
 
+  // Швы столешницы (SEAM-01), the owner's rule: the corner joint where a
+  // wing of a Г/П countertop meets the main run (Г 1, П 2 -- only for the
+  // wings really in job.pieces) plus every split of a piece longer than a
+  // slab, for the run, the wings, an island and a bar counter. Splits of
+  // the фартук and the стеновая панель are not charged. `shape` is the
+  // countertop's shape ('straight' | 'lshape' | 'ushape'); no shape -- not a
+  // countertop -- no seams.
+  const COUNTERTOP_SEAM_KEYS = ['main', 'wing'];
+  const EXTRA_SEAM_KEYS = ['island', 'barCounter'];
+  const CORNER_JOINTS = { straight: 0, lshape: 1, ushape: 2 };
+  function countertopSeams(job, material, shape) {
+    if (!shape || !job || !job.pieces) return 0;
+    const wings = job.pieces.filter(p => p.key === 'wing')
+      .reduce((s, p) => s + Math.max(0, Math.round(p.count || 1)), 0);
+    const corners = Math.min(CORNER_JOINTS[shape] || 0, wings);
+    const byKey = (material && material.seamsByKey) || {};
+    const splits = COUNTERTOP_SEAM_KEYS.concat(EXTRA_SEAM_KEYS).reduce((s, key) => s + (byKey[key] || 0), 0);
+    return corners + splits;
+  }
+
   // The online estimate's limits: a product past them is a project for a
   // manager, not a quick calculation -- and an absurd size (a mistyped
   // 99 999 999 mm) must never reach the slab search, whose work grows with
@@ -608,6 +638,9 @@
       usageLimit = 0.65,
       // Parts with their own rates (подступенки): [{ key, rates }].
       groupRates = [],
+      // SEAM-01 per seam (kitchen and bath countertops; null for any other
+      // product) and the countertop's shape -- see countertopSeams.
+      seamRate = null, shape = null,
     } = params;
     const explicitArea = !givenJob && productType !== 'A' && areaM2 !== null && areaM2 !== undefined;
     const job = givenJob || defaultJob(productType, widthM, lengthM, allowSeam, explicitArea ? areaM2 : null);
@@ -615,7 +648,7 @@
     const empty = {
       subtotal: null, fabrication: null, installation: null, polish: null, lighting: null, misc: null,
       catalogExtras: null, work: null, total: null, nSlabs: 0, remainderM2: null, matchedSlab: null, matchedSlabs: [],
-      material: null, groups: [], unpriced: [], workNote: null
+      material: null, groups: [], seams: null, unpriced: [], workNote: null
     };
 
     if (!jobIsValid(job, explicitArea || (givenJob && !givenJob.pieces))) {
@@ -676,16 +709,25 @@
     const subtotal = material.subtotal;
     const base = computeWorkAndTotal(subtotal, mainArea, rates, options, extraLineItems, landingArea);
     const groupWork = groups.reduce((s, g) => s + g.work, 0);
+    // Швы столешницы (SEAM-01): per seam, no stone coefficient. Only a
+    // countertop (a shape and a seamRate argument given) has them; a seam
+    // without a rate is the manager's, never 0 ₽.
+    const seamCount = shape ? countertopSeams(job, material, shape) : 0;
+    let seams = null;
+    if (seamCount > 0) {
+      seams = { count: seamCount, amount: isRateSet(seamRate) ? seamCount * seamRate : null };
+      if (seams.amount === null) base.unpriced.push('seams');
+    }
     // The product's own work without a rate (base.unpriced): the stone is
     // priced, the work and the total are left to the manager -- never a
     // total that looks final (see computeWorkAndTotal).
-    const work = base.work === null ? null : base.work + groupWork;
+    const work = base.work === null || (seams && seams.amount === null) ? null : base.work + groupWork + (seams ? seams.amount : 0);
     // Only one slab, one uncut piece: how much of that slab is left.
     const single = job.pieces && material.nSlabs === 1 && material.seams === 0 && job.pieces.length === 1 && job.pieces[0].count === 1;
     return {
       ok: true, reason: null, subtotal,
       fabrication: base.fabrication, installation: base.installation, polish: base.polish, lighting: base.lighting, misc: base.misc,
-      catalogExtras: base.catalogExtras, landing: base.landing, groupWork, work, total: work === null ? null : subtotal + work,
+      catalogExtras: base.catalogExtras, landing: base.landing, groupWork, seams, work, total: work === null ? null : subtotal + work,
       unpriced: base.unpriced, workNote: unpricedWorkNote(base.unpriced),
       nSlabs: material.nSlabs,
       remainderM2: single ? material.slabAreaM2 - material.productAreaM2 : null,
@@ -698,6 +740,7 @@
     findBestTypeASlab, slabCapacityForCross, minCostCover, findTypeASegmentedResult,
     computeRemainderAreaM2, computeTypeBResult, computeTypeBResultForArea, computeWorkAndTotal, calculatePrice,
     isRateSet, unpricedWorkNote,
+    countertopSeams, COUNTERTOP_SEAM_KEYS, EXTRA_SEAM_KEYS,
     cutPieces, shelfPack, packSlab, planPieces, planSurface, planMaterial, computeGroupWork, defaultJob,
     PRICING_LIMITS
   };

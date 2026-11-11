@@ -109,7 +109,7 @@
         { name: 'Монтаж', unit: 'м²', qty: area, priceRub: perM2(rates.installationRatePerM2), amount: money(result.installation) },
       ] },
       { title: 'Кромка и дополнительные работы', rows: [
-        { name: worksName(configuration), unit: null, qty: null, priceRub: null, amount: money(result.extras) + money(result.catalogExtras) },
+        { name: worksName(configuration), unit: null, qty: null, priceRub: null, amount: money(result.extras) + money(result.catalogExtras) + money(result.seams && result.seams.amount) },
       ] },
       { title: 'Прочее', rows: [
         { name: 'Прочие работы', unit: null, qty: null, priceRub: null, amount: money(result.misc) },

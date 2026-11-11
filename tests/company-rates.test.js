@@ -33,7 +33,7 @@ function price(state, catalog) {
     installEnabled: state.options.installEnabled, polishEnabled: state.options.polishEnabled, complexEnabled: state.options.complexEnabled,
     lightEnabled: state.options.lightEnabled,
     extraLineItems: inputs.extraLineItems, marginCm: SAW_MARGIN_CM, usageLimit: SLAB_USAGE_LIMIT,
-    job: inputs.job, groupRates: inputs.groupRates,
+    job: inputs.job, groupRates: inputs.groupRates, seamRate: inputs.seamRate, shape: inputs.shape,
   });
   assert.equal(r.ok, true, 'priced: ' + r.reason);
   return { r, inputs };
@@ -240,4 +240,93 @@ test('countertop lighting toggle', () => {
   assert.equal(price(sill).r.lighting, 0);
   const bath = stateFor('stoleshnitsa_vannaya', { width: { value: '500' }, length: { value: '1200' }, 'opt-light': on }, 'marble');
   assert.equal(bath.options.lightEnabled, true);
+});
+
+// ---- SEAM-01: countertop seams (corner joints + splits of long pieces) ----
+
+// Slabs of 1.5 x 3 m: a piece longer than ~2.9 m is cut in two.
+const smallSlabs = category => ({ id: 'small', category, slabs: Array.from({ length: 12 }, (_, i) => ({ article: 'S' + i, width_cm: 150, length_cm: 300, price_total_rub: 100000 })) });
+function smallStateFor(key, values, category) {
+  return ConstructorState.readConstructorState({
+    doc: createFakeDoc(values), selectedProductKey: key, product: PRODUCTS[key],
+    stone: smallSlabs(category || 'marble'), hasAdditionalWork: ProductTypes.hasAdditionalWork,
+  });
+}
+
+test('L countertop that fits the slabs has one seam', () => {
+  const { r } = price(stateFor('stoleshnitsa_kuhnya', kitchenL(), 'marble'));
+  assert.equal(r.seams.count, 1);
+  assert.equal(r.seams.amount, 25000);
+});
+
+test('U countertop has two corner seams', () => {
+  const { r } = price(stateFor('stoleshnitsa_kuhnya', kitchenL({ productShape: { value: 'ushape' } }), 'marble'));
+  assert.equal(r.seams.count, 2);
+  assert.equal(r.seams.amount, 50000);
+});
+
+test('straight countertop longer than a slab', () => {
+  const { r } = price(smallStateFor('stoleshnitsa_kuhnya', { width: { value: '600' }, length: { value: '4000' } }));
+  assert.equal(r.material.seams, 1);
+  assert.equal(r.seams.count, 1);
+  assert.equal(r.seams.amount, 25000);
+});
+
+test('island split counts, backsplash split does not', () => {
+  const { r } = price(smallStateFor('stoleshnitsa_kuhnya', {
+    width: { value: '600' }, length: { value: '2400' },
+    'extra-ostrov-width': { value: '900' }, 'extra-ostrov-length': { value: '4000' },
+    'extra-fartuk-width': { value: '600' }, 'extra-fartuk-length': { value: '4000' },
+  }));
+  assert.equal(r.material.seamsByKey.island, 1);
+  assert.equal(r.material.seamsByKey.backsplash, 1);
+  assert.equal(r.seams.count, 1);
+  assert.equal(r.seams.amount, 25000);
+});
+
+test('L shape without a wing yet has no corner seam', () => {
+  const { r } = price(stateFor('stoleshnitsa_kuhnya', { width: { value: '600' }, length: { value: '2400' }, productShape: { value: 'lshape' } }, 'marble'));
+  assert.ok(!r.seams || r.seams.count === 0, JSON.stringify(r.seams));
+});
+
+test('floors never get SEAM-01', () => {
+  const { r, inputs } = price(smallStateFor('pol', { width: { value: '5000' }, length: { value: '5000' } }));
+  assert.ok(r.nSlabs > 1);
+  assert.equal(inputs.seamRate, null);
+  assert.ok(!r.seams || r.seams.count === 0, JSON.stringify(r.seams));
+});
+
+test('a long sill split in two gets no SEAM-01', () => {
+  const { r } = price(smallStateFor('podokonnik', { width: { value: '300' }, length: { value: '4000' } }));
+  assert.ok(r.material.seams >= 1);
+  assert.ok(!r.seams || r.seams.count === 0, JSON.stringify(r.seams));
+});
+
+test('seams enter the work, without the stone coefficient', () => {
+  const marble = price(stateFor('stoleshnitsa_kuhnya', kitchenL(), 'marble')).r;
+  close(marble.work, marble.fabrication + marble.installation + marble.polish + marble.lighting + marble.catalogExtras + 25000, 'work includes the seam');
+  close(marble.total, marble.subtotal + marble.work, 'total');
+  const quartzite = price(stateFor('stoleshnitsa_kuhnya', kitchenL(), 'quartzite')).r;
+  assert.equal(quartzite.seams.amount, 25000);
+});
+
+test('bath countertop seams too', () => {
+  const { r, inputs } = price(stateFor('stoleshnitsa_vannaya', kitchenL(), 'marble'));
+  assert.equal(inputs.seamRate, 25000);
+  assert.equal(r.seams.count, 1);
+});
+
+test('a seam without a SEAM-01 rate leaves the work to the manager', () => {
+  const stub = Object.assign({}, RateCatalog, {
+    getAdditionalWorkRate: id => (id === 'SEAM-01' ? null : RateCatalog.getAdditionalWorkRate(id)),
+  });
+  const { r } = price(stateFor('stoleshnitsa_kuhnya', kitchenL(), 'marble'), stub);
+  assert.equal(r.seams.count, 1);
+  assert.equal(r.seams.amount, null);
+  assert.equal(r.work, null);
+  assert.equal(r.total, null);
+  assert.ok(r.unpriced.includes('seams'));
+  // A straight countertop that needs no seam stays priced without the rate.
+  const straight = price(stateFor('stoleshnitsa_kuhnya', { width: { value: '600' }, length: { value: '2400' } }, 'marble'), stub).r;
+  assert.ok(straight.work > 0);
 });

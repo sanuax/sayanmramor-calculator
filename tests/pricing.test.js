@@ -488,3 +488,29 @@ test('calculatePrice: extraLineItems defaults to zero catalogExtras when omitted
   const r = Pricing.calculatePrice({ stone, widthM: 1.0, lengthM: 0.6, productType: 'A', rates: SAMPLE_RATES, marginCm: 4, usageLimit: 0.65 });
   assert.equal(r.catalogExtras, 0);
 });
+
+test('cutPieces reports seams per piece key', () => {
+  // 4 m pieces on 3 m slabs: each is cut in two.
+  const small = [{ article: 'S', width_cm: 150, length_cm: 300, price_total_rub: 1000 }];
+  const pieces = [
+    { key: 'main', group: 'main', lengthM: 4, widthM: 0.6, areaM2: 2.4, count: 1, seam: true },
+    { key: 'backsplash', group: 'extra', lengthM: 4, widthM: 0.6, areaM2: 2.4, count: 1, seam: true },
+  ];
+  const r = Pricing.cutPieces(pieces, small, 4, 0.65);
+  assert.equal(r.seamsByKey.main, 1);
+  assert.equal(r.seamsByKey.backsplash, 1);
+  assert.equal(r.seams, 2);
+});
+
+test('planMaterial exposes seamsByKey summed over the parts', () => {
+  const small = Array.from({ length: 10 }, (_, i) => ({ article: 'S' + i, width_cm: 150, length_cm: 300, price_total_rub: 1000 }));
+  const job = { pieces: [
+    { key: 'main', group: 'main', lengthM: 4, widthM: 0.6, areaM2: 2.4, count: 1, seam: true },
+    { key: 'island', group: 'extra', lengthM: 4, widthM: 0.9, areaM2: 3.6, count: 1, seam: true },
+  ] };
+  const m = Pricing.planMaterial({ slabs: small, job, marginCm: 4, usageLimit: 0.65 });
+  assert.equal(m.ok, true, m.reason);
+  assert.equal(m.seamsByKey.main, 1);
+  assert.equal(m.seamsByKey.island, 1);
+  assert.equal(m.seams, 2);
+});

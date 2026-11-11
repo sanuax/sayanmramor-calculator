@@ -325,8 +325,12 @@
     return Catalog().hasPolishRate(resolveTypeId(state));
   }
 
+  // The countertops (kitchen and bath): the products with seams priced at
+  // SEAM-01 and the «Подсветка камня» choice.
+  const COUNTERTOP_KEYS = ['stoleshnitsa_kuhnya', 'stoleshnitsa_vannaya'];
+
   // «Подсветка камня» is a choice only on a kitchen or a bath countertop.
-  const LIGHT_TOGGLE_PRODUCTS = ['stoleshnitsa_kuhnya', 'stoleshnitsa_vannaya'];
+  const LIGHT_TOGGLE_PRODUCTS = COUNTERTOP_KEYS;
   function lightToggleAvailable(productKey) {
     return LIGHT_TOGGLE_PRODUCTS.includes(productKey);
   }
@@ -468,7 +472,14 @@
       });
     }
 
-    return { rates, extraLineItems, areaM2, job, groupRates };
+    // Швы столешницы (SEAM-01, per seam, no stone coefficient): kitchen and
+    // bath countertops only -- they pass their shape so pricing.js counts the
+    // corner joints; any other product has neither (no SEAM-01 line).
+    const isCountertop = !!(state.product && COUNTERTOP_KEYS.includes(state.product.key));
+    const seamRate = isCountertop ? catalog.getAdditionalWorkRate('SEAM-01') : null;
+    const shape = isCountertop ? (state.shape || 'straight') : null;
+
+    return { rates, extraLineItems, areaM2, job, groupRates, seamRate, shape };
   }
 
   return { readConstructorState, buildPricingInputs, resolveTypeId, polishAvailable, lightToggleAvailable, STEP_COUNT_RANGE, STEP_COUNT_DEFAULTS, stepCountRange, isValidStepCount };

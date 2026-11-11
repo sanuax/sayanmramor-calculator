@@ -287,7 +287,8 @@
       ['installation', 'Монтаж', r.installation],
       ['polish', 'Полировка', r.polish],
       ['lighting', 'Подсветка камня', r.lighting],
-      ['works', 'Кромка и дополнительные работы', (r.extras || 0) + (r.catalogExtras || 0)],
+      // Швы столешницы (SEAM-01) ride in this line until they get their own.
+      ['works', 'Кромка и дополнительные работы', (r.extras || 0) + (r.catalogExtras || 0) + ((r.seams && r.seams.amount) || 0)],
       // Parts with their own rates (подступенки): 0 until the company sets them.
       ['parts', 'Подступенки - работы', r.groupWork || 0],
       ['misc', 'Прочие работы', r.misc],
