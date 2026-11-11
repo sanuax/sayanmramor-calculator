@@ -52,6 +52,37 @@ test('type cards: client-facing names only -- no rate-catalog suffixes or riser 
   titles.forEach(t => assert.doesNotMatch(t, /тандартн| - |подступен/i, t));   // « - »: a «name - suffix» separator, not the hyphen of «Г-образная»
 });
 
+test('every TYPE_CARDS id is a catalog row of the same product, and every pickable catalog row has its card (exact-id mapping)', () => {
+  const RateCatalog = require('../rate-catalog.js');
+  const { PRODUCTS } = require('../product-types.js');
+  const block = html.slice(html.indexOf('const TYPE_CARDS = {'), html.indexOf('const RISER_CARDS'));
+  // Static cards: «key: [ ... { ids: ['ID'] ... } ... ]»; fasad / kaminy cards come from their models.
+  const cardIds = {
+    fasad: require('../facade-model.js').FACADE_TYPES.map(t => t.id),
+    kaminy: require('../fireplace-model.js').FIREPLACE_TYPES.map(t => t.id),
+  };
+  let key = null;
+  block.split(/\r?\n/).forEach(line => {
+    const head = line.match(/^ {4}([a-z_]+): /);
+    if (head) key = head[1];
+    const ids = line.match(/\{ ids: \['([A-Z]+-\d+)'\]/);
+    if (ids && key) (cardIds[key] = cardIds[key] || []).push(ids[1]);
+  });
+  assert.deepEqual(Object.keys(cardIds).sort(), ['fasad', 'kaminy', 'lestnitsa', 'panno', 'podokonnik', 'pol', 'stena', 'stupeni']);
+  Object.keys(cardIds).forEach(productKey => {
+    const rows = RateCatalog.getSubcategoriesForProduct(PRODUCTS[productKey].label);
+    assert.ok(cardIds[productKey].length > 0, productKey);
+    cardIds[productKey].forEach(id => assert.ok(rows.some(r => r.id === id), productKey + ': card id ' + id + ' is a catalog row of this product'));
+    // The other way round: only the stair landing (STAIR-11, a detail of a staircase) has no card.
+    rows.forEach(r => assert.ok(cardIds[productKey].includes(r.id) || r.id === 'STAIR-11', productKey + ': catalog row ' + r.id + ' has no card'));
+  });
+  // Kitchen and bath countertops pick their row by the form, not by a card.
+  ['stoleshnitsa_kuhnya', 'stoleshnitsa_vannaya'].forEach(productKey => {
+    assert.ok(PRODUCTS[productKey].hideVariantStep, productKey);
+    assert.ok(!(productKey in cardIds), productKey);
+  });
+});
+
 test('countertop shape offers П-образная', () => {
   assert.match(html, /<option value="ushape">П-образная<\/option>/);
 });

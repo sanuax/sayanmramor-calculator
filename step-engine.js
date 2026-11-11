@@ -66,7 +66,7 @@
     // ранее скрытый legacy-шагом "Вариант исполнения".
     podokonnik: ['type', 'dimensions', 'material', 'edge', 'options', 'review'],
     // stupeni: 'riser' ("с подступенками") is its own step, not folded into
-    // 'type' -- STEP-04 in PRODUCT_SUBCATEGORIES used to mix a tread-SHAPE
+    // 'type' -- the old riser row (STEP-04, now RISER-00 in rate-catalog.js) used to mix a tread-SHAPE
     // choice (Прямая/Забежная/Радиусная) and a riser YES/NO into the same
     // select, which is two different questions. 'type' now only lists the
     // tread-shape rows (see renderSubcategoryOptions()'s stupeni filter in

@@ -2285,11 +2285,10 @@
   };
   // Типы изделий -- что выбирает клиент: чистое название, короткое пояснение
   // и иконка в общей сетке (viewBox 64x40, ось x = 32). `ids` -- строки
-  // PRODUCT_SUBCATEGORIES (rate-catalog.js не меняется); у лестницы тип --
+  // PRODUCT_SUBCATEGORIES (rate-catalog.js, таблица v2); у лестницы тип --
   // это форма марша, а подступенки -- отдельный признак (#stair-risers),
-  // не часть id типа. Строки каталога,
-  // которые не являются самостоятельным выбором клиента (STAIR-09..13 --
-  // элементы облицовки, STEP-04 -- подступенок), здесь не показываются.
+  // не часть id типа. Строка каталога, которая не является самостоятельным
+  // выбором клиента (STAIR-11 -- площадка между маршами), здесь не показывается.
   // Объявлено здесь, а не рядом с renderSubcategoryOptions(): URL-bootstrap
   // ниже синхронно выбирает изделие и доходит до этих данных.
   function typeIcon(inner) {
@@ -3431,7 +3430,7 @@
   function subcategoryLabel(row, withRisers) {
     const card = typeCardFor(row.id);
     if (card) return card.title + (withRisers && selectedProductKey === 'lestnitsa' ? ', с подступенками' : '');
-    return row.shape === 'Любая' ? row.variant : row.shape;
+    return row.shape;
   }
 
   function updateSubcategoryQtyVisibility() {
@@ -3767,7 +3766,7 @@
     const rows = getSubcategoriesForProduct(product.label);
     const cards = TYPE_CARDS[productKey] || [];
     // The hidden select holds exactly the catalog rows the cards can pick
-    // (STEP-04 -- the riser -- has its own question, see the 'riser' step).
+    // (the riser, RISER-00, has its own question, see the 'riser' step).
     cards.forEach(c => c.ids.forEach(id => {
       const row = rows.find(r => r.id === id);
       if (!row) return;

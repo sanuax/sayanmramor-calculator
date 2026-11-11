@@ -352,11 +352,12 @@ test('each extra on its own: backsplash, wall panel, island, bar -- the configur
 
 const RateCatalog = require('../rate-catalog.js');
 
-test('unset rates stay null: risers, the extras\' fabrication, the extras\' installation -- no made-up rate', () => {
+test('product-types.js keeps its own old rates null (risers, extras); the company rates live only in rate-catalog.js (v2)', () => {
   assert.deepEqual(ProductTypes.RISER_WORK_RATES, { fabricationRatePerM2: null, installationRatePerM2: null, polishRatePerM2: null });
   assert.equal(ProductTypes.COUNTERTOP_EXTRAS_RATES.fartukRatePerM2, null);
   assert.equal(ProductTypes.COUNTERTOP_EXTRAS_RATES.ostrovRatePerM2, null);
-  ['EXTRA-03', 'EXTRA-05', 'EXTRA-06', 'EXTRA-07'].forEach(id => assert.equal(RateCatalog.getAdditionalWorkRate(id), null, id));
+  // The company's rates (table v2) are in rate-catalog.js; nothing else is made up.
+  assert.deepEqual(['EXTRA-03', 'EXTRA-05', 'EXTRA-06', 'EXTRA-07'].map(id => RateCatalog.getAdditionalWorkRate(id)), [15000, 60000, 40000, 60000]);
   assert.deepEqual(ProductTypes.COUNTERTOP_EXTRAS_INSTALL_RATES, { backsplash: null, wallPanel: null, island: null, barCounter: null });
 });
 

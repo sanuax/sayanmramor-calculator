@@ -94,8 +94,12 @@ test('facade types: 8 real categories, each with its own sizes -- no type uses t
       assert.ok(f.surface && f.formula, t.id + '/' + f.id + ' says what is clad and how');
     });
   });
-  // No new commercial rates were invented.
-  RateCatalog.getSubcategoriesForProduct('Фасады').forEach(r => assert.equal(r.rate, null, r.id));
+  // Every facade type has the company's rates, per m² of stone (table v2), and none was invented.
+  RateCatalog.getSubcategoriesForProduct('Фасады').forEach(r => {
+    assert.equal(r.unit, 'м²', r.id);
+    assert.deepEqual(RateCatalog.getProductRates(r.id), { fabricationRatePerM2: r.fabricationRatePerM2, installationRatePerM2: r.installationRatePerM2, polishRatePerM2: r.polishRatePerM2 }, r.id);
+  });
+  assert.equal(RateCatalog.getProductRates('FACADE-02').fabricationRatePerM2, 120000);
 });
 
 // ---- 8. Фасад здания --------------------------------------------------------

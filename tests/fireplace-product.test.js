@@ -443,17 +443,15 @@ test('WORK_RATES.kaminy exists and every rate is null -- not 0, not another prod
   assert.equal(rates.polishRatePerM2, null);
 });
 
-test('the catalog: FIREPLACE-01/02/03 by m² of stone (as priced), rate null; one installation row', () => {
+test('the catalog: FIREPLACE-01/02/03 by m² of stone (as priced), with the company rates (table v2)', () => {
   const rows = RateCatalog.PRODUCT_SUBCATEGORIES.filter(r => r.categoryLabel === 'Камины');
-  assert.deepEqual(rows.map(r => [r.id, r.shape, r.unit, r.rate, r.currency]), [
-    ['FIREPLACE-01', 'Каминный портал', 'м²', null, null],
-    ['FIREPLACE-02', 'Облицовка каминного короба', 'м²', null, null],
-    ['FIREPLACE-03', 'Подиум камина', 'м²', null, null],
+  assert.deepEqual(rows.map(r => [r.id, r.shape, r.unit, r.fabricationRatePerM2, r.installationRatePerM2, r.polishRatePerM2]), [
+    ['FIREPLACE-01', 'Портал', 'м²', 40000, 60000, 30000],
+    ['FIREPLACE-02', 'Облицовка короба', 'м²', 40000, 60000, 30000],
+    ['FIREPLACE-03', 'Подиум', 'м²', 25000, 30000, 20000],
   ]);
   // The catalog ids are the model's type ids.
   rows.forEach(r => assert.ok(FireplaceModel.getType(r.id), r.id));
-  const inst = RateCatalog.getInstallationRow('Камины');
-  assert.deepEqual([inst.id, inst.unit, inst.rate], ['INST-109', 'м²', null]);
   // No additional works were added for fireplaces.
   assert.ok(!RateCatalog.ADDITIONAL_WORKS.some(r => /камин/i.test(r.operation + r.variant)));
 });
