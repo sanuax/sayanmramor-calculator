@@ -564,19 +564,22 @@ test('the «Опции» step has rows for polish and lighting with ids', () => 
   assert.match(html, /\.checkbox-row\[hidden\]\s*\{\s*display:\s*none/);
 });
 
-test('measure and delivery: one block, one set of ids, moved by placeServiceOptions', () => {
+test('measure and delivery: among the options, before the installation, one set of ids, for every product (2026-11-12, the owner)', () => {
   ['opt-measure', 'opt-delivery'].forEach(id => {
     const tags = inputTags(id);
     assert.equal(tags.length, 1, id);
     assert.match(tags[0], /type="checkbox"/, id);
   });
-  assert.equal((html.match(/class="checkboxes service-options"/g) || []).length, 1);
-  assert.match(html, /<label class="checkbox-row"><input type="checkbox" id="opt-measure"> Замер на объекте<\/label>/);
-  assert.match(html, /<label class="checkbox-row"><input type="checkbox" id="opt-delivery"> Доставка<\/label>/);
-  assert.match(html, /function placeServiceOptions\(productKey\)/);
-  assert.match(html, /placeServiceOptions\(selectedProductKey\)/);
-  // Into «Доп. работы» for a countertop, else into «Опции».
-  assert.match(html, /getElementById\('countertopExtras'\)/);
+  const step = html.slice(html.indexOf('data-step-id="options"'));
+  const section = step.slice(0, step.indexOf('</section>'));
+  const order = [...section.matchAll(/<input type="checkbox" id="(opt-[a-z]+)">/g)].map(m => m[1]);
+  assert.deepEqual(order, ['opt-complex', 'opt-polish', 'opt-light', 'opt-measure', 'opt-delivery', 'opt-install']);
+  assert.match(section, /<label class="checkbox-row">\s*<input type="checkbox" id="opt-measure"> Замер на объекте\s*<\/label>/);
+  assert.match(section, /<label class="checkbox-row">\s*<input type="checkbox" id="opt-delivery"> Доставка\s*<\/label>/);
+  // No separate block and no mover any more: a countertop's «Доп. работы» does not carry them.
+  assert.doesNotMatch(html, /service-options|placeServiceOptions/);
+  const extras = html.slice(html.indexOf('id="countertopExtras"'), html.indexOf('data-step-id="options"'));
+  assert.doesNotMatch(extras, /opt-measure|opt-delivery/);
 });
 
 test('the Moscow note sits under the price, the asterisk on the price itself', () => {

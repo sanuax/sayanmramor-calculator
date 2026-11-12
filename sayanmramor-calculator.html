@@ -427,7 +427,6 @@
   .checkbox-row[hidden] { display: none; }
   /* Замер и доставка: a block of their own, a little apart from the options above it
      (in «Опции») or from the additional works (in «Доп. работах»). */
-  .service-options { margin-top: 14px; }
   .price-note { margin: 4px 0 0; font-size: var(--configurator-muted); color: var(--muted); line-height: 1.5; }
   .price-note[hidden] { display: none; }
   .result-hero .price-note { margin: 0 0 6px; color: rgba(255, 255, 255, 0.8); }
@@ -2037,14 +2036,17 @@
         <label class="checkbox-row" id="opt-light-row">
           <input type="checkbox" id="opt-light"> Подсветка камня
         </label>
+        <!-- Замер и доставка (MISC-01/02) stand among the options, before the installation, for every product (2026-11-12, the owner). -->
+        <label class="checkbox-row">
+          <input type="checkbox" id="opt-measure"> Замер на объекте
+        </label>
+        <label class="checkbox-row">
+          <input type="checkbox" id="opt-delivery"> Доставка
+        </label>
         <label class="checkbox-row">
           <input type="checkbox" id="opt-install"> Монтаж на объекте
         </label>
       </div>
-      <!-- Замер и доставка (MISC-01/02), on the client's request, for every product. One block,
-           one set of ids: placeServiceOptions() moves it to the end of «Доп. работы» for a
-           countertop and keeps it here for any other product. -->
-      <div class="checkboxes service-options"><label class="checkbox-row"><input type="checkbox" id="opt-measure"> Замер на объекте</label><label class="checkbox-row"><input type="checkbox" id="opt-delivery"> Доставка</label></div>
     </section>
 
     <!-- review: the final step for every product (PRODUCT_STEPS always
@@ -4393,19 +4395,6 @@
     });
   }
 
-  // «Замер» and «Доставка» (MISC-01/02) are one DOM block with one set of ids.
-  // A countertop (kitchen, bath) has the step «Доп. работы»: the block stands at
-  // its end; any other product has none, so it stands at the end of «Опции».
-  // Moving the node keeps the ids, the listeners and the ticks.
-  function placeServiceOptions(productKey) {
-    const block = document.querySelector('.service-options');
-    const hasExtrasStep = !!(productKey && StepEngine.getSteps(productKey).includes('additionalWorks'));
-    const host = hasExtrasStep
-      ? document.getElementById('countertopExtras')
-      : document.querySelector('[data-step-id="options"]');
-    if (block && host && block.parentNode !== host) host.appendChild(block);
-  }
-
   // The length of every open edge of the product (edge-length.js), measured
   // on the same scene the 3D draws: only where it is priced -- a product with
   // edge work and a chosen profile.
@@ -4431,7 +4420,6 @@
     // inside the shape/additionalWorks steps show) and are untouched.
     updateWingVisibility();
     updateOptionRows();
-    placeServiceOptions(selectedProductKey);
     updateAdditionalWorkGroupsVisibility(product);
     renumberVisibleSteps();
     updateStepUI(selectedProductKey);

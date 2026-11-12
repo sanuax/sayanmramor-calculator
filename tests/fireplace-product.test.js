@@ -624,15 +624,17 @@ test('«Опции»: the one shared step -- its boxes, in their order, for a fi
   assert.equal(PRODUCTS.kaminy.supportsOptions, undefined, 'no opt-out: the default every product has');
   assert.ok(StepEngine.getSteps('kaminy').includes('options'));
   const wholeStep = htmlBetween('data-step-id="options"', '</section>');
-  // Замер и доставка are a block of their own at the step's end (placeServiceOptions), for every product.
-  assert.match(wholeStep, /<div class="checkboxes service-options">/);
-  const step = wholeStep.slice(0, wholeStep.indexOf('<!-- Замер и доставка'));
+  // Замер и доставка stand among the boxes, before the installation, for every product (2026-11-12, the owner).
+  assert.doesNotMatch(wholeStep, /service-options/);
+  const step = wholeStep;
   const boxes = [...step.matchAll(/<input type="checkbox" id="([^"]+)"> ([^\n]+)/g)].map(m => [m[1], m[2].trim()]);
   assert.deepEqual(boxes, [
     ['opt-complex', 'Сложная форма / фигурный рез'],
     ['opt-polish', 'Дополнительная полировка'],
     // Shown by the page only on a kitchen or bath countertop (updateOptionRows).
     ['opt-light', 'Подсветка камня'],
+    ['opt-measure', 'Замер на объекте'],
+    ['opt-delivery', 'Доставка'],
     ['opt-install', 'Монтаж на объекте'],
   ]);
   // No fireplace list of its own anywhere on the page or in the state.
