@@ -65,9 +65,17 @@ test('stone coefficient multiplies fabrication only', () => {
 });
 
 test('unknown stone category prices as x1', () => {
-  ['slate', undefined].forEach(category => {
+  // 'slate' was the example until the owner listed it (x1.3, 2026-11-13); a kind nobody listed stays x1.
+  ['some-new-kind', undefined].forEach(category => {
     const { r, inputs } = price(stateFor('stoleshnitsa_kuhnya', kitchenL(), category));
     close(r.fabrication, 40000 * inputs.job.mainAreaM2, String(category));
+  });
+});
+
+test('the six kinds of the last list from the owner price at their coefficients', () => {
+  [['aragonit', 4], ['jasper', 4], ['pescanik', 1], ['septariya', 4], ['slate', 1.3], ['tigrovyi-glaz', 3]].forEach(([category, k]) => {
+    const { r, inputs } = price(stateFor('stoleshnitsa_kuhnya', kitchenL(), category));
+    close(r.fabrication, 40000 * k * inputs.job.mainAreaM2, category);
   });
 });
 

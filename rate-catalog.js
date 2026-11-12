@@ -135,6 +135,13 @@
     'artificial-marble': 1,
     'obsidian': 2,
     'soapstone': 2,
+    // The rest of the catalogue's kinds (2026-11-13, the owner's list): one stone each.
+    'aragonit': 4,
+    'jasper': 4,
+    'pescanik': 1,
+    'septariya': 4,
+    'slate': 1.3,
+    'tigrovyi-glaz': 3,
   };
 
   // Форма столешницы -> строка каталога (у столешниц тип выбирается на шаге «Форма»).

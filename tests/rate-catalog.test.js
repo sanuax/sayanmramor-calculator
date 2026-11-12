@@ -139,7 +139,7 @@ test('additional works rates', () => {
 
 test('stoneCoefficient: the company table, 1 for an unknown or empty kind', () => {
   const k = RateCatalog.stoneCoefficient;
-  assert.equal(Object.keys(RateCatalog.STONE_COEFFICIENTS).length, 15);
+  assert.equal(Object.keys(RateCatalog.STONE_COEFFICIENTS).length, 21);
   assert.equal(k('granite'), 1.3);
   assert.equal(k('quartz-agglomerate'), 1.3);
   assert.equal(k('oniks'), 1.5);
@@ -155,7 +155,13 @@ test('stoneCoefficient: the company table, 1 for an unknown or empty kind', () =
   assert.equal(k('travertin'), 1);
   assert.equal(k('limestone'), 1);
   assert.equal(k('artificial-marble'), 1);
-  assert.equal(k('slate'), 1);
+  assert.equal(k('aragonit'), 4);   // the last six kinds, from the owner's list (2026-11-13)
+  assert.equal(k('jasper'), 4);
+  assert.equal(k('pescanik'), 1);
+  assert.equal(k('septariya'), 4);
+  assert.equal(k('slate'), 1.3);
+  assert.equal(k('tigrovyi-glaz'), 3);
+  assert.equal(k('some-new-kind'), 1, 'a kind nobody listed is still x1');
   assert.equal(k(undefined), 1);
   assert.equal(k(null), 1);
   assert.equal(k(''), 1);
@@ -269,7 +275,7 @@ test('every additional work equals the spec table «Доп. работы» (all 
   });
 });
 
-test('risers, MISC and the 15 stone coefficients equal the spec tables', () => {
+test('risers, MISC and the 21 stone coefficients equal the spec tables', () => {
   assert.deepEqual(RateCatalog.RISER_RATES, { id: 'RISER-00', fabricationRatePerM2: 5000, installationRatePerM2: 5000, polishRatePerM2: null });
   assert.deepEqual(RateCatalog.MISC, {
     measure: 15000, delivery: 12000, unloadingPerM2: 3500, consumablesPerM2: 2500,
@@ -291,5 +297,11 @@ test('risers, MISC and the 15 stone coefficients equal the spec tables', () => {
     'artificial-marble': 1,
     'obsidian': 2,
     'soapstone': 2,
+    'aragonit': 4,
+    'jasper': 4,
+    'pescanik': 1,
+    'septariya': 4,
+    'slate': 1.3,
+    'tigrovyi-glaz': 3,
   });
 });
