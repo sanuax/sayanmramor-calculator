@@ -139,7 +139,7 @@ test('?product=kaminy selects the fireplace through its card', () => {
   // The bootstrap picks a product by its card's radio -- the fireplace has one.
   assert.match(html, /productGrid\.querySelector\('input\[value="' \+ initialProductKey \+ '"\]'\)/);
   // fireplace-model.js is loaded before the modules that read it and the page script.
-  const at = src => html.indexOf('<script src="' + src + '"></script>');
+  const at = src => html.replace(/\?v=[0-9a-f]{8}"/g, '"').indexOf('<script src="' + src + '"></script>');
   assert.ok(at('fireplace-model.js') > 0);
   ['constructor-state.js', 'visualizer/geometry-model.js', 'product-parts.js'].forEach(src => assert.ok(at('fireplace-model.js') < at(src), src));
   // Everything the synchronous bootstrap reaches is declared before it (TDZ).

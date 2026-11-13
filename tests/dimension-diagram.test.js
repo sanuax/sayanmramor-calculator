@@ -153,7 +153,7 @@ test('the rectangle with the length upright («Высота стены»): the l
 test('the page draws every dimension through dimension-diagram.js -- no hand-placed dimension line is left', () => {
   const script = html.slice(html.indexOf('</defs>'));
   assert.doesNotMatch(script, /marker-(start|end)="url\(#dimArrow/, 'markers only come from DimensionDiagram.svg');
-  assert.match(html, /<script src="dimension-diagram\.js"><\/script>/);
+  assert.match(html, /<script src="dimension-diagram\.js(?:\?v=[0-9a-f]{8})?"><\/script>/);
   ['DimensionDiagram.rectLayout', 'DimensionDiagram.horizontal', 'DimensionDiagram.vertical', 'D2.radius'].forEach(call =>
     assert.ok(html.includes(call), call));
 });

@@ -290,10 +290,11 @@ test('the size step shows no formula: no «Формула: …» line under the 
   assert.doesNotMatch(html, /'Формула: '/);
 });
 
-test('«Схема без крыла» only for a product with the «Форма» step (the countertops), not for the steps after a countertop was Г/П-shaped (2026-10-20, the owner)', () => {
+test('the wing drawing only for a product with the «Форма» step (the countertops), not for the steps after a countertop was Г/П-shaped (2026-10-20, the owner; the drawing itself since 2026-11-14)', () => {
   const fn = html.slice(html.indexOf('function updateWingVisibility()'), html.indexOf('function svgIcon('));
   assert.match(fn, /const hasShape = !!\(product && product\.supportsShapeSelection\);/);
-  assert.match(fn, /dimShapeNote\.hidden = !\(hasShape && \(isLshape \|\| isUshape\)\);/);
+  const pick = html.slice(html.indexOf('function currentWingShape()'), html.indexOf('function drawWingDiagram('));
+  assert.match(pick, /product && product\.supportsShapeSelection && \(shape === 'lshape' \|\| shape === 'ushape'\) \? shape : null;/);
 });
 
 test('size fields: label over the field, «мм» centred on the field itself, fields in a row on one line however their labels wrap (2026-10-20, the owner)', () => {
@@ -327,15 +328,14 @@ test('the size step says no more than asked (2026-10-20, the owner): what a size
   assert.doesNotMatch(labels, /note: /);
   ['WALL-04', 'SILL-02', 'SILL-03', 'SILL-04'].forEach(id => assert.match(labels, new RegExp("'" + id + "'[^\\n]*\\n[^\\n]*\\n\\s+tips: \\{"), id));
   // A stair: the figures under the count, the tread depth with them; only «Длины не хватает» written out.
-  const hint = html.slice(html.indexOf('function updateDimHint('), html.indexOf("const dimShapeNote = document.getElementById('dimShapeNote');"));
+  const hint = html.slice(html.indexOf('function updateDimHint('), html.indexOf("const priceOut = document.getElementById('priceOut');"));
   assert.match(hint, /figures\.push\('глубина ступени ' \+ depthMm \+ ' мм'\)/);
   assert.match(hint, /stepCountNoteEl\.textContent = figures\.join\(' · '\);/);
   assert.match(hint, /warn = 'Длины не хватает/);
   // Facades and fireplaces: the area in figures; what the price covers is said by the price, on the result screen.
   assert.doesNotMatch(html, /facade-area-scope/);
-  // The countertop diagram: three words under it.
-  assert.match(html, /dimShapeNote\.textContent = isUshape \? 'Схема без крыльев' : 'Схема без крыла';/);
-  assert.ok(html.indexOf('id="dimShapeNote"') > html.indexOf('id="dimDiagram"') && html.indexOf('id="dimShapeNote"') < html.indexOf('id="dimGenericFields"'));
+  // The countertop diagram draws its wings, so it needs no words under it (2026-11-14).
+  assert.doesNotMatch(html, /dimShapeNote/);
   assert.ok(html.indexOf('id="facadeAreaNote"') > html.indexOf('id="facadeQtyField"'));
 });
 
@@ -347,7 +347,7 @@ test('the size column: 400 px, two fields side by side with every label on one l
 
 // ---- The passport link (2026-10-20, the owner): the link reopens the same product ----
 test('the page loads passport-link.js next to url-bootstrap.js', () => {
-  assert.match(html, /<script src="url-bootstrap\.js"><\/script>\s*<script src="passport-link\.js"><\/script>/);
+  assert.match(html.replace(/\?v=[0-9a-f]{8}"/g, '"'), /<script src="url-bootstrap\.js"><\/script>\s*<script src="passport-link\.js"><\/script>/);
 });
 
 test('a passport link whose stone left the catalog: one hidden line in the material step, in the owner\'s words', () => {
@@ -369,7 +369,7 @@ test('«Скачать паспорт» sits in the lead area beside «Полу�
 });
 
 test('the passport modules load with the page; the PDF / QR libraries only on the click', () => {
-  assert.match(html, /<script src="passport-link\.js"><\/script>\s*<script src="passport-model\.js"><\/script>\s*<script src="passport-pdf\.js"><\/script>/);
+  assert.match(html.replace(/\?v=[0-9a-f]{8}"/g, '"'), /<script src="passport-link\.js"><\/script>\s*<script src="passport-model\.js"><\/script>\s*<script src="passport-pdf\.js"><\/script>/);
   assert.doesNotMatch(html, /<script[^>]+vendor\/(jspdf|qrcode)\//);
   assert.match(html, /'vendor\/jspdf\/jspdf\.umd\.min\.js'/);
   assert.match(html, /'vendor\/qrcode\/qrcode\.js'/);

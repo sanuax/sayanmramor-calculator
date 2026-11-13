@@ -22,7 +22,11 @@ const AR_FILES = ['ar-view.js', 'ar-geometry.js', 'USDZExporter.js', 'fflate.mod
 const staticImports = src => [...src.matchAll(/^\s*import\s[^;]*?from\s*['"]([^'"]+)['"]|^\s*import\s*['"]([^'"]+)['"]/gm)].map(m => m[1] || m[2]);
 
 test('the page loads no AR file: no script, preload or link to one', () => {
-  AR_FILES.forEach(f => assert.ok(!html.includes(f), f + ' is named in the page'));
+  // The import map (scripts/stamp_assets.js) names ar-view.js to give it its stamped address; it loads nothing.
+  const page = html.replace(/<!-- IMPORTMAP -->[\s\S]*?<!-- \/IMPORTMAP -->/, '');
+  AR_FILES.forEach(f => assert.ok(!page.includes(f), f + ' is named in the page'));
+  const map = JSON.parse((html.match(/<script type="importmap">([^<]*)<\/script>/) || [, '{}'])[1]).imports || {};
+  assert.ok(!Object.keys(map).some(k => /ar-geometry|USDZExporter|fflate|TextureUtils/.test(k)), 'the map names only modules the 3D imports itself');
 });
 
 test('three-scene.js imports AR only on demand (import()), never statically', () => {

@@ -640,8 +640,6 @@
   /* «Фасады»: the area, its breakdown, the formula and what the price
      covers -- one line each, the total first. */
   #facadeAreaNote, #fireplaceAreaNote { display: grid; gap: 2px; margin-top: 14px; }
-  /* «Схема без крыла» explains the diagram: right under it, the fields below. */
-  #dimShapeNote { margin: -8px auto 16px; text-align: center; }
   #facadeAreaNote[hidden], #fireplaceAreaNote[hidden] { display: none; }
   .facade-area-total { color: var(--ink); font-size: var(--configurator-text); font-weight: 700; }
   /* Every note of the size step stands in the fields' own column, from its left edge, as
@@ -1648,11 +1646,6 @@
               </defs>
             </svg>
           </div>
-          <!-- Показывается только для lshape -- диаграмма не рисует крыло
-               (не придумываем новую геометрию), только явно оговаривает,
-               что это схема главного сегмента. Сразу под схемой, которую
-               поясняет (the owner, 2026-10-20). -->
-          <div class="dim-note" id="dimShapeNote" hidden>Схема без крыла</div>
           <div class="dim-block-title" id="dimBlockTitle" hidden></div>
           <div class="dim-fields" id="dimGenericFields">
             <div class="field-unit"><span class="unit-label" id="dimLengthUnitLabel">Длина</span><input type="number" inputmode="numeric" id="length" min="0" step="1" placeholder="2000"><span class="unit">мм</span></div>
@@ -2227,41 +2220,44 @@
   <img id="lightboxImg" alt="">
 </div>
 
-<script src="pricing.js"></script>
-<script src="price-filter.js"></script>
+<script src="pricing.js?v=105ac799"></script>
+<script src="price-filter.js?v=9dde617f"></script>
 <script src="/sayanmramor-site/js/picks.js"></script>
-<script src="material-picker.js"></script>
-<script src="product-types.js"></script>
-<script src="rate-catalog.js"></script>
-<script src="facade-model.js"></script>
-<script src="fireplace-model.js"></script>
-<script src="dimension-diagram.js"></script>
-<script src="step-engine.js"></script>
-<script src="result-model.js"></script>
+<script src="material-picker.js?v=d8cfb105"></script>
+<script src="product-types.js?v=293fa8d0"></script>
+<script src="rate-catalog.js?v=cce5c5cd"></script>
+<script src="facade-model.js?v=38b99136"></script>
+<script src="fireplace-model.js?v=f9c31096"></script>
+<script src="dimension-diagram.js?v=308e699b"></script>
+<script src="step-engine.js?v=74de0ad0"></script>
+<script src="result-model.js?v=c8fa91e6"></script>
 <!-- The site's request (2026-10-26): «Получить расчёт» goes there; one contract, the site's own file. -->
 <script src="/sayanmramor-site/js/offer-handoff.js"></script>
-<script src="transition-layer.js"></script>
-<script src="constructor-state.js"></script>
-<script src="visualizer/constants.js"></script>
-<script src="visualizer/cutout-geometry.js"></script>
-<script src="visualizer/attachment-geometry.js"></script>
-<script src="visualizer/geometry-model.js"></script>
-<script src="product-parts.js"></script>
-<script src="visualizer/material-adapter.js"></script>
-<script src="visualizer/edge-profile.js"></script>
-<script src="visualizer/motion.js"></script>
-<script src="visualizer/room-layout.js"></script>
-<script src="visualizer/dimensions-3d.js"></script>
-<script src="visualizer/scene-layout.js"></script>
-<script src="edge-length.js"></script>
-<script src="visualizer/camera-framing.js"></script>
-<script src="visualizer/webgl-support.js"></script>
-<script src="visualizer/camera-preset-tracker.js"></script>
-<script src="url-bootstrap.js"></script>
-<script src="passport-link.js"></script>
-<script src="passport-model.js"></script>
-<script src="passport-pdf.js"></script>
-<script type="module" src="visualizer/three-scene.js"></script>
+<script src="transition-layer.js?v=9687eaa7"></script>
+<script src="constructor-state.js?v=0dec8d6c"></script>
+<script src="visualizer/constants.js?v=8d93fe75"></script>
+<script src="visualizer/cutout-geometry.js?v=78beb648"></script>
+<script src="visualizer/attachment-geometry.js?v=00e2cf16"></script>
+<script src="visualizer/geometry-model.js?v=419117c8"></script>
+<script src="product-parts.js?v=759885c8"></script>
+<script src="visualizer/material-adapter.js?v=52c5aea7"></script>
+<script src="visualizer/edge-profile.js?v=cb61d4f4"></script>
+<script src="visualizer/motion.js?v=6748e337"></script>
+<script src="visualizer/room-layout.js?v=071f4d13"></script>
+<script src="visualizer/dimensions-3d.js?v=2487c42c"></script>
+<script src="visualizer/scene-layout.js?v=aa3db6bb"></script>
+<script src="edge-length.js?v=fa04a8bf"></script>
+<script src="visualizer/camera-framing.js?v=db6de54c"></script>
+<script src="visualizer/webgl-support.js?v=014e10bd"></script>
+<script src="visualizer/camera-preset-tracker.js?v=6235ae21"></script>
+<script src="url-bootstrap.js?v=d580d613"></script>
+<script src="passport-link.js?v=f148d340"></script>
+<script src="passport-model.js?v=44779720"></script>
+<script src="passport-pdf.js?v=880d1d48"></script>
+<!-- IMPORTMAP -->
+<script type="importmap">{"imports":{"./visualizer/ar-view.js":"./visualizer/ar-view.js?v=49e075d1","./visualizer/three-scene.js":"./visualizer/three-scene.js?v=cabfd3b0"}}</script>
+<!-- /IMPORTMAP -->
+<script type="module" src="visualizer/three-scene.js?v=cabfd3b0"></script>
 <script>
   const { PRODUCTS, hasAdditionalWork } = ProductTypes;
   const { getSubcategoriesForProduct, getAdditionalWorkRate } = RateCatalog;
@@ -2655,14 +2651,21 @@
     // A shaped sill or a radius wall: its plan, from the same geometry the
     // 3D and the price use, with every size the client enters.
     const plan = !stairs && currentDimLabels.shape ? drawPlanDiagram(l, w) : false;
-    dimRectG.style.display = stairs || plan ? 'none' : '';
-    dimStairG.style.display = stairs || plan ? '' : 'none';
+    // A countertop that is Г- or П-shaped: its plan with the wings (the owner, 2026-11-14).
+    const wingShape = !stairs && !plan ? currentWingShape() : null;
+    dimRectG.style.display = stairs || plan || wingShape ? 'none' : '';
+    dimStairG.style.display = stairs || plan || wingShape ? '' : 'none';
     if (stairs) {
       drawStairDiagram(l, w);
       return;
     }
     dimHintEl.hidden = true;
     if (plan) return;
+    if (wingShape) {
+      drawWingDiagram(l, w, wingShape);
+      return;
+    }
+    document.getElementById('dimSvg').setAttribute('aria-label', 'Схема изделия с размерами длины и ширины');
     // Без реальных значений -- условная альбомная заготовка (тот же расчёт
     // с плейсхолдер-величинами), подписи -- названия полей.
     const layout = DimensionDiagram.rectLayout(l, w,
@@ -2674,6 +2677,35 @@
     dimRect.setAttribute('width', layout.rect.w);
     dimRect.setAttribute('height', layout.rect.h);
     dimRectDims.innerHTML = DimensionDiagram.svg(layout.length) + DimensionDiagram.svg(layout.width);
+  }
+
+  // ---- Схема размеров: столешница с крыльями -----------------------------
+  // 'lshape' / 'ushape' for a product that has a shape (the countertops), else null: the shape picked at a
+  // countertop stays in #productShape after the client moves to another product (the owner, 2026-10-20).
+  function currentWingShape() {
+    const product = selectedProductKey ? PRODUCTS[selectedProductKey] : null;
+    const shape = productShapeSelect.value;
+    return product && product.supportsShapeSelection && (shape === 'lshape' || shape === 'ushape') ? shape : null;
+  }
+  // The plan from above with the wall on top: the run, the wing (Г) or the two wings (П), every size on
+  // the drawing. What is not entered yet shows the field's name (DimensionDiagram.wingLayout).
+  function drawWingDiagram(lMm, wMm, shape) {
+    const two = shape === 'ushape';
+    const wingWidthMm = parseFloat(document.getElementById('wing-width').value) || 0;
+    const wingLengthMm = parseFloat(document.getElementById('wing-length').value) || 0;
+    const mm = (valueMm, name) => valueMm > 0 ? Math.round(valueMm) + ' мм' : name;
+    const layout = DimensionDiagram.wingLayout({
+      shape, corner: shapeCornerSelect.value, lengthMm: lMm, widthMm: wMm, wingWidthMm, wingLengthMm,
+      texts: {
+        length: mm(lMm, currentDimLabels.length), width: mm(wMm, currentDimLabels.width),
+        wingWidth: mm(wingWidthMm, 'ширина'),
+        wingLength: mm(wingLengthMm, 'длина'),
+      },
+    });
+    let svg = '<polygon points="' + layout.outline.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ') + '" ' + DIAGRAM_STONE + '/>';
+    Object.keys(layout.dims).forEach(k => { svg += dimSvg(layout.dims[k]); });
+    dimStairG.innerHTML = svg;
+    document.getElementById('dimSvg').setAttribute('aria-label', 'Схема: столешница ' + (two ? 'с двумя крыльями' : 'с крылом') + ', вид сверху');
   }
 
   // ---- Схема размеров: ступень / лестница --------------------------------
@@ -2923,7 +2955,6 @@
     stepCountNoteEl.hidden = !figures.length;
     stepCountNoteEl.textContent = figures.join(' · ');
   }
-  const dimShapeNote = document.getElementById('dimShapeNote');
   const priceOut = document.getElementById('priceOut');
   // «* Расчёт указан для объектов ...»: shown only under a real price (its text ends with the asterisk).
   const priceRegionNote = document.getElementById('priceRegionNote');
@@ -2944,9 +2975,7 @@
     // выбирается только у Г-образной.
     document.getElementById('wingWidthLabel').textContent = isUshape ? 'Крылья, ширина' : 'Крыло, ширина';
     document.getElementById('wingLengthLabel').textContent = isUshape ? 'Крылья, длина' : 'Крыло, длина';
-    // Диаграмма размеров сама не рисует крылья (см. #dimShapeNote в разметке)
-    // -- только явно оговаривает, что показан главный сегмент. Только у
-    // изделий с шагом «Форма» (столешницы): форма, выбранная у столешницы,
+    // Только у изделий с шагом «Форма» (столешницы): форма, выбранная у столешницы,
     // остаётся в #productShape и после перехода, например, к ступеням
     // (владелец, 2026-10-20); цена её там уже не учитывает (constructor-state.js).
     const product = selectedProductKey ? PRODUCTS[selectedProductKey] : null;
@@ -2954,8 +2983,6 @@
     // The wing fields are in the sizes step now, which every product shares: only a product with a shape shows them.
     wingField.style.display = hasShape && (isLshape || isUshape) ? '' : 'none';
     shapeCornerSelect.style.display = hasShape && isLshape ? '' : 'none';
-    dimShapeNote.hidden = !(hasShape && (isLshape || isUshape));
-    dimShapeNote.textContent = isUshape ? 'Схема без крыльев' : 'Схема без крыла';
   }
 
   function svgIcon(inner, viewBox) {
@@ -4941,9 +4968,9 @@
     facadeQtyInput.value = facadeQtyHidden.value;
     facadeQtyError.style.visibility = 'hidden';
   });
-  productShapeSelect.addEventListener('change', () => { updateWingVisibility(); calculate(); });
-  ['wing-width', 'wing-length'].forEach(id => document.getElementById(id).addEventListener('input', calculate));
-  shapeCornerSelect.addEventListener('change', calculate);
+  productShapeSelect.addEventListener('change', () => { updateWingVisibility(); updateDimDiagram(); calculate(); });
+  ['wing-width', 'wing-length'].forEach(id => document.getElementById(id).addEventListener('input', () => { updateDimDiagram(); calculate(); }));
+  shapeCornerSelect.addEventListener('change', () => { updateDimDiagram(); calculate(); });
 
   // ===== Result + lead =====
   const resultHeroImg = document.getElementById('resultHeroImg');

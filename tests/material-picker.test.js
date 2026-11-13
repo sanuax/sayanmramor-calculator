@@ -47,7 +47,8 @@ test('filterAndSort applies the price filter with the others; it counts as an ac
 test('the picker has the «Цена» dropdown and loads price-filter.js before material-picker.js', () => {
   const html = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'sayanmramor-calculator.html'), 'utf8');
   assert.match(html, /<div class="filter-dropdown" data-filter="price">/);
-  const a = html.indexOf('<script src="price-filter.js"></script>'), b = html.indexOf('<script src="material-picker.js"></script>');
+  const plain = html.replace(/\?v=[0-9a-f]{8}"/g, '"');
+  const a = plain.indexOf('<script src="price-filter.js"></script>'), b = plain.indexOf('<script src="material-picker.js"></script>');
   assert.ok(a > 0 && a < b);
 });
 

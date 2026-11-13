@@ -224,9 +224,57 @@
     };
   }
 
+  // A countertop with wings, in plan (the owner, 2026-11-14): the wall on top, the main run across,
+  // a wing hanging under its end -- Г: one, at the chosen corner; П: one at each end (the same size, as
+  // in the 3D and the price). The run is length x width, a wing its width (along the run) x its length
+  // (out into the room), all in one scale in a 150 x 88 area. The sizes: the length above the run; the
+  // wing's length on the wing's side and the run's depth on the other, outside the stone; the wing's
+  // width under its end. A size not entered yet is drawn from a stand-in, so the drawing keeps
+  // its shape; its label is whatever the caller says (the field's name).
+  const WING_AREA = { cx: 130, top: 38, w: 150, h: 88, minThin: 14, minRun: 40, minWing: 18 };
+  const WING_STAND_IN = { length: 2000, width: 600, wingWidth: 600, wingLength: 1000 };
+  function wingLayout(o) {
+    const L = o.lengthMm > 0 ? o.lengthMm : WING_STAND_IN.length;
+    const W = o.widthMm > 0 ? o.widthMm : WING_STAND_IN.width;
+    const wl = o.wingLengthMm > 0 ? o.wingLengthMm : WING_STAND_IN.wingLength;
+    const two = o.shape === 'ushape';
+    const rightOnly = !two && o.corner === 'right';
+    const ww = Math.min(o.wingWidthMm > 0 ? o.wingWidthMm : WING_STAND_IN.wingWidth, two ? L / 2 : L);
+    const s = Math.min(WING_AREA.w / L, WING_AREA.h / (W + wl));
+    const runW = Math.max(WING_AREA.minRun, L * s);
+    const runH = Math.max(WING_AREA.minThin, W * s);
+    const wingH = Math.max(WING_AREA.minThin, wl * s);
+    const wingW = Math.min(Math.max(WING_AREA.minWing, ww * s), two ? runW / 2 : runW);
+    const x0 = WING_AREA.cx - runW / 2, x1 = x0 + runW, y0 = WING_AREA.top, yb = y0 + runH, ye = yb + wingH;
+    const left = { x: x0, y: yb, w: wingW, h: wingH }, right = { x: x1 - wingW, y: yb, w: wingW, h: wingH };
+    const wings = two ? [left, right] : (rightOnly ? [right] : [left]);
+    const outline = two
+      ? [[x0, y0], [x1, y0], [x1, ye], [x1 - wingW, ye], [x1 - wingW, yb], [x0 + wingW, yb], [x0 + wingW, ye], [x0, ye]]
+      : (rightOnly
+        ? [[x0, y0], [x1, y0], [x1, ye], [x1 - wingW, ye], [x1 - wingW, yb], [x0, yb]]
+        : [[x0, y0], [x1, y0], [x1, yb], [x0 + wingW, yb], [x0 + wingW, ye], [x0, ye]]);
+    const t = o.texts || {};
+    // The wing's length on the wing's side; the run's depth on the other, so the two short segments (and
+    // their rotated labels) never stand one above the other on one line.
+    const side = rightOnly ? 'right' : 'left', edgeX = rightOnly ? x1 : x0;
+    const otherSide = rightOnly ? 'left' : 'right', otherEdgeX = rightOnly ? x0 : x1;
+    const wing = wings[0];
+    return {
+      main: { x: x0, y: y0, w: runW, h: runH },
+      wings,
+      outline,
+      dims: {
+        length: horizontal({ x1: x0, x2: x1, edgeY: y0, side: 'above', text: t.length }),
+        width: vertical({ y1: y0, y2: yb, edgeX: otherEdgeX, side: otherSide, text: t.width }),
+        wingLength: vertical({ y1: yb, y2: ye, edgeX, side, text: t.wingLength }),
+        wingWidth: horizontal({ x1: wing.x, x2: wing.x + wing.w, edgeY: ye, text: t.wingWidth }),
+      },
+    };
+  }
+
   return {
     VIEW, SAFE, GAP, LABEL_GAP, ARROW, MIN_INSIDE, FONT,
     textWidth, labelBox, fitLabel, horizontal, vertical, radius, segments, bounds, insideView,
-    svg, labelSvg, rectLayout,
+    svg, labelSvg, rectLayout, wingLayout,
   };
 });
