@@ -409,7 +409,7 @@ test('«Получить расчёт» takes the piece and its passport into th
 test("a passport link restores the steps' riser choice through its card, so the card shows it", () => {
   const fn = html.slice(html.indexOf('function restorePassportChoices('), html.indexOf('function openPassportStep('));
   assert.match(fn, /id === 'stupeni-riser'/);
-  assert.match(fn, /stupeniRiserGrid/);
+  assert.match(fn, /selectedProductKey === 'stupeni'\) stairRiserGrid/);
 });
 
 test('the link leaves out the hidden mirrors of the visible count fields (shorter link, smaller QR)', () => {

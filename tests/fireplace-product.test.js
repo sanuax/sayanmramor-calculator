@@ -721,6 +721,6 @@ test('the other 9 products keep their steps', () => {
     fasad: ['type', 'dimensions', 'material', 'options', 'review'],
     stoleshnitsa_vannaya: ['shape', 'dimensions', 'material', 'edge', 'additionalWorks', 'options', 'review'],
     stoleshnitsa_kuhnya: ['shape', 'dimensions', 'material', 'edge', 'additionalWorks', 'options', 'review'],
-    stupeni: ['type', 'dimensions', 'material', 'riser', 'edge', 'options', 'review'],
+    stupeni: ['type', 'dimensions', 'material', 'edge', 'options', 'review'],
   });
 });

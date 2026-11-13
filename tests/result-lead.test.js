@@ -528,13 +528,16 @@ test('result cards: one per step of the product, in the steps\' order, each with
   assert.deepEqual(cards.map(c => c.stepId), ['shape', 'dimensions', 'material', 'edge', 'additionalWorks', 'options']);
   assert.deepEqual(cards.map(c => c.label), ['Форма', 'Размеры', 'Материал', 'Кромка', 'Доп. работы', 'Опции']);
   const by = id => cards.find(c => c.stepId === id);
-  assert.deepEqual(by('shape').items.map(i => i.key), ['shape', 'wing']);
+  assert.deepEqual(by('shape').items.map(i => i.key), ['shape']);
+  // The wings are asked with the sizes (the owner, 2026-11-14), so they are on the sizes card.
   assert.ok(by('dimensions').items.some(i => i.key === 'dimensions'));
+  assert.ok(by('dimensions').items.some(i => i.key === 'wing'));
   assert.equal(by('material').items[0].value, 'Delicato Brown');
   assert.equal(by('edge').items[0].value, 'Скос (фаска)');
   assert.equal(by('additionalWorks').works.length, 1);
   assert.equal(by('options').items[0].value, 'Монтаж на объекте');
-  assert.deepEqual(cards.map(c => c.wide), [false, false, false, false, true, true]);
+  // The form card is short and stands alone before the long sizes card, so it spans the row; material and edge pair up.
+  assert.deepEqual(cards.map(c => c.wide), [true, true, false, false, true, true]);
 });
 
 test('result cards: a step left as it was still shows, in words, never empty', () => {

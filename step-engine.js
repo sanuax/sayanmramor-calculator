@@ -63,14 +63,17 @@
     // 'type' -- существующий (SILL-*/STEP-*/STAIR-*) subcategory-каталог,
     // ранее скрытый legacy-шагом "Вариант исполнения".
     podokonnik: ['type', 'dimensions', 'material', 'edge', 'options', 'review'],
-    // stupeni: 'riser' ("с подступенками") is its own step, not folded into
-    // 'type' -- the old riser row (STEP-04, now RISER-00 in rate-catalog.js) used to mix a tread-SHAPE
-    // choice (Прямая/Забежная/Радиусная) and a riser YES/NO into the same
-    // select, which is two different questions. 'type' now only lists the
-    // tread-shape rows (see renderSubcategoryOptions()'s stupeni filter in
-    // sayanmramor-calculator.html); 'riser' is a real checkbox writing to
-    // state.productConfig.stupeni.riser (see constructor-state.js).
-    stupeni:    ['type', 'dimensions', 'material', 'riser', 'edge', 'options', 'review'],
+    // stupeni: «с подступенками» is a real checkbox writing to
+    // state.productConfig.stupeni.riser (see constructor-state.js), asked as
+    // the SECOND question of the 'type' step, as for a stair (the owner,
+    // 2026-11-14; it used to be a step of its own, 'riser'): the old riser
+    // row (STEP-04, now RISER-00 in rate-catalog.js) mixed a tread-SHAPE
+    // choice (Прямая/Забежная/Радиусная) and a riser YES/NO in one select,
+    // which are two questions, so 'type' lists only the tread-shape rows
+    // (see renderSubcategoryOptions() in sayanmramor-calculator.html) and
+    // the risers are asked right under them. The riser's height goes with
+    // the sizes ('dimensions').
+    stupeni:    ['type', 'dimensions', 'material', 'edge', 'options', 'review'],
     lestnitsa:  ['type', 'dimensions', 'material', 'edge', 'options', 'review'],
     // Панно/пол/стена/фасад: ни кромки, ни доп.позиций сегодня не
     // поддерживают -- 'type' из PANEL-*/FLOOR-*/WALL-*/FACADE-* каталога.
@@ -95,7 +98,6 @@
     shape: 'Форма',
     dimensions: 'Размеры',
     material: 'Материал',
-    riser: 'Подступенок',
     edge: 'Кромка',
     additionalWorks: 'Доп. работы',
     options: 'Опции',

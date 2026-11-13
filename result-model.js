@@ -453,10 +453,12 @@
   // chosen there and its own way back. A choice whose own step this product
   // does not have (a staircase's shape is set with its sizes) goes to
   // «Размеры». A step left as it was says so in words, never an empty card.
+  // A countertop's wing is asked with the sizes, a step's risers with the
+  // type, as a stair's are (the owner, 2026-11-14).
   const SPEC_STEPS = {
     type: 'type', 'facade.form': 'type', 'fireplace.form': 'type',
-    shape: 'shape', wing: 'shape',
-    material: 'material', riser: 'riser', edge: 'edge', options: 'options',
+    shape: 'shape', wing: 'dimensions',
+    material: 'material', riser: 'type', edge: 'edge', options: 'options',
   };
   const EMPTY_CARDS = { edge: 'Не выбрана', additionalWorks: 'Без дополнительных работ', options: 'Без опций' };
 

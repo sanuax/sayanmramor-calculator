@@ -1552,8 +1552,10 @@
         <div class="choice-group" id="stairRiserField" hidden>
           <div class="choice-title" id="stairRiserTitle">Подступенки</div>
           <div class="card-grid" id="stairRiserGrid" role="radiogroup" aria-labelledby="stairRiserTitle"></div>
-          <!-- Real field constructor-state.js reads (productConfig.lestnitsa.risers); the cards above drive it. -->
+          <!-- Real fields constructor-state.js reads (productConfig.lestnitsa.risers; productConfig.stupeni.riser for
+               «Ступени»); the cards above drive them. -->
           <input type="checkbox" id="stair-risers" hidden>
+          <input type="checkbox" id="stupeni-riser" hidden>
         </div>
         <!-- «Фасады»: the chosen type's form (Круглая / Квадратная колонна,
              Окно / Дверь) as visual cards -- shown only for a type with more
@@ -1656,6 +1658,16 @@
             <div class="field-unit"><span class="unit-label" id="dimLengthUnitLabel">Длина</span><input type="number" inputmode="numeric" id="length" min="0" step="1" placeholder="2000"><span class="unit">мм</span></div>
             <div class="field-unit"><span class="unit-label" id="dimWidthUnitLabel">Ширина</span><input type="number" inputmode="numeric" id="width" min="0" step="1" placeholder="600"><span class="unit">мм</span></div>
           </div>
+          <!-- A countertop's wing (the second segment of an L or U form) and the corner of the L: asked with the
+               other sizes (the owner, 2026-11-14), only for «Г-образная» / «П-образная» (updateWingVisibility). -->
+          <div class="dim-fields" id="wingField" style="margin-top:12px;display:none">
+            <div class="field-unit"><span class="unit-label" id="wingWidthLabel">Крыло, ширина</span><input type="number" inputmode="numeric" id="wing-width" min="0" step="1" placeholder="600"><span class="unit">мм</span></div>
+            <div class="field-unit"><span class="unit-label" id="wingLengthLabel">Крыло, длина</span><input type="number" inputmode="numeric" id="wing-length" min="0" step="1" placeholder="1000"><span class="unit">мм</span></div>
+            <select id="shape-corner" style="display:none;grid-column:1 / -1">
+              <option value="left">Угол слева</option>
+              <option value="right">Угол справа</option>
+            </select>
+          </div>
           <!-- «Фасады»: the chosen form's own sizes, each under its own name
                (facade-model.js) -- only that form's fields are shown. -->
           <div class="dim-fields" id="facadeFields" hidden>
@@ -1745,9 +1757,8 @@
             <div class="dim-note step-count-note dim-summary" id="stepCountNote" hidden></div>
           </div>
           <input type="hidden" id="step-count" value="">
-          <!-- «Высота подступенка»: the riser's own size -- in this step for a
-               «+ подступенки» stair, moved to the «Подступенок» step for
-               «Ступени» (placeRiserHeightField). Required once risers are on. -->
+          <!-- «Высота подступенка»: the riser's own size, with the sizes -- for a «+ подступенки» stair and for
+               «Ступени» with risers (placeRiserHeightField). Required once risers are on. -->
           <div class="dim-count" id="riserHeightField" hidden>
             <div class="dim-count-title" id="riserHeightTitle">Высота подступенка</div>
             <div class="field-unit">
@@ -1773,40 +1784,6 @@
           <option value="lshape">Г-образная</option>
           <option value="ushape">П-образная</option>
         </select>
-        <div class="field-row" id="wingField" style="margin-top:14px;display:none">
-          <div class="field-unit">
-            <span class="unit-label" id="wingWidthLabel">Крыло, ширина</span>
-            <input type="number" inputmode="numeric" id="wing-width" min="0" step="1" placeholder="600">
-            <span class="unit">мм</span>
-          </div>
-          <div class="field-unit">
-            <span class="unit-label" id="wingLengthLabel">Крыло, длина</span>
-            <input type="number" inputmode="numeric" id="wing-length" min="0" step="1" placeholder="1000">
-            <span class="unit">мм</span>
-          </div>
-        </div>
-        <select id="shape-corner" style="margin-top:8px;display:none">
-          <option value="left">Угол слева</option>
-          <option value="right">Угол справа</option>
-        </select>
-      </div>
-    </section>
-
-    <!-- 'riser' -- stupeni-only. A real checkbox writing to
-         state.productConfig.stupeni.riser (constructor-state.js), plus the
-         riser's height: the risers are their own parts (product-parts.js) --
-         their stone is in the slab layout, their work has its own rates
-         (RateCatalog.RISER_RATES, RISER-00, not the step's). -->
-    <section class="step" data-step-id="riser" style="display:none">
-      <div class="step-head"><span class="step-num">4</span><h2 class="step-title">Подступенок</h2></div>
-      <p class="step-sub">Отдельный параметр от формы ступени - см. шаг «Тип».</p>
-      <div class="field">
-        <div class="card-grid" id="stupeniRiserGrid" role="radiogroup" aria-label="Подступенки"></div>
-        <div id="riserStepHost"></div>
-        <!-- Real field constructor-state.js reads; the cards above drive it. -->
-        <label class="checkbox-row" style="display:none">
-          <input type="checkbox" id="stupeni-riser"> С подступенками
-        </label>
       </div>
     </section>
 
@@ -2552,8 +2529,6 @@
   const sillBayFrontInput = document.getElementById('sill-bay-front');
   const riserHeightField = document.getElementById('riserHeightField');
   const riserHeightInput = document.getElementById('riser-height');
-  const riserDimsHost = riserHeightField.parentNode;
-  const riserStepHost = document.getElementById('riserStepHost');
   const stupeniRiserBox = document.getElementById('stupeni-riser');
   const stepCountTitleEl = document.getElementById('stepCountTitle');
   const stepCountNoteEl = document.getElementById('stepCountNote');
@@ -2616,7 +2591,6 @@
     tipSlots.forEach(slot => { slot.hidden = true; });
     document.querySelectorAll('.has-tip[aria-expanded="true"]').forEach(o => o.setAttribute('aria-expanded', 'false'));
   }
-  // On the document: «Высота подступенка» moves to the «Подступенок» step for «Ступени».
   document.addEventListener('click', e => {
     const el = e.target.closest && e.target.closest('.has-tip');
     if (el) showTip(el, el.getAttribute('aria-expanded') !== 'true');
@@ -2968,8 +2942,6 @@
     const isUshape = productShapeSelect.value === 'ushape';
     // П-образная: те же поля крыла, одинаковые для обоих крыльев; угол
     // выбирается только у Г-образной.
-    wingField.style.display = isLshape || isUshape ? '' : 'none';
-    shapeCornerSelect.style.display = isLshape ? '' : 'none';
     document.getElementById('wingWidthLabel').textContent = isUshape ? 'Крылья, ширина' : 'Крыло, ширина';
     document.getElementById('wingLengthLabel').textContent = isUshape ? 'Крылья, длина' : 'Крыло, длина';
     // Диаграмма размеров сама не рисует крылья (см. #dimShapeNote в разметке)
@@ -2979,6 +2951,9 @@
     // (владелец, 2026-10-20); цена её там уже не учитывает (constructor-state.js).
     const product = selectedProductKey ? PRODUCTS[selectedProductKey] : null;
     const hasShape = !!(product && product.supportsShapeSelection);
+    // The wing fields are in the sizes step now, which every product shares: only a product with a shape shows them.
+    wingField.style.display = hasShape && (isLshape || isUshape) ? '' : 'none';
+    shapeCornerSelect.style.display = hasShape && isLshape ? '' : 'none';
     dimShapeNote.hidden = !(hasShape && (isLshape || isUshape));
     dimShapeNote.textContent = isUshape ? 'Схема без крыльев' : 'Схема без крыла';
   }
@@ -3558,12 +3533,8 @@
       if (selectedProductKey === 'fasad') return facadeSizesComplete();
       if (selectedProductKey === 'kaminy') return fireplaceSizesComplete();
       if (!(mmToM(parseFloat(widthInput.value) || 0) > 0 && mmToM(parseFloat(lengthInput.value) || 0) > 0)) return false;
-      // This step's own shape sizes; «Ступени» ask the riser height on the
-      // «Подступенок» step.
-      return currentMissingSizes().filter(k => k !== 'riserHeight' || selectedProductKey !== 'stupeni').length === 0;
-    }
-    if (stepId === 'riser') {
-      return !stupeniRiserBox.checked || (parseFloat(riserHeightInput.value) || 0) > 0;
+      // This step's own shape sizes, and the riser height once risers are chosen (a stair's or a step's).
+      return currentMissingSizes().length === 0;
     }
     if (stepId === 'material') {
       return !!selectedStoneId;
@@ -3803,7 +3774,7 @@
     const rows = getSubcategoriesForProduct(product.label);
     const cards = TYPE_CARDS[productKey] || [];
     // The hidden select holds exactly the catalog rows the cards can pick
-    // (the riser, RISER-00, has its own question, see the 'riser' step).
+    // (the riser, RISER-00, has its own question under the cards).
     cards.forEach(c => c.ids.forEach(id => {
       const row = rows.find(r => r.id === id);
       if (!row) return;
@@ -3815,13 +3786,25 @@
     cards.forEach((c, index) => {
       typeCardGrid.appendChild(choiceCard(c, () => { typeCardIndex = index; applyTypeSelection(true); }));
     });
-    if (productKey === 'lestnitsa') {
+    // «Лестницы» and «Ступени» ask the risers right under the type (the owner, 2026-11-14): a stair's own
+    // checkbox, a step's own (#stupeni-riser, which the price reads).
+    if (productKey === 'lestnitsa' || productKey === 'stupeni') {
       stairRiserField.hidden = false;
       stairRiserGrid.innerHTML = '';
-      RISER_CARDS.forEach(r => stairRiserGrid.appendChild(choiceCard(r, () => { stairRisersInput.checked = r.value; applyTypeSelection(true); })));
+      RISER_CARDS.forEach(r => stairRiserGrid.appendChild(choiceCard(r, () => {
+        if (productKey === 'stupeni') {
+          stupeniRiserBox.checked = r.value;
+          stupeniRiserBox.dispatchEvent(new Event('change', { bubbles: true }));
+          markSelected(stairRiserGrid, r.value ? 1 : 0);
+        } else {
+          stairRisersInput.checked = r.value;
+          applyTypeSelection(true);
+        }
+      })));
     }
     typeCardIndex = 0;
     stairRisersInput.checked = false;
+    stupeniRiserBox.checked = false;
     applyTypeSelection(false);
   }
 
@@ -3858,7 +3841,7 @@
     if (selectedProductKey !== 'lestnitsa') stairRisersInput.checked = false;
     applyStepCountLimit();
     markSelected(typeCardGrid, typeCardIndex);
-    if (!stairRiserField.hidden) markSelected(stairRiserGrid, stairRisersInput.checked ? 1 : 0);
+    if (!stairRiserField.hidden) markSelected(stairRiserGrid, (selectedProductKey === 'stupeni' ? stupeniRiserBox : stairRisersInput).checked ? 1 : 0);
     renderFacadeForms();
     renderFireplaceForms();
     // The size fields/labels follow the new type BEFORE the change event
@@ -4200,19 +4183,6 @@
     document.getElementById('dimSvg').setAttribute('aria-label', 'Схема: ' + type.title.toLowerCase() + (form.title ? ', ' + form.title.toLowerCase() : ''));
   }
 
-  // Ступени: «Подступенки» -- те же две карточки, что у лестницы; данные --
-  // прежний чекбокс #stupeni-riser (constructor-state.js).
-  (function initStupeniRiserCards() {
-    const grid = document.getElementById('stupeniRiserGrid');
-    const box = document.getElementById('stupeni-riser');
-    RISER_CARDS.forEach(r => grid.appendChild(choiceCard(r, () => {
-      box.checked = r.value;
-      box.dispatchEvent(new Event('change', { bubbles: true }));
-      markSelected(grid, r.value ? 1 : 0);
-    })));
-    markSelected(grid, box.checked ? 1 : 0);
-  })();
-
   function updateTypeStepTitle(productKey) {
     typeStepTitleEl.textContent = TYPE_STEP_TITLES[productKey] || 'Тип';
   }
@@ -4295,13 +4265,11 @@
     shapeFieldsNoteEl.textContent = figure;
   }
 
-  // «Высота подступенка»: on the «Подступенок» step for «Ступени» (shown
-  // once risers are chosen), on the sizes step for a «+ подступенки» stair.
+  // «Высота подступенка»: on the sizes step, shown once risers are chosen (a stair's «+ подступенки»,
+  // a step's «С подступенками»).
   function placeRiserHeightField() {
     const stairRisers = selectedProductKey === 'lestnitsa' && stairRisersInput.checked;
     const stepRisers = selectedProductKey === 'stupeni' && stupeniRiserBox.checked;
-    const host = selectedProductKey === 'stupeni' ? riserStepHost : riserDimsHost;
-    if (riserHeightField.parentNode !== host) host.appendChild(riserHeightField);
     riserHeightField.hidden = !(stairRisers || stepRisers);
   }
 
@@ -5053,7 +5021,7 @@
         return;
       }
       if (id === 'stupeni-riser') {
-        document.getElementById('stupeniRiserGrid').children[value === '1' ? 1 : 0].click();
+        if (selectedProductKey === 'stupeni') stairRiserGrid.children[value === '1' ? 1 : 0].click();
         return;
       }
       if (id === 'edge-type') {
