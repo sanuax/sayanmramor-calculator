@@ -590,3 +590,18 @@ test('the Moscow note sits under the price, the asterisk on the price itself', (
   assert.match(html, /'≈ ' \+ formatRub\(result\.total\) \+ '\*'/);
   assert.match(html, /'≈ ' \+ ResultModel\.formatRub\(pricing\.total\) \+ '\*'/);
 });
+
+test('stone card: a tap on the photo chooses the stone; the photo opens large only by the corner button', () => {
+  const picker = fs.readFileSync(path.join(__dirname, '..', 'material-picker.js'), 'utf8');
+  // The photo itself has no click of its own (the card's click chooses the stone).
+  assert.doesNotMatch(picker, /img\.addEventListener\('click'/);
+  // The button opens the lightbox and never reaches the card (stopPropagation), so it chooses nothing.
+  const at = picker.indexOf("open.className = 'stone-card-open'");
+  assert.ok(at > 0, 'the corner button');
+  const block = picker.slice(at, at + 900);
+  assert.match(block, /e\.stopPropagation\(\);\s*lightboxImg\.src = img\.src;\s*lightboxOverlay\.hidden = false;/);
+  assert.match(block, /aria-label', 'Открыть фото крупно: ' \+ stone\.name/);
+  // Top left, as the site's catalogue (the heart is top right), 40 px and 36 px on phones.
+  assert.match(html, /\.stone-card-open \{[^}]*top: 4px; left: 4px;[^}]*width: 40px; height: 40px;/);
+  assert.match(html, /\.stone-card-image \.stone-card-open \{ top: 0; left: 0; width: 36px; height: 36px; \}/);
+});

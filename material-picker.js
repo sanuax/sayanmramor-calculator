@@ -360,12 +360,27 @@
         imageWrap.classList.add('image-broken');
         img.remove();
       });
-      img.addEventListener('click', (e) => {
-        e.stopPropagation();
-        lightboxImg.src = img.src;
-        lightboxOverlay.hidden = false;
-      });
       imageWrap.appendChild(img);
+
+      // A tap on the photo chooses the stone (the card's own click). The photo opens large only by
+      // this button, top left (the heart is top right), as in the site's stone catalogue; the
+      // large photo has no text (the owner, 2026-11-13: people tapped the photo to choose and got
+      // it enlarged instead).
+      if (stone.image) {
+        const open = document.createElement('button');
+        open.type = 'button';
+        open.className = 'stone-card-open';
+        open.setAttribute('aria-haspopup', 'dialog');
+        open.setAttribute('aria-label', 'Открыть фото крупно: ' + stone.name);
+        open.innerHTML = '<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8V3h5M12 3h5v5M17 12v5h-5M8 17H3v-5"/></svg>';
+        open.addEventListener('click', (e) => {
+          e.stopPropagation();
+          lightboxImg.src = img.src;
+          lightboxOverlay.hidden = false;
+        });
+        imageWrap.appendChild(open);
+        img.addEventListener('error', () => open.remove());
+      }
 
       if (stone.available === false) {
         const badge = document.createElement('span');
