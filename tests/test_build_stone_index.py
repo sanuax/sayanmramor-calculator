@@ -105,6 +105,32 @@ class BuildStoneIndexTests(unittest.TestCase):
         self.assertEqual(json.loads(text), bsi.build_stone_index(sample()))
 
 
+class StoneSlabsTests(unittest.TestCase):
+    def test_every_slab_of_a_stone_long_side_first_cheapest_first(self):
+        data = {'updated_at': 'T', 'stones': [
+            {'id': 'a', 'name': 'A', 'slabs': [
+                {'article': 'M1', 'party': '1', 'pachka': 'P', 'city': 'Москва', 'width_cm': 168, 'length_cm': 289, 'price_per_m2_rub': 61151.4},
+                {'article': 'M2', 'width_cm': 300, 'length_cm': 190, 'price_per_m2_rub': 44287.6},
+                {'article': 'M3', 'width_cm': 200, 'length_cm': 100, 'price_per_m2_rub': None},
+                {'article': 'M4', 'width_cm': 310, 'length_cm': 200, 'price_per_m2_rub': 44287.6},
+                {'article': 'M5', 'width_cm': 0, 'length_cm': 200, 'price_per_m2_rub': 100},
+                {'article': 'M6', 'price_per_m2_rub': 100},
+            ]},
+            {'id': 'gone', 'name': 'Gone', 'available': False, 'slabs': [{'width_cm': 100, 'length_cm': 100}]},
+            {'id': 'none', 'name': 'None'},
+        ]}
+        out = bsi.build_stone_slabs(data)
+        self.assertEqual(out['updated_at'], 'T')
+        # [long side, short side, price per m2 in whole roubles or null]: the same price -> the bigger slab first,
+        # no price -> last; a slab without both sizes is left out; nothing of the supplier's (article, batch, city).
+        self.assertEqual(out['stones'], {'a': [[310, 200, 44288], [300, 190, 44288], [289, 168, 61151], [200, 100, None]], 'none': []})
+
+    def test_the_slabs_file_is_compact(self):
+        text = bsi.serialize(bsi.build_stone_slabs(sample())).decode('utf-8')
+        self.assertNotIn(' ', text)
+        self.assertNotIn('M1', text)
+
+
 class ToneTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -171,16 +197,24 @@ class MainTests(unittest.TestCase):
         self.dir = Path(self.tmp.name)
         self.input = self.dir / 'slabs.json'
         self.output = self.dir / 'stone-index.json'
+        self.slabs_output = self.dir / 'stone-slabs.json'
 
     def tearDown(self):
         self.tmp.cleanup()
 
     def test_writes_the_index(self):
         self.input.write_text(json.dumps(sample(), ensure_ascii=False), encoding='utf-8')
-        code, out, _ = run_main('--input', str(self.input), '--output', str(self.output))
+        code, out, _ = run_main('--input', str(self.input), '--output', str(self.output), '--slabs-output', str(self.slabs_output))
         self.assertEqual(code, 0)
         self.assertEqual(json.loads(self.output.read_text(encoding='utf-8')), bsi.build_stone_index(sample()))
         self.assertIn('3 of 4 stones', out)
+
+    def test_writes_the_slabs_beside_the_index(self):
+        self.input.write_text(json.dumps(sample(), ensure_ascii=False), encoding='utf-8')
+        code, out, _ = run_main('--input', str(self.input), '--output', str(self.output), '--slabs-output', str(self.slabs_output))
+        self.assertEqual(code, 0)
+        self.assertEqual(json.loads(self.slabs_output.read_text(encoding='utf-8')), bsi.build_stone_slabs(sample()))
+        self.assertIn('stone-slabs.json', out)
 
     def test_bad_input_leaves_the_existing_index_untouched(self):
         self.output.write_text('{"previous": true}', encoding='utf-8')
@@ -196,7 +230,7 @@ class MainTests(unittest.TestCase):
                         self.input.unlink()
                 else:
                     self.input.write_text(content, encoding='utf-8')
-                code, _, err = run_main('--input', str(self.input), '--output', str(self.output))
+                code, _, err = run_main('--input', str(self.input), '--output', str(self.output), '--slabs-output', str(self.slabs_output))
                 self.assertNotEqual(code, 0)
                 self.assertIn('nothing written', err)
                 self.assertEqual(self.output.read_text(encoding='utf-8'), '{"previous": true}')
@@ -205,7 +239,7 @@ class MainTests(unittest.TestCase):
     def test_input_file_is_not_modified(self):
         self.input.write_text(json.dumps(sample(), ensure_ascii=False, indent=2), encoding='utf-8')
         before = self.input.read_bytes()
-        run_main('--input', str(self.input), '--output', str(self.output))
+        run_main('--input', str(self.input), '--output', str(self.output), '--slabs-output', str(self.slabs_output))
         self.assertEqual(self.input.read_bytes(), before)
 
 
@@ -223,7 +257,7 @@ class RealCatalogTests(unittest.TestCase):
         self.assertEqual(index['updated_at'], data['updated_at'])
         # Building the index never touches the calculator's data.
         with tempfile.TemporaryDirectory() as tmp:
-            code, _, _ = run_main('--output', str(Path(tmp) / 'stone-index.json'))
+            code, _, _ = run_main('--output', str(Path(tmp) / 'stone-index.json'), '--slabs-output', str(Path(tmp) / 'stone-slabs.json'))
             self.assertEqual(code, 0)
         self.assertEqual(hashlib.sha256(REAL_SLABS.read_bytes()).hexdigest(), digest)
 
@@ -234,6 +268,9 @@ class RealCatalogTests(unittest.TestCase):
         self.assertEqual([s['id'] for s in published['stones']],
                          [s['id'] for s in data['stones'] if s.get('available') is not False], hint)
         self.assertEqual(published['updated_at'], data['updated_at'], hint)
+        slabs = json.loads(bsi.DEFAULT_SLABS_OUTPUT_PATH.read_bytes())
+        self.assertEqual(slabs, bsi.build_stone_slabs(data), hint)
+        self.assertEqual(list(slabs['stones']), [s['id'] for s in published['stones']], 'one entry per stone of the index')
         places = sorted(s['tone'] for s in published['stones'] if s['tone'] is not None)
         self.assertEqual(places, list(range(len(places))), 'every place of the gradient once')
         self.assertLess(len(published['stones']) - len(places), len(published['stones']) / 10, hint)

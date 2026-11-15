@@ -25,8 +25,18 @@ have an id (unique) and a name. The input is validated before anything is
 written: on any problem the script says what is wrong, exits non-zero and
 leaves an existing stone-index.json as it was.
 
+Beside it, data/stone-slabs.json: every slab of each stone of the index, for the
+site's stone window («N плит в наличии», each slab with its size and price; the
+site loads it only when a window opens, the index stays light):
+
+    {"updated_at": "<copied from slabs.json>",
+     "stones": {"<id>": [[<long side cm>, <short side cm>, <price per m2, whole roubles, or null>], ...], ...}}
+
+cheapest first (no price last), the bigger slab first at one price; a slab without
+both sizes is left out. Nothing of the supplier's own (article, batch, city).
+
 Usage:
-  python scripts/build_stone_index.py [--input data/slabs.json] [--output data/stone-index.json]
+  python scripts/build_stone_index.py [--input data/slabs.json] [--output data/stone-index.json] [--slabs-output data/stone-slabs.json]
 """
 import argparse
 import json
@@ -39,6 +49,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_INPUT_PATH = PROJECT_ROOT / 'data' / 'slabs.json'
 DEFAULT_OUTPUT_PATH = PROJECT_ROOT / 'data' / 'stone-index.json'
+DEFAULT_SLABS_OUTPUT_PATH = PROJECT_ROOT / 'data' / 'stone-slabs.json'
 FIELDS = ('id', 'name', 'category_label_ru', 'image', 'price_from', 'countries', 'colors', 'tone')
 TONE_SIZE = (48, 28)          # a photo is judged at this size: fast, and the veins do not decide
 LIKENESS_SIZE = (16, 10)      # ... and compared with the others at this one
@@ -77,6 +88,34 @@ def _price_from(stone):
         if isinstance(price, (int, float)) and not isinstance(price, bool) and 0 < price < float('inf'):
             prices.append(price)
     return round(min(prices)) if prices else None
+
+
+def _number(value):
+    """A positive finite number, or None."""
+    if isinstance(value, (int, float)) and not isinstance(value, bool) and 0 < value < float('inf'):
+        return value
+    return None
+
+
+def build_stone_slabs(data):
+    """slabs.json data -> {updated_at, stones: {id: [[long, short, price], ...]}} for the stones
+    of the index (build_stone_index validates the same data; call it first)."""
+    out = {}
+    for stone in data.get('stones') or []:
+        if not isinstance(stone, dict) or stone.get('available') is False:
+            continue
+        rows = []
+        for slab in stone.get('slabs') or []:
+            if not isinstance(slab, dict):
+                continue
+            width, length = _number(slab.get('width_cm')), _number(slab.get('length_cm'))
+            if width is None or length is None:
+                continue
+            price = _number(slab.get('price_per_m2_rub'))
+            rows.append([round(max(width, length)), round(min(width, length)), round(price) if price is not None else None])
+        rows.sort(key=lambda r: (r[2] is None, r[2] or 0, -r[0] * r[1], -r[0]))
+        out[stone['id']] = rows
+    return {'updated_at': data.get('updated_at'), 'stones': out}
 
 
 def build_stone_index(data):
@@ -214,6 +253,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description='Build data/stone-index.json from data/slabs.json')
     parser.add_argument('--input', default=str(DEFAULT_INPUT_PATH))
     parser.add_argument('--output', default=str(DEFAULT_OUTPUT_PATH))
+    parser.add_argument('--slabs-output', default=str(DEFAULT_SLABS_OUTPUT_PATH))
     args = parser.parse_args(argv)
 
     input_path = Path(args.input)
@@ -224,6 +264,7 @@ def main(argv=None):
         with open(input_path, encoding='utf-8') as f:
             data = json.load(f)
         index = build_stone_index(data)
+        slabs = build_stone_slabs(data)
         without_tone = add_tones(index, input_path.parent)
     except ImportError:
         print('ERROR: reading the stone photos needs Pillow (python -m pip install pillow); nothing written', file=sys.stderr)
@@ -239,6 +280,10 @@ def main(argv=None):
     write_atomically(args.output, payload)
     total = len(data['stones'])
     print(f'Wrote {args.output}: {len(index["stones"])} of {total} stones, {len(payload)} bytes, {without_tone} without a place in the colour gradient')
+    slabs_payload = serialize(slabs)
+    write_atomically(args.slabs_output, slabs_payload)
+    count = sum(len(rows) for rows in slabs['stones'].values())
+    print(f'Wrote {args.slabs_output}: {count} slabs, {len(slabs_payload)} bytes')
     return 0
 
 
