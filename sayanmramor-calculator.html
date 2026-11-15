@@ -11,6 +11,7 @@
      page of the site; this page's own styles below win where they speak. -->
 <link rel="stylesheet" href="/sayanmramor-site/css/header.css">
 <link rel="stylesheet" href="/sayanmramor-site/css/picks.css">
+<link rel="stylesheet" href="/sayanmramor-site/css/stone-view.css">
 <link rel="stylesheet" href="/sayanmramor-site/css/consent.css">
 <script src="/sayanmramor-site/js/header.js" defer></script>
 <script src="/sayanmramor-site/js/consent.js" defer></script>
@@ -2223,13 +2224,14 @@
 <script src="pricing.js?v=105ac799"></script>
 <script src="price-filter.js?v=9dde617f"></script>
 <script src="/sayanmramor-site/js/picks.js"></script>
-<script src="material-picker.js?v=d8cfb105"></script>
+<script src="/sayanmramor-site/js/stone-view.js"></script>
+<script src="material-picker.js?v=9994a60e"></script>
 <script src="product-types.js?v=293fa8d0"></script>
 <script src="rate-catalog.js?v=cce5c5cd"></script>
 <script src="facade-model.js?v=38b99136"></script>
 <script src="fireplace-model.js?v=f9c31096"></script>
 <script src="dimension-diagram.js?v=308e699b"></script>
-<script src="step-engine.js?v=74de0ad0"></script>
+<script src="step-engine.js?v=c21c885f"></script>
 <script src="result-model.js?v=c8fa91e6"></script>
 <!-- The site's request (2026-10-26): «Получить расчёт» goes there; one contract, the site's own file. -->
 <script src="/sayanmramor-site/js/offer-handoff.js"></script>
@@ -5369,14 +5371,15 @@
       productGrid.scrollIntoView({ behavior: 'smooth', block: 'start' });
       return;
     }
+    // In the steps' own order: the stone comes before the sizes (the owner, 2026-11-15).
+    if (!isCurrentStepDataValid('material')) {
+      goToStep('material');
+      return;
+    }
     if (!isCurrentStepDataValid('dimensions')) {
       dimsTouched = true;
       dimError.style.display = 'block';
       goToStep('dimensions');
-      return;
-    }
-    if (!isCurrentStepDataValid('material')) {
-      goToStep('material');
       return;
     }
     goToStep('review');

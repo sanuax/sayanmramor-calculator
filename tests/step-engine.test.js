@@ -8,7 +8,7 @@ const ALL_PRODUCT_KEYS = [
   'stoleshnitsa_vannaya', 'stoleshnitsa_kuhnya', 'stupeni', 'kaminy',
 ];
 
-const KNOWN_STEP_IDS = ['type', 'shape', 'dimensions', 'material', 'riser', 'edge', 'additionalWorks', 'options', 'review'];
+const KNOWN_STEP_IDS = ['type', 'shape', 'material', 'dimensions', 'riser', 'edge', 'additionalWorks', 'options', 'review'];
 
 test('getSteps returns [] for an unknown or missing product key', () => {
   assert.deepEqual(StepEngine.getSteps('does-not-exist'), []);
@@ -18,7 +18,7 @@ test('getSteps returns [] for an unknown or missing product key', () => {
 
 test('getSteps returns the full declared sequence, ending in "review", for a real product', () => {
   const steps = StepEngine.getSteps('stoleshnitsa_kuhnya');
-  assert.deepEqual(steps, ['shape', 'dimensions', 'material', 'edge', 'additionalWorks', 'options', 'review']);
+  assert.deepEqual(steps, ['shape', 'material', 'dimensions', 'edge', 'additionalWorks', 'options', 'review']);
 });
 
 test('every product in PRODUCT_STEPS ends with "review" -- it is always the last step regardless of product', () => {
@@ -60,9 +60,9 @@ test('every product\'s first step is correct for its real capabilities', () => {
   });
 });
 
-test('«Камины»: type, sizes, stone, the shared options, result -- no shape, edge or additional works of other products', () => {
+test('«Камины»: type, stone, sizes, the shared options, result -- no shape, edge or additional works of other products', () => {
   const steps = StepEngine.getSteps('kaminy');
-  assert.deepEqual(steps, ['type', 'dimensions', 'material', 'options', 'review']);
+  assert.deepEqual(steps, ['type', 'material', 'dimensions', 'options', 'review']);
   ['shape', 'edge', 'additionalWorks', 'riser'].forEach(id => assert.equal(steps.includes(id), false, id));
 });
 
@@ -70,7 +70,7 @@ test('a product missing a capability skips that step entirely -- e.g. podokonnik
   const steps = StepEngine.getSteps('podokonnik');
   assert.equal(steps.includes('shape'), false);
   assert.equal(steps.includes('additionalWorks'), false);
-  assert.deepEqual(steps, ['type', 'dimensions', 'material', 'edge', 'options', 'review']);
+  assert.deepEqual(steps, ['type', 'material', 'dimensions', 'edge', 'options', 'review']);
 });
 
 test('firstStep/lastStep reflect each product\'s own sequence', () => {
@@ -93,21 +93,23 @@ test('isFirstStep/isLastStep', () => {
 });
 
 test('nextStep walks the product\'s own sequence and returns null past the end', () => {
-  assert.equal(StepEngine.nextStep('stoleshnitsa_kuhnya', 'shape'), 'dimensions');
+  assert.equal(StepEngine.nextStep('stoleshnitsa_kuhnya', 'shape'), 'material');
   assert.equal(StepEngine.nextStep('stoleshnitsa_kuhnya', 'options'), 'review');
   assert.equal(StepEngine.nextStep('stoleshnitsa_kuhnya', 'review'), null);
   // Skips straight over a step this product doesn't have -- podokonnik has
   // no 'shape'/'additionalWorks', so 'edge' goes straight to 'options'.
-  assert.equal(StepEngine.nextStep('podokonnik', 'material'), 'edge');
+  assert.equal(StepEngine.nextStep('podokonnik', 'material'), 'dimensions');
+  assert.equal(StepEngine.nextStep('podokonnik', 'dimensions'), 'edge');
   assert.equal(StepEngine.nextStep('podokonnik', 'edge'), 'options');
-  // podokonnik's real first step is now 'type', not 'dimensions'.
-  assert.equal(StepEngine.nextStep('podokonnik', 'type'), 'dimensions');
+  // podokonnik's real first step is 'type'; the stone comes second (the owner, 2026-11-15).
+  assert.equal(StepEngine.nextStep('podokonnik', 'type'), 'material');
 });
 
 test('previousStep walks backwards and returns null before the start', () => {
-  assert.equal(StepEngine.previousStep('stoleshnitsa_kuhnya', 'dimensions'), 'shape');
+  assert.equal(StepEngine.previousStep('stoleshnitsa_kuhnya', 'material'), 'shape');
+  assert.equal(StepEngine.previousStep('stoleshnitsa_kuhnya', 'dimensions'), 'material');
   assert.equal(StepEngine.previousStep('stoleshnitsa_kuhnya', 'shape'), null);
-  assert.equal(StepEngine.previousStep('podokonnik', 'edge'), 'material');
+  assert.equal(StepEngine.previousStep('podokonnik', 'edge'), 'dimensions');
   assert.equal(StepEngine.previousStep('podokonnik', 'type'), null);
 });
 
@@ -165,12 +167,12 @@ test('canAdvance treats undefined/omitted validity as valid (steps with no block
 test('buildProgress lists every step of the product with 1-based position and correct active/done flags', () => {
   const progress = StepEngine.buildProgress('stoleshnitsa_kuhnya', 'edge');
   assert.equal(progress.length, 7);
-  assert.deepEqual(progress.map(p => p.id), ['shape', 'dimensions', 'material', 'edge', 'additionalWorks', 'options', 'review']);
+  assert.deepEqual(progress.map(p => p.id), ['shape', 'material', 'dimensions', 'edge', 'additionalWorks', 'options', 'review']);
   assert.deepEqual(progress.map(p => p.position), [1, 2, 3, 4, 5, 6, 7]);
   const active = progress.filter(p => p.active);
   assert.equal(active.length, 1);
   assert.equal(active[0].id, 'edge');
-  assert.deepEqual(progress.filter(p => p.done).map(p => p.id), ['shape', 'dimensions', 'material']);
+  assert.deepEqual(progress.filter(p => p.done).map(p => p.id), ['shape', 'material', 'dimensions']);
   assert.equal(progress.find(p => p.id === 'options').done, false);
   assert.equal(progress.find(p => p.id === 'review').done, false);
 });
@@ -219,19 +221,20 @@ test('isReachable: back always; forward only past steps whose data is valid -- e
   const isValid = id => (id in valid ? valid[id] : true);
   const k = 'stoleshnitsa_kuhnya';
   // Back from the Result to any earlier step.
-  ['shape', 'dimensions', 'material', 'edge', 'additionalWorks', 'options', 'review'].forEach(id =>
+  ['shape', 'material', 'dimensions', 'edge', 'additionalWorks', 'options', 'review'].forEach(id =>
     assert.equal(StepEngine.isReachable(k, 'review', id, isValid), true, id));
   // All data in place: any step forward, including the Result.
   assert.equal(StepEngine.isReachable(k, 'shape', 'review', isValid), true);
-  // No stone yet: up to «Материал» itself, nothing after it.
+  // No stone yet: up to «Материал» itself, nothing after it (not even «Размеры», which follows it now).
   valid.material = false;
   assert.equal(StepEngine.isReachable(k, 'shape', 'material', isValid), true);
+  assert.equal(StepEngine.isReachable(k, 'shape', 'dimensions', isValid), false);
   assert.equal(StepEngine.isReachable(k, 'shape', 'edge', isValid), false);
   assert.equal(StepEngine.isReachable(k, 'shape', 'review', isValid), false);
   // No sizes: nothing past «Размеры», whatever else is filled in.
   valid.material = true; valid.dimensions = false;
   assert.equal(StepEngine.isReachable(k, 'shape', 'dimensions', isValid), true);
-  assert.equal(StepEngine.isReachable(k, 'shape', 'material', isValid), false);
+  assert.equal(StepEngine.isReachable(k, 'shape', 'edge', isValid), false);
   // Steps of another product, or unknown ids, are never reachable.
   assert.equal(StepEngine.isReachable('podokonnik', 'type', 'shape', isValid), false);
   assert.equal(StepEngine.isReachable(k, 'shape', 'nope', isValid), false);
@@ -241,7 +244,7 @@ test('buildProgress marks every step reachable or not, for each product', () => 
   const noStone = id => id !== 'material';
   ALL_PRODUCT_KEYS.forEach(key => {
     const steps = StepEngine.getSteps(key);
-    const progress = StepEngine.buildProgress(key, 'dimensions', noStone);
+    const progress = StepEngine.buildProgress(key, 'material', noStone);
     const m = steps.indexOf('material');
     progress.forEach((p, i) => assert.equal(p.reachable, i <= m, key + ' ' + p.id));
     // Without a validity check nothing blocks (as with canAdvance).

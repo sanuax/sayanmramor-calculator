@@ -595,12 +595,18 @@ test('stone card: a tap on the photo chooses the stone; the photo opens large on
   const picker = fs.readFileSync(path.join(__dirname, '..', 'material-picker.js'), 'utf8');
   // The photo itself has no click of its own (the card's click chooses the stone).
   assert.doesNotMatch(picker, /img\.addEventListener\('click'/);
-  // The button opens the lightbox and never reaches the card (stopPropagation), so it chooses nothing.
+  // The button never reaches the card (stopPropagation), so it chooses nothing. It opens the site's own stone
+  // window (js/stone-view.js), as the site's galleries do (the owner, 2026-11-15); the bare photo only without it.
   const at = picker.indexOf("open.className = 'stone-card-open'");
   assert.ok(at > 0, 'the corner button');
   const block = picker.slice(at, at + 900);
-  assert.match(block, /e\.stopPropagation\(\);\s*lightboxImg\.src = img\.src;\s*lightboxOverlay\.hidden = false;/);
-  assert.match(block, /aria-label', 'Открыть фото крупно: ' \+ stone\.name/);
+  assert.match(block, /e\.stopPropagation\(\);\s*if \(openStone\(stone, e\.detail === 0\)\) return;\s*lightboxImg\.src = img\.src;\s*lightboxOverlay\.hidden = false;/);
+  assert.match(block, /aria-label', 'Открыть крупно: ' \+ stone\.name/);
+  // The window turns through the stones as the picker shows them; its button chooses, as a press on the card does.
+  assert.match(picker, /StoneView\.create\(\{\s*list: \(\) => filteredList\.map\(forView\),\s*action: \{ label: 'Выбрать этот камень', choose: s => \{ stoneView\.close\(\); onSelect\(s\.id\); close\(\); \} \},\s*offer: false,/);
+  assert.match(picker, /if \(stoneView && stoneView\.isOpen\(\)\) return;/, 'Esc closes the stone window, not the picker under it');
+  assert.match(html, /<link rel="stylesheet" href="\/sayanmramor-site\/css\/stone-view\.css">/);
+  assert.match(html, /<script src="\/sayanmramor-site\/js\/stone-view\.js"><\/script>\s*<script src="material-picker\.js/);
   // Top left, as the site's catalogue (the heart is top right), 40 px and 36 px on phones.
   assert.match(html, /\.stone-card-open \{[^}]*top: 4px; left: 4px;[^}]*width: 40px; height: 40px;/);
   assert.match(html, /\.stone-card-image \.stone-card-open \{ top: 0; left: 0; width: 36px; height: 36px; \}/);

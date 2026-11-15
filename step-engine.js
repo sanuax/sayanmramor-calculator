@@ -53,16 +53,18 @@
   //     company rates: buildPricingInputs() prices the work by it
   //     (ConstructorState.resolveTypeId). It is not a fake shape/geometry
   //     step.
+  // Every product: its form or type first, then the stone, then the sizes (the owner, 2026-11-15:
+  // «вторыми материалы, третьими размеры»; the sizes used to come before the stone).
   const PRODUCT_STEPS = {
     // Столешницы: форма (прямая/Г-образная) -- самостоятельный шаг с
     // реальной геометрией (supportsShapeSelection), плюс кромка и
     // дополнительные позиции (вырезы/отверстия/бортик/фартук/остров/...).
-    stoleshnitsa_kuhnya:  ['shape', 'dimensions', 'material', 'edge', 'additionalWorks', 'options', 'review'],
-    stoleshnitsa_vannaya: ['shape', 'dimensions', 'material', 'edge', 'additionalWorks', 'options', 'review'],
+    stoleshnitsa_kuhnya:  ['shape', 'material', 'dimensions', 'edge', 'additionalWorks', 'options', 'review'],
+    stoleshnitsa_vannaya: ['shape', 'material', 'dimensions', 'edge', 'additionalWorks', 'options', 'review'],
     // Подоконник/ступени/лестница: supportsEdgeWork -- реальная кромка.
     // 'type' -- существующий (SILL-*/STEP-*/STAIR-*) subcategory-каталог,
     // ранее скрытый legacy-шагом "Вариант исполнения".
-    podokonnik: ['type', 'dimensions', 'material', 'edge', 'options', 'review'],
+    podokonnik: ['type', 'material', 'dimensions', 'edge', 'options', 'review'],
     // stupeni: «с подступенками» is a real checkbox writing to
     // state.productConfig.stupeni.riser (see constructor-state.js), asked as
     // the SECOND question of the 'type' step, as for a stair (the owner,
@@ -73,18 +75,18 @@
     // (see renderSubcategoryOptions() in sayanmramor-calculator.html) and
     // the risers are asked right under them. The riser's height goes with
     // the sizes ('dimensions').
-    stupeni:    ['type', 'dimensions', 'material', 'edge', 'options', 'review'],
-    lestnitsa:  ['type', 'dimensions', 'material', 'edge', 'options', 'review'],
+    stupeni:    ['type', 'material', 'dimensions', 'edge', 'options', 'review'],
+    lestnitsa:  ['type', 'material', 'dimensions', 'edge', 'options', 'review'],
     // Панно/пол/стена/фасад: ни кромки, ни доп.позиций сегодня не
     // поддерживают -- 'type' из PANEL-*/FLOOR-*/WALL-*/FACADE-* каталога.
-    panno: ['type', 'dimensions', 'material', 'options', 'review'],
-    pol:   ['type', 'dimensions', 'material', 'options', 'review'],
-    stena: ['type', 'dimensions', 'material', 'options', 'review'],
-    fasad: ['type', 'dimensions', 'material', 'options', 'review'],
+    panno: ['type', 'material', 'dimensions', 'options', 'review'],
+    pol:   ['type', 'material', 'dimensions', 'options', 'review'],
+    stena: ['type', 'material', 'dimensions', 'options', 'review'],
+    fasad: ['type', 'material', 'dimensions', 'options', 'review'],
     // Камины: 'type' -- тип камина (портал / облицовка короба / подиум,
     // FIREPLACE-* каталога, форма портала -- там же), размеры этого типа
     // (fireplace-model.js), камень, общие опции, итог. Ни кромки, ни доп.позиций.
-    kaminy: ['type', 'dimensions', 'material', 'options', 'review'],
+    kaminy: ['type', 'material', 'dimensions', 'options', 'review'],
   };
 
   // Человекочитаемые подписи для прогресса -- UI не должен сам решать, как

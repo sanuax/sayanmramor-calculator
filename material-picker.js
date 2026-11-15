@@ -344,6 +344,40 @@
       };
     })();
 
+    // The stone, large: the site's window (js/stone-view.js + css/stone-view.css, loaded from the site
+    // by the page), the same as in its stone galleries. Its arrows turn through the stones as this
+    // picker shows them (filtered and sorted); its button chooses the stone, as a press on the card does.
+    const StoneView = typeof window !== 'undefined' ? window.StoneView : null;
+    let stoneView = null;
+    const viewed = new Map();   // one view-shaped stone per stone, so turning finds the same object
+    function forView(stone) {
+      if (!viewed.has(stone.id)) {
+        const price = shownPrice(stone);
+        viewed.set(stone.id, {
+          id: stone.id,
+          name: stone.name,
+          type: stone.category_label_ru || '',
+          image: stone.image ? 'data/' + stone.image : null,
+          price: price === null ? null : Math.round(price),
+          countries: (stone.countries || []).map(c => c && c.label_ru).filter(Boolean),
+          available: stone.available !== false,
+        });
+      }
+      return viewed.get(stone.id);
+    }
+    function openStone(stone, viaKeys) {
+      if (!StoneView || !StoneView.canView()) return false;
+      if (!stoneView) {
+        stoneView = StoneView.create({
+          list: () => filteredList.map(forView),
+          action: { label: 'Выбрать этот камень', choose: s => { stoneView.close(); onSelect(s.id); close(); } },
+          offer: false,
+        });
+      }
+      stoneView.open(forView(stone), viaKeys);
+      return true;
+    }
+
     function buildCard(stone) {
       const card = document.createElement('div');
       card.className = 'stone-card';
@@ -362,19 +396,21 @@
       });
       imageWrap.appendChild(img);
 
-      // A tap on the photo chooses the stone (the card's own click). The photo opens large only by
-      // this button, top left (the heart is top right), as in the site's stone catalogue; the
-      // large photo has no text (the owner, 2026-11-13: people tapped the photo to choose and got
-      // it enlarged instead).
+      // A tap on the photo chooses the stone (the card's own click). The stone opens large only by
+      // this button, top left (the heart is top right), as in the site's stone catalogue (the owner,
+      // 2026-11-13: people tapped the photo to choose and got it enlarged instead). Since 2026-11-15
+      // it opens the site's own stone window (js/stone-view.js), as the gallery does; the bare
+      // photo (the lightbox) only if that script did not load.
       if (stone.image) {
         const open = document.createElement('button');
         open.type = 'button';
         open.className = 'stone-card-open';
         open.setAttribute('aria-haspopup', 'dialog');
-        open.setAttribute('aria-label', 'Открыть фото крупно: ' + stone.name);
+        open.setAttribute('aria-label', 'Открыть крупно: ' + stone.name);
         open.innerHTML = '<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8V3h5M12 3h5v5M17 12v5h-5M8 17H3v-5"/></svg>';
         open.addEventListener('click', (e) => {
           e.stopPropagation();
+          if (openStone(stone, e.detail === 0)) return;
           lightboxImg.src = img.src;
           lightboxOverlay.hidden = false;
         });
@@ -517,6 +553,7 @@
     });
 
     function close() {
+      if (stoneView) stoneView.close();
       overlay.hidden = true;
     }
     closeBtn.addEventListener('click', close);
@@ -530,6 +567,7 @@
 
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
+        if (stoneView && stoneView.isOpen()) return;   // the stone window closes itself; the picker stays
         if (!lightboxOverlay.hidden) { closeLightbox(); return; }
         if (anyDropdownOpen()) { registerCloser.closeAll(); return; }
         if (!overlay.hidden) close();

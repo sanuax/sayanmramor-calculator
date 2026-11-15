@@ -37,10 +37,10 @@ test('the wing fields show only for a product that has a shape (they now share t
   assert.match(fn, /shapeCornerSelect\.style\.display = hasShape && isLshape \? '' : 'none';/);
 });
 
-test('«Ступени»: the steps are type, sizes, material, edge, options, result (no «Подступенок» step)', () => {
-  assert.deepEqual(StepEngine.getSteps('stupeni'), ['type', 'dimensions', 'material', 'edge', 'options', 'review']);
+test('«Ступени»: the steps are type, material, sizes, edge, options, result (no «Подступенок» step)', () => {
+  assert.deepEqual(StepEngine.getSteps('stupeni'), ['type', 'material', 'dimensions', 'edge', 'options', 'review']);
   assert.ok(!('riser' in StepEngine.STEP_LABELS));
-  assert.deepEqual(StepEngine.getSteps('lestnitsa'), ['type', 'dimensions', 'material', 'edge', 'options', 'review']);
+  assert.deepEqual(StepEngine.getSteps('lestnitsa'), ['type', 'material', 'dimensions', 'edge', 'options', 'review']);
   assert.ok(!html.includes('data-step-id="riser"'));
   assert.ok(!html.includes('stupeniRiserGrid') && !html.includes('riserStepHost'));
 });

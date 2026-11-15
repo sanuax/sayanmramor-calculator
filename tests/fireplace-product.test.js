@@ -319,10 +319,10 @@ test('the model\'s constraints reach the page: fit, pier, depth, lintel, shelf, 
     'Размер «Ширина простенка» не оставляет места для каменных плит толщиной 30 мм.');
 });
 
-test('«Далее» on the size step: only a complete, valid fireplace goes on -- to «Материал»', () => {
+test('«Далее» on the size step: only a complete, valid fireplace goes on -- to «Опции» (the stone comes before the sizes since 2026-11-15)', () => {
   assert.match(htmlBetween('function isCurrentStepDataValid(stepId)', '\n  }\n'), /if \(selectedProductKey === 'kaminy'\) return fireplaceSizesComplete\(\);/);
   assert.match(htmlBetween('function fireplaceSizesComplete()', '\n  }\n'), /FireplaceModel\.readFireplaceConfig\(document, type\.id\)\.complete/);
-  assert.equal(StepEngine.nextStep('kaminy', 'dimensions'), 'material');
+  assert.equal(StepEngine.nextStep('kaminy', 'dimensions'), 'options');
   assert.equal(StepEngine.canAdvance('kaminy', 'dimensions', false), false);
   assert.equal(StepEngine.canAdvance('kaminy', 'dimensions', true), true);
   VARIANTS.forEach(v => assert.equal(variantState(v).productConfig.kaminy.complete, true, v.name));
@@ -412,12 +412,12 @@ test('the other 9 products: no fireplace in their configuration, their sizes as 
 
 // ---- steps --------------------------------------------------------------------------
 
-test('PRODUCT_STEPS.kaminy: type, sizes, stone, the shared options, result', () => {
-  assert.deepEqual(StepEngine.PRODUCT_STEPS.kaminy, ['type', 'dimensions', 'material', 'options', 'review']);
-  assert.equal(StepEngine.nextStep('kaminy', 'material'), 'options');
+test('PRODUCT_STEPS.kaminy: type, stone, sizes, the shared options, result', () => {
+  assert.deepEqual(StepEngine.PRODUCT_STEPS.kaminy, ['type', 'material', 'dimensions', 'options', 'review']);
+  assert.equal(StepEngine.nextStep('kaminy', 'material'), 'dimensions');
   assert.equal(StepEngine.nextStep('kaminy', 'options'), 'review');
   assert.equal(StepEngine.previousStep('kaminy', 'review'), 'options');
-  assert.equal(StepEngine.previousStep('kaminy', 'options'), 'material');
+  assert.equal(StepEngine.previousStep('kaminy', 'options'), 'dimensions');
   assert.equal(StepEngine.firstStep('kaminy'), 'type');
   assert.equal(StepEngine.lastStep('kaminy'), 'review');
 });
@@ -713,14 +713,14 @@ test('the options change no geometry: the same plates with or without them', () 
 
 test('the other 9 products keep their steps', () => {
   assert.deepEqual(Object.fromEntries(Object.keys(PRODUCTS).filter(k => k !== 'kaminy').map(k => [k, StepEngine.getSteps(k)])), {
-    lestnitsa: ['type', 'dimensions', 'material', 'edge', 'options', 'review'],
-    panno: ['type', 'dimensions', 'material', 'options', 'review'],
-    podokonnik: ['type', 'dimensions', 'material', 'edge', 'options', 'review'],
-    pol: ['type', 'dimensions', 'material', 'options', 'review'],
-    stena: ['type', 'dimensions', 'material', 'options', 'review'],
-    fasad: ['type', 'dimensions', 'material', 'options', 'review'],
-    stoleshnitsa_vannaya: ['shape', 'dimensions', 'material', 'edge', 'additionalWorks', 'options', 'review'],
-    stoleshnitsa_kuhnya: ['shape', 'dimensions', 'material', 'edge', 'additionalWorks', 'options', 'review'],
-    stupeni: ['type', 'dimensions', 'material', 'edge', 'options', 'review'],
+    lestnitsa: ['type', 'material', 'dimensions', 'edge', 'options', 'review'],
+    panno: ['type', 'material', 'dimensions', 'options', 'review'],
+    podokonnik: ['type', 'material', 'dimensions', 'edge', 'options', 'review'],
+    pol: ['type', 'material', 'dimensions', 'options', 'review'],
+    stena: ['type', 'material', 'dimensions', 'options', 'review'],
+    fasad: ['type', 'material', 'dimensions', 'options', 'review'],
+    stoleshnitsa_vannaya: ['shape', 'material', 'dimensions', 'edge', 'additionalWorks', 'options', 'review'],
+    stoleshnitsa_kuhnya: ['shape', 'material', 'dimensions', 'edge', 'additionalWorks', 'options', 'review'],
+    stupeni: ['type', 'material', 'dimensions', 'edge', 'options', 'review'],
   });
 });
