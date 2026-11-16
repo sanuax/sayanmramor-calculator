@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-09-15T23:53:23+03:00",
+  "updated_at": "2026-11-16T20:27:32+00:00",
   "stones": [
     {
       "id": "delicato-brown",
@@ -303623,6 +303623,761 @@
         }
       ],
       "image": "images/calacatta-caldia.webp",
+      "consecutive_empty_scrapes": 0,
+      "available": true
+    },
+    {
+      "id": "agate-ambra-gold",
+      "name": "Agate Ambra Gold",
+      "category": "agate",
+      "category_label_ru": "Агат",
+      "colors": [
+        {
+          "label_ru": "Желтый",
+          "segment": "yellow"
+        }
+      ],
+      "countries": [
+        {
+          "label_ru": "Италия",
+          "segment": "italy"
+        }
+      ],
+      "hardness_category": 3,
+      "source_url": "https://veneziastone.com/agate/agate-ambra-gold/slabs/",
+      "slabs": [
+        {
+          "article": "M0583771",
+          "party": "14656",
+          "pachka": "BLM22819",
+          "city": "Москва",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 364129.0,
+          "price_total_rub": 1759471.0
+        },
+        {
+          "article": "M0636796",
+          "party": "15188",
+          "pachka": "BLM25699",
+          "city": "Москва",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 382336.0,
+          "price_total_rub": 1847444.0
+        }
+      ],
+      "image": "images/agate-ambra-gold.webp",
+      "consecutive_empty_scrapes": 0,
+      "available": true
+    },
+    {
+      "id": "agate-ambra",
+      "name": "Agate Ambra",
+      "category": "agate",
+      "category_label_ru": "Агат",
+      "colors": [
+        {
+          "label_ru": "Желтый",
+          "segment": "yellow"
+        }
+      ],
+      "countries": [
+        {
+          "label_ru": "Италия",
+          "segment": "italy"
+        }
+      ],
+      "hardness_category": 3,
+      "source_url": "https://veneziastone.com/agate/agate-ambra/slabs/",
+      "slabs": [
+        {
+          "article": "M0519956",
+          "party": "14046",
+          "pachka": "BLM19042",
+          "city": "Москва",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 345923.0,
+          "price_total_rub": 1671497.0
+        }
+      ],
+      "image": "images/agate-ambra.webp",
+      "consecutive_empty_scrapes": 0,
+      "available": true
+    },
+    {
+      "id": "agate-athena",
+      "name": "Agate Athena",
+      "category": "agate",
+      "category_label_ru": "Агат",
+      "colors": [
+        {
+          "label_ru": "Бежевый",
+          "segment": "beige"
+        }
+      ],
+      "countries": [
+        {
+          "label_ru": "Италия",
+          "segment": "italy"
+        }
+      ],
+      "hardness_category": 3,
+      "source_url": "https://veneziastone.com/agate/agate-athena/slabs/",
+      "slabs": [
+        {
+          "article": "M0278435",
+          "party": "147",
+          "pachka": "BLM05805",
+          "city": "Краснодар",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 345650.0,
+          "price_total_rub": 1670178.0
+        },
+        {
+          "article": "M0636783",
+          "party": "15188",
+          "pachka": "BLM25689",
+          "city": "Москва",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 382336.0,
+          "price_total_rub": 1847444.0
+        }
+      ],
+      "image": "images/agate-athena.webp",
+      "consecutive_empty_scrapes": 0,
+      "available": true
+    },
+    {
+      "id": "agate-aura",
+      "name": "Agate Aura",
+      "category": "agate",
+      "category_label_ru": "Агат",
+      "colors": [
+        {
+          "label_ru": "Желтый",
+          "segment": "yellow"
+        }
+      ],
+      "countries": [
+        {
+          "label_ru": "Италия",
+          "segment": "italy"
+        }
+      ],
+      "hardness_category": 3,
+      "source_url": "https://veneziastone.com/agate/agate-aura/slabs/",
+      "slabs": [
+        {
+          "article": "M0414112",
+          "party": "10537",
+          "pachka": "BLM11573",
+          "city": "МО, Бузланово",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 345923.0,
+          "price_total_rub": 1671497.0
+        },
+        {
+          "article": "M0414111",
+          "party": "10537",
+          "pachka": "BLM11573",
+          "city": "МО, Бузланово",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 345923.0,
+          "price_total_rub": 1671497.0
+        }
+      ],
+      "image": "images/agate-aura.webp",
+      "consecutive_empty_scrapes": 0,
+      "available": true
+    },
+    {
+      "id": "agate-black-galaxy-special-design",
+      "name": "Agate Black Galaxy Special Design",
+      "category": "agate",
+      "category_label_ru": "Агат",
+      "colors": [
+        {
+          "label_ru": "Черный",
+          "segment": "black"
+        }
+      ],
+      "countries": [
+        {
+          "label_ru": "Италия",
+          "segment": "italy"
+        }
+      ],
+      "hardness_category": 3,
+      "source_url": "https://veneziastone.com/agate/agate-black-galaxy-special-design/slabs/",
+      "slabs": [
+        {
+          "article": "M0519954",
+          "party": "14046",
+          "pachka": "BLM19040",
+          "city": "Краснодар",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 362309.0,
+          "price_total_rub": 1750673.0
+        }
+      ],
+      "image": "images/agate-black-galaxy-special-design.webp",
+      "consecutive_empty_scrapes": 0,
+      "available": true
+    },
+    {
+      "id": "agate-blue-tornada",
+      "name": "Agate Blue Tornada",
+      "category": "agate",
+      "category_label_ru": "Агат",
+      "colors": [
+        {
+          "label_ru": "Синий",
+          "segment": "blue"
+        }
+      ],
+      "countries": [
+        {
+          "label_ru": "Италия",
+          "segment": "italy"
+        }
+      ],
+      "hardness_category": 3,
+      "source_url": "https://veneziastone.com/agate/agate-blue-tornada/slabs/",
+      "slabs": [
+        {
+          "article": "M0636780",
+          "party": "15188",
+          "pachka": "BLM25687",
+          "city": "Москва",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 327716.0,
+          "price_total_rub": 1583524.0
+        },
+        {
+          "article": "M0636785",
+          "party": "15188",
+          "pachka": "BLM25691",
+          "city": "Москва",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 327716.0,
+          "price_total_rub": 1583524.0
+        },
+        {
+          "article": "M0636797",
+          "party": "15188",
+          "pachka": "BLM25700",
+          "city": "Москва",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 327716.0,
+          "price_total_rub": 1583524.0
+        },
+        {
+          "article": "M0442301",
+          "party": "13286",
+          "pachka": "BLM14597",
+          "city": "МО, Бузланово",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 355026.0,
+          "price_total_rub": 1715484.0
+        }
+      ],
+      "image": "images/agate-blue-tornada.webp",
+      "consecutive_empty_scrapes": 0,
+      "available": true
+    },
+    {
+      "id": "agate-blue",
+      "name": "Agate Blue",
+      "category": "agate",
+      "category_label_ru": "Агат",
+      "colors": [
+        {
+          "label_ru": "Синий",
+          "segment": "blue"
+        }
+      ],
+      "countries": [
+        {
+          "label_ru": "Италия",
+          "segment": "italy"
+        }
+      ],
+      "hardness_category": 3,
+      "source_url": "https://veneziastone.com/agate/agate-blue/slabs/",
+      "slabs": [
+        {
+          "article": "M0382986",
+          "party": "8439",
+          "pachka": "BLM09875",
+          "city": "МО, Бузланово",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 273097.0,
+          "price_total_rub": 1319603.0
+        },
+        {
+          "article": "M0382989",
+          "party": "8439",
+          "pachka": "BLM09877",
+          "city": "Москва",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 300407.0,
+          "price_total_rub": 1451563.0
+        },
+        {
+          "article": "M0278438",
+          "party": "147",
+          "pachka": "BLM05806",
+          "city": "Москва",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 322801.0,
+          "price_total_rub": 1559771.0
+        },
+        {
+          "article": "M0442302",
+          "party": "13286",
+          "pachka": "BLM14598",
+          "city": "Москва",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 327716.0,
+          "price_total_rub": 1583524.0
+        },
+        {
+          "article": "M0442303",
+          "party": "13286",
+          "pachka": "BLM14598",
+          "city": "Краснодар",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 327716.0,
+          "price_total_rub": 1583524.0
+        },
+        {
+          "article": "C0002985",
+          "party": "158",
+          "pachka": "BLM00779",
+          "city": "Москва",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 325987.0,
+          "price_total_rub": 1575166.0
+        },
+        {
+          "article": "C0002984",
+          "party": "158",
+          "pachka": "BLM00779",
+          "city": "Санкт-Петербург",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 325987.0,
+          "price_total_rub": 1575166.0
+        },
+        {
+          "article": "00207145",
+          "party": "1833",
+          "pachka": "BLM00420",
+          "city": "Краснодар",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 325987.0,
+          "price_total_rub": 1575166.0
+        },
+        {
+          "article": "00207144",
+          "party": "1833",
+          "pachka": "BLM00419",
+          "city": "МО, Бузланово",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 325987.0,
+          "price_total_rub": 1575166.0
+        },
+        {
+          "article": "C0002986",
+          "party": "1",
+          "pachka": "BLM00781",
+          "city": "Москва",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 325987.0,
+          "price_total_rub": 1575166.0
+        },
+        {
+          "article": "M0278439",
+          "party": "149",
+          "pachka": "BLM05807",
+          "city": "Москва",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 341553.0,
+          "price_total_rub": 1650384.0
+        },
+        {
+          "article": "M0636801",
+          "party": "15188",
+          "pachka": "BLM25702",
+          "city": "Москва",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 364129.0,
+          "price_total_rub": 1759471.0
+        },
+        {
+          "article": "M0636787",
+          "party": "15188",
+          "pachka": "BLM25693",
+          "city": "Москва",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 364129.0,
+          "price_total_rub": 1759471.0
+        },
+        {
+          "article": "M0636799",
+          "party": "15188",
+          "pachka": "BLM25702",
+          "city": "Москва",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 364129.0,
+          "price_total_rub": 1759471.0
+        },
+        {
+          "article": "M0636800",
+          "party": "15188",
+          "pachka": "BLM25702",
+          "city": "Москва",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 364129.0,
+          "price_total_rub": 1759471.0
+        }
+      ],
+      "image": "images/agate-blue.webp",
+      "consecutive_empty_scrapes": 0,
+      "available": true
+    },
+    {
+      "id": "agate-carnelian",
+      "name": "Agate Carnelian",
+      "category": "agate",
+      "category_label_ru": "Агат",
+      "colors": [
+        {
+          "label_ru": "Желтый",
+          "segment": "yellow"
+        }
+      ],
+      "countries": [
+        {
+          "label_ru": "Италия",
+          "segment": "italy"
+        }
+      ],
+      "hardness_category": 3,
+      "source_url": "https://veneziastone.com/agate/agate-carnelian/slabs/",
+      "slabs": [
+        {
+          "article": "K0001570",
+          "party": "1701",
+          "pachka": "BLK00683",
+          "city": "Краснодар",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 348745.0,
+          "price_total_rub": 1685133.0
+        }
+      ],
+      "image": "images/agate-carnelian.webp",
+      "consecutive_empty_scrapes": 0,
+      "available": true
+    },
+    {
+      "id": "agate-cezanne-light-with-gold",
+      "name": "Agate Cezanne Light With Gold",
+      "category": "agate",
+      "category_label_ru": "Агат",
+      "colors": [
+        {
+          "label_ru": "Красный",
+          "segment": "red"
+        }
+      ],
+      "countries": [
+        {
+          "label_ru": "Италия",
+          "segment": "italy"
+        }
+      ],
+      "hardness_category": 3,
+      "source_url": "https://veneziastone.com/agate/agate-cezanne-light-with-gold/slabs/",
+      "slabs": [
+        {
+          "article": "00177032",
+          "party": "1701",
+          "pachka": "BLM00412",
+          "city": "Москва",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 366314.0,
+          "price_total_rub": 1770028.0
+        }
+      ],
+      "image": "images/agate-cezanne-light-with-gold.webp",
+      "consecutive_empty_scrapes": 0,
+      "available": true
+    },
+    {
+      "id": "agate-cezanne-with-gold-inlay",
+      "name": "Agate Cezanne With Gold Inlay",
+      "category": "agate",
+      "category_label_ru": "Агат",
+      "colors": [
+        {
+          "label_ru": "Красный",
+          "segment": "red"
+        }
+      ],
+      "countries": [
+        {
+          "label_ru": "Италия",
+          "segment": "italy"
+        }
+      ],
+      "hardness_category": 3,
+      "source_url": "https://veneziastone.com/agate/agate-cezanne-with-gold-inlay/slabs/",
+      "slabs": [
+        {
+          "article": "M0611374",
+          "party": "14946",
+          "pachka": "BLM24094",
+          "city": "Москва",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 345923.0,
+          "price_total_rub": 1671497.0
+        }
+      ],
+      "image": "images/agate-cezanne-with-gold-inlay.webp",
+      "consecutive_empty_scrapes": 0,
+      "available": true
+    },
+    {
+      "id": "agate-cezanne",
+      "name": "Agate Cezanne",
+      "category": "agate",
+      "category_label_ru": "Агат",
+      "colors": [
+        {
+          "label_ru": "Красный",
+          "segment": "red"
+        }
+      ],
+      "countries": [
+        {
+          "label_ru": "Италия",
+          "segment": "italy"
+        }
+      ],
+      "hardness_category": 3,
+      "source_url": "https://veneziastone.com/agate/agate-cezanne/slabs/",
+      "slabs": [
+        {
+          "article": "M0454506",
+          "party": "13340",
+          "pachka": "BLM15512",
+          "city": "МО, Бузланово",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 218478.0,
+          "price_total_rub": 1055683.0
+        },
+        {
+          "article": "M0611372",
+          "party": "14946",
+          "pachka": "BLM24092",
+          "city": "Москва",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 254891.0,
+          "price_total_rub": 1231630.0
+        },
+        {
+          "article": "M0382982",
+          "party": "8439",
+          "pachka": "BLM09871",
+          "city": "Санкт-Петербург",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 263994.0,
+          "price_total_rub": 1275616.0
+        }
+      ],
+      "image": "images/agate-cezanne.webp",
+      "consecutive_empty_scrapes": 0,
+      "available": true
+    },
+    {
+      "id": "agate-chocolate",
+      "name": "Agate Chocolate",
+      "category": "agate",
+      "category_label_ru": "Агат",
+      "colors": [
+        {
+          "label_ru": "Коричневый",
+          "segment": "brown"
+        }
+      ],
+      "countries": [
+        {
+          "label_ru": "Италия",
+          "segment": "italy"
+        }
+      ],
+      "hardness_category": 3,
+      "source_url": "https://veneziastone.com/agate/agate-chocolate/slabs/",
+      "slabs": [
+        {
+          "article": "C0002989",
+          "party": "158",
+          "pachka": "BLM00840",
+          "city": "Москва",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 348745.0,
+          "price_total_rub": 1685133.0
+        }
+      ],
+      "image": "images/agate-chocolate.webp",
+      "consecutive_empty_scrapes": 0,
+      "available": true
+    },
+    {
+      "id": "agate-crystal-with-gold-inlay",
+      "name": "Agate Crystal With Gold Inlay",
+      "category": "agate",
+      "category_label_ru": "Агат",
+      "colors": [
+        {
+          "label_ru": "Белый",
+          "segment": "white"
+        }
+      ],
+      "countries": [
+        {
+          "label_ru": "Италия",
+          "segment": "italy"
+        }
+      ],
+      "hardness_category": 3,
+      "source_url": "https://veneziastone.com/agate/agate-crystal-with-gold-inlay/slabs/",
+      "slabs": [
+        {
+          "article": "M0257816",
+          "party": "161",
+          "pachka": "BLM04359",
+          "city": "Москва",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 286934.0,
+          "price_total_rub": 1386463.0
+        }
+      ],
+      "image": "images/agate-crystal-with-gold-inlay.webp",
+      "consecutive_empty_scrapes": 0,
+      "available": true
+    },
+    {
+      "id": "agate-delta-light-giant",
+      "name": "Agate Delta Light Giant",
+      "category": "agate",
+      "category_label_ru": "Агат",
+      "colors": [
+        {
+          "label_ru": "Голубой",
+          "segment": "light-blue"
+        }
+      ],
+      "countries": [
+        {
+          "label_ru": "Италия",
+          "segment": "italy"
+        }
+      ],
+      "hardness_category": 3,
+      "source_url": "https://veneziastone.com/agate/agate-delta-light-giant/slabs/",
+      "slabs": [
+        {
+          "article": "C0001606",
+          "party": "1",
+          "pachka": "BLM00640",
+          "city": "Краснодар",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 310420.0,
+          "price_total_rub": 1499949.0
+        }
+      ],
+      "image": "images/agate-delta-light-giant.webp",
+      "consecutive_empty_scrapes": 0,
+      "available": true
+    },
+    {
+      "id": "agate-delta-light-with-gold-inlay",
+      "name": "Agate Delta Light With Gold Inlay",
+      "category": "agate",
+      "category_label_ru": "Агат",
+      "colors": [
+        {
+          "label_ru": "Голубой",
+          "segment": "light-blue"
+        }
+      ],
+      "countries": [
+        {
+          "label_ru": "Италия",
+          "segment": "italy"
+        }
+      ],
+      "hardness_category": 3,
+      "source_url": "https://veneziastone.com/agate/agate-delta-light-with-gold-inlay/slabs/",
+      "slabs": [
+        {
+          "article": "C0001627",
+          "party": "1844",
+          "pachka": "BLM00642",
+          "city": "Москва",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 310420.0,
+          "price_total_rub": 1499949.0
+        },
+        {
+          "article": "M0552342",
+          "party": "14355",
+          "pachka": "BLM20967",
+          "city": "Москва",
+          "width_cm": 302,
+          "length_cm": 160,
+          "price_per_m2_rub": 336820.0,
+          "price_total_rub": 1627510.0
+        }
+      ],
+      "image": "images/agate-delta-light-with-gold-inlay.webp",
       "consecutive_empty_scrapes": 0,
       "available": true
     }
