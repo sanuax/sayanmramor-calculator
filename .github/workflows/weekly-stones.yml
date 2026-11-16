@@ -103,13 +103,12 @@ jobs:
 
       - name: Tests
         run: |
-          # The sources are stored with Windows line endings, and 5 markup tests read them with 
-.
+          # The sources are stored with Windows line endings, and 5 markup tests read them with LF.
           # So the tests run on a copy with LF endings; the build below uses the original tree.
           mkdir -p "$RUNNER_TEMP/t"
           tar --exclude='./.git' --exclude='./site' -cf - . | tar -xf - -C "$RUNNER_TEMP/t"
           cd "$RUNNER_TEMP/t"
-          find . -type f \( -name '*.js' -o -name '*.mjs' -o -name '*.html' -o -name '*.css' -o -name '*.json' \)             -not -path './data/*' -not -path './vendor/*' -print0 | xargs -0 sed -i 's/$//'
+          find . -type f -not -path './data/*' -not -path './vendor/*' \( -name '*.js' -o -name '*.mjs' -o -name '*.html' -o -name '*.css' -o -name '*.json' \) -print0 | xargs -0 sed -i 's/\r$//'
           node --test tests/*.test.js
           python -m pytest tests -q
 
