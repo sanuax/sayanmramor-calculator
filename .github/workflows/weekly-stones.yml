@@ -109,8 +109,11 @@ jobs:
           tar --exclude='./.git' --exclude='./site' -cf - . | tar -xf - -C "$RUNNER_TEMP/t"
           cd "$RUNNER_TEMP/t"
           find . -type f -not -path './data/*' -not -path './vendor/*' \( -name '*.js' -o -name '*.mjs' -o -name '*.html' -o -name '*.css' -o -name '*.json' \) -print0 | xargs -0 sed -i 's/\r$//'
-          node --test tests/*.test.js
-          python -m pytest tests -q
+          # A failure is also printed as annotations, readable without opening the log.
+          fail() { grep -aE '^(✖|not ok)|AssertionError|expected|actual|FAILED|Error' "$1" | head -20 | cut -c1-240 | while IFS= read -r l; do echo "::error::$l"; done; tail -15 "$1"; exit 1; }
+          node --test tests/*.test.js > "$RUNNER_TEMP/node-test.log" 2>&1 || { echo "node tests failed"; fail "$RUNNER_TEMP/node-test.log"; }
+          python -m pytest tests -q > "$RUNNER_TEMP/py-test.log" 2>&1 || { echo "pytest failed"; fail "$RUNNER_TEMP/py-test.log"; }
+          tail -3 "$RUNNER_TEMP/node-test.log" "$RUNNER_TEMP/py-test.log"
 
       - name: Build the site for the domain
         run: |

@@ -95,12 +95,13 @@ test('unavailable materials are never silently dropped by filtering -- they stay
   assert.ok(result.some(s => s.id === 'b'), 'an unavailable stone must still be present in the filtered list');
 });
 
-test('the real 891-material catalog loads and filters without breaking (dataset smoke test)', () => {
+test('the real material catalog loads and filters without breaking (dataset smoke test)', () => {
   const data = require('../data/slabs.json');
   const stones = data.stones;
-  assert.equal(stones.length, 891);
+  // The catalog grows and shrinks with every parser run (the weekly update): never a fixed count.
+  assert.ok(stones.length >= 800, 'the catalog has hundreds of stones, got ' + stones.length);
   const filtered = MaterialPicker.filterAndSort(stones, { query: '', sortKey: 'name-asc' });
-  assert.equal(filtered.length, 891);
+  assert.equal(filtered.length, stones.length);
   // A real, specific stone (used throughout this session's manual QA) must
   // actually be findable by name -- proves search works against real data,
   // not just the small fixture used elsewhere in this test file.
