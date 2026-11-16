@@ -70,7 +70,7 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/w"
           cp data/slabs.json "$RUNNER_TEMP/w/slabs.before.json"
-          python scripts/collect_catalog_urls.py --output "$RUNNER_TEMP/w/catalog.txt" --debug | tail -5
+          python scripts/collect_catalog_urls.py --output "$RUNNER_TEMP/w/catalog.txt" --debug | tail -n 5
           python scripts/ci_weekly.py queue --catalog "$RUNNER_TEMP/w/catalog.txt" \
             --slabs data/slabs.json --out "$RUNNER_TEMP/w/queue.txt"
 
@@ -110,10 +110,10 @@ jobs:
           cd "$RUNNER_TEMP/t"
           find . -type f -not -path './data/*' -not -path './vendor/*' \( -name '*.js' -o -name '*.mjs' -o -name '*.html' -o -name '*.css' -o -name '*.json' \) -print0 | xargs -0 sed -i 's/\r$//'
           # A failure is also printed as annotations, readable without opening the log.
-          fail() { grep -aE '^(✖|not ok)|AssertionError|expected|actual|FAILED|Error' "$1" | head -20 | cut -c1-240 | while IFS= read -r l; do echo "::error::$l"; done; tail -15 "$1"; exit 1; }
+          fail() { grep -aE '^(✖|not ok)|AssertionError|expected|actual|FAILED|Error' "$1" | head -n 20 | cut -c1-240 | while IFS= read -r l; do echo "::error::$l"; done; tail -n 15 "$1"; exit 1; }
           node --test tests/*.test.js > "$RUNNER_TEMP/node-test.log" 2>&1 || { echo "node tests failed"; fail "$RUNNER_TEMP/node-test.log"; }
           python -m pytest tests -q > "$RUNNER_TEMP/py-test.log" 2>&1 || { echo "pytest failed"; fail "$RUNNER_TEMP/py-test.log"; }
-          tail -3 "$RUNNER_TEMP/node-test.log" "$RUNNER_TEMP/py-test.log"
+          tail -n 3 "$RUNNER_TEMP/node-test.log"; tail -n 3 "$RUNNER_TEMP/py-test.log"
 
       - name: Build the site for the domain
         run: |
