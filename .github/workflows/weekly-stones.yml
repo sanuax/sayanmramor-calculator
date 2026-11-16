@@ -1,0 +1,160 @@
+name: weekly-stones
+
+# Каждый понедельник в 04:00 по Москве: собрать каталог камней veneziastone.com,
+# проверить данные, закоммитить их в эту ветку и выложить сайт на sayanmramor.ru.
+# Подробности и что делать при сбое: docs/weekly-stones.md
+on:
+  schedule:
+    - cron: '0 1 * * 1'   # 01:00 UTC = 04:00 МСК
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: 'Сколько камней обработать (пусто = все). Для проверки, например 15.'
+        required: false
+        default: ''
+      publish:
+        description: 'Коммитить данные и выкладывать на сайт (false = только проверить, ничего не публиковать)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: weekly-stones
+  cancel-in-progress: false
+
+env:
+  HOST: u1248418@server93.hosting.reg.ru
+  # Отпечаток хостинга (чтобы подключаться только к настоящему серверу).
+  KNOWN_HOST: 'server93.hosting.reg.ru ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFMsztdg5FS5SrnXQ269V5H3JTE/itaCmF0kng0qNu/T'
+  # По расписанию inputs пусты: тогда публикуем и берём все камни.
+  LIMIT: ${{ github.event_name == 'workflow_dispatch' && inputs.limit || '' }}
+  PUBLISH: ${{ github.event_name != 'workflow_dispatch' || inputs.publish }}
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: sanuax/sayanmramor-site
+          ref: master
+          path: site
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Check the deploy key is set
+        if: env.PUBLISH == 'true'
+        env:
+          DEPLOY_KEY: ${{ secrets.SSH_DEPLOY_KEY }}
+        run: |
+          test -n "$DEPLOY_KEY" || { echo "Нет секрета SSH_DEPLOY_KEY (см. docs/weekly-stones.md), останавливаюсь до парсинга"; exit 1; }
+
+      - name: Install
+        run: |
+          pip install playwright beautifulsoup4 Pillow pytest
+          playwright install --with-deps chromium
+
+      - name: Collect the catalog and build the queue
+        run: |
+          mkdir -p "$RUNNER_TEMP/w"
+          cp data/slabs.json "$RUNNER_TEMP/w/slabs.before.json"
+          python scripts/collect_catalog_urls.py --output "$RUNNER_TEMP/w/catalog.txt" --debug | tail -5
+          python scripts/ci_weekly.py queue --catalog "$RUNNER_TEMP/w/catalog.txt" \
+            --slabs data/slabs.json --out "$RUNNER_TEMP/w/queue.txt"
+
+      - name: Scrape stones
+        timeout-minutes: 330
+        run: |
+          args=()
+          if [ -n "$LIMIT" ]; then args+=(--limit "$LIMIT"); fi
+          python scripts/scrape_slabs.py --urls "$RUNNER_TEMP/w/queue.txt" --fetch-images \
+            --failed-log "$RUNNER_TEMP/w/failed.txt" --failed-image-log "$RUNNER_TEMP/w/failed_img.txt" \
+            "${args[@]}"
+
+      - name: Safety gate
+        run: |
+          total=$(grep -c '^https' "$RUNNER_TEMP/w/queue.txt")
+          if [ -n "$LIMIT" ]; then
+            attempted=$LIMIT; partial=--partial
+          else
+            attempted=$total; partial=
+          fi
+          python scripts/ci_weekly.py check --before "$RUNNER_TEMP/w/slabs.before.json" --after data/slabs.json \
+            --failed "$RUNNER_TEMP/w/failed.txt" --attempted "$attempted" \
+            --catalog "$(grep -c '^https' "$RUNNER_TEMP/w/catalog.txt")" $partial
+          if [ -s "$RUNNER_TEMP/w/failed_img.txt" ]; then
+            echo "Картинки не скачались: $(grep -c '^https' "$RUNNER_TEMP/w/failed_img.txt")" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Rebuild the stone index
+        run: python scripts/build_stone_index.py
+
+      - name: Tests
+        run: |
+          node --test tests/*.test.js
+          pytest tests/test_scrape_slabs.py -q
+
+      - name: Build the site for the domain
+        run: |
+          mkdir -p "$RUNNER_TEMP/b/calc" "$RUNNER_TEMP/b/site"
+          # the working tree with the new data, without git metadata and CI files
+          tar --exclude='./.git' --exclude='./.github' --exclude='./site' --exclude='__pycache__' --exclude='.pytest_cache' -cf - . | tar -xf - -C "$RUNNER_TEMP/b/calc"
+          git -C site archive HEAD | tar -xf - -C "$RUNNER_TEMP/b/site"
+          node site/scripts/build_domain.js --site "$RUNNER_TEMP/b/site" --calc "$RUNNER_TEMP/b/calc" --out "$RUNNER_TEMP/b/dist"
+          test -f "$RUNNER_TEMP/b/dist/index.html"
+          test -f "$RUNNER_TEMP/b/dist/studio/index.html"
+          test -f "$RUNNER_TEMP/b/dist/studio/data/stone-index.json"
+          echo "собрано файлов: $(find "$RUNNER_TEMP/b/dist" -type f | wc -l)" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit the new data
+        if: env.PUBLISH == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/slabs.json data/stone-index.json data/stone-slabs.json data/images
+          if git diff --cached --quiet; then
+            echo "Данные не изменились, коммит не нужен." | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            git commit -m "Weekly stone update from veneziastone.com ($(date -u +%F)): slabs.json, stone-index.json, stone-slabs.json, images (the weekly job)"
+            git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+
+      - name: Upload to sayanmramor.ru
+        if: env.PUBLISH == 'true'
+        env:
+          DEPLOY_KEY: ${{ secrets.SSH_DEPLOY_KEY }}
+        run: |
+          test -n "$DEPLOY_KEY" || { echo "Нет секрета SSH_DEPLOY_KEY (см. docs/weekly-stones.md)"; exit 1; }
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          printf '%s\n' "$KNOWN_HOST" > ~/.ssh/known_hosts
+          tar -C "$RUNNER_TEMP/b/dist" -czf - . | ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes "$HOST" deploy | tee -a "$GITHUB_STEP_SUMMARY"
+          rm -f ~/.ssh/deploy
+
+      - name: Check the live site
+        if: env.PUBLISH == 'true'
+        run: |
+          sleep 5
+          for u in https://sayanmramor.ru/ https://sayanmramor.ru/studio/ https://sayanmramor.ru/studio/data/stone-index.json; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "$u")
+            echo "$u -> $code" | tee -a "$GITHUB_STEP_SUMMARY"
+            [ "$code" = 200 ] || exit 1
+          done
+          live=$(curl -s --max-time 30 https://sayanmramor.ru/studio/data/stone-index.json | python -c "import sys,json; print(json.load(sys.stdin)['updated_at'])")
+          mine=$(python -c "import json; print(json.load(open('data/stone-index.json',encoding='utf-8'))['updated_at'])")
+          echo "updated_at на сайте: $live, у нас: $mine" | tee -a "$GITHUB_STEP_SUMMARY"
+          [ "$live" = "$mine" ]
