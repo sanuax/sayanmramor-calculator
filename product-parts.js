@@ -171,7 +171,10 @@
       if (has(part)) pieces.push(piece(key, label, part.lengthM, part.widthM, part.lengthM * part.widthM, 1, { group: 'extra' }));
     };
     extra('backsplash', 'Фартук', state.backsplash);
+    const wingExtras = state.wingExtras || { backsplash: [], wallPanel: [], curb: [] };
+    wingExtras.backsplash.forEach(w => extra('backsplash', 'Фартук (крыло)', w));
     extra('wallPanel', 'Стеновая панель', state.wallPanel);
+    wingExtras.wallPanel.forEach(w => extra('wallPanel', 'Стеновая панель (крыло)', w));
     extra('island', 'Остров', pick(state.island.standard, state.island.figured));
     extra('barCounter', 'Барная стойка', pick(state.barCounter.standard, state.barCounter.complex));
     return { pieces };

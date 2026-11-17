@@ -50,6 +50,40 @@
     return EDGE_FIELDS.some(f => f.type === value) ? value : null;
   }
 
+  // A Г / П countertop's wings can carry their own фартук, стеновая панель and бортик (the owner,
+  // 2026-11-17): Г one (on the chosen corner), П two (left, right). Each has its own fields --
+  // extra-fartuk-w1-width / -length, extra-wallpanel-w1-..., extra-bortik-w1 (slot 1, 2) -- read
+  // only for a slot the shape has a wing for. The main run's own elements stay as they are.
+  const WING_EXTRA_FIELDS = {
+    backsplash: n => ({ widthId: 'extra-fartuk-w' + n + '-width', lengthId: 'extra-fartuk-w' + n + '-length' }),
+    wallPanel: n => ({ widthId: 'extra-wallpanel-w' + n + '-width', lengthId: 'extra-wallpanel-w' + n + '-length' }),
+    curb: n => ({ lengthId: 'extra-bortik-w' + n }),
+  };
+  function wingSlotSides(shape, corner) {
+    if (shape === 'lshape') return [corner === 'right' ? 'right' : 'left'];
+    if (shape === 'ushape') return ['left', 'right'];
+    return [];
+  }
+  function readWingExtras(doc, capabilities, shape, corner) {
+    const sides = wingSlotSides(shape, corner);
+    const out = { backsplash: [], wallPanel: [], curb: [] };
+    if (!capabilities) return out;
+    Object.keys(out).forEach(kind => {
+      if (!capabilities[kind]) return;
+      sides.forEach((side, i) => {
+        const ids = WING_EXTRA_FIELDS[kind](i + 1);
+        const lengthM = mmToM(numFromField(doc, ids.lengthId));
+        if (kind === 'curb') {
+          if (lengthM > 0) out.curb.push({ slot: i + 1, side, lengthM });
+          return;
+        }
+        const widthM = mmToM(numFromField(doc, ids.widthId));
+        if (widthM > 0 && lengthM > 0) out[kind].push({ slot: i + 1, side, widthM, lengthM });
+      });
+    });
+    return out;
+  }
+
   function readSinkCounts(doc, hasCapability) {
     if (!hasCapability) return { overlay: 0, undermount: 0, integrated: 0 };
     return {
@@ -147,6 +181,7 @@
     const wallPanel = capabilities && capabilities.wallPanel
       ? { widthM: mmToM(numFromField(d, 'extra-wallpanel-width')), lengthM: mmToM(numFromField(d, 'extra-wallpanel-length')) }
       : { widthM: 0, lengthM: 0 };
+    const wingExtras = readWingExtras(d, capabilities, shape, corner);
     const island = capabilities && capabilities.island
       ? {
           standard: { widthM: mmToM(numFromField(d, 'extra-ostrov-width')), lengthM: mmToM(numFromField(d, 'extra-ostrov-length')) },
@@ -213,6 +248,7 @@
       curbLengthM,
       backsplash,
       wallPanel,
+      wingExtras,
       island,
       barCounter,
       edge: { type: readSelectedEdgeType(d), lengthMm: null },
@@ -416,10 +452,13 @@
     // The countertop's elements (EXTRA-01..07): their work x the stone
     // coefficient, per metre (бортик) or per m² of the element.
     const area = part => part.widthM * part.lengthM;
+    // The wings' own elements are priced with the main run's: one quantity per rate.
+    const wingExtras = state.wingExtras || { backsplash: [], wallPanel: [], curb: [] };
+    const sum = (list, f) => list.reduce((t, p) => t + f(p), 0);
     const ELEMENT_ITEMS = [
-      ['EXTRA-01', state.curbLengthM],
-      ['EXTRA-02', area(state.backsplash)],
-      ['EXTRA-03', area(state.wallPanel)],
+      ['EXTRA-01', state.curbLengthM + sum(wingExtras.curb, p => p.lengthM)],
+      ['EXTRA-02', area(state.backsplash) + sum(wingExtras.backsplash, area)],
+      ['EXTRA-03', area(state.wallPanel) + sum(wingExtras.wallPanel, area)],
       ['EXTRA-04', area(state.island.standard)],
       ['EXTRA-05', area(state.island.figured)],
       ['EXTRA-06', area(state.barCounter.standard)],

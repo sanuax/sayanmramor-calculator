@@ -875,8 +875,9 @@ test('the profile stays off the wall and the joints: main run, wings and sills l
     const q = main.outline[(i + 1) % main.outline.length];
     return Math.abs(p[0] + 0.325) < 1e-9 && Math.abs(q[0] + 0.325) < 1e-9;
   });
+  // The front only (the owner, 2026-11-17): the wall side and both ends are straight cuts.
   const straight = named(at('straight'), 'main')[0];
-  assert.deepEqual(straight.closed, [wallSide(straight)]);
+  assert.deepEqual(straight.closed.slice().sort((a, b) => a - b), [0, 1 + 1, wallSide(straight)].sort((a, b) => a - b));
   const l = at('lshape');
   const main = named(l, 'main')[0], wing = named(l, 'wing')[0];
   assert.ok(main.closed.includes(wallSide(main)), 'wall side');
@@ -887,6 +888,8 @@ test('the profile stays off the wall and the joints: main run, wings and sills l
   });
   assert.ok(joint !== undefined, 'joint on the room side');
   assert.ok(wing.closed.includes(3), 'the wing\'s joint');
+  assert.ok(wing.closed.includes(1), 'the wing\'s far end');
+  assert.ok(main.closed.includes(0) && main.closed.includes(main.outline.length - 2), 'the run\'s ends');
   const sill = named(layoutFor('podokonnik', { width: { value: '300' }, length: { value: '1500' }, productSubcategory: { value: 'SILL-02' }, 'edge-type': { value: 'rounding' } }), 'main')[0];
   assert.ok(sill.closed && sill.closed.length > 0, 'a sill: along the window and at the walls');
 });

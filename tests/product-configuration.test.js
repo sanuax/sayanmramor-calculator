@@ -30,7 +30,7 @@ function readState(productKey, values) {
 test('every one of the 9 products has a working state contract: dimensions, product identity, and a stable set of top-level keys', () => {
   const expectedKeys = [
     'product', 'stone', 'dimensions', 'shape', 'wing', 'corner',
-    'sinkCounts', 'cooktopCount', 'holeCounts', 'curbLengthM', 'backsplash', 'wallPanel',
+    'sinkCounts', 'cooktopCount', 'holeCounts', 'curbLengthM', 'backsplash', 'wallPanel', 'wingExtras',
     'island', 'barCounter', 'edge', 'additionalWorks', 'bookmatchMode', 'options',
     'subcategory', 'stepCount', 'productConfig',
   ];

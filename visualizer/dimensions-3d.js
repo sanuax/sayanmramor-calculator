@@ -155,6 +155,22 @@
     onWall('backsplash', model.backsplash, 'extra-fartuk-length', 'extra-fartuk-width', 1);
     onWall('wall-panel', model.wallPanel, 'extra-wallpanel-length', 'extra-wallpanel-width', -1);
     onWall('curb', model.curb, 'extra-bortik', null, 1);
+    // The wings' own elements: their length along the top (a wing's wall side runs along X), their
+    // height at the far end of the run -- the field of each is that slot's (extra-fartuk-w1-length ...).
+    const we = model.wingExtras;
+    if (we) {
+      const onWingWall = (name, items, lengthField, heightField) => items.forEach(item => {
+        const part = named(layout, name + '-wing-' + item.corner)[0];
+        if (!part) return;
+        const be = boxExtent(part), z = item.corner === 'left' ? be.z1 : be.z0;
+        const prefix = lengthField(item.slot);
+        out.push(dim(prefix, item.lengthM, [be.x0, be.y1, z], [be.x1, be.y1, z], UP));
+        if (heightField) out.push(dim(heightField(item.slot), item.heightM, [be.x1, be.y0, z], [be.x1, be.y1, z], [1, 0, 0]));
+      });
+      onWingWall('backsplash', we.backsplash, n => 'extra-fartuk-w' + n + '-length', n => 'extra-fartuk-w' + n + '-width');
+      onWingWall('wall-panel', we.wallPanel, n => 'extra-wallpanel-w' + n + '-length', n => 'extra-wallpanel-w' + n + '-width');
+      onWingWall('curb', we.curb, n => 'extra-bortik-w' + n, null);
+    }
     return out;
   }
 

@@ -625,6 +625,42 @@
   .work-item-body-inner { overflow: hidden; }
   .work-item-body-pad { padding: 0 16px 16px; }
   .reveal-row.filled { border-color: var(--accent); background: var(--accent-soft); }
+  /* Крылья Г/П: строка крыла и «+» под фартуком, стеновой панелью и бортиком (владелец, 2026-11-17).
+     Закрытая строка -- атрибут hidden: он сильнее display:flex строки. */
+  .reveal-row[hidden], .extra-add[hidden], .reveal-rows[hidden] { display: none; }
+  /* Строки фартука, панели и бортика (основная и крыльев) -- одна сетка: название, поля, место под «×».
+     Поля стоят на одних и тех же местах в каждой строке, длина под длиной, ширина под шириной
+     (владелец, 2026-11-17). Место под «×» есть и у основной строки, у неё кнопки нет. */
+  [data-extra-kind] .reveal-row {
+    /* the fields column is two fields wide in every row, so the bortik's single length stands where the фартук's length does */
+    display: grid; grid-template-columns: minmax(0, 1fr) 292px 30px; column-gap: 12px; align-items: center;
+  }
+  [data-extra-kind] .reveal-row[hidden] { display: none; }
+  [data-extra-kind] .reveal-row .rr-title { grid-column: 1; grid-row: 1; }
+  [data-extra-kind] .reveal-row .rr-fields { grid-column: 2; grid-row: 1; }
+  [data-extra-kind] .reveal-row > .field-unit { grid-column: 2; grid-row: 1; width: 140px; justify-self: start; }
+  .reveal-row .extra-remove {
+    grid-column: 3; grid-row: 1; width: 30px; height: 30px; padding: 0; border-radius: 50%;
+    border: 1px solid var(--line); background: var(--card); color: var(--muted);
+    font: inherit; font-size: 18px; line-height: 1; cursor: pointer;
+  }
+  .reveal-row .extra-remove:hover { border-color: var(--accent); color: var(--ink); }
+  /* «+ … на крыло» -- в шрифте заголовков сайта (Unbounded), не в шрифте полей. */
+  .extra-add {
+    align-self: flex-start; padding: 10px 16px; border-radius: 10px; cursor: pointer;
+    border: 1px dashed var(--accent); background: none; color: var(--ink);
+    font-family: var(--font-display); font-size: 13px; font-weight: 500; letter-spacing: -0.01em;
+  }
+  .extra-add:hover { background: var(--accent-soft); }
+  /* Отметка «длина подставлена сама» -- поле остаётся обычным, его можно менять. */
+  .field-unit input[data-auto-length] { font-variant-numeric: tabular-nums; }
+  @media (max-width: 480px) {
+    /* Узкий экран: название и «×» в первой строке, обе колонки полей -- во второй, на всю ширину. */
+    [data-extra-kind] .reveal-row { grid-template-columns: minmax(0, 1fr) 30px; row-gap: 8px; }
+    [data-extra-kind] .reveal-row .rr-fields,
+    [data-extra-kind] .reveal-row > .field-unit { grid-column: 1 / -1; grid-row: 2; width: auto; }
+    .reveal-row .extra-remove { grid-column: 2; }
+  }
   /* Позиция с единственным вариантом (варочная панель): сама строка --
      переключатель, без раскрытия и второго клика. */
   .work-item:has(.work-item-head.selected) { border-color: var(--accent); background: var(--accent-soft); }
@@ -1916,8 +1952,34 @@
             <span class="work-item-chevron" aria-hidden="true"><svg viewBox="0 0 12 12" fill="none"><path d="M3 4.5 L6 7.5 L9 4.5" stroke="var(--muted)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
           </button>
           <div class="work-item-body"><div class="work-item-body-inner"><div class="work-item-body-pad">
-            <div class="reveal-rows">
-              <div class="reveal-row"><span class="rr-title">Длина</span><div class="field-unit"><input type="number" inputmode="numeric" id="extra-bortik" min="0" step="1" placeholder="0"><span class="unit">мм</span></div></div>
+            <!-- Бортик нужен не каждому: пока карточка не нажата, его нет в цене. С ней длина
+                 подставляется сама (по столешнице; на крыле -- глубина плюс длина крыла). -->
+            <div class="card-grid">
+              <div class="pick-card" data-toggle-field="extra-bortik-on" role="button" tabindex="0" aria-pressed="false">
+                <span class="pc-check">✓</span>
+                <svg viewBox="0 0 60 34" aria-hidden="true"><rect x="4" y="22" width="52" height="8" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/><rect x="4" y="12" width="52" height="10" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5"/></svg>
+                <div class="pc-title">Нужен бортик</div>
+                <div class="pc-desc">Длина подставится по столешнице</div>
+              </div>
+            </div>
+            <input type="hidden" id="extra-bortik-on" value="">
+            <div class="reveal-rows" id="curb-rows" data-extra-kind="curb" hidden>
+              <div class="reveal-row"><span class="rr-title">Длина</span><div class="field-unit"><input type="number" inputmode="numeric" id="extra-bortik" min="0" step="1" placeholder="0" data-auto-length="main" data-needs="extra-bortik-on"><span class="unit">мм</span></div></div>
+              <div class="reveal-row extra-wing-row" data-extra-slot="1" hidden>
+                <span class="rr-title" data-wing-label>Крыло</span>
+                <button type="button" class="extra-remove" aria-label="Убрать с крыла" title="Убрать с крыла">×</button>
+                <div class="rr-fields">
+                  <div class="field-unit"><span class="unit-label">Длина</span><input type="number" inputmode="numeric" id="extra-bortik-w1" min="0" step="1" placeholder="0" data-auto-length="wing" data-needs="extra-bortik-on"><span class="unit">мм</span></div>
+                </div>
+              </div>
+              <div class="reveal-row extra-wing-row" data-extra-slot="2" hidden>
+                <span class="rr-title" data-wing-label>Крыло</span>
+                <button type="button" class="extra-remove" aria-label="Убрать с крыла" title="Убрать с крыла">×</button>
+                <div class="rr-fields">
+                  <div class="field-unit"><span class="unit-label">Длина</span><input type="number" inputmode="numeric" id="extra-bortik-w2" min="0" step="1" placeholder="0" data-auto-length="wing" data-needs="extra-bortik-on"><span class="unit">мм</span></div>
+                </div>
+              </div>
+              <button type="button" class="extra-add" data-extra-add hidden>+ Бортик на крыло</button>
             </div>
           </div></div></div>
         </div>
@@ -1932,14 +1994,31 @@
             <span class="work-item-chevron" aria-hidden="true"><svg viewBox="0 0 12 12" fill="none"><path d="M3 4.5 L6 7.5 L9 4.5" stroke="var(--muted)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
           </button>
           <div class="work-item-body"><div class="work-item-body-inner"><div class="work-item-body-pad">
-            <div class="reveal-rows">
+            <div class="reveal-rows" data-extra-kind="backsplash">
               <div class="reveal-row">
                 <span class="rr-title">Фартук</span>
                 <div class="rr-fields">
-                  <div class="field-unit"><span class="unit-label">Длина</span><input type="number" inputmode="numeric" id="extra-fartuk-length" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
-                  <div class="field-unit"><span class="unit-label">Ширина</span><input type="number" inputmode="numeric" id="extra-fartuk-width" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
+                  <div class="field-unit"><span class="unit-label">Длина</span><input type="number" inputmode="numeric" id="extra-fartuk-length" min="0" step="1" placeholder="0" data-auto-length="main"><span class="unit">мм</span></div>
+                  <div class="field-unit"><span class="unit-label">Ширина</span><input type="number" inputmode="numeric" id="extra-fartuk-width" min="0" step="1" placeholder="0" data-extra-width><span class="unit">мм</span></div>
                 </div>
               </div>
+              <div class="reveal-row extra-wing-row" data-extra-slot="1" hidden>
+                <span class="rr-title" data-wing-label>Крыло</span>
+                <button type="button" class="extra-remove" aria-label="Убрать с крыла" title="Убрать с крыла">×</button>
+                <div class="rr-fields">
+                  <div class="field-unit"><span class="unit-label">Длина</span><input type="number" inputmode="numeric" id="extra-fartuk-w1-length" min="0" step="1" placeholder="0" data-auto-length="wing"><span class="unit">мм</span></div>
+                  <div class="field-unit"><span class="unit-label">Ширина</span><input type="number" inputmode="numeric" id="extra-fartuk-w1-width" min="0" step="1" placeholder="0" data-extra-width><span class="unit">мм</span></div>
+                </div>
+              </div>
+              <div class="reveal-row extra-wing-row" data-extra-slot="2" hidden>
+                <span class="rr-title" data-wing-label>Крыло</span>
+                <button type="button" class="extra-remove" aria-label="Убрать с крыла" title="Убрать с крыла">×</button>
+                <div class="rr-fields">
+                  <div class="field-unit"><span class="unit-label">Длина</span><input type="number" inputmode="numeric" id="extra-fartuk-w2-length" min="0" step="1" placeholder="0" data-auto-length="wing"><span class="unit">мм</span></div>
+                  <div class="field-unit"><span class="unit-label">Ширина</span><input type="number" inputmode="numeric" id="extra-fartuk-w2-width" min="0" step="1" placeholder="0" data-extra-width><span class="unit">мм</span></div>
+                </div>
+              </div>
+              <button type="button" class="extra-add" data-extra-add hidden>+ Фартук на крыло</button>
             </div>
           </div></div></div>
         </div>
@@ -1954,14 +2033,31 @@
             <span class="work-item-chevron" aria-hidden="true"><svg viewBox="0 0 12 12" fill="none"><path d="M3 4.5 L6 7.5 L9 4.5" stroke="var(--muted)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
           </button>
           <div class="work-item-body"><div class="work-item-body-inner"><div class="work-item-body-pad">
-            <div class="reveal-rows">
+            <div class="reveal-rows" data-extra-kind="wallPanel">
               <div class="reveal-row">
                 <span class="rr-title">Стеновая панель</span>
                 <div class="rr-fields">
-                  <div class="field-unit"><span class="unit-label">Длина</span><input type="number" inputmode="numeric" id="extra-wallpanel-length" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
-                  <div class="field-unit"><span class="unit-label">Ширина</span><input type="number" inputmode="numeric" id="extra-wallpanel-width" min="0" step="1" placeholder="0"><span class="unit">мм</span></div>
+                  <div class="field-unit"><span class="unit-label">Длина</span><input type="number" inputmode="numeric" id="extra-wallpanel-length" min="0" step="1" placeholder="0" data-auto-length="main"><span class="unit">мм</span></div>
+                  <div class="field-unit"><span class="unit-label">Ширина</span><input type="number" inputmode="numeric" id="extra-wallpanel-width" min="0" step="1" placeholder="0" data-extra-width><span class="unit">мм</span></div>
                 </div>
               </div>
+              <div class="reveal-row extra-wing-row" data-extra-slot="1" hidden>
+                <span class="rr-title" data-wing-label>Крыло</span>
+                <button type="button" class="extra-remove" aria-label="Убрать с крыла" title="Убрать с крыла">×</button>
+                <div class="rr-fields">
+                  <div class="field-unit"><span class="unit-label">Длина</span><input type="number" inputmode="numeric" id="extra-wallpanel-w1-length" min="0" step="1" placeholder="0" data-auto-length="wing"><span class="unit">мм</span></div>
+                  <div class="field-unit"><span class="unit-label">Ширина</span><input type="number" inputmode="numeric" id="extra-wallpanel-w1-width" min="0" step="1" placeholder="0" data-extra-width><span class="unit">мм</span></div>
+                </div>
+              </div>
+              <div class="reveal-row extra-wing-row" data-extra-slot="2" hidden>
+                <span class="rr-title" data-wing-label>Крыло</span>
+                <button type="button" class="extra-remove" aria-label="Убрать с крыла" title="Убрать с крыла">×</button>
+                <div class="rr-fields">
+                  <div class="field-unit"><span class="unit-label">Длина</span><input type="number" inputmode="numeric" id="extra-wallpanel-w2-length" min="0" step="1" placeholder="0" data-auto-length="wing"><span class="unit">мм</span></div>
+                  <div class="field-unit"><span class="unit-label">Ширина</span><input type="number" inputmode="numeric" id="extra-wallpanel-w2-width" min="0" step="1" placeholder="0" data-extra-width><span class="unit">мм</span></div>
+                </div>
+              </div>
+              <button type="button" class="extra-add" data-extra-add hidden>+ Панель на крыло</button>
             </div>
           </div></div></div>
         </div>
@@ -2240,26 +2336,26 @@
 <script src="fireplace-model.js?v=f9c31096"></script>
 <script src="dimension-diagram.js?v=308e699b"></script>
 <script src="step-engine.js?v=c21c885f"></script>
-<script src="result-model.js?v=c8fa91e6"></script>
+<script src="result-model.js?v=b37a1345"></script>
 <!-- Long words in the option cards break with a hyphen in any browser (2026-11-16): soft-hyphen.js. -->
 <script src="soft-hyphen.js?v=8fe91a8b"></script>
 <script>SoftHyphen.watch(document);</script>
 <!-- The site's request (2026-10-26): «Получить расчёт» goes there; one contract, the site's own file. -->
 <script src="/sayanmramor-site/js/offer-handoff.js"></script>
 <script src="transition-layer.js?v=9687eaa7"></script>
-<script src="constructor-state.js?v=ef3ae7ae"></script>
+<script src="constructor-state.js?v=d27799d7"></script>
 <script src="visualizer/constants.js?v=6bc5cd23"></script>
 <script src="visualizer/cutout-geometry.js?v=bf2f8360"></script>
-<script src="visualizer/attachment-geometry.js?v=00e2cf16"></script>
-<script src="visualizer/geometry-model.js?v=31d038d7"></script>
-<script src="product-parts.js?v=759885c8"></script>
+<script src="visualizer/attachment-geometry.js?v=18c7db98"></script>
+<script src="visualizer/geometry-model.js?v=dfd4ea76"></script>
+<script src="product-parts.js?v=43685b60"></script>
 <script src="visualizer/material-adapter.js?v=52c5aea7"></script>
-<script src="visualizer/edge-profile.js?v=cb61d4f4"></script>
+<script src="visualizer/edge-profile.js?v=5381b565"></script>
 <script src="visualizer/motion.js?v=6748e337"></script>
 <script src="visualizer/room-layout.js?v=071f4d13"></script>
-<script src="visualizer/dimensions-3d.js?v=2487c42c"></script>
-<script src="visualizer/scene-layout.js?v=77b65611"></script>
-<script src="edge-length.js?v=fa04a8bf"></script>
+<script src="visualizer/dimensions-3d.js?v=3f42235f"></script>
+<script src="visualizer/scene-layout.js?v=4bb239a3"></script>
+<script src="edge-length.js?v=d8830f9d"></script>
 <script src="visualizer/camera-framing.js?v=db6de54c"></script>
 <script src="visualizer/webgl-support.js?v=014e10bd"></script>
 <script src="visualizer/camera-preset-tracker.js?v=6235ae21"></script>
@@ -2268,9 +2364,9 @@
 <script src="passport-model.js?v=44779720"></script>
 <script src="passport-pdf.js?v=880d1d48"></script>
 <!-- IMPORTMAP -->
-<script type="importmap">{"imports":{"./visualizer/ar-view.js":"./visualizer/ar-view.js?v=49e075d1","./visualizer/three-scene.js":"./visualizer/three-scene.js?v=03d439bb"}}</script>
+<script type="importmap">{"imports":{"./visualizer/ar-view.js":"./visualizer/ar-view.js?v=49e075d1","./visualizer/three-scene.js":"./visualizer/three-scene.js?v=4e4b5ead"}}</script>
 <!-- /IMPORTMAP -->
-<script type="module" src="visualizer/three-scene.js?v=03d439bb"></script>
+<script type="module" src="visualizer/three-scene.js?v=4e4b5ead"></script>
 <script>
   const { PRODUCTS, hasAdditionalWork } = ProductTypes;
   const { getSubcategoriesForProduct, getAdditionalWorkRate } = RateCatalog;
@@ -3025,10 +3121,13 @@
     // Скос: один прямой срез на каждом углу (в 3D -- фаска 8 мм).
     { type: 'bevel', title: 'Скос (фаска)', desc: 'Срез под углом',
       icon: svgIcon('<path d="M10 10 H58 L64 16 V22 L58 28 H10 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5" stroke-linejoin="round"/>', '4 4 66 46') },
-    // Фигурная: многогранный профиль -- в 3D кромка из трёх граней на каждом
-    // углу; грани видны, чем профиль и отличается от гладкого скругления.
+    // Фигурная (чертёж владельца, 2026-11-17: «L(30)+НК(20) h40, подклейка
+    // "сандвич"»): два слоя по 20 мм. В верхнем -- выборка R15 у переднего угла,
+    // под ним подклеена полоса (50-80 мм) с уступом 2 мм и скруглением R12;
+    // 29 мм от начала выборки до торца. Масштаб иконки: 40 мм = 18 (0,45 на мм),
+    // полоса снизу -- 60 мм. Тот же профиль в 3D (edge-profile.js figuredProfile).
     { type: 'figured', title: 'Фигурная', desc: 'Декоративный профиль',
-      icon: svgIcon('<path d="M10 10 H55 L59.5 11.2 L62.8 14.5 L64 19 L62.8 23.5 L59.5 26.8 L55 28 H10 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5" stroke-linejoin="round"/>', '4 4 66 46') },
+      icon: svgIcon('<path d="M10 10 H50.95 A6.75 6.75 0 0 0 57.7 16.75 V19 H58.6 V19.9 A5.4 5.4 0 0 1 64 25.3 V28 H37 V19 H10 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5" stroke-linejoin="round"/><path d="M37 19 H57.7" fill="none" stroke="var(--stone-line)" stroke-width="1"/>', '4 4 66 46') },
     // Подгиб камнем: камень возвращается вниз по торцу (в 3D -- каменный
     // фартук высотой в толщину плиты под передним краем), торец вдвое выше.
     { type: 'stone-wrap', title: 'Подгиб камнем', desc: 'Визуально толстый торец',
@@ -4452,6 +4551,7 @@
     updateWingVisibility();
     updateOptionRows();
     updateAdditionalWorkGroupsVisibility(product);
+    syncWingExtras();
     renumberVisibleSteps();
     updateStepUI(selectedProductKey);
 
@@ -4574,8 +4674,12 @@
       const labels = { straight: 'кромка прямая', figured: 'кромка фигурная/сложная', rounding: 'скругление', bevel: 'скос/фаска', 'stone-wrap': 'подгиб камнем' };
       optionLabels.push(`${labels[item.edge]}: ${decimal2(item.quantity)} м.п.`);
     });
-    if (constructorState.curbLengthM > 0) optionLabels.push(`бортик: ${decimal2(constructorState.curbLengthM)} м.п.`);
-    const fartukAreaM2 = constructorState.backsplash.widthM * constructorState.backsplash.lengthM;
+    const wingExtras = constructorState.wingExtras;
+    const areaOf = part => part.widthM * part.lengthM;
+    const sumOf = (list, f) => list.reduce((t, p) => t + f(p), 0);
+    const curbTotalM = constructorState.curbLengthM + sumOf(wingExtras.curb, p => p.lengthM);
+    if (curbTotalM > 0) optionLabels.push(`бортик: ${decimal2(curbTotalM)} м.п.`);
+    const fartukAreaM2 = areaOf(constructorState.backsplash) + sumOf(wingExtras.backsplash, areaOf);
     if (fartukAreaM2 > 0) optionLabels.push(`фартук: ${decimal2(fartukAreaM2)} м²`);
     const ostrovAreaM2 = constructorState.island.standard.widthM * constructorState.island.standard.lengthM;
     if (ostrovAreaM2 > 0) optionLabels.push(`остров/полуостров: ${decimal2(ostrovAreaM2)} м²`);
@@ -4591,7 +4695,7 @@
     QUANTITY_LABELS.forEach(([qty, label]) => { if (qty > 0) optionLabels.push(`${label}: ${qty} шт.`); });
     const AREA_LABELS = [
       [constructorState.island.figured.widthM * constructorState.island.figured.lengthM, 'остров фигурный'],
-      [constructorState.wallPanel.widthM * constructorState.wallPanel.lengthM, 'стеновая панель'],
+      [areaOf(constructorState.wallPanel) + sumOf(wingExtras.wallPanel, areaOf), 'стеновая панель'],
       [constructorState.barCounter.standard.widthM * constructorState.barCounter.standard.lengthM, 'барная стойка стандартная'],
       [constructorState.barCounter.complex.widthM * constructorState.barCounter.complex.lengthM, 'барная стойка сложная'],
     ];
@@ -4892,6 +4996,112 @@
   makeVariantExclusive(BAR_STANDARD_FIELDS, BAR_COMPLEX_FIELDS);
   makeVariantExclusive(BAR_COMPLEX_FIELDS, BAR_STANDARD_FIELDS);
 
+  // ---- Крылья Г/П: «+» под фартуком, стеновой панелью и бортиком, и длина по умолчанию ----
+  // (владелец, 2026-11-17). Первые размеры -- основной сегмент; «+» открывает строку крыла: у Г одну,
+  // у П две (левое, правое). Строки крыльев -- обычные поля страницы с постоянными id (extra-fartuk-w1-...),
+  // поэтому ссылка-паспорт, заявка и расчёт читают их как любые другие (constructor-state.js).
+  // Длина подставляется сама: у основного сегмента -- длина столешницы, у крыла -- глубина плюс длина
+  // крыла (боковая стена от угла до конца крыла). Подставленное число клиент меняет как обычное.
+  var wingRowsAll = Array.from(document.querySelectorAll('.extra-wing-row'));
+  const wingSlotCount = () => { const s = currentWingShape(); return s === 'lshape' ? 1 : (s === 'ushape' ? 2 : 0); };
+  const wingRowLabel = slot => (currentWingShape() === 'ushape' ? (slot === 1 ? 'Левое крыло' : 'Правое крыло') : 'Крыло');
+  const fieldMm = id => parseFloat(document.getElementById(id).value) || 0;
+  var curbFlag = document.getElementById('extra-bortik-on');
+  const curbOn = () => parseFloat(curbFlag.value) > 0;
+
+  function autoLengthsMm() {
+    const length = fieldMm('length'), depth = fieldMm('width'), wingLength = fieldMm('wing-length');
+    return { main: length > 0 ? Math.round(length) : 0, wing: depth > 0 && wingLength > 0 ? Math.round(depth + wingLength) : 0 };
+  }
+  // A length follows the sizes while it is empty or still the number it was filled with; one the client
+  // changed stays theirs. Cleared by hand it stays empty until they leave the field (then it fills again).
+  function syncAutoLengths() {
+    const auto = autoLengthsMm();
+    document.querySelectorAll('[data-auto-length]').forEach(el => {
+      const row = el.closest('.extra-wing-row');
+      if (row && row.hidden) return;
+      const group = el.closest('.work-item');
+      if (group && group.style.display === 'none') return;
+      if (el.dataset.needs && !(parseFloat(document.getElementById(el.dataset.needs).value) > 0)) return;
+      if (el.dataset.cleared === '1') return;
+      if (el.value !== '' && el.value !== (el.dataset.autoValue || '')) return;
+      const next = auto[el.dataset.autoLength] > 0 ? String(auto[el.dataset.autoLength]) : '';
+      el.value = next;
+      el.dataset.autoValue = next;
+    });
+  }
+  function syncWingExtras() {
+    if (!wingRowsAll) return;   // the page script has not got this far yet
+    const n = wingSlotCount();
+    wingRowsAll.forEach(row => {
+      const slot = Number(row.dataset.extraSlot);
+      row.hidden = !(slot <= n && row.dataset.open === '1');
+      row.querySelector('[data-wing-label]').textContent = wingRowLabel(slot);
+    });
+    document.querySelectorAll('[data-extra-kind]').forEach(kind => {
+      const open = Array.from(kind.querySelectorAll('.extra-wing-row')).filter(r => !r.hidden).length;
+      kind.querySelector('[data-extra-add]').hidden = !(n > 0 && open < n);
+    });
+    document.getElementById('curb-rows').hidden = !curbOn();
+    syncAutoLengths();
+    document.querySelectorAll('#countertopExtras .reveal-row').forEach(r => { if (r._syncFilled) r._syncFilled(); });
+  }
+  function openWingRow(row) {
+    row.dataset.open = '1';
+    // A new wing starts as wide as the main run's element; the client changes it.
+    const width = row.querySelector('[data-extra-width]');
+    const mainWidth = row.closest('[data-extra-kind]').querySelector('.reveal-row:not(.extra-wing-row) [data-extra-width]');
+    if (width && mainWidth && width.value === '' && parseFloat(mainWidth.value) > 0) width.value = mainWidth.value;
+  }
+  function clearWingRow(row) {
+    row.dataset.open = '0';
+    row.querySelectorAll('input').forEach(el => { el.value = ''; el.dataset.autoValue = ''; el.dataset.cleared = ''; });
+  }
+  document.querySelectorAll('[data-extra-add]').forEach(btn => btn.addEventListener('click', () => {
+    const n = wingSlotCount();
+    const next = Array.from(btn.closest('[data-extra-kind]').querySelectorAll('.extra-wing-row')).find(r => Number(r.dataset.extraSlot) <= n && r.hidden);
+    if (!next) return;
+    openWingRow(next);
+    syncWingExtras();
+    calculate();
+  }));
+  wingRowsAll.forEach(row => {
+    row.dataset.open = '0';
+    row.querySelector('.extra-remove').addEventListener('click', () => { clearWingRow(row); syncWingExtras(); calculate(); });
+    // A value that arrives some other way (a passport link) opens its row.
+    row.querySelectorAll('input').forEach(el => el.addEventListener('input', () => {
+      if (parseFloat(el.value) > 0 && row.dataset.open !== '1') { row.dataset.open = '1'; syncWingExtras(); }
+    }));
+  });
+  document.querySelectorAll('[data-auto-length]').forEach(el => {
+    el.addEventListener('input', e => { if (e.isTrusted) el.dataset.cleared = el.value === '' ? '1' : ''; });
+    el.addEventListener('change', () => { if (el.value === '') { el.dataset.cleared = ''; syncAutoLengths(); calculate(); } });
+  });
+  // «Нужен бортик»: off -- no curb anywhere (its fields are emptied); on -- its length fills in.
+  curbFlag.addEventListener('input', () => {
+    if (!curbOn()) {
+      document.querySelectorAll('#curb-rows input').forEach(el => { el.value = ''; el.dataset.autoValue = ''; el.dataset.cleared = ''; });
+      wingRowsAll.filter(r => r.closest('#curb-rows')).forEach(r => { r.dataset.open = '0'; });
+    }
+    syncWingExtras();
+    calculate();
+  });
+  // A curb length arriving without the card pressed (an older passport link) switches it on.
+  document.querySelectorAll('#curb-rows input').forEach(el => el.addEventListener('input', () => {
+    if (parseFloat(el.value) > 0 && !curbOn()) {
+      curbFlag.value = '1';
+      const card = document.querySelector('[data-toggle-field="extra-bortik-on"]');
+      card.classList.add('selected');
+      card.setAttribute('aria-pressed', 'true');
+      syncWingExtras();
+    }
+  }));
+  [
+    'extra-fartuk-w1-length', 'extra-fartuk-w1-width', 'extra-fartuk-w2-length', 'extra-fartuk-w2-width',
+    'extra-wallpanel-w1-length', 'extra-wallpanel-w1-width', 'extra-wallpanel-w2-length', 'extra-wallpanel-w2-width',
+    'extra-bortik-w1', 'extra-bortik-w2',
+  ].forEach(id => document.getElementById(id).addEventListener('input', calculate));
+
   // «Дополнительные позиции»: раскрытие/закрытие accordion и подсветка
   // заполненного варианта -- чисто визуальные обработчики, не влияют на
   // calculate()/state (те продолжают слушать те же самые input-события,
@@ -4905,10 +5115,13 @@
   });
   document.querySelectorAll('#countertopExtras .reveal-row').forEach(row => {
     const rowInputs = row.querySelectorAll('input');
+    // A row with a width is filled once it has one: its length may be filled by itself (data-auto-length).
     const syncFilled = () => {
-      row.classList.toggle('filled', Array.from(rowInputs).some(el => parseFloat(el.value) > 0));
+      const width = row.querySelector('[data-extra-width]');
+      row.classList.toggle('filled', width ? parseFloat(width.value) > 0 : Array.from(rowInputs).some(el => parseFloat(el.value) > 0));
     };
     rowInputs.forEach(el => el.addEventListener('input', syncFilled));
+    row._syncFilled = syncFilled;
     syncFilled();
   });
 

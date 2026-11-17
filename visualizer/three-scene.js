@@ -25,6 +25,7 @@ let userAdjusted = false;
 const reducedMotion = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
 let cameraMove = null;   // a glide to a new view: { spring, goal }
 let morph = null;        // the model easing to a new size: { spring } over the shown bounds
+let rise = null;         // wall elements easing in / to a new size: { spring, items } (see startRise)
 let lastFrameTime = 0;
 // «Студия» / «День» / «Вечер» and the furniture fronts' colour (RoomLayout).
 let roomMode = 'studio';
@@ -690,7 +691,7 @@ function buildStoneBowl(group, part, materials) {
   const [cx, top, cz] = part.center;
   const [sx, depth, sz] = part.size;
   const slabM = part.slabThicknessM || 0;
-  const rounding = window.EdgeProfile.profile(part.edge, 0, slabM).topSize;
+  const rounding = window.EdgeProfile.profile(window.EdgeProfile.holeEdge(part.edge), 0, slabM).topSize;
   const rise = Math.max(0, slabM - rounding);   // from the slab's underside to where its top rounding begins
   const w = sx / 2 - STONE_BOWL_OVERLAP_M, l = sz / 2 - STONE_BOWL_OVERLAP_M, t = STONE_BOWL_WALL_M;
   const shape = new THREE.Shape();
@@ -1080,9 +1081,13 @@ function buildProductGroup(layout, materialDescriptor) {
   let stoneIndex = 0;
   let mainStone = null;   // the countertop's own slab: { part, index }
   let lastSlab = null;    // the stone part drawn last, apart from aprons
+  group.userData.wall = {};
   layout.parts.forEach(part => {
     const before = group.children.length;
     buildPart(group, part, materials);
+    if (part.kind === 'box' && WALL_ELEMENT.test(part.name || '') && group.children[before] && group.children[before].isMesh) {
+      group.userData.wall[part.name] = { mesh: group.children[before], center: part.center.slice(), size: part.size.slice() };
+    }
     if (part.role === 'stone') {
       const index = stoneIndex++;
       if (part.name === 'main' && !mainStone) mainStone = { part, index };
@@ -1687,6 +1692,63 @@ function viewDirection() {
 
 // ---- the model easing to a new size ----------------------------------------
 
+// The backsplash, the wall panel and the curb -- the main run's and each wing's -- are not part of the
+// countertop's bounds, so the bounds' easing does not move them. They ease on their own (the owner,
+// 2026-11-17): a new one rises from the top it stands on, one that changes its size grows or shrinks
+// to the new one, together, in the same spring as the rest of the 3D. Removed ones go at once.
+const WALL_ELEMENT = /^(backsplash|wall-panel|curb)(-wing-(left|right))?$/;
+
+function applyRise() {
+  const t = rise.spring.x[0];
+  rise.items.forEach(({ entry, from, to }) => {
+    const c = [0, 1, 2].map(i => from.c[i] + (to.c[i] - from.c[i]) * t);
+    const s = [0, 1, 2].map(i => from.s[i] + (to.s[i] - from.s[i]) * t);
+    entry.mesh.position.set(c[0], c[1], c[2]);
+    entry.mesh.scale.set(s[0] / to.s[0], s[1] / to.s[1], s[2] / to.s[2]);
+    entry.shown = { c, s };
+  });
+}
+
+function finishRise() {
+  rise.items.forEach(({ entry, to }) => {
+    entry.mesh.position.set(to.c[0], to.c[1], to.c[2]);
+    entry.mesh.scale.set(1, 1, 1);
+    entry.shown = null;
+  });
+  rise = null;
+}
+
+// `previous` is the earlier group's wall elements (name -> { center, size, shown }): what each was, or
+// -- while it was still easing -- what it showed.
+function startRise(group, previous) {
+  const items = [];
+  Object.keys(group.userData.wall).forEach(name => {
+    const entry = group.userData.wall[name];
+    const to = { c: entry.center, s: entry.size };
+    const old = previous[name];
+    let from;
+    if (old) {
+      from = old.shown || { c: old.center, s: old.size };
+      const same = [0, 1, 2].every(i => Math.abs(from.c[i] - to.c[i]) < 1e-6 && Math.abs(from.s[i] - to.s[i]) < 1e-6);
+      if (same) return;
+    } else {
+      // From a sliver on the top it stands on (its bottom edge stays put as it rises).
+      const sliver = Math.max(to.s[1] * 0.001, 1e-5), base = to.c[1] - to.s[1] / 2;
+      from = { c: [to.c[0], base + sliver / 2, to.c[2]], s: [to.s[0], sliver, to.s[2]] };
+    }
+    items.push({ entry, from, to });
+  });
+  if (!items.length) return;
+  rise = { spring: window.Motion.createSpring([0]), items };
+  window.Motion.retarget(rise.spring, [1]);
+  applyRise();
+}
+
+function stepRise(dt) {
+  if (window.Motion.step(rise.spring, dt, 1e-3)) { finishRise(); return; }
+  applyRise();
+}
+
 // A new size of the same product (the same parts, only longer, wider, ...):
 // the model eases from the size on screen to the new one instead of jumping
 // -- the new model is drawn stretched to the old one's bounds and relaxes to
@@ -1788,6 +1850,7 @@ function init(canvasEl) {
     const dt = lastFrameTime && now ? (now - lastFrameTime) / 1000 : 0;
     lastFrameTime = now || 0;
     if (morph) stepMorph(dt);
+    if (rise) stepRise(dt);
     if (productGroup) stepFade(productGroup.userData.materials);
     stepRoomFade();
     if (cameraMove) stepCamera(dt);
@@ -1856,6 +1919,14 @@ function rebuild(geometryModel, materialDescriptor) {
   const structure = geometryModel.productKey + '#' + structureOf(layout);
   const resized = productGroup && lastBounds && layout.bounds && !reducedMotion.matches
     && productGroup.userData.structure === structure ? shownBounds() : null;
+  // The wall elements of the same product on screen now (rise: the same product, other elements).
+  const previousWall = productGroup && !reducedMotion.matches && lastProductKey === geometryModel.productKey
+    ? Object.keys(productGroup.userData.wall || {}).reduce((o, name) => {
+      const e = productGroup.userData.wall[name];
+      o[name] = { center: e.center, size: e.size, shown: e.shown || null };
+      return o;
+    }, {}) : null;
+  rise = null;
   if (productGroup) {
     scene.remove(productGroup);
     disposeRoom(productGroup);
@@ -1867,6 +1938,7 @@ function rebuild(geometryModel, materialDescriptor) {
   productGroup.userData.structure = structure;
   productGroup.userData.shape = shapeOf(geometryModel);
   scene.add(productGroup);
+  if (previousWall) startRise(productGroup, previousWall);
   if (!resized) morph = null;
   if (layout.bounds && !resized) placeLights(layout.bounds);
 
@@ -1942,6 +2014,7 @@ function capture(presetName, { width, height }) {
   if (!renderer || !hasModel || !lastBounds) return null;
   flushResize();
   if (morph) { morph.spring.x = morph.spring.goal.slice(); stepMorph(0); }
+  if (rise) finishRise();
   const presets = window.VisualizerConstants.CAMERA_PRESETS;
   const preset = presets[presetName] || presets.iso;
   const size = renderer.getSize(new THREE.Vector2());
@@ -2008,7 +2081,7 @@ function dispose() {
   cameraPresetTracker = null;
   textures = null;
   lastBounds = null; lastLayout = null; lastProductKey = null; hasModel = false; userAdjusted = false;
-  cameraMove = null; morph = null; lastFrameTime = 0;
+  cameraMove = null; morph = null; rise = null; lastFrameTime = 0;
 }
 
 // ---- AR («Поставить у себя в комнате», the owner, 2026-10-22) -------------

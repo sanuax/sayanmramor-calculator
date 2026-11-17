@@ -61,8 +61,8 @@ test('supported product + edge profile + non-null edge rate -> the rate x the op
 
 test('the company edge rates are live: rounding (EDGE-04) adds 10 000 per metre of open edge on a supporting product, nothing where edges are unsupported', () => {
   assert.equal(RateCatalog.getAdditionalWorkRate('EDGE-04'), 10000);
-  // Sill 2.0 m; kitchen 2000 x 600 against the wall: front 2.0 + two ends 0.6.
-  [['podokonnik', 2.0], ['stoleshnitsa_kuhnya', 3.2]].forEach(([key, lengthM]) => {
+  // Sill 2.0 m; kitchen 2000 x 600 against the wall: its front 2.0 only (the owner, 2026-11-17).
+  [['podokonnik', 2.0], ['stoleshnitsa_kuhnya', 2.0]].forEach(([key, lengthM]) => {
     const withEdge = pricingFor(key, { 'edge-type': { value: 'rounding' } }, RateCatalog.getAdditionalWorkRate).result;
     const without = pricingFor(key, {}, RateCatalog.getAdditionalWorkRate).result;
     assert.equal(Math.round(withEdge.total - without.total), Math.round(10000 * lengthM), key);

@@ -8,9 +8,9 @@
 // groove. The plan outline is the stone's exact size: the profile goes
 // into the stone, it never makes the slab bigger.
 //
-// Smooth profiles (the rounding) and gently turning outlines (a rounded
-// island corner, a radius step) get smooth normals; the chamfer and the
-// figured edge keep their facets, as their cards show them.
+// Smooth profiles (the rounding, the figured edge's cove and round-over) and
+// gently turning outlines (a rounded island corner, a radius step) get smooth
+// normals; the chamfer keeps its facet, as its card shows it.
 //
 // Pure (no three.js): a triangle list of positions and normals in layout
 // space (metres; wall = -X, room = +X, run = Z, up = +Y). The caller passes
@@ -76,10 +76,44 @@
     }
   }
 
+  // «Фигурная» (the owner's drawing, 2026-11-17: «Кромка фигурная L(30)+НК(20) h40, подклейка
+  // "сандвич"»): two 20 mm layers. The top one has a cove R15 scooped out of its front corner; the
+  // strip glued under it reaches 2 mm further, steps down 2 mm and rounds over R12 to its own front --
+  // 15 + 2 + 12 = 29 mm from where the cove starts to the front. Drawn for 40 mm, scaled to the slab's
+  // thickness. In mm: x out from where the cove starts, h up from the underside.
+  const FIGURED_H_MM = 40, FIGURED_DEPTH_MM = 29, FIGURED_ARC_SEGMENTS = 8;
+  function figuredProfile(y0, y1) {
+    const k = (y1 - y0) / FIGURED_H_MM;   // metres per mm of the drawing
+    const pts = [];
+    const at = (x, h, o, u) => pts.push({ s: (FIGURED_DEPTH_MM - x) * k, y: y0 + h * k, o, u });
+    // The cove: centre (15, 40), from the top rim down to the top layer's front; its normal faces the centre.
+    for (let i = 0; i <= FIGURED_ARC_SEGMENTS; i++) {
+      const t = (Math.PI / 2) * (i / FIGURED_ARC_SEGMENTS);
+      at(15 - 15 * Math.cos(t), 40 - 15 * Math.sin(t), Math.cos(t), Math.sin(t));
+    }
+    at(15, 25, 1, 0); at(15, 20, 1, 0);          // the top layer's front, down to the joint
+    at(15, 20, 0, 1); at(17, 20, 0, 1);          // the strip's top: the 2 mm ledge
+    at(17, 20, 1, 0); at(17, 18, 1, 0);          // its 2 mm step down
+    // The round-over: centre (17, 6), from the step to the strip's front; smooth into it.
+    for (let i = 0; i <= FIGURED_ARC_SEGMENTS; i++) {
+      const t = (Math.PI / 2) * (i / FIGURED_ARC_SEGMENTS);
+      at(17 + 12 * Math.sin(t), 6 + 12 * Math.cos(t), Math.sin(t), Math.cos(t));
+    }
+    at(29, 0, 1, 0);                             // the strip's front, down to the underside
+    return { points: pts, sTop: pts[0].s, sBottom: 0, topSize: (FIGURED_H_MM - 6) * k, bottomSize: 0 };
+  }
+
+  // A hole (a sink, a tap) is cut with the plain arris whatever the edge: the figured profile is the
+  // front's, not a cut-out's (the integrated sink's bowl follows the same rule, three-scene.js).
+  function holeEdge(edge) {
+    return edge === 'figured' ? null : edge;
+  }
+
   // The cross-section of an edge from the top rim down to the bottom rim:
   // points { s, y, o, u }. sTop/sBottom: how far the rims sit inside the
   // outline; size(Top|Bottom): how far down/up the treatment reaches.
   function profile(edge, y0, y1) {
+    if (edge === 'figured' && y1 - y0 >= 0.015) return figuredProfile(y0, y1);
     const c = cornersFor(edge, y1 - y0);
     const top = corner(c.top[0], c.top[1], c.top[2]);
     const bottom = corner(c.bottom[0], c.bottom[1], c.bottom[2]);
@@ -170,14 +204,15 @@
     const { y0, y1 } = part;
     const closed = new Set(part.closed || []);
     const prof = profile(part.edge, y0, y1);
-    const levels = prof.points;
+    const holeProf = profile(holeEdge(part.edge), y0, y1);
     const out = createSink();
     const up = [0, 1, 0], down = [0, -1, 0];
 
-    const loops = [{ pts: part.outline, hole: false, closedAt: i => closed.has(i) }];
-    (part.holes || []).forEach(h => loops.push({ pts: holeLoop(h), hole: true, closedAt: () => false }));
+    const loops = [{ pts: part.outline, hole: false, closedAt: i => closed.has(i), prof }];
+    (part.holes || []).forEach(h => loops.push({ pts: holeLoop(h), hole: true, closedAt: () => false, prof: holeProf }));
 
     const rims = loops.map(loop => {
+      const levels = loop.prof.points;
       const edges = edgesOf(loop.pts, loop.hole);
       edges.forEach((e, i) => { e.open = !loop.closedAt(i); });
       const n = edges.length;
@@ -242,13 +277,19 @@
           }
         } else {
           // A straight cut: one flat face, its ends shaped by the profiles
-          // that run into it. Convex, so a fan from its centre covers it.
+          // that run into it -- not convex where a profile is (the figured
+          // edge's cove and step), so it is triangulated in its own plane.
           const h = outward(e), nrm = normal3(h, 1, 0);
           const startSide = levels.map(L => [cornerPoints(e, a, L.s, true)[0], L.y]);
           const endSide = levels.map(L => [cornerPoints(e, b, L.s, false)[0], L.y]).reverse();
-          const poly = startSide.concat(endSide).map(([q, y]) => [q[0], y, q[1]]);
-          const c = poly.reduce((acc, v) => [acc[0] + v[0] / poly.length, acc[1] + v[1] / poly.length, acc[2] + v[2] / poly.length], [0, 0, 0]);
-          poly.forEach((v, k) => out.tri(c, v, poly[(k + 1) % poly.length], nrm, nrm, nrm));
+          const poly = [];
+          startSide.concat(endSide).map(([q, y]) => [q[0], y, q[1]]).forEach(v => {
+            const last = poly[poly.length - 1];
+            if (!last || Math.hypot(v[0] - last[0], v[1] - last[1], v[2] - last[2]) > 1e-12) poly.push(v);
+          });
+          if (poly.length > 1 && Math.hypot(poly[0][0] - poly[poly.length - 1][0], poly[0][1] - poly[poly.length - 1][1], poly[0][2] - poly[poly.length - 1][2]) <= 1e-12) poly.pop();
+          const flat = poly.map(v => ({ x: (v[0] - e.p[0]) * e.dir[0] + (v[2] - e.p[1]) * e.dir[1], y: v[1] }));
+          options.triangulate(flat, []).forEach(([i, j, k]) => out.tri(poly[i], poly[j], poly[k], nrm, nrm, nrm));
         }
       });
 
@@ -265,7 +306,7 @@
         });
         return pts;
       };
-      return { top: rim(() => prof.sTop), bottom: rim(() => prof.sBottom) };
+      return { top: rim(() => loop.prof.sTop), bottom: rim(() => loop.prof.sBottom) };
     });
 
     // Top and bottom faces.
@@ -297,5 +338,5 @@
     return pts;
   }
 
-  return { profile, buildSolid, holeLoop, signedArea };
+  return { profile, holeEdge, buildSolid, holeLoop, signedArea };
 });

@@ -18,7 +18,7 @@
     VISUAL_LAYOUT_MODULE_M, VISUAL_LARGE_FORMAT_MODULE_M, VISUAL_STAIR_TREAD_DEPTH_M, VISUAL_STAIR_RISE_M,
   } = isNode ? require('./constants.js') : globalRoot.VisualizerConstants;
   const { resolveCutouts, resolveHoles } = isNode ? require('./cutout-geometry.js') : globalRoot.CutoutGeometry;
-  const { resolveBacksplash, resolveCurb, resolveWallPanel, resolveIsland, resolveBarCounter } = isNode ? require('./attachment-geometry.js') : globalRoot.AttachmentGeometry;
+  const { resolveBacksplash, resolveCurb, resolveWallPanel, resolveWingExtras, resolveIsland, resolveBarCounter } = isNode ? require('./attachment-geometry.js') : globalRoot.AttachmentGeometry;
   const FacadeModel = isNode ? require('../facade-model.js') : globalRoot.FacadeModel;
 
   // Остров/барная стойка each have two UI variants (rectangular/figured,
@@ -603,6 +603,7 @@
       backsplash: resolveBacksplash(state.backsplash),
       curb: resolveCurb(state.curbLengthM),
       wallPanel: resolveWallPanel(state.wallPanel),
+      wingExtras: resolveWingExtras(state.wingExtras, wings),
       // Island faces the main segment's own LENGTH run, offset along WIDTH
       // -- see attachment-geometry.js. Bar counter extends past one
       // LENGTH-end instead, so the two can never occupy the same space.

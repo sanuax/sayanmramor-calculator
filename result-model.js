@@ -90,11 +90,18 @@
         if (n > 0) works.push({ key: 'hole.' + t, label: 'Отверстие под ' + HOLE_LABELS[t], quantity: n, unit: 'шт.' });
       });
     }
+    // A wing's own element is named by the wing it stands on: «Левое крыло» / «Правое крыло» on a П,
+    // plain «крыло» on a Г.
+    const wingExtras = state.wingExtras || { backsplash: [], wallPanel: [], curb: [] };
+    const wingName = w => (state.shape === 'ushape' ? (w.side === 'right' ? 'правое крыло' : 'левое крыло') : 'крыло');
     if (caps.curb && state.curbLengthM > 0) {
       works.push({ key: 'curb', label: 'Бортик', quantity: null, unit: null, lengthMm: mToMm(state.curbLengthM) });
     }
+    if (caps.curb) wingExtras.curb.forEach(w => works.push({ key: 'curb.wing' + w.slot, label: 'Бортик - ' + wingName(w), quantity: null, unit: null, lengthMm: mToMm(w.lengthM) }));
     if (caps.backsplash && hasArea(state.backsplash)) works.push(areaWork('backsplash', 'Фартук', state.backsplash));
+    if (caps.backsplash) wingExtras.backsplash.forEach(w => works.push(areaWork('backsplash.wing' + w.slot, 'Фартук - ' + wingName(w), w)));
     if (caps.wallPanel && hasArea(state.wallPanel)) works.push(areaWork('wallPanel', 'Стеновая панель', state.wallPanel));
+    if (caps.wallPanel) wingExtras.wallPanel.forEach(w => works.push(areaWork('wallPanel.wing' + w.slot, 'Стеновая панель - ' + wingName(w), w)));
     if (caps.island) {
       if (hasArea(state.island.standard)) works.push(areaWork('island.standard', 'Остров - прямоугольный', state.island.standard));
       if (hasArea(state.island.figured)) works.push(areaWork('island.figured', 'Остров - фигурный', state.island.figured));

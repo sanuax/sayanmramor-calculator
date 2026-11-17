@@ -8,7 +8,8 @@
 //   - a part with `openEdges` (a tread, a landing): those outline edges --
 //     or `openLengthM` where only part of such an edge is open (a П landing,
 //     where the upper march starts on its front);
-//   - a part with `closed` (a countertop's main run and wings, every sill,
+//   - a part with `closed` (a countertop's main run and wings -- their front
+//     only, the ends are straight cuts (the owner, 2026-11-17) --, every sill,
 //     a bar counter whose ends have no edge): every outline edge not listed
 //     in `closed`;
 //   - an island: its whole outline;

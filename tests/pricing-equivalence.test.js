@@ -89,8 +89,8 @@ const stone = {
 const SCENARIOS = [
   {
     name: 'kitchen countertop, a bevel edge + sink + cooktop + curb + backsplash, all options on',
-    // 2000 deep x 600 along the wall: front 0.6 + two ends 2.0.
-    productKey: 'stoleshnitsa_kuhnya', typeId: 'KITCHEN-11', edgeLengthM: 4.6,
+    // 2000 deep x 600 along the wall: the front only, 0.6 (its ends are straight cuts, the owner, 2026-11-17).
+    productKey: 'stoleshnitsa_kuhnya', typeId: 'KITCHEN-11', edgeLengthM: 0.6,
     values: {
       width: { value: '2000' }, length: { value: '600' },
       'edge-type': { value: 'bevel' },

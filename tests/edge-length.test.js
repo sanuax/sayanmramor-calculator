@@ -29,42 +29,44 @@ const near = (actual, expected, msg) => assert.ok(Math.abs(actual - expected) < 
 const kitchen = extra => Object.assign({ width: v(600), length: v(3000), 'edge-type': v('straight') }, extra || {});
 const kitchenL = extra => kitchen(Object.assign({ productShape: v('lshape'), 'wing-width': v(600), 'wing-length': v(1500) }, extra || {}));
 
-test('straight countertop against the wall: front edge and both ends', () => {
-  near(lengthOf('stoleshnitsa_kuhnya', kitchen()), 4.2);   // 3.0 + 0.6 + 0.6
-  near(lengthOf('stoleshnitsa_vannaya', kitchen()), 4.2);
+// A countertop has its edge on the front only -- its long side not at the wall; its ends are straight
+// cuts (the owner, 2026-11-17).
+test('straight countertop against the wall: the front edge only, not the ends', () => {
+  near(lengthOf('stoleshnitsa_kuhnya', kitchen()), 3.0);
+  near(lengthOf('stoleshnitsa_vannaya', kitchen()), 3.0);
 });
 
 test('L countertop: no edge along the walls or at the joint', () => {
-  // Main: front 2.4 (the 0.6 where the wing joins is a joint) + its free end 0.6;
-  // its other end is against the wing's wall. Wing: its long open side 1.5 + its far end 0.6.
-  near(lengthOf('stoleshnitsa_kuhnya', kitchenL()), 5.1);
-  near(lengthOf('stoleshnitsa_kuhnya', kitchenL({ 'shape-corner': v('right') })), 5.1);
+  // Main: its front 2.4 (the 0.6 where the wing joins is a joint); its ends are straight cuts.
+  // Wing: its front 1.5 (the side facing the kitchen); its far end is a straight cut.
+  near(lengthOf('stoleshnitsa_kuhnya', kitchenL()), 3.9);
+  near(lengthOf('stoleshnitsa_kuhnya', kitchenL({ 'shape-corner': v('right') })), 3.9);
 });
 
-test('U countertop: the main run\'s front between the wings + each wing\'s open side and far end', () => {
-  near(lengthOf('stoleshnitsa_kuhnya', kitchenL({ productShape: v('ushape') })), 6.0);   // 1.8 + 2 x (1.5 + 0.6)
+test('U countertop: the main run\'s front between the wings + each wing\'s front', () => {
+  near(lengthOf('stoleshnitsa_kuhnya', kitchenL({ productShape: v('ushape') })), 4.8);   // 1.8 + 2 x 1.5
 });
 
 test('an L countertop whose wing has no size yet is priced as the straight run', () => {
-  near(lengthOf('stoleshnitsa_kuhnya', kitchen({ productShape: v('lshape') })), 4.2);
-  near(lengthOf('stoleshnitsa_kuhnya', kitchen({ productShape: v('lshape'), 'wing-width': v(0), 'wing-length': v(1500) })), 4.2);
+  near(lengthOf('stoleshnitsa_kuhnya', kitchen({ productShape: v('lshape') })), 3.0);
+  near(lengthOf('stoleshnitsa_kuhnya', kitchen({ productShape: v('lshape'), 'wing-width': v(0), 'wing-length': v(1500) })), 3.0);
 });
 
 test('a sink or tap hole is not an edge', () => {
-  near(lengthOf('stoleshnitsa_kuhnya', kitchen({ 'cut-sink-undermount': v(1), 'hole-mixer': v(1) })), 4.2);
-  near(lengthOf('stoleshnitsa_kuhnya', kitchen({ 'cut-sink-integrated': v(1) })), 4.2);
+  near(lengthOf('stoleshnitsa_kuhnya', kitchen({ 'cut-sink-undermount': v(1), 'hole-mixer': v(1) })), 3.0);
+  near(lengthOf('stoleshnitsa_kuhnya', kitchen({ 'cut-sink-integrated': v(1) })), 3.0);
 });
 
 test('island: full perimeter', () => {
-  near(lengthOf('stoleshnitsa_kuhnya', kitchen({ 'extra-ostrov-width': v(800), 'extra-ostrov-length': v(1200) })), 4.2 + 4.0);
+  near(lengthOf('stoleshnitsa_kuhnya', kitchen({ 'extra-ostrov-width': v(800), 'extra-ostrov-length': v(1200) })), 3.0 + 4.0);
   // Фигурный: the rounded outline, segment by segment.
-  near(lengthOf('stoleshnitsa_kuhnya', kitchen({ 'extra-ostrov-figured-width': v(800), 'extra-ostrov-figured-length': v(1200) })), 4.2 + 3.582);
+  near(lengthOf('stoleshnitsa_kuhnya', kitchen({ 'extra-ostrov-figured-width': v(800), 'extra-ostrov-figured-length': v(1200) })), 3.0 + 3.582);
 });
 
 test('bar counter: its two long sides, no edge on its ends (the owner, 2026-11-11)', () => {
-  near(lengthOf('stoleshnitsa_kuhnya', kitchen({ 'extra-bar-standard-width': v(500), 'extra-bar-standard-length': v(1500) })), 4.2 + 3.0);
+  near(lengthOf('stoleshnitsa_kuhnya', kitchen({ 'extra-bar-standard-width': v(500), 'extra-bar-standard-length': v(1500) })), 3.0 + 3.0);
   // «Сложная»: the half-round end is an end too -- the long sides stop where the round starts (1.5 - 0.25).
-  near(lengthOf('stoleshnitsa_kuhnya', kitchen({ 'extra-bar-complex-width': v(500), 'extra-bar-complex-length': v(1500) })), 4.2 + 2.5);
+  near(lengthOf('stoleshnitsa_kuhnya', kitchen({ 'extra-bar-complex-width': v(500), 'extra-bar-complex-length': v(1500) })), 3.0 + 2.5);
 });
 
 test('the 3D draws the profile where the price counts it: bar ends and straight sill ends are closed', () => {
@@ -82,8 +84,8 @@ test('the 3D draws the profile where the price counts it: bar ends and straight 
 });
 
 test('stone wrap: the same open edges as any other profile; the apron strips are not counted again', () => {
-  near(lengthOf('stoleshnitsa_kuhnya', kitchen({ 'edge-type': v('stone-wrap') })), 4.2);
-  near(lengthOf('stoleshnitsa_kuhnya', kitchenL({ 'edge-type': v('stone-wrap') })), 5.1);
+  near(lengthOf('stoleshnitsa_kuhnya', kitchen({ 'edge-type': v('stone-wrap') })), 3.0);
+  near(lengthOf('stoleshnitsa_kuhnya', kitchenL({ 'edge-type': v('stone-wrap') })), 3.9);
 });
 
 test('sill: only the room side', () => {

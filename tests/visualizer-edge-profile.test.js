@@ -164,3 +164,32 @@ test('a gently turning outline is one smooth surface; a square corner stays cris
     assert.ok(nx < 1e-6 || nz < 1e-6, 'square corner normal ' + nx + ', ' + nz);
   }
 });
+
+// «Фигурная» by the owner's drawing (2026-11-17): «L(30)+НК(20) h40, подклейка "сандвич"».
+test('figured: a cove R15 from the top, a 2 mm ledge and step, a round-over R12 -- 29 mm in all, on 40 mm', () => {
+  const prof = EdgeProfile.profile('figured', 0, 0.04);
+  const mm = v => Math.round(v * 1e4) / 10;
+  const pts = prof.points.map(p => [mm(p.s), mm(p.y)]);
+  assert.deepEqual(pts[0], [29, 40], 'the cove starts 29 mm in from the front, on the top');
+  assert.deepEqual(pts[pts.length - 1], [0, 0], 'the strip\'s front is the outline, down to the underside');
+  ['14,25', '14,20', '12,20', '12,18', '0,6'].forEach(p => assert.ok(pts.some(q => q.join(',') === p), p));
+  // On the cove, every point is 15 mm from its centre (s 14, y 40); on the round-over 12 mm from (s 12, y 6).
+  prof.points.slice(0, 9).forEach(p => assert.ok(Math.abs(Math.hypot(p.s - 0.014, p.y - 0.04) - 0.015) < 1e-9));
+  prof.points.slice(15, 24).forEach(p => assert.ok(Math.abs(Math.hypot(p.s - 0.012, p.y - 0.006) - 0.012) < 1e-9));
+  // A thinner slab: the same drawing, scaled.
+  assert.ok(Math.abs(EdgeProfile.profile('figured', 0, 0.03).sTop - 0.029 * 0.75) < 1e-12);
+});
+
+test('figured: a sink or tap hole keeps the plain arris, the front gets the profile', () => {
+  assert.equal(EdgeProfile.holeEdge('figured'), null);
+  assert.equal(EdgeProfile.holeEdge('rounding'), 'rounding');
+  const hole = { rect: { x: 0, z: 0, w: 0.4, l: 0.5 } };
+  const mesh = solid(Object.assign({}, base, { edge: 'figured', closed: [0, 2, 3], holes: [hole] }));
+  let topMinAroundHole = Infinity;
+  for (let i = 0; i < mesh.positions.length; i += 3) {
+    const [x, y, z] = [mesh.positions[i], mesh.positions[i + 1], mesh.positions[i + 2]];
+    if (Math.abs(y - T / 2) < 1e-9 && Math.abs(z) < 0.3 && Math.abs(x) < 0.25) topMinAroundHole = Math.min(topMinAroundHole, Math.abs(x));
+  }
+  assert.ok(Math.abs(topMinAroundHole - (0.2 + 0.0015)) < 1e-6, 'the hole\'s top rim: its own arris, ' + topMinAroundHole);
+  closedVolume(mesh);
+});

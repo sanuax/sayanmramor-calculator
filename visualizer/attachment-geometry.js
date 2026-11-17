@@ -60,6 +60,29 @@
     };
   }
 
+  // The wings' own фартук, стеновая панель and бортик (ConstructorState.wingExtras): each stands along the
+  // wall side of the wing it is for -- the wing's outer edge, which continues the main run's end -- so it
+  // runs from the main run's wall out to the wing's end: its natural length is the depth plus the wing's
+  // length. Only for a side that has a wing in the model (a wing is real once both its sizes are entered).
+  function resolveWingExtras(wingExtras, wings) {
+    const out = { backsplash: [], wallPanel: [], curb: [] };
+    if (!wingExtras) return out;
+    const wingAt = side => (wings || []).find(w => w.corner === side);
+    ['backsplash', 'wallPanel'].forEach(kind => {
+      (wingExtras[kind] || []).forEach(e => {
+        const wing = wingAt(e.side);
+        if (!wing || !(e.widthM > 0) || !(e.lengthM > 0)) return;
+        out[kind].push({ corner: e.side, slot: e.slot, heightM: e.widthM, lengthM: e.lengthM, wingLengthM: wing.lengthM, edge: 'back', source: 'real' });
+      });
+    });
+    (wingExtras.curb || []).forEach(e => {
+      const wing = wingAt(e.side);
+      if (!wing || !(e.lengthM > 0)) return;
+      out.curb.push({ corner: e.side, slot: e.slot, lengthM: e.lengthM, wingLengthM: wing.lengthM, heightM: VISUAL_FALLBACK_CURB_HEIGHT_M, edge: 'back', source: 'fallback-height' });
+    });
+    return out;
+  }
+
   // offsetXM/offsetZM are the island's own center, in the SAME local frame as
   // the main segment's center (0,0) -- directly usable as a mesh position,
   // not a distance-from-an-edge that still needs half-length math downstream.
@@ -168,5 +191,5 @@
     };
   }
 
-  return { resolveBacksplash, resolveCurb, resolveWallPanel, resolveIsland, resolveBarCounter };
+  return { resolveBacksplash, resolveCurb, resolveWallPanel, resolveWingExtras, resolveIsland, resolveBarCounter };
 });

@@ -172,8 +172,9 @@
       const mid = (z + roomSide[k + 1]) / 2;
       if (wingSpans.some(([a, b]) => mid > a && mid < b)) mainClosed.push(k + 1);
     });
-    if (wingSpans.some(([, b]) => b >= L / 2 - 1e-9)) mainClosed.push(roomSide.length);   // the +Z end
-    if (wingSpans.some(([a]) => a <= -L / 2 + 1e-9)) mainClosed.push(0);                // the -Z end
+    // The ends of the run are straight cuts too: a countertop has its edge on the front only -- its long
+    // side that is not at the wall (the owner, 2026-11-17); the price measures the same open edges.
+    mainClosed.push(0, roomSide.length);
     // A cut is made in the segment it stands on: the main run's, or a wing's (a sink or a faucet the
     // placement put on a wing, cutout-geometry.js).
     const centreOf = h => h.rect || h.circle;
@@ -200,8 +201,9 @@
     wings.forEach(({ lengthM: wl }, i) => {
       const [z0, z1] = wingSpans[i];
       // rect's edges: 0 along z0, 1 the far end, 2 along z1, 3 the joint. The
-      // wing's wall side is its outer one, in line with the main run's end.
-      parts.push(prism('stone', rect(W / 2, W / 2 + wl, z0, z1), bottom, top, { holes: holesOnWing([z0, z1]), edge: wingEdge, closed: [z1 > 0 ? 2 : 0, 3], name: 'wing' }));
+      // wing's wall side is its outer one, in line with the main run's end; its
+      // edge is on its front only (the side facing the kitchen), not its far end.
+      parts.push(prism('stone', rect(W / 2, W / 2 + wl, z0, z1), bottom, top, { holes: holesOnWing([z0, z1]), edge: wingEdge, closed: [z1 > 0 ? 2 : 0, 1, 3], name: 'wing' }));
       if (edge === 'stone-wrap') {
         // The wing's front edge: its long side facing the kitchen (the +Z
         // wing faces -Z, the -Z one +Z), out to its end; from the main run's
@@ -281,6 +283,31 @@
       // On the countertop, along the wall edge.
       const h = m.curb.heightM;
       parts.push(Object.assign(box('stone', [wallX + h / 2, top + h / 2, 0], [h, h, alongWall(m.curb.lengthM)]), { name: 'curb' }));
+    }
+
+    // The wings' own фартук, стеновая панель and бортик, along each wing's wall side (z = +L/2 for the
+    // 'left' wing, -L/2 for the 'right' one), from the main run's wall out to the wing's end -- the same
+    // stacking as on the main run: the backsplash against the wall's face, the panel behind it.
+    const we = m.wingExtras;
+    if (we) {
+      const wingWall = corner => (corner === 'left' ? L / 2 : -L / 2);
+      const outward = corner => (corner === 'left' ? 1 : -1);
+      const along = (len, wingLen) => Math.min(len, W + wingLen);
+      const hasBacksplashOn = corner => we.backsplash.some(b => b.corner === corner);
+      const nameOf = (base, corner) => base + '-wing-' + corner;
+      we.backsplash.forEach(b => {
+        const len = along(b.lengthM, b.wingLengthM);
+        parts.push(Object.assign(box('stone', [-W / 2 + len / 2, top + b.heightM / 2, wingWall(b.corner) + outward(b.corner) * 0.01], [len, b.heightM, 0.02]), { name: nameOf('backsplash', b.corner) }));
+      });
+      we.wallPanel.forEach(p => {
+        const len = along(p.lengthM, p.wingLengthM);
+        const z = wingWall(p.corner) + outward(p.corner) * ((hasBacksplashOn(p.corner) ? 0.02 : 0) + 0.01);
+        parts.push(Object.assign(box('stone', [-W / 2 + len / 2, top + p.heightM / 2, z], [len, p.heightM, 0.02]), { name: nameOf('wall-panel', p.corner) }));
+      });
+      we.curb.forEach(c => {
+        const len = along(c.lengthM, c.wingLengthM), h = c.heightM;
+        parts.push(Object.assign(box('stone', [-W / 2 + len / 2, top + h / 2, wingWall(c.corner) - outward(c.corner) * h / 2], [len, h, h]), { name: nameOf('curb', c.corner) }));
+      });
     }
 
     if (m.island) {
@@ -411,7 +438,7 @@
     const parts = plan
       ? [prism('stone', plan.outline, -m.visualThicknessM / 2, m.visualThicknessM / 2, { edge: m.edge ? m.edge.type : null, closed: sillClosed(plan, m.widthM, m.lengthM), name: 'main' })]
         .concat(wrapped ? sillWrap(plan, m.widthM, m.lengthM, m.visualThicknessM) : [])
-      : countertopParts(Object.assign({}, m, { sink: null, cooktop: null, holes: null, backsplash: null, wallPanel: null, curb: null, island: null, barCounter: null, wing: null, wings: null }));
+      : countertopParts(Object.assign({}, m, { sink: null, cooktop: null, holes: null, backsplash: null, wallPanel: null, curb: null, wingExtras: null, island: null, barCounter: null, wing: null, wings: null }));
     // A straight sill is drawn as the countertop's slab, with the shaped
     // sills' rule all the same: the profile only on the room (front) side,
     // never on the ends at the reveals (the owner, 2026-11-11: «кромка
