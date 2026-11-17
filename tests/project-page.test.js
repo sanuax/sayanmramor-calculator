@@ -59,3 +59,37 @@ test('the passport\'s titles name each product of the project in the singular', 
   assert.equal(PassportModel.PASSPORT_TITLES.stoleshnitsa_kuhnya, 'Столешница на кухню');
   assert.equal(PassportModel.PASSPORT_TITLES.podokonnik, 'Подоконник');
 });
+
+// ---- one total, one Result, one request, one link (the owner, 2026-11-17) ----
+
+test('a project link (pv=2) opens the whole project; a one-product passport link (pv=1) as before', () => {
+  assert.match(html, /const projectLink = ProjectModel\.readProjectQuery\(bootstrapParams, /);
+  assert.match(html, /const passportLink = projectLink \? null : PassportLink\.readPassportQuery\(/);
+  assert.match(html, /if \(projectLink\) \{/);
+});
+
+test('the project\'s price is one: ProjectPricing over every product', () => {
+  assert.match(fn('priceProjectNow'), /ProjectPricing\.priceProject\(/);
+  assert.match(fn('renderProjectPricing'), /Стоимость проекта/);
+});
+
+test('«Получить расчёт» of a project: one card for the whole project, its own link', () => {
+  const piece = fn('projectPiece');
+  assert.match(piece, /'Проект: '/);
+  assert.match(piece, /ProjectModel\.buildProjectQuery\(project\)/);
+  assert.match(fn('sendToRequest'), /projectPiece\(\)/);
+  assert.match(fn('currentShareQuery'), /ProjectModel\.buildProjectQuery\(project\)/);
+});
+
+test('the Result of a project lists its products, each with its price and a way back to it', () => {
+  assert.equal((html.match(/id="resultProject"/g) || []).length, 1);
+  const render = fn('renderResultProject');
+  assert.match(render, /switchToItem\(/);
+  assert.match(render, /Изделия проекта|resultProject/);
+});
+
+test('the Result has its own «+ Добавить изделие»; the panel of a project is «Ваш проект»', () => {
+  assert.equal((html.match(/id="resultAddBtn"/g) || []).length, 1);
+  assert.match(html, /resultAddBtn'\)\.addEventListener\('click', addProjectItem\)/);
+  assert.match(fn('renderProjectPricing'), /'Ваш проект'/);
+});
