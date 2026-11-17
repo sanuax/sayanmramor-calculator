@@ -33,10 +33,10 @@
   const VISUAL_FALLBACK_HOLE_EDGE_MARGIN_M = 0.02;
   // Minimum stone left in front of a cutout (room-side edge).
   const VISUAL_FALLBACK_CUTOUT_FRONT_MARGIN_M = 0.03;
-  // Minimum stone between a sink's cut and ANY corner of the countertop outline -- the outer corners and the
-  // inner (re-entrant) ones of an L, U or G -- so a sink never stands on a corner or straddles it, where the
-  // stone is weakest (the owner, 2026-11-17). The one place this distance is set.
-  const SINK_CORNER_MARGIN_M = 0.15;
+  // Minimum stone between a sink's or a cooktop's cut and ANY corner of the countertop outline -- the outer
+  // corners and the inner (re-entrant) ones of an L, U or G -- so a cut never stands on a corner or straddles
+  // it, where the stone is weakest (the owner, 2026-11-17). The one place this distance is set.
+  const CUTOUT_CORNER_MARGIN_M = 0.15;
 
   // Attachment sizes/placement with no real input: curb has only a real
   // length (no height/cross-section anywhere); island/bar counter have no
@@ -83,7 +83,7 @@
     VISUAL_FALLBACK_THICKNESS_M, CAMERA_PRESETS,
     VISUAL_FALLBACK_FAUCET_GAP_M, VISUAL_FALLBACK_DISPENSER_OFFSET_M, VISUAL_FALLBACK_HOLE_EDGE_MARGIN_M,
     VISUAL_FALLBACK_SINK_CUTOUT_SIZE_M, VISUAL_FALLBACK_COOKTOP_CUTOUT_SIZE_M, VISUAL_FALLBACK_HOLE_RADIUS_M,
-    VISUAL_FALLBACK_CUTOUT_GAP_M, VISUAL_FALLBACK_CUTOUT_FRONT_MARGIN_M, SINK_CORNER_MARGIN_M,
+    VISUAL_FALLBACK_CUTOUT_GAP_M, VISUAL_FALLBACK_CUTOUT_FRONT_MARGIN_M, CUTOUT_CORNER_MARGIN_M,
     VISUAL_FALLBACK_CURB_HEIGHT_M, VISUAL_FALLBACK_ISLAND_GAP_M, VISUAL_FALLBACK_BAR_COUNTER_RAISE_M,
     VISUAL_FALLBACK_FLOOR_THICKNESS_M,
     VISUAL_STAIR_RISE_M, VISUAL_STAIR_TREAD_DEPTH_M, VISUAL_RISER_THICKNESS_M,

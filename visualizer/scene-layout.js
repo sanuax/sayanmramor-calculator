@@ -174,7 +174,12 @@
     });
     if (wingSpans.some(([, b]) => b >= L / 2 - 1e-9)) mainClosed.push(roomSide.length);   // the +Z end
     if (wingSpans.some(([a]) => a <= -L / 2 + 1e-9)) mainClosed.push(0);                // the -Z end
-    parts.push(prism('stone', mainOutline, bottom, top, { holes, edge, closed: mainClosed.sort((a, b) => a - b), name: 'main' }));
+    // A cut is made in the segment it stands on: the main run's, or a wing's (a sink or a faucet the
+    // placement put on a wing, cutout-geometry.js).
+    const centreOf = h => h.rect || h.circle;
+    const holesOnMain = holes.filter(h => centreOf(h).x <= W / 2 + 1e-9);
+    const holesOnWing = ([z0, z1]) => holes.filter(h => centreOf(h).x > W / 2 + 1e-9 && centreOf(h).z >= z0 - 1e-9 && centreOf(h).z <= z1 + 1e-9);
+    parts.push(prism('stone', mainOutline, bottom, top, { holes: holesOnMain, edge, closed: mainClosed.sort((a, b) => a - b), name: 'main' }));
 
     if (edge === 'stone-wrap') {
       // "Подгиб камнем" belongs to the main run only: a stone apron under its
@@ -196,7 +201,7 @@
       const [z0, z1] = wingSpans[i];
       // rect's edges: 0 along z0, 1 the far end, 2 along z1, 3 the joint. The
       // wing's wall side is its outer one, in line with the main run's end.
-      parts.push(prism('stone', rect(W / 2, W / 2 + wl, z0, z1), bottom, top, { edge: wingEdge, closed: [z1 > 0 ? 2 : 0, 3], name: 'wing' }));
+      parts.push(prism('stone', rect(W / 2, W / 2 + wl, z0, z1), bottom, top, { holes: holesOnWing([z0, z1]), edge: wingEdge, closed: [z1 > 0 ? 2 : 0, 3], name: 'wing' }));
       if (edge === 'stone-wrap') {
         // The wing's front edge: its long side facing the kitchen (the +Z
         // wing faces -Z, the -Z one +Z), out to its end; from the main run's

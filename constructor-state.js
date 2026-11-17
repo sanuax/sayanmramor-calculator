@@ -334,12 +334,12 @@
   const NO_RATES = { fabricationRatePerM2: null, installationRatePerM2: null, polishRatePerM2: null };
 
   // The integrated sink is priced per metre of its cut along the countertop
-  // (CUT-03, м.п.): the length the 3D draws (GeometryModel sink.cut.lengthM).
+  // (CUT-03, м.п.): the length the 3D draws (GeometryModel sink.cut.alongM: along its own segment, a sink on a wing is turned).
   // No length -- null (the manager prices it), never 1 m.
   function integratedSinkCutLengthM(state) {
     try {
       const model = Geometry().buildGeometryModel(state);
-      const len = model && model.sink && model.sink.cut ? model.sink.cut.lengthM : null;
+      const len = model && model.sink && model.sink.cut ? model.sink.cut.alongM : null;
       return isRate(len) && len > 0 ? len : null;
     } catch (e) {
       return null;
