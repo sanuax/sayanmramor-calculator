@@ -44,6 +44,12 @@
   // same proportions, never below CUTOUT_MIN_SCALE of the full size.
   const VISUAL_FALLBACK_COOKTOP_DEPTH_SLACK_M = 0.11;
   const CUTOUT_MIN_SCALE = 0.5;
+  // When a run is too short for a sink and a hob (the owner, 2026-11-17: they overlapped), first a compact
+  // two-zone hob (the usual 30 x 52 cm, burners side by side along the run), then the sink a little smaller
+  // (CUTOUT_SQUEEZE_SCALE of its size), then a tighter gap between them and no corner margin for the hob.
+  const VISUAL_FALLBACK_COMPACT_COOKTOP_CUTOUT_SIZE_M = { widthM: 0.29, lengthM: 0.52 };
+  const CUTOUT_SQUEEZE_SCALE = 0.75;
+  const CUTOUT_TIGHT_GAP_M = 0.05;
 
   // Attachment sizes/placement with no real input: curb has only a real
   // length (no height/cross-section anywhere); island/bar counter have no
@@ -92,6 +98,7 @@
     VISUAL_FALLBACK_SINK_CUTOUT_SIZE_M, VISUAL_FALLBACK_COOKTOP_CUTOUT_SIZE_M, VISUAL_FALLBACK_HOLE_RADIUS_M,
     VISUAL_FALLBACK_CUTOUT_GAP_M, VISUAL_FALLBACK_CUTOUT_FRONT_MARGIN_M, CUTOUT_CORNER_MARGIN_M,
     VISUAL_FALLBACK_COOKTOP_DEPTH_SLACK_M, CUTOUT_MIN_SCALE,
+    VISUAL_FALLBACK_COMPACT_COOKTOP_CUTOUT_SIZE_M, CUTOUT_SQUEEZE_SCALE, CUTOUT_TIGHT_GAP_M,
     VISUAL_FALLBACK_CURB_HEIGHT_M, VISUAL_FALLBACK_ISLAND_GAP_M, VISUAL_FALLBACK_BAR_COUNTER_RAISE_M,
     VISUAL_FALLBACK_FLOOR_THICKNESS_M,
     VISUAL_STAIR_RISE_M, VISUAL_STAIR_TREAD_DEPTH_M, VISUAL_RISER_THICKNESS_M,

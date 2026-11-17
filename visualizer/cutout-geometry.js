@@ -26,6 +26,7 @@
     VISUAL_FALLBACK_FAUCET_GAP_M, VISUAL_FALLBACK_DISPENSER_OFFSET_M, VISUAL_FALLBACK_HOLE_EDGE_MARGIN_M,
     VISUAL_FALLBACK_CUTOUT_GAP_M, VISUAL_FALLBACK_CUTOUT_FRONT_MARGIN_M, CUTOUT_CORNER_MARGIN_M,
     VISUAL_FALLBACK_COOKTOP_DEPTH_SLACK_M, CUTOUT_MIN_SCALE,
+    VISUAL_FALLBACK_COMPACT_COOKTOP_CUTOUT_SIZE_M, CUTOUT_SQUEEZE_SCALE, CUTOUT_TIGHT_GAP_M,
   } = (typeof module !== 'undefined' && module.exports) ? require('./constants.js') : globalRoot.VisualizerConstants;
 
   const R = VISUAL_FALLBACK_HOLE_RADIUS_M;
@@ -51,17 +52,26 @@
 
   // A cut's size for a segment of this depth: the full size, or -- when the depth leaves less than the
   // slack around it -- scaled down (width and length alike) to what fits, never below CUTOUT_MIN_SCALE.
-  // nominalLengthM is the full length: what an integrated sink is priced by, the drawing aside.
+  // `shrink` squeezes it further (never below the minimum scale either). nominalLengthM is the full
+  // length: what an integrated sink is priced by, the drawing aside.
   const SINK_DEPTH_SLACK_M = VISUAL_FALLBACK_CUTOUT_FRONT_MARGIN_M + FAUCET_CLEARANCE_M;
-  function fitSize(base, depthM, slackM) {
-    const k = clamp((depthM - slackM) / base.widthM, CUTOUT_MIN_SCALE, 1);
+  function fitSize(base, depthM, slackM, shrink) {
+    const k = Math.max(CUTOUT_MIN_SCALE, clamp((depthM - slackM) / base.widthM, CUTOUT_MIN_SCALE, 1) * (shrink || 1));
     return { widthM: base.widthM * k, lengthM: base.lengthM * k, nominalLengthM: base.lengthM };
   }
-  const fitSink = depthM => fitSize(VISUAL_FALLBACK_SINK_CUTOUT_SIZE_M, depthM, SINK_DEPTH_SLACK_M);
-  const fitCooktop = depthM => fitSize(VISUAL_FALLBACK_COOKTOP_CUTOUT_SIZE_M, depthM, VISUAL_FALLBACK_COOKTOP_DEPTH_SLACK_M);
+  // The sizes of one try: the sink (maybe squeezed) and the hob (a standard four-zone one, or the compact
+  // two-zone one) for a segment of any depth.
+  function sizing(o) {
+    const hobBase = o && o.compact ? VISUAL_FALLBACK_COMPACT_COOKTOP_CUTOUT_SIZE_M : VISUAL_FALLBACK_COOKTOP_CUTOUT_SIZE_M;
+    return {
+      zones: o && o.compact ? 2 : 4,
+      sink: depthM => fitSize(VISUAL_FALLBACK_SINK_CUTOUT_SIZE_M, depthM, SINK_DEPTH_SLACK_M, o && o.shrink),
+      cooktop: depthM => fitSize(hobBase, depthM, VISUAL_FALLBACK_COOKTOP_DEPTH_SLACK_M, o && o.hobShrink),
+    };
+  }
   // The run positions the sink and the cooktop want on a segment of this depth and run length.
-  function runWants(depthM, runM, hasSink, hasCooktop) {
-    return runCenters(runM, hasSink, hasCooktop, fitSink(depthM).lengthM, fitCooktop(depthM).lengthM);
+  function runWants(depthM, runM, hasSink, hasCooktop, S) {
+    return runCenters(runM, hasSink, hasCooktop, S.sink(depthM).lengthM, S.cooktop(depthM).lengthM);
   }
 
   // Depth position: the sink moves just far enough toward the room to leave
@@ -197,13 +207,14 @@
 
   // Where a cut goes: `main` is the fallback/chosen cut on the main run (its xM stays), `wingDepth(w)` the
   // depth position on a wing of width w, `wingRun(l)` the wanted run position on a wing of length l (the
-  // sink and the cooktop share a wing's run the way they share the main one), `allowWings` false for a chosen (real) position. The main run first;
-  // then each wing the cut fits on; else the best the main run can do.
+  // sink and the cooktop share a wing's run the way they share the main one), `allowWings` false for a
+  // chosen (real) position. The main run first; then each wing the cut fits on; else the best the main run
+  // can do. Returns { cut, strict }: strict when the spot keeps every corner and the obstacle at their margins.
   function placeCut(main, sizeFor, wingDepth, wingRun, widthM, lengthM, wings, ctx, allowWings) {
     const ms = { widthM: main.widthM, lengthM: main.lengthM, nominalLengthM: main.alongM };   // the main run's cut, as clamped to a small slab
     const mainSpot = strict => findSpot(r => cutOnMain(ms, main.xM, r), ms.lengthM / 2, lengthM - ms.lengthM / 2, main.zM, ctx, strict);
     let r = mainSpot(true);
-    if (r !== null) return Object.assign(main, cutOnMain(ms, main.xM, r));
+    if (r !== null) return { cut: Object.assign(main, cutOnMain(ms, main.xM, r)), strict: true };
     if (allowWings) {
       const list = (wings || []).filter(w => w.widthM > 0 && w.lengthM > 0);
       for (const wing of list) {
@@ -212,11 +223,11 @@
         const depth = wingDepth(wing.widthM, size);
         const make = rr => cutOnWing(size, wing, widthM, lengthM, depth, rr);
         const rw = findSpot(make, size.lengthM / 2, wing.lengthM - size.lengthM / 2, wingRun(wing), ctx, true);
-        if (rw !== null) return Object.assign(main, make(rw));
+        if (rw !== null) return { cut: Object.assign(main, make(rw)), strict: true };
       }
     }
     r = mainSpot(false);
-    return Object.assign(main, cutOnMain(ms, main.xM, r));
+    return { cut: Object.assign(main, cutOnMain(ms, main.xM, r)), strict: false };
   }
 
   function resolveCutout(position, fallbackPoint, sizeM, widthM, lengthM) {
@@ -228,41 +239,82 @@
     return { xM: c.xM, zM: c.zM, widthM: c.widthM, lengthM: c.lengthM, alongM, onWing: null, source: point.source };
   }
 
-  // options.cooktopPresent lets the sink make room for a cooktop on the same run;
-  // options.wings (GeometryModel.wings) tell where the countertop's corners and wings are. A
-  // spot -- the fallback one or a chosen (real) one -- nearer than CUTOUT_CORNER_MARGIN_M to a
-  // corner is slid along the run to the nearest spot that is not; when the main run has none,
-  // the sink goes to a wing (a chosen position stays on the main run).
-  function resolveSinkCutout(sinkState, widthM, lengthM, options) {
-    if (!sinkState || sinkState.count <= 0) return null;
+  // One try at the sink, with the sizes `S` (sizing()) and options.wings (GeometryModel.wings): the
+  // countertop's corners and wings. A spot -- the fallback one or a chosen (real) one -- nearer than
+  // CUTOUT_CORNER_MARGIN_M to a corner is slid along the run to the nearest spot that is not; when the main
+  // run has none, the sink goes to a wing (a chosen position stays on the main run).
+  function placeSink(sinkState, widthM, lengthM, options, S) {
     const cookPresent = !!(options && options.cooktopPresent);
-    const size = fitSink(widthM);
-    const { sinkZ } = runWants(widthM, lengthM, true, cookPresent);
+    const size = S.sink(widthM);
+    const { sinkZ } = runWants(widthM, lengthM, true, cookPresent, S);
     const fallback = { xM: sinkDepthCenter(widthM, size), zM: sinkZ };
     const wings = options && options.wings;
     const ctx = { corners: outlineCorners(widthM, lengthM, wings), margin: CUTOUT_CORNER_MARGIN_M, obstacle: null, gap: 0 };
     const main = resolveCutout(sinkState.position, fallback, size, widthM, lengthM);
-    const cut = placeCut(main, fitSink, (w, sz) => sinkDepthCenter(w, sz), wing => runWants(wing.widthM, wing.lengthM, true, cookPresent).sinkZ, widthM, lengthM, wings, ctx, main.source === 'fallback');
-    return { type: sinkState.type, count: sinkState.count, cut };
+    const placed = placeCut(main, S.sink, (w, sz) => sinkDepthCenter(w, sz), wing => runWants(wing.widthM, wing.lengthM, true, cookPresent, S).sinkZ, widthM, lengthM, wings, ctx, main.source === 'fallback');
+    return { value: { type: sinkState.type, count: sinkState.count, cut: placed.cut }, strict: placed.strict };
   }
 
-  // options.sinkCut (the sink as resolved above) is the cooktop's obstacle: it keeps the gap to it
-  // and, like the sink, the margin from every corner -- on the main run if there is a place, else on
-  // a wing. A chosen (real) position is left as it is.
-  function resolveCooktopCutout(cooktopState, widthM, lengthM, options) {
-    if (!cooktopState || cooktopState.count <= 0) return null;
+  // One try at the cooktop. options.sinkCut (the sink as resolved) is its obstacle: it keeps `gapM` to
+  // it and, like the sink, `cornerMarginM` from every corner -- on the main run if there is a place, else
+  // on a wing. A chosen (real) position is left as it is.
+  function placeCooktop(cooktopState, widthM, lengthM, options, S, gapM, cornerMarginM) {
     const sinkPresent = !!(options && options.sinkPresent);
-    const size = fitCooktop(widthM);
-    const { cooktopZ } = runWants(widthM, lengthM, sinkPresent, true);
+    const size = S.cooktop(widthM);
+    const { cooktopZ } = runWants(widthM, lengthM, sinkPresent, true, S);
     const fallback = { xM: widthM / 2, zM: cooktopZ };
     const wings = options && options.wings;
     const cut = resolveCutout(cooktopState.position, fallback, size, widthM, lengthM);
+    let strict = true;
     if (cut.source === 'fallback') {
-      const ctx = { corners: outlineCorners(widthM, lengthM, wings), margin: CUTOUT_CORNER_MARGIN_M,
-        obstacle: (options && options.sinkCut) || null, gap: VISUAL_FALLBACK_CUTOUT_GAP_M };
-      placeCut(cut, fitCooktop, w => w / 2, wing => runWants(wing.widthM, wing.lengthM, sinkPresent, true).cooktopZ, widthM, lengthM, wings, ctx, true);
+      const ctx = { corners: outlineCorners(widthM, lengthM, wings), margin: cornerMarginM,
+        obstacle: (options && options.sinkCut) || null, gap: gapM };
+      strict = placeCut(cut, S.cooktop, w => w / 2, wing => runWants(wing.widthM, wing.lengthM, sinkPresent, true, S).cooktopZ, widthM, lengthM, wings, ctx, true).strict;
     }
-    return { count: cooktopState.count, cut };
+    cut.zones = S.zones;
+    return { value: { count: cooktopState.count, cut }, strict };
+  }
+
+  // The tries, in order, when there is a sink and a hob: the standard hob; the compact two-zone one; the sink
+  // squeezed too; then a tighter gap between them and no corner margin for the hob; at last both at their smallest. The first try in which
+  // both keep their margins wins; if none does, the last one stands (overlap-free as far as it can be).
+  const TRIES = [
+    { compact: false, shrink: 1, gap: VISUAL_FALLBACK_CUTOUT_GAP_M, corner: CUTOUT_CORNER_MARGIN_M },
+    { compact: true, shrink: 1, gap: VISUAL_FALLBACK_CUTOUT_GAP_M, corner: CUTOUT_CORNER_MARGIN_M },
+    { compact: true, shrink: CUTOUT_SQUEEZE_SCALE, gap: VISUAL_FALLBACK_CUTOUT_GAP_M, corner: CUTOUT_CORNER_MARGIN_M },
+    { compact: true, shrink: CUTOUT_SQUEEZE_SCALE, gap: CUTOUT_TIGHT_GAP_M, corner: 0 },
+    // a very short run: both at their smallest
+    { compact: true, shrink: CUTOUT_MIN_SCALE, hobShrink: CUTOUT_SQUEEZE_SCALE, gap: CUTOUT_TIGHT_GAP_M, corner: 0 },
+  ];
+
+  // The sink and the cooktop of a countertop together: { sink, cooktop } (each null when there is none).
+  // options.wings as for the single ones.
+  function resolveCutouts(sinkState, cooktopState, widthM, lengthM, options) {
+    const hasSink = !!(sinkState && sinkState.count > 0), hasCook = !!(cooktopState && cooktopState.count > 0);
+    if (!hasSink && !hasCook) return { sink: null, cooktop: null };
+    const wings = options && options.wings;
+    let last = null;
+    for (const t of TRIES) {
+      if (!hasCook && t !== TRIES[0]) break;                      // a sink alone has just one size
+      if (!hasSink && t.shrink !== 1) continue;                   // a hob alone is not squeezed by a sink
+      const S = sizing(t);
+      const sinkTry = hasSink ? placeSink(sinkState, widthM, lengthM, { cooktopPresent: hasCook, wings }, S) : null;
+      const cookTry = hasCook ? placeCooktop(cooktopState, widthM, lengthM,
+        { sinkPresent: hasSink, sinkCut: sinkTry ? sinkTry.value.cut : null, wings }, S, t.gap, t.corner) : null;
+      last = { sink: sinkTry ? sinkTry.value : null, cooktop: cookTry ? cookTry.value : null };
+      if ((!sinkTry || sinkTry.strict) && (!cookTry || cookTry.strict)) break;
+    }
+    return last;
+  }
+
+  // The same one at a time, for a caller that has only one of them (options as in the tries above).
+  function resolveSinkCutout(sinkState, widthM, lengthM, options) {
+    if (!sinkState || sinkState.count <= 0) return null;
+    return placeSink(sinkState, widthM, lengthM, options, sizing(options)).value;
+  }
+  function resolveCooktopCutout(cooktopState, widthM, lengthM, options) {
+    if (!cooktopState || cooktopState.count <= 0) return null;
+    return placeCooktop(cooktopState, widthM, lengthM, options, sizing(options), VISUAL_FALLBACK_CUTOUT_GAP_M, CUTOUT_CORNER_MARGIN_M).value;
   }
 
   function clampPointToSlab(xM, zM, widthM, lengthM) {
@@ -341,5 +393,5 @@
     };
   }
 
-  return { resolveSinkCutout, resolveCooktopCutout, resolveHoles, outlineCorners };
+  return { resolveCutouts, resolveSinkCutout, resolveCooktopCutout, resolveHoles, outlineCorners };
 });

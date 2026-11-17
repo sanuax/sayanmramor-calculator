@@ -17,7 +17,7 @@
     VISUAL_FALLBACK_THICKNESS_M, VISUAL_FALLBACK_FLOOR_THICKNESS_M,
     VISUAL_LAYOUT_MODULE_M, VISUAL_LARGE_FORMAT_MODULE_M, VISUAL_STAIR_TREAD_DEPTH_M, VISUAL_STAIR_RISE_M,
   } = isNode ? require('./constants.js') : globalRoot.VisualizerConstants;
-  const { resolveSinkCutout, resolveCooktopCutout, resolveHoles } = isNode ? require('./cutout-geometry.js') : globalRoot.CutoutGeometry;
+  const { resolveCutouts, resolveHoles } = isNode ? require('./cutout-geometry.js') : globalRoot.CutoutGeometry;
   const { resolveBacksplash, resolveCurb, resolveWallPanel, resolveIsland, resolveBarCounter } = isNode ? require('./attachment-geometry.js') : globalRoot.AttachmentGeometry;
   const FacadeModel = isNode ? require('../facade-model.js') : globalRoot.FacadeModel;
 
@@ -574,8 +574,7 @@
     const hasCooktop = state.additionalWorks.cooktop && state.additionalWorks.cooktop.count > 0;
     // The sink and the cooktop keep clear of every corner of the outline, the wings' inner ones too;
     // with no room on the main run they go to a wing (cutout-geometry.js).
-    const sink = resolveSinkCutout(state.additionalWorks.sink, widthM, lengthM, { cooktopPresent: hasCooktop, wings });
-    const cooktop = resolveCooktopCutout(state.additionalWorks.cooktop, widthM, lengthM, { sinkPresent: hasSink, sinkCut: sink ? sink.cut : null, wings });
+    const { sink, cooktop } = resolveCutouts(state.additionalWorks.sink, state.additionalWorks.cooktop, widthM, lengthM, { wings });
     // Edge fields are read for every product (constructor-state.js), but an
     // edge only exists on products that support edge work.
     const edgeSupported = !caps || caps.supportsEdgeWork;

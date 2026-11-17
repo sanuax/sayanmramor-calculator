@@ -343,3 +343,39 @@ test('a narrow wing hosts a scaled sink or hob sized for the wing\'s own depth',
     assertCutClear(cut, W, L, wing, 'lshape', 'left', 'on the narrow wing');
   });
 });
+
+// ---- a short run: the sink and the hob never overlap; a compact two-zone hob steps in ----
+
+test('a short straight run: the sink and the hob never overlap, whatever the depth (from 0.9 m of run)', () => {
+  for (const W of [0.4, 0.5, 0.6, 0.8]) {
+    for (let L = 0.9; L <= 3.0 + EPS; L += 0.05) {
+      const wing = { widthM: 0, lengthM: 0 };
+      const model = buildGeometryModel(stateFor({ W, L, shape: 'straight', corner: 'left', wing, sink: true, cooktop: true }));
+      const s = model.sink.cut, h = model.cooktop.cut, label = `depth ${W}, run ${L.toFixed(2)}`;
+      assert.ok(cutGapOf(s, h) >= C.CUTOUT_TIGHT_GAP_M - EPS, `${label}: the gap between the sink and the hob is ${cutGapOf(s, h).toFixed(3)}`);
+      [s, h].forEach(c => assert.ok(c.zM - c.lengthM / 2 >= -EPS && c.zM + c.lengthM / 2 <= L + EPS && c.xM - c.widthM / 2 >= -EPS && c.xM + c.widthM / 2 <= W + EPS, `${label}: inside the slab`));
+    }
+  }
+});
+
+test('the hob is the compact two-zone one only when the run is too short for the standard one', () => {
+  const zones = L => buildGeometryModel(stateFor({ W: 0.6, L, shape: 'straight', corner: 'left', wing: { widthM: 0, lengthM: 0 }, sink: true, cooktop: true })).cooktop.cut.zones;
+  assert.equal(zones(2.4), 4);
+  assert.equal(zones(1.0), 2);
+  const compact = buildGeometryModel(stateFor({ W: 0.6, L: 1.0, shape: 'straight', corner: 'left', wing: { widthM: 0, lengthM: 0 }, sink: true, cooktop: true })).cooktop.cut;
+  assert.equal(compact.widthM, C.VISUAL_FALLBACK_COMPACT_COOKTOP_CUTOUT_SIZE_M.widthM);
+  assert.equal(compact.lengthM, C.VISUAL_FALLBACK_COMPACT_COOKTOP_CUTOUT_SIZE_M.lengthM);
+});
+
+test('a hob alone on a short run is not squeezed: standard if it fits, else the compact one', () => {
+  const hob = L => buildGeometryModel(stateFor({ W: 0.6, L, shape: 'straight', corner: 'left', wing: { widthM: 0, lengthM: 0 }, sink: false, cooktop: true })).cooktop.cut;
+  assert.equal(hob(1.5).zones, 4);
+  assert.equal(hob(0.8).zones, 2);
+});
+
+test('the scene tells the renderer how many zones the hob has', () => {
+  const SceneLayout = require('../visualizer/scene-layout.js');
+  const hob = L => SceneLayout.buildSceneLayout(buildGeometryModel(stateFor({ W: 0.6, L, shape: 'straight', corner: 'left', wing: { widthM: 0, lengthM: 0 }, sink: true, cooktop: true })), {}).parts.find(p => p.kind === 'cooktop');
+  assert.equal(hob(2.4).zones, 4);
+  assert.equal(hob(1.0).zones, 2);
+});

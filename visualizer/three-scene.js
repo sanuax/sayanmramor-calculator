@@ -914,8 +914,8 @@ const COOKTOP_PX_PER_M = 1800;
 const COOKTOP_CORNER_M = 0.008;
 const COOKTOP_BEVEL_M = 0.0012;
 const cooktopPrints = new Map();   // 'sx x sz' -> its texture, for the page's life
-function cooktopPrint(sx, sz) {
-  const key = sx.toFixed(3) + 'x' + sz.toFixed(3);
+function cooktopPrint(sx, sz, zoneCount) {
+  const key = sx.toFixed(3) + 'x' + sz.toFixed(3) + 'x' + zoneCount;
   if (cooktopPrints.has(key)) return cooktopPrints.get(key);
   // The canvas as seen from the front: across it the run (left to right), down it the depth (wall to front).
   const k = COOKTOP_PX_PER_M, w = Math.round(sz * k), h = Math.round(sx * k);
@@ -925,9 +925,18 @@ function cooktopPrint(sx, sz) {
   g.fillStyle = '#0a0a0b';
   g.fillRect(0, 0, w, h);
   const m = v => v * k;
-  // The zones: large front-left and back-right, small back-left and front-right.
-  // [across the run 0..1, from the wall in m, radius in m]
-  const zones = [[0.27, 0.315, 0.095], [0.27, 0.115, 0.07], [0.73, 0.115, 0.095], [0.73, 0.315, 0.07]];
+  // The controls take a band along the front edge; the zones are laid out in the rest of the depth, so a
+  // smaller plate (a narrow top, a compact two-zone hob: the owner, 2026-11-17) never has a burner under its
+  // controls. Four zones: large front-left and back-right, small back-left and front-right; two: a large and a
+  // small side by side. [across the run 0..1, from the wall in m, radius in m]
+  const strip = Math.min(0.076, sx * 0.25), pad = 0.015;
+  const usable = sx - strip - 2 * pad;
+  const rows = zoneCount === 2 ? 1 : 2, rowH = usable / rows;
+  const rBig = Math.min(0.095, rowH * 0.48, sz * 0.23), rSmall = rBig * 0.74;
+  const yBack = pad + rowH / 2, yFront = pad + rowH * (rows - 0.5);
+  const zones = zoneCount === 2
+    ? [[0.27, yBack, rBig], [0.73, yBack, rSmall]]
+    : [[0.27, yFront, rBig], [0.27, yBack, rSmall], [0.73, yBack, rBig], [0.73, yFront, rSmall]];
   zones.forEach(([u, d, r]) => {
     const x = u * w, y = m(d), R = m(r);
     g.strokeStyle = 'rgba(150, 150, 146, 0.55)';
@@ -945,7 +954,7 @@ function cooktopPrint(sx, sz) {
     }
   });
   // The controls, a strip along the front edge.
-  const cy = h - m(0.038), ink = 'rgba(205, 205, 200, 0.78)';
+  const cy = h - m(strip / 2), ink = 'rgba(205, 205, 200, 0.78)';
   g.strokeStyle = ink; g.fillStyle = ink; g.lineCap = 'round';
   // Power: an open ring and its stroke.
   const px = m(0.055), pr = m(0.0075);
@@ -953,7 +962,8 @@ function cooktopPrint(sx, sz) {
   g.beginPath(); g.arc(px, cy, pr, -Math.PI / 2 + 0.55, Math.PI * 1.5 - 0.55); g.stroke();
   g.beginPath(); g.moveTo(px, cy - pr - m(0.002)); g.lineTo(px, cy - m(0.001)); g.stroke();
   // The slider: a line with its steps, the numbers over it.
-  const s0 = w / 2 - m(0.11), s1 = w / 2 + m(0.11);
+  const half = Math.min(0.11, Math.max(0.03, sz / 2 - 0.09));   // the slider keeps clear of the power key and the timer on a narrow plate
+  const s0 = w / 2 - m(half), s1 = w / 2 + m(half);
   g.lineWidth = m(0.0012);
   g.beginPath(); g.moveTo(s0, cy + m(0.004)); g.lineTo(s1, cy + m(0.004)); g.stroke();
   g.font = '500 ' + Math.round(m(0.0085)) + 'px Arial, sans-serif';
@@ -1001,7 +1011,7 @@ function buildCooktop(group, part, materials) {
   // The print on its top, just over the glass, its own glossy black.
   if (!materials.cooktop) {
     materials.cooktop = new THREE.MeshPhysicalMaterial({
-      color: '#ffffff', map: cooktopPrint(sx, sz), roughness: 0.06, metalness: 0, envMapIntensity: 1.1,
+      color: '#ffffff', map: cooktopPrint(sx, sz, part.zones || 4), roughness: 0.06, metalness: 0, envMapIntensity: 1.1,
     });
   }
   const print = new THREE.ShapeGeometry(flat, 6);
