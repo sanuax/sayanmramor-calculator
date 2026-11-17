@@ -152,5 +152,5 @@
     return out;
   }
 
-  return { edgeLengthOf, priceItem, priceProject };
+  return { edgeLengthOf, sizesReady, priceItem, priceProject };
 });

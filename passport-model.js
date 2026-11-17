@@ -173,5 +173,5 @@
     };
   }
 
-  return { FLAT_PRODUCTS, passportNumber, passportFileName, pickShots, buildSpecification, buildPassport };
+  return { FLAT_PRODUCTS, PASSPORT_TITLES, passportNumber, passportFileName, pickShots, buildSpecification, buildPassport };
 });
