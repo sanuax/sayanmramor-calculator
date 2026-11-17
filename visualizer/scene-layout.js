@@ -20,7 +20,7 @@
 //              outline[i+1]: against a wall, or a joint between pieces)
 //   box    -- axis-aligned box: center [x,y,z], size [sx,sy,sz]
 //   basin   -- open-top box hanging below yTop: center [x,yTop,z], size [sx,depth,sz]
-//   cooktop -- glass plate sitting on yTop: center [x,yTop,z], size [sx,sy,sz]
+//   cooktop -- glass plate sitting on yTop: center [x,yTop,z], size [sx,sy,sz] (its footprint), front [dx,dz] (the side its controls face)
 //   faucet  -- a mixer tap standing on yTop: center [x,yTop,z], dir [dx,dz] (where its spout points), scale
 //   dispenser, socket -- a soap dispenser (dir as the tap's) and a flush socket in their holes: center [x,yTop,z]
 //   seams   -- line segments [[x1,y1,z1,x2,y2,z2],...] drawn on a surface
@@ -255,7 +255,11 @@
 
     if (m.cooktop) {
       const c = m.cooktop.cut;
-      parts.push({ kind: 'cooktop', role: 'glass', center: [lx(c.xM), top, lz(c.zM)], size: [c.widthM + 0.02, 0.006, c.lengthM + 0.02], name: 'cooktop' });
+      // Its front -- the controls' side, the side a person stands on -- is the room side of the segment it is
+      // on: +X on the main run; on a wing (turned a quarter) the side away from the wing's own wall, -Z for the
+      // left wing (wall at +Z), +Z for the right one.
+      const front = c.onWing === 'left' ? [0, -1] : (c.onWing === 'right' ? [0, 1] : [1, 0]);
+      parts.push({ kind: 'cooktop', role: 'glass', center: [lx(c.xM), top, lz(c.zM)], size: [c.widthM + 0.02, 0.006, c.lengthM + 0.02], front, name: 'cooktop' });
     }
 
     // Backsplash, wall panel and curb are drawn along the main run's wall.

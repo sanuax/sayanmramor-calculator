@@ -270,3 +270,21 @@ test('a short main run and a long wing: the sink and the cooktop both go on the 
     assert.ok(cutGapOf(model.sink.cut, model.cooktop.cut) >= C.VISUAL_FALLBACK_CUTOUT_GAP_M - EPS, 'the gap between them');
   }
 });
+
+test('the cooktop faces the room: its front is +X on the main run, and on a wing away from the wing\'s own wall', () => {
+  const SceneLayout = require('../visualizer/scene-layout.js');
+  const hob = state => SceneLayout.buildSceneLayout(buildGeometryModel(state), {}).parts.find(p => p.kind === 'cooktop');
+  // main run
+  assert.deepEqual(hob(stateFor({ W: 0.6, L: 2.4, shape: 'straight', corner: 'left', wing: { widthM: 0, lengthM: 0 }, sink: false, cooktop: true })).front, [1, 0]);
+  for (const corner of ['left', 'right']) {
+    const W = 0.6, L = 0.9;
+    const state = stateFor({ W, L, shape: 'lshape', corner, wing: { widthM: 0.6, lengthM: 2.0 }, sink: false, cooktop: true });
+    const model = buildGeometryModel(state);
+    assert.equal(model.cooktop.cut.onWing, corner);
+    const part = hob(state);
+    // the wing's own wall in the scene's frame: z = L/2 - zM, zM 0 (left) or L (right)
+    const wallZ = corner === 'left' ? L / 2 : -L / 2;
+    assert.equal(part.front[0], 0);
+    assert.ok(part.front[1] * (part.center[2] - wallZ) > 0, 'faces away from the wall, toward the person standing at the hob');
+  }
+});

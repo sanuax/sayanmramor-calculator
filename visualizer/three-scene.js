@@ -985,12 +985,18 @@ function roundedRect(sx, sz, r) {
 }
 function buildCooktop(group, part, materials) {
   const [cx, top, cz] = part.center;
-  const [sx, sy, sz] = part.size;
+  // The plate is built facing +X (its front), then turned to face part.front: on a wing the plate stands a
+  // quarter-turn, its footprint's x and z swapped, and its controls face the room, the person at the hob.
+  const front = part.front || [1, 0];
+  const turnY = Math.atan2(-front[1], front[0]);
+  const quarter = Math.abs(front[1]) > Math.abs(front[0]);
+  const [sx, sy, sz] = quarter ? [part.size[2], part.size[1], part.size[0]] : part.size;
   // The plate: its flat top the shape, the bevel round it out to the full size.
   const b = COOKTOP_BEVEL_M, flat = roundedRect(sx - 2 * b, sz - 2 * b, COOKTOP_CORNER_M);
   const plate = new THREE.ExtrudeGeometry(flat, { depth: Math.max(0.001, sy - 2 * b), bevelEnabled: true, bevelThickness: b, bevelSize: b, bevelSegments: 2, curveSegments: 6 });
   plate.rotateX(-Math.PI / 2);
   plate.translate(0, b, 0);
+  plate.rotateY(turnY);
   addMesh(group, plate, materials.glass, [cx, top, cz]);
   // The print on its top, just over the glass, its own glossy black.
   if (!materials.cooktop) {
@@ -1004,6 +1010,7 @@ function buildCooktop(group, part, materials) {
   const pos = print.attributes.position, uv = print.attributes.uv;
   for (let i = 0; i < pos.count; i++) uv.setXY(i, (sz / 2 - pos.getZ(i)) / sz, 1 - (pos.getX(i) + sx / 2) / sx);
   uv.needsUpdate = true;
+  print.rotateY(turnY);
   addMesh(group, print, materials.cooktop, [cx, top + sy + 0.0004, cz], false);
 }
 
