@@ -572,8 +572,10 @@
 
     const hasSink = state.additionalWorks.sink && state.additionalWorks.sink.count > 0;
     const hasCooktop = state.additionalWorks.cooktop && state.additionalWorks.cooktop.count > 0;
-    const sink = resolveSinkCutout(state.additionalWorks.sink, widthM, lengthM, { cooktopPresent: hasCooktop });
-    const cooktop = resolveCooktopCutout(state.additionalWorks.cooktop, widthM, lengthM, { sinkPresent: hasSink });
+    // The sink keeps clear of every corner of the outline, the wings' inner ones too
+    // (cutout-geometry.js); the cooktop makes room for it.
+    const sink = resolveSinkCutout(state.additionalWorks.sink, widthM, lengthM, { cooktopPresent: hasCooktop, wings });
+    const cooktop = resolveCooktopCutout(state.additionalWorks.cooktop, widthM, lengthM, { sinkPresent: hasSink, sinkCut: sink ? sink.cut : null, wings });
     // Edge fields are read for every product (constructor-state.js), but an
     // edge only exists on products that support edge work.
     const edgeSupported = !caps || caps.supportsEdgeWork;

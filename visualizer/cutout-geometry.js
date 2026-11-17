@@ -24,7 +24,7 @@
   const {
     VISUAL_FALLBACK_SINK_CUTOUT_SIZE_M, VISUAL_FALLBACK_COOKTOP_CUTOUT_SIZE_M, VISUAL_FALLBACK_HOLE_RADIUS_M,
     VISUAL_FALLBACK_FAUCET_GAP_M, VISUAL_FALLBACK_DISPENSER_OFFSET_M, VISUAL_FALLBACK_HOLE_EDGE_MARGIN_M,
-    VISUAL_FALLBACK_CUTOUT_GAP_M, VISUAL_FALLBACK_CUTOUT_FRONT_MARGIN_M,
+    VISUAL_FALLBACK_CUTOUT_GAP_M, VISUAL_FALLBACK_CUTOUT_FRONT_MARGIN_M, SINK_CORNER_MARGIN_M,
   } = (typeof module !== 'undefined' && module.exports) ? require('./constants.js') : globalRoot.VisualizerConstants;
 
   const R = VISUAL_FALLBACK_HOLE_RADIUS_M;
@@ -75,6 +75,93 @@
     return { sinkZ, cooktopZ };
   }
 
+  // ---- corners ----------------------------------------------------------
+  // A sink never stands on a corner of the countertop: its cut keeps
+  // SINK_CORNER_MARGIN_M from every vertex of the outline, outer and inner
+  // (re-entrant) alike. The sink is only ever moved ALONG the run (the depth is
+  // fixed by the faucet behind it), to the nearest spot that keeps the margin.
+  //
+  // Corners of the outline in the plan frame, from the main run (depth
+  // widthM, run lengthM) and its wings ({ widthM: along the run, lengthM: out
+  // from it, corner: 'left' | 'right' } -- as in GeometryModel.wings). A wing
+  // at the 'left' end spans zM 0..width, one at the 'right' end
+  // lengthM-width..lengthM, both on the room side (xM = widthM) of the run.
+  function outlineCorners(widthM, lengthM, wings) {
+    const has = side => (wings || []).find(w => w.corner === side && w.widthM > 0 && w.lengthM > 0);
+    const left = has('left'), right = has('right');
+    const pts = [[0, 0], [0, lengthM]];
+    if (left) {
+      pts.push([widthM + left.lengthM, 0], [widthM + left.lengthM, left.widthM]);
+      if (left.widthM < lengthM) pts.push([widthM, left.widthM]);
+    } else {
+      pts.push([widthM, 0]);
+    }
+    if (right) {
+      pts.push([widthM + right.lengthM, lengthM], [widthM + right.lengthM, lengthM - right.widthM]);
+      if (right.widthM < lengthM) pts.push([widthM, lengthM - right.widthM]);
+    } else {
+      pts.push([widthM, lengthM]);
+    }
+    return pts;
+  }
+
+  function nearestCornerDistance(cut, corners) {
+    let d = Infinity;
+    corners.forEach(([px, pz]) => {
+      const dx = Math.max(Math.abs(px - cut.xM) - cut.widthM / 2, 0);
+      const dz = Math.max(Math.abs(pz - cut.zM) - cut.lengthM / 2, 0);
+      d = Math.min(d, Math.max(dx, dz));   // square band: no corner within the margin of the cut on any side
+    });
+    return d;
+  }
+
+  // Run-wise gap between two cuts (negative when they overlap).
+  function runGap(a, b) {
+    return Math.abs(a.zM - b.zM) - (a.lengthM + b.lengthM) / 2;
+  }
+
+  const RUN_SEARCH_STEP_M = 0.005;
+  const TOL = 1e-9;
+
+  // Moves a cut along the run, from where it was wanted to the nearest spot that
+  // keeps `corners` at `cornerMargin` and `obstacle` (another cut, optional) at
+  // `obstacleGap`. If no spot has both: with an obstacle, the gap to it wins; else
+  // the corners. If no spot keeps the margin at all (a run too short for it), the
+  // spot farthest from the corners. The cut's size and depth position stay as given.
+  // "Near a corner" is a square band: the largest of the x and z distances from the
+  // cut's rectangle to the corner, so a sink a little off the front edge still keeps
+  // the whole margin along the run.
+  function slideAlongRun(cut, lengthM, corners, cornerMargin, obstacle, obstacleGap) {
+    const lo = cut.lengthM / 2, hi = Math.max(lo, lengthM - cut.lengthM / 2);
+    const at = zM => Object.assign({}, cut, { zM });
+    const okCorners = z => nearestCornerDistance(at(z), corners) >= cornerMargin - TOL;
+    const okObstacle = z => !obstacle || runGap(at(z), obstacle) >= obstacleGap - TOL;
+    const want = clamp(cut.zM, lo, hi);
+    const candidates = [want, hi];
+    for (let z = lo; z < hi; z += RUN_SEARCH_STEP_M) candidates.push(z);
+    const nearest = ok => {
+      let best = null;
+      candidates.forEach(z => {
+        if (!ok(z)) return;
+        if (best === null || Math.abs(z - want) < Math.abs(best - want) - TOL) best = z;
+      });
+      return best;
+    };
+    let z = nearest(z => okCorners(z) && okObstacle(z));
+    // no spot has both: the cut must not overlap the other cut (the cooktop's case), else the
+    // corners come first (the sink's)
+    if (z === null && obstacle) z = nearest(okObstacle);
+    if (z === null) z = nearest(okCorners);
+    if (z === null) {
+      let bestD = -Infinity;
+      candidates.forEach(c => {
+        const d = nearestCornerDistance(at(c), corners);
+        if (d > bestD + TOL || (Math.abs(d - bestD) <= TOL && Math.abs(c - want) < Math.abs(z - want))) { bestD = d; z = c; }
+      });
+    }
+    return z;
+  }
+
   function resolveCutout(position, fallbackPoint, sizeM, widthM, lengthM) {
     const point = position
       ? { xM: position.xMm / 1000, zM: position.yMm / 1000, source: 'real' }
@@ -89,15 +176,30 @@
     const size = VISUAL_FALLBACK_SINK_CUTOUT_SIZE_M;
     const { sinkZ } = runCenters(lengthM, true, !!(options && options.cooktopPresent));
     const fallback = { xM: sinkDepthCenter(widthM, size), zM: sinkZ };
-    return { type: sinkState.type, count: sinkState.count, cut: resolveCutout(sinkState.position, fallback, size, widthM, lengthM) };
+    const cut = resolveCutout(sinkState.position, fallback, size, widthM, lengthM);
+    // options.wings (GeometryModel.wings) say where the countertop's corners are. A spot --
+    // the fallback one or a chosen (real) one -- that is nearer than SINK_CORNER_MARGIN_M to
+    // a corner is slid along the run to the nearest spot that is not.
+    const corners = outlineCorners(widthM, lengthM, options && options.wings);
+    cut.zM = slideAlongRun(cut, lengthM, corners, SINK_CORNER_MARGIN_M, null, 0);
+    return { type: sinkState.type, count: sinkState.count, cut };
   }
 
+  // options.sinkCut (the sink as resolved above) is the cooktop's one obstacle: when the
+  // sink was moved off a corner onto the cooktop's spot, the cooktop slides along the run
+  // to keep the gap -- preferring a spot clear of the corners too. Otherwise it stays put.
   function resolveCooktopCutout(cooktopState, widthM, lengthM, options) {
     if (!cooktopState || cooktopState.count <= 0) return null;
     const size = VISUAL_FALLBACK_COOKTOP_CUTOUT_SIZE_M;
     const { cooktopZ } = runCenters(lengthM, !!(options && options.sinkPresent), true);
     const fallback = { xM: widthM / 2, zM: cooktopZ };
-    return { count: cooktopState.count, cut: resolveCutout(cooktopState.position, fallback, size, widthM, lengthM) };
+    const cut = resolveCutout(cooktopState.position, fallback, size, widthM, lengthM);
+    const sinkCut = options && options.sinkCut;
+    if (sinkCut && cut.source === 'fallback' && runGap(cut, sinkCut) < VISUAL_FALLBACK_CUTOUT_GAP_M - TOL) {
+      const corners = outlineCorners(widthM, lengthM, options.wings);
+      cut.zM = slideAlongRun(cut, lengthM, corners, SINK_CORNER_MARGIN_M, sinkCut, VISUAL_FALLBACK_CUTOUT_GAP_M);
+    }
+    return { count: cooktopState.count, cut };
   }
 
   function clampPointToSlab(xM, zM, widthM, lengthM) {
@@ -155,5 +257,5 @@
     };
   }
 
-  return { resolveSinkCutout, resolveCooktopCutout, resolveHoles };
+  return { resolveSinkCutout, resolveCooktopCutout, resolveHoles, outlineCorners };
 });
