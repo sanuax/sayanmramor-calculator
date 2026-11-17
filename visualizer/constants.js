@@ -37,6 +37,13 @@
   // corners and the inner (re-entrant) ones of an L, U or G -- so a cut never stands on a corner or straddles
   // it, where the stone is weakest (the owner, 2026-11-17). The one place this distance is set.
   const CUTOUT_CORNER_MARGIN_M = 0.15;
+  // A narrow countertop gets a smaller sink and cooktop (the owner, 2026-11-17: on a 400 mm depth they filled
+  // it edge to edge). A cut's width across the depth is at most the depth less a slack: the sink's is the stone
+  // in front of it plus the room for the faucet behind it (cutout-geometry.js), the cooktop's the stone on both
+  // sides of it (55 mm each: a standard 600 mm depth keeps its full-size hob). Its length scales along, to the
+  // same proportions, never below CUTOUT_MIN_SCALE of the full size.
+  const VISUAL_FALLBACK_COOKTOP_DEPTH_SLACK_M = 0.11;
+  const CUTOUT_MIN_SCALE = 0.5;
 
   // Attachment sizes/placement with no real input: curb has only a real
   // length (no height/cross-section anywhere); island/bar counter have no
@@ -84,6 +91,7 @@
     VISUAL_FALLBACK_FAUCET_GAP_M, VISUAL_FALLBACK_DISPENSER_OFFSET_M, VISUAL_FALLBACK_HOLE_EDGE_MARGIN_M,
     VISUAL_FALLBACK_SINK_CUTOUT_SIZE_M, VISUAL_FALLBACK_COOKTOP_CUTOUT_SIZE_M, VISUAL_FALLBACK_HOLE_RADIUS_M,
     VISUAL_FALLBACK_CUTOUT_GAP_M, VISUAL_FALLBACK_CUTOUT_FRONT_MARGIN_M, CUTOUT_CORNER_MARGIN_M,
+    VISUAL_FALLBACK_COOKTOP_DEPTH_SLACK_M, CUTOUT_MIN_SCALE,
     VISUAL_FALLBACK_CURB_HEIGHT_M, VISUAL_FALLBACK_ISLAND_GAP_M, VISUAL_FALLBACK_BAR_COUNTER_RAISE_M,
     VISUAL_FALLBACK_FLOOR_THICKNESS_M,
     VISUAL_STAIR_RISE_M, VISUAL_STAIR_TREAD_DEPTH_M, VISUAL_RISER_THICKNESS_M,

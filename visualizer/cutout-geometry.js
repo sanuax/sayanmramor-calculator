@@ -25,6 +25,7 @@
     VISUAL_FALLBACK_SINK_CUTOUT_SIZE_M, VISUAL_FALLBACK_COOKTOP_CUTOUT_SIZE_M, VISUAL_FALLBACK_HOLE_RADIUS_M,
     VISUAL_FALLBACK_FAUCET_GAP_M, VISUAL_FALLBACK_DISPENSER_OFFSET_M, VISUAL_FALLBACK_HOLE_EDGE_MARGIN_M,
     VISUAL_FALLBACK_CUTOUT_GAP_M, VISUAL_FALLBACK_CUTOUT_FRONT_MARGIN_M, CUTOUT_CORNER_MARGIN_M,
+    VISUAL_FALLBACK_COOKTOP_DEPTH_SLACK_M, CUTOUT_MIN_SCALE,
   } = (typeof module !== 'undefined' && module.exports) ? require('./constants.js') : globalRoot.VisualizerConstants;
 
   const R = VISUAL_FALLBACK_HOLE_RADIUS_M;
@@ -48,6 +49,21 @@
     };
   }
 
+  // A cut's size for a segment of this depth: the full size, or -- when the depth leaves less than the
+  // slack around it -- scaled down (width and length alike) to what fits, never below CUTOUT_MIN_SCALE.
+  // nominalLengthM is the full length: what an integrated sink is priced by, the drawing aside.
+  const SINK_DEPTH_SLACK_M = VISUAL_FALLBACK_CUTOUT_FRONT_MARGIN_M + FAUCET_CLEARANCE_M;
+  function fitSize(base, depthM, slackM) {
+    const k = clamp((depthM - slackM) / base.widthM, CUTOUT_MIN_SCALE, 1);
+    return { widthM: base.widthM * k, lengthM: base.lengthM * k, nominalLengthM: base.lengthM };
+  }
+  const fitSink = depthM => fitSize(VISUAL_FALLBACK_SINK_CUTOUT_SIZE_M, depthM, SINK_DEPTH_SLACK_M);
+  const fitCooktop = depthM => fitSize(VISUAL_FALLBACK_COOKTOP_CUTOUT_SIZE_M, depthM, VISUAL_FALLBACK_COOKTOP_DEPTH_SLACK_M);
+  // The run positions the sink and the cooktop want on a segment of this depth and run length.
+  function runWants(depthM, runM, hasSink, hasCooktop) {
+    return runCenters(runM, hasSink, hasCooktop, fitSink(depthM).lengthM, fitCooktop(depthM).lengthM);
+  }
+
   // Depth position: the sink moves just far enough toward the room to leave
   // the faucet a place behind it, never closer than the front margin. A
   // cooktop simply sits centred in the depth.
@@ -60,9 +76,9 @@
   // the run. Together they split the run 30/70 -- or, on a short run, are
   // packed around the centre with the minimum gap -- so they never overlap
   // whenever the run is long enough to hold both.
-  function runCenters(lengthM, hasSink, hasCooktop) {
-    const s = VISUAL_FALLBACK_SINK_CUTOUT_SIZE_M.lengthM;
-    const c = VISUAL_FALLBACK_COOKTOP_CUTOUT_SIZE_M.lengthM;
+  function runCenters(lengthM, hasSink, hasCooktop, sinkLengthM, cooktopLengthM) {
+    const s = sinkLengthM;
+    const c = cooktopLengthM;
     if (!(hasSink && hasCooktop)) return { sinkZ: lengthM / 2, cooktopZ: lengthM / 2 };
     let sinkZ = lengthM * 0.3;
     let cooktopZ = lengthM * 0.7;
@@ -134,13 +150,14 @@
   //                distance from the wing's own wall (zM 0 for the left wing, lengthM for the right
   //                one); the cut is turned: its x extent is the size's length, its z extent its width.
   // alongM stays the extent along the segment's run, onWing says which wing (null: the main run).
+  const along = size => (size.nominalLengthM != null ? size.nominalLengthM : size.lengthM);
   function cutOnMain(size, depthM, r) {
-    return { xM: depthM, zM: r, widthM: size.widthM, lengthM: size.lengthM, alongM: size.lengthM, onWing: null };
+    return { xM: depthM, zM: r, widthM: size.widthM, lengthM: size.lengthM, alongM: along(size), onWing: null };
   }
   function cutOnWing(size, wing, widthM, lengthM, depthM, r) {
     return {
       xM: widthM + r, zM: wing.corner === 'left' ? depthM : lengthM - depthM,
-      widthM: size.lengthM, lengthM: size.widthM, alongM: size.lengthM, onWing: wing.corner,
+      widthM: size.lengthM, lengthM: size.widthM, alongM: along(size), onWing: wing.corner,
     };
   }
 
@@ -182,18 +199,19 @@
   // depth position on a wing of width w, `wingRun(l)` the wanted run position on a wing of length l (the
   // sink and the cooktop share a wing's run the way they share the main one), `allowWings` false for a chosen (real) position. The main run first;
   // then each wing the cut fits on; else the best the main run can do.
-  function placeCut(main, size, wingDepth, wingRun, widthM, lengthM, wings, ctx, allowWings) {
-    const ms = { widthM: main.widthM, lengthM: main.lengthM };   // the main run's cut, as clamped to a small slab
+  function placeCut(main, sizeFor, wingDepth, wingRun, widthM, lengthM, wings, ctx, allowWings) {
+    const ms = { widthM: main.widthM, lengthM: main.lengthM, nominalLengthM: main.alongM };   // the main run's cut, as clamped to a small slab
     const mainSpot = strict => findSpot(r => cutOnMain(ms, main.xM, r), ms.lengthM / 2, lengthM - ms.lengthM / 2, main.zM, ctx, strict);
     let r = mainSpot(true);
     if (r !== null) return Object.assign(main, cutOnMain(ms, main.xM, r));
     if (allowWings) {
       const list = (wings || []).filter(w => w.widthM > 0 && w.lengthM > 0);
       for (const wing of list) {
+        const size = sizeFor(wing.widthM);   // sized for the wing's own depth
         if (wing.widthM < size.widthM - TOL || wing.lengthM < size.lengthM - TOL) continue;
-        const depth = wingDepth(wing.widthM);
+        const depth = wingDepth(wing.widthM, size);
         const make = rr => cutOnWing(size, wing, widthM, lengthM, depth, rr);
-        const rw = findSpot(make, size.lengthM / 2, wing.lengthM - size.lengthM / 2, wingRun(wing.lengthM), ctx, true);
+        const rw = findSpot(make, size.lengthM / 2, wing.lengthM - size.lengthM / 2, wingRun(wing), ctx, true);
         if (rw !== null) return Object.assign(main, make(rw));
       }
     }
@@ -206,7 +224,8 @@
       ? { xM: position.xMm / 1000, zM: position.yMm / 1000, source: 'real' }
       : Object.assign({ source: 'fallback' }, fallbackPoint);
     const c = clampCutoutToSlab(point, sizeM, widthM, lengthM);
-    return { xM: c.xM, zM: c.zM, widthM: c.widthM, lengthM: c.lengthM, alongM: c.lengthM, onWing: null, source: point.source };
+    const alongM = sizeM.nominalLengthM != null ? Math.min(sizeM.nominalLengthM, lengthM) : c.lengthM;
+    return { xM: c.xM, zM: c.zM, widthM: c.widthM, lengthM: c.lengthM, alongM, onWing: null, source: point.source };
   }
 
   // options.cooktopPresent lets the sink make room for a cooktop on the same run;
@@ -216,13 +235,14 @@
   // the sink goes to a wing (a chosen position stays on the main run).
   function resolveSinkCutout(sinkState, widthM, lengthM, options) {
     if (!sinkState || sinkState.count <= 0) return null;
-    const size = VISUAL_FALLBACK_SINK_CUTOUT_SIZE_M;
-    const { sinkZ } = runCenters(lengthM, true, !!(options && options.cooktopPresent));
+    const cookPresent = !!(options && options.cooktopPresent);
+    const size = fitSink(widthM);
+    const { sinkZ } = runWants(widthM, lengthM, true, cookPresent);
     const fallback = { xM: sinkDepthCenter(widthM, size), zM: sinkZ };
     const wings = options && options.wings;
     const ctx = { corners: outlineCorners(widthM, lengthM, wings), margin: CUTOUT_CORNER_MARGIN_M, obstacle: null, gap: 0 };
     const main = resolveCutout(sinkState.position, fallback, size, widthM, lengthM);
-    const cut = placeCut(main, size, w => sinkDepthCenter(w, size), l => runCenters(l, true, !!(options && options.cooktopPresent)).sinkZ, widthM, lengthM, wings, ctx, main.source === 'fallback');
+    const cut = placeCut(main, fitSink, (w, sz) => sinkDepthCenter(w, sz), wing => runWants(wing.widthM, wing.lengthM, true, cookPresent).sinkZ, widthM, lengthM, wings, ctx, main.source === 'fallback');
     return { type: sinkState.type, count: sinkState.count, cut };
   }
 
@@ -231,15 +251,16 @@
   // a wing. A chosen (real) position is left as it is.
   function resolveCooktopCutout(cooktopState, widthM, lengthM, options) {
     if (!cooktopState || cooktopState.count <= 0) return null;
-    const size = VISUAL_FALLBACK_COOKTOP_CUTOUT_SIZE_M;
-    const { cooktopZ } = runCenters(lengthM, !!(options && options.sinkPresent), true);
+    const sinkPresent = !!(options && options.sinkPresent);
+    const size = fitCooktop(widthM);
+    const { cooktopZ } = runWants(widthM, lengthM, sinkPresent, true);
     const fallback = { xM: widthM / 2, zM: cooktopZ };
     const wings = options && options.wings;
     const cut = resolveCutout(cooktopState.position, fallback, size, widthM, lengthM);
     if (cut.source === 'fallback') {
       const ctx = { corners: outlineCorners(widthM, lengthM, wings), margin: CUTOUT_CORNER_MARGIN_M,
         obstacle: (options && options.sinkCut) || null, gap: VISUAL_FALLBACK_CUTOUT_GAP_M };
-      placeCut(cut, size, w => w / 2, l => runCenters(l, !!(options && options.sinkPresent), true).cooktopZ, widthM, lengthM, wings, ctx, true);
+      placeCut(cut, fitCooktop, w => w / 2, wing => runWants(wing.widthM, wing.lengthM, sinkPresent, true).cooktopZ, widthM, lengthM, wings, ctx, true);
     }
     return { count: cooktopState.count, cut };
   }
@@ -286,14 +307,14 @@
       const g = VISUAL_FALLBACK_FAUCET_GAP_M + R;
       const behind = { xM: sinkCut.xM, zM: sinkCut.zM + towardWall * (sinkCut.lengthM / 2 + g) };
       const wallGap = sinkWing.corner === 'left' ? behind.zM - R : lengthM - behind.zM - R;
-      faucet = wallGap >= EDGE ? behind : inWing({ xM: sinkCut.xM + sinkCut.widthM / 2 + g, zM: sinkCut.zM }, sinkWing);
+      faucet = wallGap >= EDGE - TOL ? behind : inWing({ xM: sinkCut.xM + sinkCut.widthM / 2 + g, zM: sinkCut.zM }, sinkWing);
       dispenser = inWing({ xM: faucet.xM + VISUAL_FALLBACK_DISPENSER_OFFSET_M, zM: faucet.zM }, sinkWing);
       if (circleHitsRect(dispenser, sinkCut, 0.005)) {
         dispenser = inWing({ xM: faucet.xM - VISUAL_FALLBACK_DISPENSER_OFFSET_M, zM: faucet.zM }, sinkWing);
       }
     } else if (sinkCut) {
       const behindX = sinkCut.xM - sinkCut.widthM / 2 - VISUAL_FALLBACK_FAUCET_GAP_M - R;
-      faucet = behindX - R >= EDGE
+      faucet = behindX - R >= EDGE - TOL
         ? { xM: behindX, zM: sinkCut.zM }
         : clampPointToSlab(sinkCut.xM, sinkCut.zM + sinkCut.lengthM / 2 + VISUAL_FALLBACK_FAUCET_GAP_M + R, widthM, lengthM);
     } else {

@@ -132,7 +132,7 @@ test('the owner\'s case: an L with a sink and a cooktop, the sink was left strad
 
 test('resolveSinkCutout: a run too short to keep the margin on both sides still gives a cut inside the slab, as far from the corners as possible', () => {
   const cutout = resolveSinkCutout({ type: 'undermount', count: 1, position: null }, 0.6, 0.55,
-    { wings: [{ widthM: 0.3, lengthM: 1, corner: 'left' }] });
+    { wings: [] });
   const c = cutout.cut;
   assert.ok(c.zM - c.lengthM / 2 >= -EPS && c.zM + c.lengthM / 2 <= 0.55 + EPS);
   assert.equal(c.lengthM, C.VISUAL_FALLBACK_SINK_CUTOUT_SIZE_M.lengthM);
@@ -287,4 +287,59 @@ test('the cooktop faces the room: its front is +X on the main run, and on a wing
     assert.equal(part.front[0], 0);
     assert.ok(part.front[1] * (part.center[2] - wallZ) > 0, 'faces away from the wall, toward the person standing at the hob');
   }
+});
+
+// ---- a narrow countertop gets a smaller sink and cooktop ----
+
+const SINK = C.VISUAL_FALLBACK_SINK_CUTOUT_SIZE_M, HOB = C.VISUAL_FALLBACK_COOKTOP_CUTOUT_SIZE_M;
+
+test('a 600 mm depth keeps the full-size sink and hob', () => {
+  const model = buildGeometryModel(stateFor({ W: 0.6, L: 2.4, shape: 'straight', corner: 'left', wing: { widthM: 0, lengthM: 0 }, sink: true, cooktop: true }));
+  assert.equal(model.sink.cut.widthM, SINK.widthM);
+  assert.equal(model.sink.cut.lengthM, SINK.lengthM);
+  assert.equal(model.cooktop.cut.widthM, HOB.widthM);
+  assert.equal(model.cooktop.cut.lengthM, HOB.lengthM);
+});
+
+test('a 400 mm depth: the sink and the hob shrink, in proportion, and leave stone on both sides (the faucet fits behind the sink)', () => {
+  const W = 0.4;
+  const model = buildGeometryModel(stateFor({ W, L: 2.4, shape: 'straight', corner: 'left', wing: { widthM: 0, lengthM: 0 }, sink: true, cooktop: true }));
+  const s = model.sink.cut, h = model.cooktop.cut;
+  assert.ok(s.widthM < SINK.widthM && h.widthM < HOB.widthM, 'smaller than the full size');
+  assert.ok(Math.abs(s.lengthM / s.widthM - SINK.lengthM / SINK.widthM) < 1e-9, 'the sink keeps its proportions');
+  assert.ok(Math.abs(h.lengthM / h.widthM - HOB.lengthM / HOB.widthM) < 1e-9, 'the hob keeps its proportions');
+  // stone in front of the sink, and the room for the faucet behind it
+  assert.ok(W - (s.xM + s.widthM / 2) >= C.VISUAL_FALLBACK_CUTOUT_FRONT_MARGIN_M - EPS, 'stone in front of the sink');
+  assert.ok(s.xM - s.widthM / 2 >= 0.09 - EPS, 'room behind the sink for the faucet');
+  // the hob: stone on both sides
+  assert.ok(h.xM - h.widthM / 2 >= 0.05 && W - (h.xM + h.widthM / 2) >= 0.05, 'stone each side of the hob');
+  // the price: the integrated sink is still priced by its full cut length
+  assert.equal(s.alongM, SINK.lengthM);
+});
+
+test('a narrow top: the faucet stands behind the shrunk sink, on the slab', () => {
+  const W = 0.4;
+  const st = stateFor({ W, L: 2.4, shape: 'straight', corner: 'left', wing: { widthM: 0, lengthM: 0 }, sink: true, cooktop: false });
+  st.holeCounts = { mixer: 1, socket: 0, dispenser: 0 };
+  const model = buildGeometryModel(st);
+  const m = model.holes.mixer.position, s = model.sink.cut;
+  assert.ok(m.xM < s.xM - s.widthM / 2, 'behind the sink');
+  assert.ok(m.xM - model.holes.mixer.radiusM >= C.VISUAL_FALLBACK_HOLE_EDGE_MARGIN_M - EPS, 'on the slab, clear of the wall edge');
+});
+
+test('the scale stops at the minimum: a very shallow top does not shrink the sink below CUTOUT_MIN_SCALE', () => {
+  const model = buildGeometryModel(stateFor({ W: 0.2, L: 2.4, shape: 'straight', corner: 'left', wing: { widthM: 0, lengthM: 0 }, sink: true, cooktop: false }));
+  assert.ok(Math.abs(model.sink.cut.widthM - SINK.widthM * C.CUTOUT_MIN_SCALE) < 1e-9 || model.sink.cut.widthM <= 0.2);
+  assert.ok(model.sink.cut.widthM >= Math.min(0.2, SINK.widthM * C.CUTOUT_MIN_SCALE) - EPS);
+});
+
+test('a narrow wing hosts a scaled sink or hob sized for the wing\'s own depth', () => {
+  const W = 0.6, L = 0.9, wing = { widthM: 0.4, lengthM: 2.0 };
+  const model = buildGeometryModel(stateFor({ W, L, shape: 'lshape', corner: 'left', wing, sink: true, cooktop: true }));
+  [model.sink.cut, model.cooktop.cut].forEach(cut => {
+    assert.equal(cut.onWing, 'left');
+    assert.ok(insideWing(cut, W, L, wing, 'left'));
+    assert.ok(cut.lengthM <= wing.widthM - 0.1 + EPS, 'across the narrow wing it leaves stone at the sides (z extent)');
+    assertCutClear(cut, W, L, wing, 'lshape', 'left', 'on the narrow wing');
+  });
 });
