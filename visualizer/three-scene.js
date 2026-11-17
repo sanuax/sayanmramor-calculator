@@ -26,6 +26,13 @@ const reducedMotion = window.matchMedia ? window.matchMedia('(prefers-reduced-mo
 let cameraMove = null;   // a glide to a new view: { spring, goal }
 let morph = null;        // the model easing to a new size: { spring } over the shown bounds
 let rise = null;         // wall elements easing in / to a new size: { spring, items } (see startRise)
+// The project (the owner, 2026-11-17): the project's other products beside the active one (setCompanions).
+let companions = [];      // [{ key, group, layout, modelKey }] -- placed by ProjectLayout around the active one
+let projectUnion = null;  // the bounds of every product where it stands (null: one product, as before)
+let projectFloor = null;  // one floor under the whole project (the groups' own discs are hidden)
+let anchorKey = null;     // the product the world is placed around: at the origin
+let activeKeyShown = null;
+let framingAll = false;   // the camera frames the whole project («Весь проект»)
 let lastFrameTime = 0;
 // «Студия» / «День» / «Вечер» and the furniture fronts' colour (RoomLayout).
 let roomMode = 'studio';
@@ -393,7 +400,8 @@ function applyStone(materials, desc, fade) {
   stone.bumpScale = desc.bumpScale;
   stone.envMapIntensity = desc.envMapIntensity;
   stone.userData.tileUniforms.stoneGlow.value = desc.translucent ? 0.24 : 0;
-  const current = () => materials.descriptor === desc && productGroup && productGroup.userData.materials === materials;
+  const isActive = () => !!(productGroup && productGroup.userData.materials === materials);
+  const current = () => materials.descriptor === desc && (isActive() || companions.some(c => c.group.userData.materials === materials));
 
   const cached = desc.source === 'image' && stoneTextures.get(desc.imageUrl);
   if (cached && cached.entry) {
@@ -418,7 +426,7 @@ function applyStone(materials, desc, fade) {
   loadStonePhoto(desc).then(photo => {
     // Only if this stone is still the one on screen.
     if (!photo || !current()) return;
-    const smoothly = !reducedMotion.matches;
+    const smoothly = !reducedMotion.matches && isActive();
     if (smoothly && !materials.pending) holdCurrentLook(materials);
     showLook(materials, photoLook(materials, desc, photo), smoothly);
   });
@@ -1168,6 +1176,8 @@ function disposeGroup(group) {
 // Soft architectural light, placed relative to the model so a 0.4 m step
 // and a 5 m kitchen get the same quality of light and shadow.
 function placeLights(bounds) {
+  // A project: the light is set for all its products, not only the active one.
+  if (projectUnion) bounds = projectUnion;
   const c = [0, 1, 2].map(i => (bounds.min[i] + bounds.max[i]) / 2);
   const size = Math.max(bounds.max[0] - bounds.min[0], bounds.max[1] - bounds.min[1], bounds.max[2] - bounds.min[2], 0.5);
   const at = (light, dir, dist) => {
@@ -1398,6 +1408,13 @@ function applyRoomState(S) {
   renderer.toneMappingExposure = S.exposure;
   shown = { room: S.room, glow: S.glow, lamps: S.lamps, front: S.front.clone() };
   setLamps(S.lamps);
+  // A project: the room is built for the active product, so the others leave while it is shown.
+  companions.forEach(c => { c.group.visible = S.room < 0.5; });
+  if (projectFloor) {
+    projectFloor.material.opacity = 1 - S.room;
+    projectFloor.material.depthWrite = S.room <= 0;
+    projectFloor.visible = S.room < 1;
+  }
   if (!productGroup) return;
   let room = productGroup.userData.room;
   if (S.room > 0 && !room) room = buildRoom(productGroup);
@@ -1416,7 +1433,7 @@ function applyRoomState(S) {
     disc.material.opacity = opacity;
     // Fading, it must not hide the room's floor below it.
     disc.material.depthWrite = opacity >= 1;
-    disc.visible = opacity > 0;
+    disc.visible = opacity > 0 && !projectFloor;
   }
 }
 
@@ -1472,7 +1489,7 @@ function setRoom({ mode, facade }) {
 // What the room offers for the current product: a room at all, and fronts
 // to colour.
 function roomOptions() {
-  const data = hasModel && window.RoomLayout.buildRoom(lastLayout, lastProductKey);
+  const data = hasModel && lastLayout && window.RoomLayout.buildRoom(lastLayout, lastProductKey);
   return { hasRoom: !!data, hasFacades: !!(data && data.hasFacades) };
 }
 
@@ -1593,9 +1610,15 @@ function currentDirection() {
   return d.lengthSq() > 1e-9 ? [d.x, d.y, d.z] : [1, 0.8, 1];
 }
 
-// Where the camera goes to show the whole product from `direction`.
-function fitView(direction) {
-  const fit = window.CameraFraming.fitCamera({ bounds: lastBounds, direction, fovDeg: FOV_DEG, aspect: camera.aspect, padding: framePadding });
+// What the camera frames: the active product, or the whole project («Весь проект», or no active
+// product yet -- a new one still being chosen).
+function frameBounds() {
+  return (framingAll || !lastBounds) && projectUnion ? projectUnion : lastBounds;
+}
+
+// Where the camera goes to show the whole product from `direction` (`bounds`: another one's).
+function fitView(direction, bounds) {
+  const fit = window.CameraFraming.fitCamera({ bounds: bounds || frameBounds(), direction, fovDeg: FOV_DEG, aspect: camera.aspect, padding: framePadding });
   return {
     target: fit.target, position: fit.position,
     near: Math.max(0.01, fit.distance / 100), far: fit.distance * 40,
@@ -1616,7 +1639,7 @@ function placeCamera(view) {
 
 // `smooth`: the camera glides there (moveCamera) instead of jumping.
 function frame(direction, smooth) {
-  if (!lastBounds) return;
+  if (!frameBounds()) return;
   moveCamera(fitView(direction), smooth);
 }
 
@@ -1890,7 +1913,9 @@ function flushResize() {
   rebuild(geometryModel, materialDescriptor);
 }
 
-function update(geometryModel, materialDescriptor) {
+// opts.instant: another product of the project became the active one -- no easing from the one before.
+function update(geometryModel, materialDescriptor, opts) {
+  const instant = !!(opts && opts.instant);
   if (pendingResize) { clearTimeout(pendingResize.timer); pendingResize = null; }
   // Same geometry, another stone (or the same one again): only the stone
   // material changes -- meshes, lights, camera and controls stay as they are.
@@ -1905,22 +1930,22 @@ function update(geometryModel, materialDescriptor) {
     applyStone(materials, materialDescriptor, fade);
     return;
   }
-  if (productGroup && !reducedMotion.matches && productGroup.userData.shape === shapeOf(geometryModel)) {
+  if (!instant && productGroup && !reducedMotion.matches && productGroup.userData.shape === shapeOf(geometryModel)) {
     pendingResize = { geometryModel, materialDescriptor, timer: setTimeout(flushResize, RESIZE_SETTLE_MS) };
     return;
   }
-  rebuild(geometryModel, materialDescriptor);
+  rebuild(geometryModel, materialDescriptor, instant);
 }
 
-function rebuild(geometryModel, materialDescriptor) {
+function rebuild(geometryModel, materialDescriptor, instant) {
   lastModel = geometryModel;
   const geometryKey = JSON.stringify(geometryModel);
   const layout = window.SceneLayout.buildSceneLayout(geometryModel);
   const structure = geometryModel.productKey + '#' + structureOf(layout);
-  const resized = productGroup && lastBounds && layout.bounds && !reducedMotion.matches
+  const resized = !instant && productGroup && lastBounds && layout.bounds && !reducedMotion.matches
     && productGroup.userData.structure === structure ? shownBounds() : null;
   // The wall elements of the same product on screen now (rise: the same product, other elements).
-  const previousWall = productGroup && !reducedMotion.matches && lastProductKey === geometryModel.productKey
+  const previousWall = !instant && productGroup && !reducedMotion.matches && lastProductKey === geometryModel.productKey
     ? Object.keys(productGroup.userData.wall || {}).reduce((o, name) => {
       const e = productGroup.userData.wall[name];
       o[name] = { center: e.center, size: e.size, shown: e.shown || null };
@@ -1938,6 +1963,8 @@ function rebuild(geometryModel, materialDescriptor) {
   productGroup.userData.structure = structure;
   productGroup.userData.shape = shapeOf(geometryModel);
   scene.add(productGroup);
+  // A project: one floor under all of it, not the product's own disc.
+  if (projectFloor && productGroup.userData.floorDisc) productGroup.userData.floorDisc.visible = false;
   if (previousWall) startRise(productGroup, previousWall);
   if (!resized) morph = null;
   if (layout.bounds && !resized) placeLights(layout.bounds);
@@ -2010,8 +2037,11 @@ function resetView() {
 // read before the browser can clear it (no preserveDrawingBuffer) and before
 // it paints, so the client never sees it -- then everything is put back. The
 // client's own view (userAdjusted) is not touched.
-function capture(presetName, { width, height }) {
-  if (!renderer || !hasModel || !lastBounds) return null;
+// opts.only: 'active' (the default), 'all' (the whole project) or a companion's key.
+function capture(presetName, { width, height }, opts) {
+  const only = (opts && opts.only) || 'active';
+  const target = only === 'active' || only === 'all' ? null : companions.find(c => c.key === only);
+  if (!renderer || !hasModel || (only === 'active' && !lastBounds) || (only === 'all' && !(projectUnion || lastBounds)) || (only !== 'active' && only !== 'all' && !target)) return null;
   flushResize();
   if (morph) { morph.spring.x = morph.spring.goal.slice(); stepMorph(0); }
   if (rise) finishRise();
@@ -2028,20 +2058,46 @@ function capture(presetName, { width, height }) {
   const studio = onScreen.room === 0 && onScreen.lamps === 0 && !roomFade;
   try {
     if (!studio) applyRoomState(roomTarget('studio'));
-    const dimLines = productGroup.userData.dims && productGroup.userData.dims.lines;
+    const dimLines = productGroup && productGroup.userData.dims && productGroup.userData.dims.lines;
     if (dimLines) dimLines.visible = false;
+    // Only what the shot is of: the others are hidden for it; a single product stands on its own disc.
+    shotScene(only, target, true);
     renderer.setPixelRatio(1);
     renderer.setSize(width, height, false);
     camera.aspect = width / height;
-    placeCamera(fitView(preset.direction));
+    const bounds = only === 'all' ? (projectUnion || lastBounds)
+      : target ? { min: target.layout.bounds.min.map((v, k) => v + target.group.position.getComponent(k)), max: target.layout.bounds.max.map((v, k) => v + target.group.position.getComponent(k)) }
+      : lastBounds;
+    placeCamera(fitView(preset.direction, bounds));
     renderer.render(scene, camera);
     url = renderer.domElement.toDataURL('image/jpeg', 0.9);
   } finally {
+    shotScene(only, target, false);
     if (!studio) applyRoomState(onScreen);
-    if (productGroup.userData.dims) productGroup.userData.dims.lines.visible = dimsShown > 0;
+    if (productGroup && productGroup.userData.dims) productGroup.userData.dims.lines.visible = dimsShown > 0;
     restoreView(saved, size);
   }
   return url;
+}
+
+// For a shot (on: true) only its product(s), each single product on its own floor disc; back after it.
+function shotScene(only, target, on) {
+  if (!companions.length) return;
+  const single = only !== 'all';
+  const show = (group, visible) => {
+    if (!group) return;
+    group.visible = visible;
+    if (group.userData.floorDisc) group.userData.floorDisc.visible = on && single && visible;
+  };
+  if (on) {
+    show(productGroup, only === 'all' || only === 'active');
+    companions.forEach(c => show(c.group, only === 'all' || c === target));
+    if (projectFloor) projectFloor.visible = only === 'all';
+  } else {
+    show(productGroup, true);
+    companions.forEach(c => show(c.group, true));
+    applyRoomState(roomCurrent());
+  }
 }
 
 function restoreView(saved, size) {
@@ -2082,6 +2138,145 @@ function dispose() {
   textures = null;
   lastBounds = null; lastLayout = null; lastProductKey = null; hasModel = false; userAdjusted = false;
   cameraMove = null; morph = null; rise = null; lastFrameTime = 0;
+  companions.forEach(disposeCompanion);
+  companions = []; clearProjectFloor(); projectUnion = null; anchorKey = null; activeKeyShown = null; framingAll = false;
+}
+
+// ---- the project (the owner, 2026-11-17) -----------------------------------
+//
+// The project's products in one scene: the active one is the product above (productGroup -- its room,
+// sizes, easing, AR); the others are companions, built from their own models and placed as a showcase
+// (ProjectLayout) around it, so the active one stays at the origin and all of the above works as it
+// does for one product. When another product becomes the active one, the world moves under it and the
+// camera moves with the world -- the picture does not jump -- then glides to the new active product.
+
+function disposeCompanion(c) {
+  if (scene) scene.remove(c.group);
+  disposeGroup(c.group);
+}
+
+function shiftWorld(d) {
+  if (!d || (!d[0] && !d[1] && !d[2])) return;
+  camera.position.x += d[0]; camera.position.y += d[1]; camera.position.z += d[2];
+  controls.target.x += d[0]; controls.target.y += d[1]; controls.target.z += d[2];
+  if (cameraMove) for (let k = 0; k < 3; k++) cameraMove.spring.x[k] += d[k];
+  controls.update();
+}
+
+function setProjectFloor(union, floorY) {
+  const radius = Math.max(union.max[0] - union.min[0], union.max[2] - union.min[2]) * 0.6 + 1.2;
+  if (projectFloor) { scene.remove(projectFloor); projectFloor.geometry.dispose(); projectFloor.material.dispose(); }
+  const disc = new THREE.CircleGeometry(radius, 96);
+  disc.rotateX(-Math.PI / 2);
+  const material = new THREE.MeshStandardMaterial({ color: FLOOR_COLOR, roughness: 0.92, metalness: 0, alphaMap: textures.floorFade, transparent: true, envMapIntensity: 0.3 });
+  projectFloor = new THREE.Mesh(disc, material);
+  projectFloor.position.set((union.min[0] + union.max[0]) / 2, floorY - 0.0005, (union.min[2] + union.max[2]) / 2);
+  projectFloor.receiveShadow = true;
+  scene.add(projectFloor);
+}
+
+function clearProjectFloor() {
+  if (!projectFloor) return;
+  if (scene) scene.remove(projectFloor);
+  projectFloor.geometry.dispose();
+  projectFloor.material.dispose();
+  projectFloor = null;
+}
+
+// Every product of the project in its order: { key, geometryModel, materialDescriptor } -- the active
+// one (activeIndex) is the one update() shows (its model here is not used); a product without a model
+// yet (no sizes) has none and no place. activeKey: the active product's key.
+function setCompanions(list, activeIndex, activeKey) {
+  if (!scene) return;
+  const keep = new Set();
+  const placed = [];
+  list.forEach((it, i) => {
+    if (i === activeIndex) {
+      if (productGroup && lastLayout && lastLayout.bounds) placed.push({ key: it.key, layout: lastLayout, active: true });
+      return;
+    }
+    if (!it.geometryModel || !it.materialDescriptor) return;
+    const modelKey = JSON.stringify(it.geometryModel) + '|' + JSON.stringify(it.materialDescriptor);
+    let c = companions.find(x => x.key === it.key);
+    if (c && c.modelKey !== modelKey) { disposeCompanion(c); companions = companions.filter(x => x !== c); c = null; }
+    if (!c) {
+      const layout = window.SceneLayout.buildSceneLayout(it.geometryModel);
+      if (!layout.bounds) return;
+      c = { key: it.key, layout, modelKey, group: buildProductGroup(layout, it.materialDescriptor) };
+      if (c.group.userData.floorDisc) c.group.userData.floorDisc.visible = false;
+      scene.add(c.group);
+      companions.push(c);
+    }
+    keep.add(c.key);
+    placed.push({ key: it.key, layout: c.layout, companion: c });
+  });
+  companions.filter(c => !keep.has(c.key)).forEach(disposeCompanion);
+  companions = companions.filter(c => keep.has(c.key));
+
+  const activeChanged = activeKey !== activeKeyShown;
+  activeKeyShown = activeKey;
+  // One product (or none): the scene is the product's own, as before.
+  if (!companions.length) {
+    projectUnion = null;
+    clearProjectFloor();
+    if (productGroup && productGroup.userData.floorDisc) productGroup.userData.floorDisc.visible = true;
+    anchorKey = activeKey;
+    framingAll = false;
+    if (lastBounds) placeLights(lastBounds);
+    return;
+  }
+  hasModel = true;
+  let anchor = placed.findIndex(p => p.active);
+  if (anchor < 0) anchor = Math.max(0, placed.findIndex(p => p.key === anchorKey));
+  const { offsets, union } = window.ProjectLayout.arrange(placed.map(p => ({ bounds: p.layout.bounds, floorY: p.layout.floorY })), anchor);
+  // The world moves under a new anchor; the camera with it, so nothing jumps.
+  const oldAnchor = placed.findIndex(p => p.key === anchorKey);
+  if (anchorKey && placed[anchor].key !== anchorKey && oldAnchor >= 0) shiftWorld(offsets[oldAnchor]);
+  anchorKey = placed[anchor].key;
+  placed.forEach((p, i) => { if (p.companion) p.companion.group.position.set(...offsets[i]); });
+  const unionChanged = !projectUnion || JSON.stringify(projectUnion) !== JSON.stringify(union);
+  projectUnion = union;
+  if (unionChanged) setProjectFloor(union, placed[anchor].layout.floorY);
+  if (productGroup && productGroup.userData.floorDisc) productGroup.userData.floorDisc.visible = false;
+  applyRoomState(roomCurrent());
+  placeLights(union);
+  if (activeChanged) {
+    // A new active product: the camera glides to it; none yet (a new one being chosen): to all.
+    framingAll = !productGroup;
+    moveCamera(fitView(viewDirection()), true);
+    userAdjusted = false;
+  } else if (unionChanged && framingAll && !userAdjusted) {
+    frame(viewDirection(), true);
+  }
+}
+
+// A new product being chosen: no active one on screen; the others stay.
+function clearActive() {
+  if (pendingResize) { clearTimeout(pendingResize.timer); pendingResize = null; }
+  if (!productGroup) return;
+  scene.remove(productGroup);
+  disposeRoom(productGroup);
+  disposeDims(productGroup);
+  disposeGroup(productGroup);
+  productGroup = null;
+  lastModel = null; lastLayout = null; lastBounds = null; lastProductKey = null;
+  morph = null; rise = null;
+}
+
+// «Весь проект»: the camera glides to show every product.
+function focusProject() {
+  if (!projectUnion) return;
+  framingAll = true;
+  moveCamera(fitView(viewDirection()), true);
+  userAdjusted = false;
+}
+
+// Back to the active product.
+function focusActive() {
+  framingAll = false;
+  if (!lastBounds) return;
+  moveCamera(fitView(viewDirection()), true);
+  userAdjusted = false;
 }
 
 // ---- AR («Поставить у себя в комнате», the owner, 2026-10-22) -------------
@@ -2137,6 +2332,6 @@ function startAr(mode) {
     });
 }
 
-const ThreeScene = { init, update, setView, resetView, showEdge, canShowEdge, setRoom, roomOptions, setDimensions, canShowDimensions, canShowAr, startAr, capture, dispose };
+const ThreeScene = { init, update, setView, resetView, showEdge, canShowEdge, setRoom, roomOptions, setDimensions, canShowDimensions, canShowAr, startAr, capture, dispose, setCompanions, clearActive, focusProject, focusActive };
 window.ThreeScene = ThreeScene;
 export default ThreeScene;

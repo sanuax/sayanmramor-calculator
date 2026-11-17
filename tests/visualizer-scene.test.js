@@ -838,7 +838,7 @@ test('«Подгиб камнем» on steps and stairs: a stone strip under the
 // three-scene.js is an ES module (it imports three), so it is read as text here.
 test('ThreeScene exports capture() for the passport, and taking a shot never counts as the client looking around', () => {
   const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'visualizer', 'three-scene.js'), 'utf8');
-  assert.match(src, /const ThreeScene = \{ init, update, setView, resetView, showEdge, canShowEdge, setRoom, roomOptions, setDimensions, canShowDimensions, canShowAr, startAr, capture, dispose \};/);
+  assert.match(src, /const ThreeScene = \{ init, update, setView, resetView, showEdge, canShowEdge, setRoom, roomOptions, setDimensions, canShowDimensions, canShowAr, startAr, capture, dispose, setCompanions, clearActive, focusProject, focusActive \};/);
   const start = src.indexOf('function capture(');
   assert.ok(start > 0, 'function capture');
   const body = src.slice(start, src.indexOf('\n}\n', start));
@@ -956,4 +956,19 @@ test('the П landing: only the part of its front the upper march does not start 
   assert.ok(Math.abs(landing.openLengthM - 1.1) < 1e-9, 'open: the arriving march 1.0 + the 0.1 gap');
   const lLanding = named(layoutFor('lestnitsa', { width: { value: '1000' }, length: { value: '3000' }, 'step-count': { value: '5' }, productSubcategory: { value: 'STAIR-03' } }), 'landing')[0];
   assert.equal(lLanding.openLengthM, undefined, 'a Г landing\'s front is open over its whole width');
+});
+
+// The project (the owner, 2026-11-17): the other products of the project beside the active one,
+// «Весь проект», a glide to each; a room shows the active product alone; a passport shot takes one
+// product or the whole project.
+test('the project\'s 3D: companions, the whole project, the room shows the active one alone, a shot of one or all', () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'visualizer', 'three-scene.js'), 'utf8');
+  const body = name => { const s = src.indexOf('function ' + name + '('); assert.ok(s > 0, name); return src.slice(s, src.indexOf('\n}\n', s)); };
+  assert.match(body('setCompanions'), /ProjectLayout\.arrange\(/, 'the showcase places them');
+  assert.match(body('setCompanions'), /shiftWorld\(/, 'a new active product: the world moves, the view does not jump');
+  assert.match(body('applyRoomState'), /companions\.forEach\(/, 'a room hides the companions');
+  assert.match(body('capture'), /only/, 'a shot of one product or all');
+  assert.match(body('focusProject'), /framingAll = true/);
+  assert.match(body('focusActive'), /framingAll = false/);
+  assert.match(body('update'), /instant/, 'switching products: no morph from the one before');
 });
