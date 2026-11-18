@@ -122,3 +122,43 @@ test('a surface product of the same stone takes the slabs the pieces left', () =
   const used = p.groups[0].slabs.map(s => s.article);
   assert.equal(new Set(used).size, used.length, 'no slab counted twice');
 });
+
+// ---- the final review's fixes (2026-11-18) ----
+
+test('a product priced twice from the same state is priced once', () => {
+  const s = countertop(stone('a', 4));
+  assert.equal(ProjectPricing.priceItem(s), ProjectPricing.priceItem(s));
+});
+
+// One stone's products: cut together or one after another, whichever costs less and works (on the real
+// slabs where the review found it: together dearer -- calacatta; together short, in turn fine --
+// calacatta-da-vinci, imperial-cream). A stone the weekly update has dropped is skipped.
+const REAL = require('../data/slabs.json');
+const Pricing = require('../pricing.js');
+const realStone = id => (REAL.stones || REAL).find(s => s.id === id && s.available !== false);
+function inTurn(states) {
+  let pool = states[0].stone.slabs, sum = 0;
+  for (const s of states) {
+    const a = ProjectPricing.priceItem(s);
+    const plan = Pricing.planMaterial({ slabs: pool, job: a.inputs.job, marginCm: ProductTypes.SAW_MARGIN_CM, usageLimit: ProductTypes.SLAB_USAGE_LIMIT });
+    if (!plan.ok) return null;
+    sum += plan.subtotal;
+    pool = pool.filter(x => !plan.slabs.includes(x));
+  }
+  return sum;
+}
+[
+  ['calacatta', st => [countertop(st, { width: v(600), length: v(3000) }), sill(st, { width: v(400), length: v(1800) })]],
+  ['calacatta-da-vinci', st => [countertop(st, { width: v(650), length: v(2600) }), countertop(st, { width: v(650), length: v(2600) })]],
+  ['imperial-cream', st => [countertop(st, { width: v(650), length: v(2600) }), countertop(st, { width: v(650), length: v(2600) })]],
+].forEach(([id, make]) => {
+  const st = realStone(id);
+  test('one stone\'s cut is never dearer, nor short, where cutting in turn works: ' + id, { skip: !st && 'not in the catalog now' }, () => {
+    const states = make(st);
+    const turn = inTurn(states);
+    if (turn === null) return;
+    const p = ProjectPricing.priceProject(states);
+    assert.equal(p.groups[0].ok, true, 'cut: ' + p.groups[0].reason);
+    assert.ok(p.groups[0].subtotal <= turn + 1, p.groups[0].subtotal + ' <= ' + turn);
+  });
+});

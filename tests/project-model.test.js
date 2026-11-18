@@ -96,3 +96,39 @@ test('newItemId: different every time', () => {
   const a = ProjectModel.newItemId(), b = ProjectModel.newItemId();
   assert.ok(a && b && a !== b);
 });
+
+// ---- the final review's fixes (2026-11-18) ----
+
+test('snapshotDoc: a mirrored field (the step count, the facade quantity) is read from the field it mirrors', () => {
+  const mirrors = { 'step-count': 'stepCountInput', 'facade-quantity': 'facadeQtyInput' };
+  const doc = ProjectModel.snapshotDoc({ stepCountInput: '10' }, {}, mirrors);
+  assert.equal(doc.getElementById('step-count').value, '10');
+  assert.equal(doc.getElementById('facade-quantity').value, '', 'not in the snapshot: the page\'s own default');
+  // The state reader sees the count the client chose, not the product's default.
+  const ConstructorState = require('../constructor-state.js');
+  const ProductTypes = require('../product-types.js');
+  const state = ConstructorState.readConstructorState({
+    doc: ProjectModel.snapshotDoc({ width: '300', length: '1200', productSubcategory: 'STEP-01', stepCountInput: '10' }, {}, mirrors),
+    selectedProductKey: 'stupeni', product: ProductTypes.PRODUCTS.stupeni, stone: null, hasAdditionalWork: ProductTypes.hasAdditionalWork,
+  });
+  assert.equal(state.stepCount, 10);
+});
+
+test('a project with a product the calculator does not know is cut down to what it knows; nothing known: none', () => {
+  const known = key => key === 'pol' || key === 'podokonnik';
+  const p = { items: [{ id: 'a', productKey: 'pol', stoneId: 's', fields: {} }, { id: 'b', productKey: 'gone', stoneId: 's', fields: {} }, { id: 'c', productKey: 'podokonnik', stoneId: 's', fields: {} }], active: 2 };
+  const back = ProjectModel.deserialize(JSON.stringify(p), known);
+  assert.deepEqual(back.items.map(i => i.id), ['a', 'c']);
+  assert.equal(back.items[back.active].id, 'c', 'the same product stays active');
+  assert.equal(ProjectModel.deserialize(JSON.stringify({ items: [p.items[1]], active: 0 }), known), null);
+  const q = new URLSearchParams('pv=2&p1=' + encodeURIComponent('product=gone&pv=1') + '&p2=' + encodeURIComponent('product=pol&pv=1&width=300') + '&a=2');
+  const link = ProjectModel.readProjectQuery(q, ['width'], known);
+  assert.deepEqual(link.items.map(i => i.productKey), ['pol']);
+  assert.equal(link.active, 0);
+});
+
+test('the project link: the active product is counted among the products the link carries', () => {
+  const p = { items: [{ id: 'a', productKey: null, stoneId: null, fields: {} }, { id: 'b', productKey: 'pol', stoneId: 's', fields: {} }, { id: 'c', productKey: 'podokonnik', stoneId: 's', fields: {} }], active: 2 };
+  const back = ProjectModel.readProjectQuery(new URLSearchParams(ProjectModel.buildProjectQuery(p)), []);
+  assert.equal(back.items[back.active].productKey, 'podokonnik');
+});

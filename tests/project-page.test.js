@@ -105,3 +105,34 @@ test('the passport of a project: the project\'s page and each product\'s, shots 
 test('«Весь проект» in a room goes back to «Студия», where the whole project is', () => {
   assert.match(fn('renderViewerProject'), /data-room="studio"/);
 });
+
+// ---- the final review's fixes (2026-11-18) ----
+test('the counts of a product not edited are read through the fields they mirror; the edited one is priced from the form', () => {
+  assert.match(html, /const PROJECT_MIRRORS = \{ 'step-count': 'stepCountInput', 'facade-quantity': 'facadeQtyInput' \};/);
+  assert.match(fn('itemComputed'), /PROJECT_MIRRORS/);
+  assert.match(fn('priceProjectNow'), /lastCalcSnapshot/);
+});
+
+test('a stored project of several products is not overwritten by a page opened for one product', () => {
+  assert.match(fn('storeProject'), /projectOwned/);
+});
+
+test('a stock that is short for all the products of a stone together is said in words', () => {
+  assert.match(fn('projectReasonText'), /не хватает/);
+  assert.match(fn('renderProjectPricing'), /projectReasonText\(p\)/);
+  assert.match(fn('renderResultProject'), /projectReasonText\(p\)/);
+});
+
+test('the per-product memories of the form go back to their start too', () => {
+  const reset = fn('resetFormToInitial');
+  ['stepCountByProduct', 'facadeQtyByType', 'facadeSizesByType', 'fireplaceSizesByType', 'facadeFieldsOwner', 'fireplaceFieldsOwner'].forEach(n => assert.match(reset, new RegExp(n), n));
+});
+
+test('no product on screen: the 3D buttons for it (edge, sizes, AR, rooms) are refreshed', () => {
+  assert.match(fn('updateProjectScene'), /updateViewerButtons\(\)/);
+});
+
+test('a product the calculator does not know never reaches the form', () => {
+  assert.match(html, /ProjectModel\.deserialize\(localStorage\.getItem\(PROJECT_STORE_KEY\), isKnownProduct\)/);
+  assert.match(html, /ProjectModel\.readProjectQuery\(bootstrapParams, passportFieldControls\(\)\.map\(el => el\.id\), isKnownProduct\)/);
+});

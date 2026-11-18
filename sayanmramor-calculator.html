@@ -2407,7 +2407,7 @@
 <script src="visualizer/scene-layout.js?v=4bb239a3"></script>
 <script src="visualizer/project-layout.js?v=f2b025b1"></script>
 <script src="edge-length.js?v=d8830f9d"></script>
-<script src="project-pricing.js?v=81cd00ed"></script>
+<script src="project-pricing.js?v=242c15e2"></script>
 <script src="visualizer/camera-framing.js?v=db6de54c"></script>
 <script src="visualizer/webgl-support.js?v=014e10bd"></script>
 <script src="visualizer/camera-preset-tracker.js?v=6235ae21"></script>
@@ -2415,11 +2415,11 @@
 <script src="passport-link.js?v=f148d340"></script>
 <script src="passport-model.js?v=66c7942d"></script>
 <script src="passport-pdf.js?v=de04eb04"></script>
-<script src="project-model.js?v=89d7396d"></script>
+<script src="project-model.js?v=b1becc52"></script>
 <!-- IMPORTMAP -->
-<script type="importmap">{"imports":{"./visualizer/ar-view.js":"./visualizer/ar-view.js?v=49e075d1","./visualizer/three-scene.js":"./visualizer/three-scene.js?v=82022a30"}}</script>
+<script type="importmap">{"imports":{"./visualizer/ar-view.js":"./visualizer/ar-view.js?v=49e075d1","./visualizer/three-scene.js":"./visualizer/three-scene.js?v=8f92c8bb"}}</script>
 <!-- /IMPORTMAP -->
-<script type="module" src="visualizer/three-scene.js?v=82022a30"></script>
+<script type="module" src="visualizer/three-scene.js?v=8f92c8bb"></script>
 <script>
   const { PRODUCTS, hasAdditionalWork } = ProductTypes;
   const { getSubcategoriesForProduct, getAdditionalWorkRate } = RateCatalog;
@@ -3525,7 +3525,9 @@
   const passportInitial = new Map(passportFieldControls().map(el => [el.id, { value: el.value, checked: el.checked }]));
   const bootstrapParams = new URLSearchParams(window.location.search);
   // A project's link (pv=2, the owner, 2026-11-17) opens the whole project; a passport link (pv=1) one product.
-  const projectLink = ProjectModel.readProjectQuery(bootstrapParams, passportFieldControls().map(el => el.id));
+  // A product the calculator offers -- a stored project or a link with another one leaves it out.
+  const isKnownProduct = key => !!(PRODUCTS[key] && !PRODUCTS[key].configuratorHidden);
+  const projectLink = ProjectModel.readProjectQuery(bootstrapParams, passportFieldControls().map(el => el.id), isKnownProduct);
   const passportLink = projectLink ? null : PassportLink.readPassportQuery(bootstrapParams, passportFieldControls().map(el => el.id));
   const initialProductKey = UrlBootstrap.resolveInitialProductKey(bootstrapParams.get('product'), PRODUCTS);
   if (initialProductKey) {
@@ -3564,6 +3566,7 @@
       if (passportLink && selectedProductKey) openPassportStep();
       if (projectLink) {
         project = projectLink;
+        projectOwned = true;
         loadItem(project.items[project.active]);
         if (selectedProductKey) openPassportStep();
       }
@@ -4601,6 +4604,19 @@
     return EdgeLength.openEdgeLengthM(SceneLayout.buildSceneLayout(GeometryModel.buildGeometryModel(state)));
   }
 
+  // The 3D's buttons for the product on screen (edge, rooms, AR, sizes) -- after a new model, or none.
+  function updateViewerButtons() {
+    document.getElementById('viewerEdge').hidden = !window.ThreeScene.canShowEdge();
+    updateViewerRoom();
+    updateViewerAr();
+    const dimsBtn = document.getElementById('viewerDims');
+    dimsBtn.hidden = !window.ThreeScene.canShowDimensions();
+    if (dimsBtn.hidden && dimsBtn.getAttribute('aria-pressed') === 'true') {
+      dimsBtn.setAttribute('aria-pressed', 'false');
+      window.ThreeScene.setDimensions(false);
+    }
+  }
+
   // Returns { state, outcome } -- outcome.kind is 'incomplete' | 'manual' |
   // 'ok' (see ResultModel.summarizePricing) -- from every exit point.
   function computeAndRenderSummary() {
@@ -4665,15 +4681,7 @@
       window.ThreeScene.update(geometryModel, materialDescriptor, { instant: sceneActiveId !== null && activeId !== sceneActiveId });
       sceneActiveId = activeId;
       sceneUpdatedThisCalc = true;
-      document.getElementById('viewerEdge').hidden = !window.ThreeScene.canShowEdge();
-      updateViewerRoom();
-      updateViewerAr();
-      const dimsBtn = document.getElementById('viewerDims');
-      dimsBtn.hidden = !window.ThreeScene.canShowDimensions();
-      if (dimsBtn.hidden && dimsBtn.getAttribute('aria-pressed') === 'true') {
-        dimsBtn.setAttribute('aria-pressed', 'false');
-        window.ThreeScene.setDimensions(false);
-      }
+      updateViewerButtons();
     }
 
     if (!selectedProductKey) {
@@ -5277,7 +5285,10 @@
   // others beside it (ThreeScene.setCompanions). The project is kept in the browser.
   // `var`: calculate() may run before this part of the script has (DATA_LOADED guards it, but not a TDZ).
   const PROJECT_STORE_KEY = 'sayan-calc-project';
+  // Hidden fields the page keeps equal to a visible one: a snapshot has the visible one only.
+  const PROJECT_MIRRORS = { 'step-count': 'stepCountInput', 'facade-quantity': 'facadeQtyInput' };
   var project = null;
+  var projectOwned = false;   // this page built or opened a project of several products: it may store it
   var projectSwitching = false;
   var sceneUpdatedThisCalc = false;
   var sceneActiveId = null;
@@ -5316,7 +5327,7 @@
     if (hit && hit.sig === sig) return hit;
     const stone = item.stoneId ? STONES_BY_ID[item.stoneId] || null : null;
     const state = ConstructorState.readConstructorState({
-      doc: ProjectModel.snapshotDoc(item.fields, PROJECT_INITIAL), selectedProductKey: item.productKey,
+      doc: ProjectModel.snapshotDoc(item.fields, PROJECT_INITIAL, PROJECT_MIRRORS), selectedProductKey: item.productKey,
       product: PRODUCTS[item.productKey], stone, hasAdditionalWork,
     });
     const geometryModel = ProjectPricing.sizesReady(state) ? GeometryModel.buildGeometryModel(state) : null;
@@ -5326,8 +5337,17 @@
     return entry;
   }
 
+  // A page opened for one product (a site link, a passport) never writes over a stored project of
+  // several: only a project this page built or opened is stored (projectOwned).
   function storeProject() {
-    try { localStorage.setItem(PROJECT_STORE_KEY, ProjectModel.serialize(project)); } catch (e) { /* the project still works on the page */ }
+    if (project.items.length > 1) projectOwned = true;
+    try {
+      if (!projectOwned) {
+        const stored = ProjectModel.deserialize(localStorage.getItem(PROJECT_STORE_KEY), isKnownProduct);
+        if (stored && stored.items.length > 1) return;
+      }
+      localStorage.setItem(PROJECT_STORE_KEY, ProjectModel.serialize(project));
+    } catch (e) { /* the project still works on the page */ }
   }
 
   // After every calculation: the active product's snapshot, the list, the 3D, the browser's copy.
@@ -5349,7 +5369,10 @@
   function updateProjectScene() {
     if (!viewerReady || !window.ThreeScene || !window.ThreeScene.setCompanions || !project) return;
     // A product with no model yet (a new one being chosen): no stale one left on screen.
-    if (project.items.length > 1 && !sceneUpdatedThisCalc) window.ThreeScene.clearActive();
+    if (project.items.length > 1 && !sceneUpdatedThisCalc) {
+      window.ThreeScene.clearActive();
+      updateViewerButtons();
+    }
     const list = project.items.map((item, i) => {
       if (i === project.active) return { key: item.id };
       const c = itemComputed(item);
@@ -5427,8 +5450,13 @@
       if (input && parseFloat(input.value) > 0) card.click();
     });
     wingRowsAll.forEach(row => clearWingRow(row));
-    Object.keys(facadeFormByType).forEach(k => { delete facadeFormByType[k]; });
-    Object.keys(fireplaceFormByType).forEach(k => { delete fireplaceFormByType[k]; });
+    // The per-product memories: the count of steps, a facade's / fireplace's sizes and quantity by type.
+    [facadeFormByType, fireplaceFormByType, facadeQtyByType, facadeSizesByType, fireplaceSizesByType, stepCountByProduct].forEach(map => {
+      Object.keys(map).forEach(k => { delete map[k]; });
+    });
+    Object.assign(stepCountByProduct, ConstructorState.STEP_COUNT_DEFAULTS);
+    facadeFieldsOwner.typeId = null;
+    fireplaceFieldsOwner.typeId = null;
     passportFieldControls().forEach(control => {
       const start = passportInitial.get(control.id) || { value: '', checked: false };
       const isBox = control.type === 'checkbox' || control.type === 'radio';
@@ -5495,7 +5523,10 @@
     const computed = project.items.map(item => itemComputed(item));
     const key = computed.map(c => (c ? c.sig : '-')).join('|');
     if (key === projectPricingKey && projectPricing) return;
-    projectPricing = ProjectPricing.priceProject(computed.map(c => (c ? c.state : null)));
+    // The edited product as the page reads it -- the form itself (lastCalcSnapshot); the others from their snapshots.
+    const live = lastCalcSnapshot && lastCalcSnapshot.state;
+    const activeKey = project.items[project.active].productKey;
+    projectPricing = ProjectPricing.priceProject(computed.map((c, i) => (i === project.active && live && live.product && live.product.key === activeKey ? live : (c ? c.state : null))));
     projectPricingKey = key;
   }
 
@@ -5520,6 +5551,18 @@
     if (p.minOrderTopUp > 0) lines.push({ label: 'До минимального заказа', value: formatRub(p.minOrderTopUp) });
     return lines;
   }
+  // Why the project's total is the manager's, in words: a stone whose stock is short for all its
+  // products together, or a product the manager prices.
+  function projectReasonText(p) {
+    const failed = p.groups.find(g => g.ok === false);
+    if (failed) {
+      const stone = STONES_BY_ID[failed.stoneId];
+      return 'На складе не хватает плит ' + (stone ? stone.name : '') + ' на все изделия из этого камня вместе - раскрой подберёт менеджер.';
+    }
+    const i = p.items.findIndex(it => it.kind === 'manual' || (it.kind === 'ok' && it.price === null));
+    return i >= 0 ? 'Цену изделия «' + itemTitle(project.items[i]) + '» уточнит менеджер.' : '';
+  }
+
   function renderProjectPricing() {
     const inProject = !!(project && project.items.length > 1 && projectPricing);
     priceLabelEl.textContent = inProject ? 'Стоимость проекта' : 'Ориентировочная стоимость';
@@ -5532,8 +5575,9 @@
     else setPriceHint('Заполните все изделия проекта, чтобы увидеть общую стоимость');
     remainderOut.textContent = '';
     const lines = projectExtraLines(p);
-    projectExtrasEl.textContent = lines.map(l => l.label + ': ' + l.value).join(' · ');
-    projectExtrasEl.hidden = !lines.length;
+    const reason = p.kind === 'manual' ? projectReasonText(p) : '';
+    projectExtrasEl.textContent = [reason].concat(lines.map(l => l.label + ': ' + l.value)).filter(Boolean).join(' · ');
+    projectExtrasEl.hidden = !projectExtrasEl.textContent;
   }
 
   // The share link: the project's (pv=2) once there are two products, the product's own (pv=1) before.
@@ -5586,7 +5630,7 @@
     resultTotalEl.textContent = priced ? '≈ ' + ResultModel.formatRub(p.total) + '*' : 'Стоимость уточнит менеджер';
     resultTotalEl.classList.toggle('is-manual', !priced);
     document.getElementById('resultRegionNote').hidden = !priced;
-    const manual = p.kind === 'incomplete' ? 'Заполните все изделия проекта, чтобы увидеть общую стоимость.' : (priced ? '' : 'Стоимость части проекта уточнит менеджер.');
+    const manual = p.kind === 'incomplete' ? 'Заполните все изделия проекта, чтобы увидеть общую стоимость.' : (priced ? '' : (projectReasonText(p) || 'Стоимость части проекта уточнит менеджер.'));
     resultManualEl.textContent = manual;
     resultManualEl.hidden = !manual;
     resultProjectCards.replaceChildren(...project.items.map((item, i) => {
@@ -5643,9 +5687,10 @@
   // A page opened on its own (no product, no passport link): the project the client was building.
   function restoreStoredProject() {
     let stored = null;
-    try { stored = ProjectModel.deserialize(localStorage.getItem(PROJECT_STORE_KEY)); } catch (e) { stored = null; }
+    try { stored = ProjectModel.deserialize(localStorage.getItem(PROJECT_STORE_KEY), isKnownProduct); } catch (e) { stored = null; }
     if (!stored || stored.items.length < 2) return;
     project = stored;
+    projectOwned = true;
     loadItem(project.items[project.active]);
   }
 

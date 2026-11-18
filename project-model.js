@@ -64,27 +64,31 @@
   function buildProjectQuery(project) {
     const params = new URLSearchParams();
     params.set('pv', String(PROJECT_VERSION));
-    let n = 0;
-    project.items.forEach(item => {
+    let n = 0, active = 1;
+    project.items.forEach((item, i) => {
       if (!item.productKey) return;   // a product not chosen yet is no part of the link
       n += 1;
+      if (i === project.active) active = n;   // counted among the products the link carries
       params.set(ITEM_PARAM(n), PassportLink.buildPassportQuery({ productKey: item.productKey, stoneId: item.stoneId, fields: item.fields }));
     });
-    params.set(ACTIVE_PARAM, String(project.active + 1));
+    params.set(ACTIVE_PARAM, String(active));
     return params.toString();
   }
 
-  // null: not a project link. Only the page's own field ids come back (fieldIds).
-  function readProjectQuery(params, fieldIds) {
+  // null: not a project link. Only the page's own field ids come back (fieldIds); a product the
+  // calculator does not know (isKnown(productKey) false -- one taken off, a broken link) is left out.
+  function readProjectQuery(params, fieldIds, isKnown) {
     if (params.get('pv') !== String(PROJECT_VERSION)) return null;
+    const wanted = parseInt(params.get(ACTIVE_PARAM), 10) || 1;
     const items = [];
+    let active = 0;
     for (let n = 1; params.has(ITEM_PARAM(n)); n++) {
       const one = PassportLink.readPassportQuery(new URLSearchParams(params.get(ITEM_PARAM(n))), fieldIds);
-      if (!one || !one.productKey) continue;
+      if (!one || !one.productKey || (isKnown && !isKnown(one.productKey))) continue;
+      if (n === wanted) active = items.length;
       items.push({ id: newItemId(), productKey: one.productKey, stoneId: one.stoneId || null, fields: one.fields });
     }
     if (!items.length) return null;
-    const active = Math.min(Math.max((parseInt(params.get(ACTIVE_PARAM), 10) || 1) - 1, 0), items.length - 1);
     return { items, active };
   }
 
@@ -94,23 +98,34 @@
     return JSON.stringify(project);
   }
 
-  function deserialize(text) {
+  // isKnown(productKey): a product the calculator still offers; one it does not is left out (a product
+  // not chosen yet, productKey null, stays).
+  function deserialize(text, isKnown) {
     if (typeof text !== 'string') return null;
     let p;
     try { p = JSON.parse(text); } catch (e) { return null; }
     if (!p || !Array.isArray(p.items) || !p.items.length) return null;
     const ok = p.items.every(i => i && typeof i.id === 'string' && i.fields && typeof i.fields === 'object');
     if (!ok) return null;
-    const active = Number.isInteger(p.active) && p.active >= 0 && p.active < p.items.length ? p.active : 0;
-    return { items: p.items.map(copyItem), active };
+    const wasActive = Number.isInteger(p.active) && p.active >= 0 && p.active < p.items.length ? p.items[p.active].id : null;
+    const items = p.items.filter(i => !i.productKey || !isKnown || isKnown(i.productKey)).map(copyItem);
+    if (!items.length) return null;
+    const active = Math.max(0, items.findIndex(i => i.id === wasActive));
+    return { items, active };
   }
 
   // ---- a product's choices as the state reader (ConstructorState) sees a form ------------------
 
   // `initial`: { [id]: { value, checked, type } } -- every control as the page starts. A field in the
   // snapshot is its value ('1' / '0' for a checkbox); any other control is the page's own start.
-  function snapshotDoc(fields, initial) {
-    const f = fields || {}, init = initial || {};
+  // `mirrors`: { [hidden id]: visible id } -- a hidden field the page keeps equal to a visible one (the
+  // step count, the facade quantity) is not in a snapshot; it is read from the field it mirrors.
+  function snapshotDoc(fields, initial, mirrors) {
+    const init = initial || {};
+    const f = Object.assign({}, fields || {});
+    Object.keys(mirrors || {}).forEach(hidden => {
+      if (!Object.prototype.hasOwnProperty.call(f, hidden) && Object.prototype.hasOwnProperty.call(f, mirrors[hidden])) f[hidden] = f[mirrors[hidden]];
+    });
     return {
       getElementById(id) {
         const start = init[id];

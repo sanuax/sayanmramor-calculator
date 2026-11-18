@@ -33,6 +33,8 @@ let projectFloor = null;  // one floor under the whole project (the groups' own 
 let anchorKey = null;     // the product the world is placed around: at the origin
 let activeKeyShown = null;
 let framingAll = false;   // the camera frames the whole project («Весь проект»)
+let framingAllAuto = false; // ...because no product was being edited (a new one): its first model takes the camera
+let lastCompanionArgs = null; // the last setCompanions call: the row is placed again after a deferred resize
 let lastFrameTime = 0;
 // «Студия» / «День» / «Вечер» and the furniture fronts' colour (RoomLayout).
 let roomMode = 'studio';
@@ -1408,8 +1410,9 @@ function applyRoomState(S) {
   renderer.toneMappingExposure = S.exposure;
   shown = { room: S.room, glow: S.glow, lamps: S.lamps, front: S.front.clone() };
   setLamps(S.lamps);
-  // A project: the room is built for the active product, so the others leave while it is shown.
-  companions.forEach(c => { c.group.visible = S.room < 0.5; });
+  // A project: the room is built for the active product, so the others leave while it is shown --
+  // unless no product is being edited (a new one being chosen): then the others are all there is.
+  companions.forEach(c => { c.group.visible = S.room < 0.5 || !productGroup; });
   if (projectFloor) {
     projectFloor.material.opacity = 1 - S.room;
     projectFloor.material.depthWrite = S.room <= 0;
@@ -1999,6 +2002,9 @@ function rebuild(geometryModel, materialDescriptor, instant) {
   hasModel = true;
   if (action === 'reset') setView(cameraPresetTracker.getDefaultPreset(), !first);
   else if (action === 'refit') { frame(viewDirection(), true); userAdjusted = false; }
+  // A project: the row placed again for the edited product's new size (a deferred resize arrives here
+  // after the page's setCompanions).
+  if (companions.length && lastCompanionArgs) setCompanions(...lastCompanionArgs);
 }
 
 // The view buttons glide (`smooth` unless false); the first model is
@@ -2145,6 +2151,7 @@ function dispose() {
   cameraMove = null; morph = null; rise = null; lastFrameTime = 0;
   companions.forEach(disposeCompanion);
   companions = []; clearProjectFloor(); projectUnion = null; anchorKey = null; activeKeyShown = null; framingAll = false;
+  framingAllAuto = false; lastCompanionArgs = null;
 }
 
 // ---- the project (the owner, 2026-11-17) -----------------------------------
@@ -2193,6 +2200,7 @@ function clearProjectFloor() {
 // yet (no sizes) has none and no place. activeKey: the active product's key.
 function setCompanions(list, activeIndex, activeKey) {
   if (!scene) return;
+  lastCompanionArgs = [list, activeIndex, activeKey];
   const keep = new Set();
   const placed = [];
   list.forEach((it, i) => {
@@ -2248,6 +2256,13 @@ function setCompanions(list, activeIndex, activeKey) {
   if (activeChanged) {
     // A new active product: the camera glides to it; none yet (a new one being chosen): to all.
     framingAll = !productGroup;
+    framingAllAuto = framingAll;
+    moveCamera(fitView(viewDirection()), true);
+    userAdjusted = false;
+  } else if (framingAllAuto && productGroup) {
+    // The new product has its first model: the camera goes to it.
+    framingAll = false;
+    framingAllAuto = false;
     moveCamera(fitView(viewDirection()), true);
     userAdjusted = false;
   } else if (unionChanged && framingAll && !userAdjusted) {
@@ -2272,6 +2287,7 @@ function clearActive() {
 function focusProject() {
   if (!projectUnion) return;
   framingAll = true;
+  framingAllAuto = false;
   moveCamera(fitView(viewDirection()), true);
   userAdjusted = false;
 }

@@ -45,7 +45,15 @@
   //   incomplete -- no product, sizes, a shape's own size or a stone yet
   //   manual     -- the manager's (a sold-out stone, no slab that fits, ...): `reason`
   //   ok         -- `result` (Pricing.calculatePrice), `inputs` (ConstructorState.buildPricingInputs)
+  // A state is priced once (the project prices every product on every change): by the state object.
+  const pricedStates = new WeakMap();
   function priceItem(state) {
+    if (state && typeof state === 'object' && pricedStates.has(state)) return pricedStates.get(state);
+    const out = priceItemNow(state);
+    if (state && typeof state === 'object') pricedStates.set(state, out);
+    return out;
+  }
+  function priceItemNow(state) {
     const edgeLengthM = state && state.product ? edgeLengthOf(state) : 0;
     if (!state || !state.product || !sizesReady(state)) return { kind: 'incomplete', edgeLengthM };
     if (ProductParts.buildJob(state).missing.length) return { kind: 'incomplete', edgeLengthM };
@@ -72,17 +80,38 @@
     ? job.pieces.reduce((s, p) => s + p.areaM2 * Math.max(0, Math.round(p.count || 1)), 0)
     : job.surfaceAreaM2);
 
-  // One stone's products cut together: the pieces in one layout, the surfaces on the slabs left.
-  function cutGroup(stone, jobs) {
-    const pieces = [].concat(...jobs.filter(j => j.pieces).map(j => j.pieces));
-    const surfaceAreaM2 = jobs.filter(j => !j.pieces).reduce((s, j) => s + j.surfaceAreaM2, 0);
-    let slabs = [], subtotal = 0;
-    if (pieces.length) {
-      const plan = Pricing.planMaterial({ slabs: stone.slabs, job: { pieces }, marginCm: ProductTypes.SAW_MARGIN_CM, usageLimit: ProductTypes.SLAB_USAGE_LIMIT });
-      if (!plan.ok) return { ok: false, reason: plan.reason };
-      slabs = plan.slabs.slice();
-      subtotal += plan.subtotal;
+  // One stone's products cut from its slabs: the pieces of all of them in one layout -- or, product by
+  // product, each on the slabs the ones before left (in the project's order, and largest first) --
+  // whichever works and costs less (the layout search does not try every split, so together is not
+  // always the cheaper, the final review found: 2026-11-18); the surfaces then on the slabs left.
+  const planOf = (slabs, pieces) => Pricing.planMaterial({ slabs, job: { pieces }, marginCm: ProductTypes.SAW_MARGIN_CM, usageLimit: ProductTypes.SLAB_USAGE_LIMIT });
+  function cutPieces(stone, pieceJobs) {
+    if (!pieceJobs.length) return { ok: true, slabs: [], subtotal: 0 };
+    const tries = [];
+    const together = planOf(stone.slabs, [].concat(...pieceJobs.map(j => j.pieces)));
+    tries.push(together.ok ? { ok: true, slabs: together.slabs.slice(), subtotal: together.subtotal } : { ok: false, reason: together.reason });
+    if (pieceJobs.length > 1) {
+      const area = j => j.pieces.reduce((s, p) => s + p.areaM2 * Math.max(1, Math.round(p.count || 1)), 0);
+      [pieceJobs, pieceJobs.slice().sort((a, b) => area(b) - area(a))].forEach(order => {
+        let slabs = [], subtotal = 0;
+        for (const j of order) {
+          const plan = planOf(stone.slabs.filter(s => !slabs.includes(s)), j.pieces);
+          if (!plan.ok) { tries.push({ ok: false, reason: plan.reason }); return; }
+          slabs = slabs.concat(plan.slabs);
+          subtotal += plan.subtotal;
+        }
+        tries.push({ ok: true, slabs, subtotal });
+      });
     }
+    const ok = tries.filter(t => t.ok).sort((a, b) => a.subtotal - b.subtotal);
+    return ok.length ? ok[0] : tries[0];
+  }
+  function cutGroup(stone, jobs) {
+    const pieces = cutPieces(stone, jobs.filter(j => j.pieces));
+    if (!pieces.ok) return { ok: false, reason: pieces.reason };
+    const slabs = pieces.slabs.slice();
+    let subtotal = pieces.subtotal;
+    const surfaceAreaM2 = jobs.filter(j => !j.pieces).reduce((s, j) => s + j.surfaceAreaM2, 0);
     if (surfaceAreaM2 > 0) {
       const left = stone.slabs.filter(s => !slabs.includes(s));
       const plan = Pricing.planSurface(left, surfaceAreaM2, ProductTypes.SLAB_USAGE_LIMIT);

@@ -979,3 +979,12 @@ test('a room shows the active product alone, so the camera goes to it from «В�
   const body = src.slice(s, s + src.slice(s).search(/\r?\n\}\r?\n/));
   assert.match(body, /framingAll = false/);
 });
+
+// ---- the final review's fixes (2026-11-18) ----
+test('the project\'s 3D after a deferred resize, a new product in a room, the camera on a new product', () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'visualizer', 'three-scene.js'), 'utf8');
+  const body = name => { const s = src.indexOf('function ' + name + '('); assert.ok(s > 0, name); return src.slice(s, s + src.slice(s).search(/\r?\n\}\r?\n/)); };
+  assert.match(body('rebuild'), /lastCompanionArgs/, 'the row placed again once the edited product has its new size');
+  assert.match(body('applyRoomState'), /!productGroup/, 'no product edited yet: the others stay in view');
+  assert.match(body('setCompanions'), /framingAllAuto/, 'a new product\'s first model: the camera goes to it');
+});
