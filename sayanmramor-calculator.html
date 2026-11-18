@@ -549,7 +549,16 @@
   .mode-switch:hover { color: var(--ink); }
   /* A phone: the two cards stay side by side, as on a computer (the owner, 2026-11-18). */
   @media (max-width: 640px) {
-    .mode-choice { padding-bottom: 40px; }
+    /* In the middle of the screen, a little above it (the owner, 2026-11-18): the room under the header
+       (106px: the header and the page's top padding; 40px: the body's bottom padding), the block centered
+       in it, the extra bottom padding lifting it (less of it on a short screen, where it would only
+       make the page scroll). */
+    .mode-choice {
+      display: flex; flex-direction: column; justify-content: center;
+      min-height: calc(100vh - 146px); min-height: calc(100svh - 146px);
+      padding-bottom: clamp(40px, calc(100vh - 700px), 116px); padding-bottom: clamp(40px, calc(100svh - 700px), 116px);
+    }
+    .mode-choice-new { align-self: center; }
     .mode-choice .mode-choice-title { font-size: 28px; }
     .mode-choice .subtitle { font-size: var(--configurator-muted); }
     .mode-choice-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 22px; }
@@ -1369,6 +1378,8 @@
     @media (prefers-reduced-motion: no-preference) {
       .product-card:hover .product-card-scene > svg { transform: scale(1.035) perspective(2000px); }
       .stone-card:hover .stone-card-image img { transform: scale(1.06) perspective(2000px); }
+      /* The same for the scenes of «Что будем считать?» (the owner, 2026-11-18: «иконки дрожат»). */
+      .mode-card:hover .mode-card-scene svg { transform: scale(1.03) perspective(2000px); }
     }
   }
 
