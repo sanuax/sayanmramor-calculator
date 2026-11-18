@@ -120,7 +120,8 @@ test('a stored project of several products is not overwritten by a page opened f
 
 test('a stock that is short for all the products of a stone together is said in words', () => {
   assert.match(fn('projectReasonText'), /не хватает/);
-  assert.match(fn('renderProjectPricing'), /projectReasonText\(p\)/);
+  // said under the project's cards («Состав», 2026-11-18), no longer in the panel
+  assert.match(fn('renderProjectBlock'), /projectReasonText\(pricing\)/);
   assert.match(fn('renderResultProject'), /projectReasonText\(p\)/);
 });
 

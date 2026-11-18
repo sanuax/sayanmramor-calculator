@@ -371,36 +371,113 @@
   .viewer-facades-label { font-size: var(--configurator-muted); color: var(--dark-text-muted); margin-right: 2px; }
   .viewer-controls .viewer-swatch { width: 26px; height: 26px; padding: 0; background: var(--swatch); }
   /* The project (the owner, 2026-11-17): its products in the panel, «+ Добавить изделие», the 3D's buttons. */
-  .viewer-project[hidden], .project-block[hidden], .project-add[hidden] { display: none; }
-  .project-block { margin-bottom: 20px; }
-  .project-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
-  .project-count { font-size: var(--configurator-muted); color: var(--dark-text-muted); }
-  .project-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-  .project-item { display: flex; align-items: stretch; gap: 6px; }
-  .project-item-open {
-    flex: 1 1 auto; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 10px; row-gap: 2px;
-    padding: 10px 12px; border: 1px solid var(--dark-border); border-radius: 8px; background: var(--dark-bg-2);
-    color: var(--dark-text); font: inherit; text-align: left; cursor: pointer;
+  .viewer-project[hidden], .project-add[hidden] { display: none; }
+  /* The project, redesigned (the owner, 2026-11-18, «Состав» of two concepts): the products as a row
+     of cards over the calculator, the one edited a dark showcase, the total and «Получить расчёт»
+     beside them, «Добавить изделие» the row's last card -- the panel's dashed button gives way to it. */
+  body.calc-project .project-add { display: none; }
+  /* On the Result the cards above already list the products: the Result keeps the stones and the total. */
+  .result-project .result-built-title, #resultProjectCards { display: none; }
+  .result-project .result-lines { margin-top: 0; }
+  /* A price the manager gives: words, not a figure -- no figure's size. */
+  .result-price.is-manual { font-size: var(--configurator-title); font-weight: 700; color: var(--dark-text); min-height: 0; }
+
+  .project-rail { margin: 0 0 36px; }
+  .project-rail[hidden] { display: none; }
+  .project-rail-head { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 14px 28px; margin-bottom: 16px; }
+  .project-rail-titles { flex: 1 1 auto; display: flex; align-items: baseline; gap: 12px; min-width: 0; }
+  .project-rail-title { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.015em; }
+  .project-rail-count { color: var(--muted); font-size: var(--configurator-muted); white-space: nowrap; }
+  .project-rail-total { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; text-align: right; }
+  .project-rail-total-label { font-size: var(--configurator-muted); color: var(--muted); }
+  .project-rail-total-value { font-family: var(--font-display); font-size: 24px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .project-rail-total-value.is-manual { font-size: 17px; letter-spacing: -0.01em; }
+  .project-rail-cta {
+    min-height: 48px; padding: 0 26px; border: 0; border-radius: 999px; background: var(--accent); color: #fff;
+    font-family: var(--font-display); font-size: 14px; font-weight: 500; letter-spacing: -0.01em; cursor: pointer;
+    transition: background-color 0.2s ease;
   }
-  .project-item-open:hover { border-color: var(--dark-accent); }
-  .project-item.is-active .project-item-open { border-color: var(--dark-accent); background: var(--dark-accent-soft); }
-  .project-item-name { grid-column: 1; font-size: var(--configurator-text); font-weight: 700; overflow-wrap: anywhere; }
-  .project-item-meta { grid-column: 1; font-size: var(--configurator-muted); color: var(--dark-text-muted); overflow-wrap: anywhere; }
-  .project-item-price { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
-  .project-item-remove {
-    flex: none; width: 36px; border: 1px solid var(--dark-border); border-radius: 8px; background: none;
-    color: var(--dark-text-muted); font: inherit; font-size: 18px; line-height: 1; cursor: pointer;
+  .project-rail-cta:hover { background: var(--accent-hover); }
+  .project-rail-cta:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .project-rail-list {
+    list-style: none; margin: 0; padding: 2px 2px 10px; display: grid; grid-auto-flow: column; grid-auto-columns: 232px; gap: 14px;
+    overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: thin; scrollbar-color: var(--stone-line) transparent;
   }
-  .project-item-remove:hover { border-color: var(--dark-accent); color: var(--dark-text); }
-  .project-add {
-    width: 100%; margin-bottom: 10px; padding: 12px; border: 1px dashed var(--dark-accent); border-radius: 6px; background: none;
-    color: var(--dark-text); font-family: var(--font-display); font-size: 13px; font-weight: 500; letter-spacing: -0.01em; cursor: pointer;
+  .project-tile { position: relative; scroll-snap-align: start; }
+  .project-tile-open {
+    width: 100%; height: 100%; display: flex; flex-direction: column; gap: 12px; padding: 6px 6px 16px; text-align: left; cursor: pointer;
+    border: 1px solid var(--line); border-radius: 16px; background: var(--card); color: var(--ink); font: inherit;
+    transition: border-color 0.2s ease, box-shadow 0.25s ease;
   }
-  .project-add:hover { background: var(--dark-accent-soft); }
-  .project-extras { margin-top: 8px; font-size: var(--configurator-muted); color: var(--dark-text-muted); line-height: 1.6; }
-  .project-extras[hidden], .result-project[hidden] { display: none; }
+  .project-tile-open:hover { border-color: var(--stone-line); }
+  .project-tile-open:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .project-tile-scene { position: relative; display: block; aspect-ratio: 3 / 2; border-radius: 11px; overflow: hidden; background: var(--dark-bg); }
+  .project-tile-scene svg { display: block; width: 100%; height: 100%; }
+  .project-tile-scene.is-empty { display: grid; place-items: center; padding: 0 12px; text-align: center; border: 1px dashed rgba(233, 231, 225, 0.22); background: #262c28; color: var(--dark-text-muted); font-size: var(--configurator-muted); }
+  .project-tile-badge {
+    position: absolute; left: 10px; top: 10px; padding: 4px 9px; border-radius: 999px;
+    background: rgba(22, 26, 23, 0.72); color: var(--dark-text); font-size: 11.5px; font-weight: 600; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  }
+  .project-tile-body { flex: 1 1 auto; display: flex; flex-direction: column; gap: 6px; padding: 0 8px; min-width: 0; }
+  .project-tile-name { font-size: var(--configurator-text); font-weight: 700; line-height: 1.3; }
+  .project-tile-num { margin-right: 6px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .project-tile-stone { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: var(--configurator-muted); color: var(--muted); }
+  .project-tile-stone span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .project-swatch { flex: none; width: 18px; height: 18px; border-radius: 50%; background: var(--stone) center / cover no-repeat; box-shadow: inset 0 0 0 1px rgba(28, 29, 27, 0.14); }
+  .project-swatch.is-empty { background: none; box-shadow: inset 0 0 0 1px currentColor; opacity: 0.45; }
+  .project-tile-sizes { font-size: var(--configurator-muted); color: var(--muted); font-variant-numeric: tabular-nums; }
+  .project-tile-price { margin-top: auto; padding-top: 8px; font-size: var(--configurator-text); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .project-tile-price.is-manual { font-weight: 600; color: var(--muted); }
+  /* The one edited: a dark showcase, as the choice's cards. */
+  .project-tile.is-active .project-tile-open { border-color: transparent; background: var(--dark-bg); color: var(--dark-text); box-shadow: 0 22px 40px -28px rgba(20, 24, 21, 0.7); }
+  .project-tile.is-active .project-tile-num, .project-tile.is-active .project-tile-stone,
+  .project-tile.is-active .project-tile-sizes, .project-tile.is-active .project-tile-price.is-manual { color: var(--dark-text-muted); }
+  .project-tile.is-active .project-swatch { box-shadow: inset 0 0 0 1px rgba(233, 231, 225, 0.25); }
+  .project-tile-remove {
+    position: absolute; top: 12px; right: 12px; z-index: 1; width: 30px; height: 30px; display: grid; place-items: center; padding: 0;
+    border: 0; border-radius: 50%; background: rgba(22, 26, 23, 0.66); color: #e9e7e1; cursor: pointer;
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); opacity: 0; transition: opacity 0.2s ease, background-color 0.2s ease;
+  }
+  .project-tile-remove svg { width: 12px; height: 12px; }
+  .project-tile:hover .project-tile-remove, .project-tile-remove:focus-visible { opacity: 1; }
+  .project-tile-remove:hover { background: rgba(22, 26, 23, 0.9); }
+  @media (hover: none) { .project-tile-remove { opacity: 1; } }
+  .project-tile-add {
+    width: 100%; height: 100%; min-height: 250px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+    border: 1.5px dashed var(--stone-line); border-radius: 16px; background: none; color: var(--ink); font: inherit; font-weight: 600; cursor: pointer;
+    transition: border-color 0.2s ease, background-color 0.2s ease;
+  }
+  .project-tile-add-plus { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--accent); color: var(--accent); transition: background-color 0.2s ease, color 0.2s ease; }
+  .project-tile-add-plus svg { width: 16px; height: 16px; }
+  .project-tile-add:hover { border-color: var(--accent); background: rgba(42, 84, 70, 0.04); }
+  .project-tile-add:hover .project-tile-add-plus { background: var(--accent); color: #fff; }
+  .project-tile-add:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .project-rail-extras { display: flex; flex-wrap: wrap; gap: 4px 22px; margin-top: 10px; font-size: var(--configurator-muted); color: var(--muted); }
+  .project-rail-extras[hidden] { display: none; }
+  .project-rail-extras b { font-weight: 600; color: var(--ink); }
+  @media (max-width: 640px) {
+    .project-rail { margin-bottom: 28px; }
+    .project-rail-head { align-items: center; gap: 12px 16px; }
+    .project-rail-titles { flex-basis: 100%; }
+    .project-rail-title { font-size: 19px; }
+    .project-rail-total { flex: 1 1 auto; align-items: flex-start; text-align: left; }
+    .project-rail-total-value { font-size: 20px; }
+    .project-rail-total-value.is-manual { font-size: 15px; }
+    .project-rail-cta { min-height: 44px; padding: 0 20px; font-size: 13px; }
+    /* The row runs to the screen's edges and scrolls sideways. */
+    .project-rail-list { grid-auto-columns: 158px; gap: 10px; margin: 0 -20px; padding: 2px 20px 10px; scroll-padding: 0 20px; }
+    .project-tile-open { padding: 5px 5px 12px; gap: 10px; border-radius: 14px; }
+    .project-tile-scene { border-radius: 9px; }
+    .project-tile-body { padding: 0 6px; gap: 5px; }
+    .project-tile-name { font-size: 13.5px; }
+    .project-tile-stone, .project-tile-sizes { font-size: 12px; }
+    .project-tile-price { font-size: 13.5px; }
+    .project-tile-badge { left: 7px; top: 7px; padding: 3px 7px; font-size: 10.5px; }
+    .project-tile-remove { top: 9px; right: 9px; width: 28px; height: 28px; }
+    .project-tile-add { min-height: 200px; font-size: 13.5px; }
+  }
+  .result-project[hidden] { display: none; }
   .result-project { margin-top: 28px; }
-  .result-project .result-lines { margin-top: 16px; }
   .viewer-controls .viewer-swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--dark-bg-2), 0 0 0 3px var(--dark-accent); }
   /* AR «Поставить у себя в комнате»: only on a phone or tablet where AR works
      (WebglSupport.arMode) -- the main action there, so a wide button of its own. */
@@ -1695,6 +1772,17 @@
   </section>
   <h1>Рассчитайте стоимость изделия</h1>
   <p class="subtitle">Выберите тип изделия, материал и размеры - получите ориентировочную стоимость за несколько секунд. Точную цену рассчитает наш специалист после уточнения деталей проекта.</p>
+  <!-- The project's products over the calculator («Состав», the owner, 2026-11-18): a card each, the
+       one edited dark; a tap edits another; the total and the request beside them. -->
+  <section class="project-rail" id="projectBlock" hidden aria-labelledby="projectRailTitle">
+    <div class="project-rail-head">
+      <div class="project-rail-titles"><h2 class="project-rail-title" id="projectRailTitle">Изделия проекта</h2><span class="project-rail-count" id="projectCount"></span></div>
+      <div class="project-rail-total"><span class="project-rail-total-label">Стоимость проекта</span><span class="project-rail-total-value" id="projectRailTotal"></span></div>
+      <button type="button" class="project-rail-cta" id="projectRailCta">Получить расчёт</button>
+    </div>
+    <ol class="project-rail-list" id="projectList"></ol>
+    <div class="project-rail-extras" id="projectRailExtras" hidden></div>
+  </section>
 
   <div class="configurator">
     <section class="step">
@@ -2415,12 +2503,6 @@
 
             <div class="summary-info">
               <div>
-                <!-- The project (2026-11-17): its products, from the second one on; a tap edits it. -->
-                <div class="project-block" id="projectBlock" hidden>
-                  <div class="project-head"><span class="result-label">Проект</span><span class="project-count" id="projectCount"></span></div>
-                  <ol class="project-list" id="projectList"></ol>
-                  <div class="project-extras" id="projectExtras" hidden></div>
-                </div>
                 <div class="result-label" id="priceLabel">Ориентировочная стоимость</div>
                 <div class="result-price placeholder" id="priceOut">Выберите тип изделия, материал и размеры, чтобы увидеть расчёт</div>
                 <p class="price-note" id="priceRegionNote">* Расчёт указан для объектов, находящихся в Москве и Московской области</p>
@@ -2578,6 +2660,13 @@
   // выбором клиента (STAIR-11 -- площадка между маршами), здесь не показывается.
   // Объявлено здесь, а не рядом с renderSubcategoryOptions(): URL-bootstrap
   // ниже синхронно выбирает изделие и доходит до этих данных.
+  // A product's scene as a copy of its own (the owner, 2026-11-18): the ids of its gradients get the
+  // copy's own mark (uid), so a copy never borrows another's -- the first one in the page wins an id,
+  // and one in a hidden part of the page (the mode choice) leaves the others without their light.
+  function productSceneSvg(key, uid) {
+    const inner = (PRODUCT_ICONS[key] || '').split('pi-' + key + '-').join('pi-' + key + '-' + uid + '-');
+    return '<svg viewBox="0 0 120 80" preserveAspectRatio="xMidYMid slice" aria-hidden="true">' + inner + '</svg>';
+  }
   function typeIcon(inner) {
     return '<svg viewBox="0 0 64 40" aria-hidden="true">' + inner + '</svg>';
   }
@@ -5501,34 +5590,110 @@
     window.ThreeScene.setCompanions(list, project.active, project.items[project.active].id);
   }
 
+  // The project's products as cards over the calculator («Состав», the owner, 2026-11-18), from the
+  // first product on: a project of one is a project too. A tap edits a product; × takes it out (there
+  // is no × while it is the only one).
+  const projectRailTotal = document.getElementById('projectRailTotal');
+  const projectRailExtras = document.getElementById('projectRailExtras');
+  const ICON_X = '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+  const ICON_PLUS = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v12M2 8h12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+
+  // A project of one product is priced on its own here (priceProjectNow prices two and more).
+  function railPricing(items) {
+    if (items.length > 1) return projectPricing;
+    const live = lastCalcSnapshot && lastCalcSnapshot.state;
+    if (!live || !live.product) return null;
+    try { return ProjectPricing.priceProject([live]); } catch (e) { return null; }
+  }
+
+  function projectItemView(item, i, pricing) {
+    const stone = item.stoneId ? STONES_BY_ID[item.stoneId] : null;
+    const c = itemComputed(item);
+    const price = item.productKey ? itemPriceText(pricing, i) : 'не заполнено';
+    return {
+      title: itemTitle(item), productKey: item.productKey, active: i === project.active,
+      stoneName: stone ? stone.name : 'Камень не выбран', stoneImage: stone && stone.image ? 'data/' + stone.image : '',
+      // the sizes never broken over two lines («2400 × 600» and «мм» apart)
+      sizes: itemSizesText(c && c.state).replace(/ /g, String.fromCharCode(160)), price, priced: price.charAt(0) === '≈',
+    };
+  }
+
+  function projectSwatch(v) {
+    const sw = el('span', 'project-swatch' + (v.stoneImage ? '' : ' is-empty'));
+    if (v.stoneImage) sw.style.backgroundImage = 'url("' + v.stoneImage + '")';
+    return sw;
+  }
+
+  function projectRemoveButton(v, i) {
+    const remove = el('button', 'project-tile-remove');
+    remove.type = 'button';
+    remove.innerHTML = ICON_X;
+    remove.setAttribute('aria-label', 'Убрать «' + v.title + '» из проекта');
+    remove.title = 'Убрать из проекта';
+    remove.addEventListener('click', () => removeProjectItem(i));
+    return remove;
+  }
+
   function renderProjectBlock() {
     const items = project ? project.items : [];
+    const inProject = calcMode === 'project' && items.length > 0;
     projectAddBtn.hidden = calcMode !== 'project' || !selectedProductKey;
-    projectBlock.hidden = !(items.length > 1);
-    if (!(items.length > 1)) return;
+    projectBlock.hidden = !inProject;
+    if (!inProject) return;
+    const pricing = railPricing(items);
+    const views = items.map((item, i) => projectItemView(item, i, pricing));
+    const canRemove = items.length > 1;
+    const canAdd = !!selectedProductKey;
     projectCount.textContent = items.length + ' ' + plural(items.length, 'изделие', 'изделия', 'изделий');
-    projectList.innerHTML = '';
-    items.forEach((item, i) => {
-      const li = el('li', 'project-item' + (i === project.active ? ' is-active' : ''));
-      const open = el('button', 'project-item-open');
+
+    // A card each: the product's scene, its name, its stone and sizes, its price; the one edited dark.
+    const tiles = views.map((v, i) => {
+      const li = el('li', 'project-tile' + (v.active ? ' is-active' : ''));
+      const open = el('button', 'project-tile-open');
       open.type = 'button';
-      if (i === project.active) open.setAttribute('aria-current', 'true');
-      const stone = item.stoneId ? STONES_BY_ID[item.stoneId] : null;
-      open.appendChild(el('span', 'project-item-name', (i + 1) + '. ' + itemTitle(item)));
-      open.appendChild(el('span', 'project-item-meta', stone ? stone.name : 'Камень не выбран'));
-      open.appendChild(el('span', 'project-item-price', projectItemPriceText(i)));
+      if (v.active) open.setAttribute('aria-current', 'true');
+      const scene = el('span', 'project-tile-scene' + (v.productKey ? '' : ' is-empty'));
+      if (v.productKey) scene.innerHTML = productSceneSvg(v.productKey, 'pt' + i);
+      else scene.textContent = 'Выберите тип изделия';
+      if (v.active) scene.appendChild(el('span', 'project-tile-badge', 'Редактируется'));
+      const body = el('span', 'project-tile-body');
+      const name = el('span', 'project-tile-name');
+      name.append(el('span', 'project-tile-num', String(i + 1)), document.createTextNode(v.title));
+      const stoneLine = el('span', 'project-tile-stone');
+      stoneLine.append(projectSwatch(v), el('span', null, v.stoneName));
+      body.append(name, stoneLine);
+      if (v.sizes) body.appendChild(el('span', 'project-tile-sizes', v.sizes));
+      body.appendChild(el('span', 'project-tile-price' + (v.priced ? '' : ' is-manual'), v.price));
+      open.append(scene, body);
       open.addEventListener('click', () => switchToItem(i));
       li.appendChild(open);
-      if (items.length > 1) {
-        const remove = el('button', 'project-item-remove', '×');
-        remove.type = 'button';
-        remove.setAttribute('aria-label', 'Убрать «' + itemTitle(item) + '» из проекта');
-        remove.title = 'Убрать из проекта';
-        remove.addEventListener('click', () => removeProjectItem(i));
-        li.appendChild(remove);
-      }
-      projectList.appendChild(li);
+      if (canRemove) li.appendChild(projectRemoveButton(v, i));
+      return li;
     });
+    if (canAdd) {
+      const li = el('li', 'project-tile');
+      const add = el('button', 'project-tile-add');
+      add.type = 'button';
+      add.innerHTML = '<span class="project-tile-add-plus">' + ICON_PLUS + '</span><span>Добавить изделие</span>';
+      add.addEventListener('click', addProjectItem);
+      li.appendChild(add);
+      tiles.push(li);
+    }
+    projectList.replaceChildren(...tiles);
+    const total = !pricing ? { text: 'Заполните изделие', manual: true }
+      : pricing.kind === 'ok' ? { text: '≈ ' + formatRub(pricing.total), manual: false }
+      : pricing.kind === 'manual' ? { text: 'Уточнит менеджер', manual: true }
+      : { text: 'Заполните все изделия', manual: true };
+    projectRailTotal.textContent = total.text;
+    projectRailTotal.classList.toggle('is-manual', total.manual);
+    const reason = pricing && pricing.kind === 'manual' ? projectReasonText(pricing) : '';
+    const extras = (reason ? [el('span', null, reason)] : []).concat((pricing ? projectExtraLines(pricing) : []).map(line => {
+      const span = el('span', null, line.label + ': ');
+      span.appendChild(el('b', null, line.value));
+      return span;
+    }));
+    projectRailExtras.replaceChildren(...extras);
+    projectRailExtras.hidden = !extras.length;
   }
 
   function renderViewerProject() {
@@ -5554,7 +5719,8 @@
       if (viewerReady) window.ThreeScene.focusProject();
       renderViewerProject();
     });
-    items.forEach((item, i) => button((i + 1) + '. ' + itemTitle(item), !viewingAll && i === project.active, () => switchToItem(i)));
+    // The other products are a tap away in the project's list; here only the one edited (2026-11-18).
+    button((project.active + 1) + '. ' + itemTitle(project.items[project.active]), !viewingAll, () => switchToItem(project.active));
   }
 
   // The form back to the page's own start: every card-driven choice through its own control, every
@@ -5650,15 +5816,15 @@
     projectPricingKey = key;
   }
 
-  function projectItemPriceText(i) {
-    const it = projectPricing && projectPricing.items[i];
+  function itemPriceText(pricing, i) {
+    const it = pricing && pricing.items[i];
     if (!it || it.kind === 'incomplete') return 'не заполнено';
     if (it.kind === 'manual' || it.price === null) return 'уточнит менеджер';
     return '≈ ' + formatRub(it.price);
   }
+  function projectItemPriceText(i) { return itemPriceText(projectPricing, i); }
 
   const priceLabelEl = document.getElementById('priceLabel');
-  const projectExtrasEl = document.getElementById('projectExtras');
   // What the stones take and what is charged once for the project, as lines.
   function projectExtraLines(p) {
     const lines = [];
@@ -5687,17 +5853,13 @@
     const inProject = !!(project && project.items.length > 1 && projectPricing);
     priceLabelEl.textContent = inProject ? 'Стоимость проекта' : 'Ориентировочная стоимость';
     if (selectedProductKey || inProject) summaryTitleEl.textContent = inProject ? 'Ваш проект' : ResultModel.resultTitle(selectedProductKey);
-    projectExtrasEl.hidden = !inProject;
+    priceOut.classList.toggle('is-manual', inProject && projectPricing.kind === 'manual');
     if (!inProject) return;
     const p = projectPricing;
     if (p.kind === 'ok') setPriceValue('≈ ' + formatRub(p.total) + '*');
     else if (p.kind === 'manual') setPriceValue('Нужно уточнить у менеджера');
     else setPriceHint('Заполните все изделия проекта, чтобы увидеть общую стоимость');
     remainderOut.textContent = '';
-    const lines = projectExtraLines(p);
-    const reason = p.kind === 'manual' ? projectReasonText(p) : '';
-    projectExtrasEl.textContent = [reason].concat(lines.map(l => l.label + ': ' + l.value)).filter(Boolean).join(' · ');
-    projectExtrasEl.hidden = !projectExtrasEl.textContent;
   }
 
   // The share link: the project's (pv=2) once there are two products, the product's own (pv=1) before.
@@ -5790,6 +5952,8 @@
     productGrid.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
   projectAddBtn.addEventListener('click', addProjectItem);
+  document.getElementById('projectRailCta').addEventListener('click', () => ctaBtn.click());
+
   // The Result's button: «+ Добавить изделие» in a project, «Сделать проектом» for one product.
   document.getElementById('resultAddBtn').addEventListener('click', () => (calcMode === 'project' ? addProjectItem() : makeProjectFromSingle()));
 
@@ -5813,6 +5977,8 @@
   const modeChoiceNewEl = document.getElementById('modeChoiceNew');
   const pageTitleEl = document.querySelector('.wrap > h1:not(.mode-choice-title)');
   const PAGE_TITLE_ONE = pageTitleEl.textContent;
+  const pageSubtitleEl = document.querySelector('.wrap > .subtitle');
+  const PAGE_SUBTITLE_ONE = pageSubtitleEl.textContent;
   const resultAddBtnEl = document.getElementById('resultAddBtn');
 
   function storedProject() {
@@ -5822,13 +5988,15 @@
   // The two cards' pictures: the product scenes of the calculator (one; three for a project --
   // a kitchen, a fireplace and steps, the owner, 2026-11-18).
   (function drawModeScenes() {
-    const scene = key => '<svg viewBox="0 0 120 80" preserveAspectRatio="xMidYMid slice" aria-hidden="true">' + (PRODUCT_ICONS[key] || '') + '</svg>';
-    document.querySelector('[data-mode-scene="single"]').innerHTML = scene('stoleshnitsa_kuhnya');
-    document.querySelector('[data-mode-scene="project"]').innerHTML = scene('stoleshnitsa_kuhnya') + scene('kaminy') + scene('stupeni');
+    document.querySelector('[data-mode-scene="single"]').innerHTML = productSceneSvg('stoleshnitsa_kuhnya', 'mc1');
+    document.querySelector('[data-mode-scene="project"]').innerHTML = productSceneSvg('stoleshnitsa_kuhnya', 'mc2') + productSceneSvg('kaminy', 'mc2') + productSceneSvg('stupeni', 'mc2');
   })();
 
   function renderModeTexts() {
     pageTitleEl.textContent = calcMode === 'project' ? 'Рассчитайте стоимость проекта' : PAGE_TITLE_ONE;
+    pageSubtitleEl.textContent = calcMode === 'project'
+      ? 'Соберите все изделия в одном расчёте: у каждого свой камень и размеры, а цена и заявка общие.'
+      : PAGE_SUBTITLE_ONE;
     resultAddBtnEl.textContent = calcMode === 'project' ? '+ Добавить изделие' : 'Сделать проектом';
     const stored = storedProject();
     const n = stored && stored.items.length > 1 ? stored.items.length : 0;
@@ -5843,6 +6011,7 @@
   function showModeChoice() {
     calcMode = null;
     document.body.classList.add('choosing-mode');
+    document.body.classList.remove('calc-project');
     modeChoiceEl.hidden = false;
     renderModeTexts();
     window.scrollTo(0, 0);
@@ -5853,6 +6022,7 @@
   function setCalcMode(mode, fromChoice) {
     calcMode = mode;
     document.body.classList.remove('choosing-mode');
+    document.body.classList.toggle('calc-project', mode === 'project');
     modeChoiceEl.hidden = true;
     if (fromChoice) { try { history.pushState({ calcMode: mode }, ''); } catch (e) { /* no history: the choice is still there via «Сменить режим» */ } }
     renderModeTexts();
