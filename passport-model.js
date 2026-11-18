@@ -173,5 +173,20 @@
     };
   }
 
-  return { FLAT_PRODUCTS, PASSPORT_TITLES, passportNumber, passportFileName, pickShots, buildSpecification, buildPassport };
+  // The project's passport (the owner, 2026-11-17): its own page -- every product (rows: { title, meta,
+  // priceRub }), the lines charged once ({ label, amountRub }), the total or the manager's note -- and
+  // every product's passport after it, under the project's number and date.
+  function buildProjectPassport({ items, rows, lines, totalRub, manual, createdAt, random4, link, pricesDateText }) {
+    const number = passportNumber(createdAt, random4);
+    const date = dateText(createdAt);
+    return {
+      project: true, number, dateText: date, title: 'Проект',
+      fileName: passportFileName('Проект', createdAt),
+      items: (items || []).map(p => Object.assign({}, p, { number, dateText: date, inProject: true })),
+      rows: rows || [], lines: lines || [], totalRub: totalRub === undefined ? null : totalRub, manual: manual || null,
+      note: REGION_NOTE, pricesDateText: pricesDateText || null, link,
+    };
+  }
+
+  return { FLAT_PRODUCTS, PASSPORT_TITLES, buildProjectPassport, passportNumber, passportFileName, pickShots, buildSpecification, buildPassport };
 });

@@ -93,3 +93,11 @@ test('the Result has its own «+ Добавить изделие»; the panel of
   assert.match(html, /resultAddBtn'\)\.addEventListener\('click', addProjectItem\)/);
   assert.match(fn('renderProjectPricing'), /'Ваш проект'/);
 });
+
+test('the passport of a project: the project\'s page and each product\'s, shots of each product alone', () => {
+  assert.match(fn('buildPassportFile'), /buildProjectPassportFile\(\)/);
+  const project = fn('buildProjectPassportFile');
+  assert.match(project, /PassportModel\.buildProjectPassport\(/);
+  assert.match(project, /\{ only(: | \})/, 'each product shot alone');
+  assert.match(fn('itemResultData'), /ProjectPricing\.priceItem\(/);
+});

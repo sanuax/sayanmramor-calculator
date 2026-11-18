@@ -2413,8 +2413,8 @@
 <script src="visualizer/camera-preset-tracker.js?v=6235ae21"></script>
 <script src="url-bootstrap.js?v=d580d613"></script>
 <script src="passport-link.js?v=f148d340"></script>
-<script src="passport-model.js?v=652651ee"></script>
-<script src="passport-pdf.js?v=880d1d48"></script>
+<script src="passport-model.js?v=66c7942d"></script>
+<script src="passport-pdf.js?v=de04eb04"></script>
 <script src="project-model.js?v=89d7396d"></script>
 <!-- IMPORTMAP -->
 <script type="importmap">{"imports":{"./visualizer/ar-view.js":"./visualizer/ar-view.js?v=49e075d1","./visualizer/three-scene.js":"./visualizer/three-scene.js?v=daa1d30b"}}</script>
@@ -5936,9 +5936,95 @@
     }
     downloadPassportFile(file);
   }
+  // A product of the project that is not being edited, as the Result and the passport read it: its
+  // configuration and its price alone (ProjectPricing.priceItem -- the same calculation as the page's).
+  function itemResultData(item) {
+    const c = itemComputed(item);
+    if (!c) return null;
+    const state = c.state, key = item.productKey, product = PRODUCTS[key];
+    const typeId = state.subcategory.id;
+    const row = typeId ? getSubcategoriesForProduct(product.label).find(r => r.id === typeId) : null;
+    const card = row ? (TYPE_CARDS[key] || []).find(cd => cd.ids.includes(row.id)) : null;
+    const risers = key === 'lestnitsa' && state.productConfig.lestnitsa && state.productConfig.lestnitsa.risers;
+    const isSpiral = key === 'lestnitsa' && GeometryModel.STAIR_SHAPES[typeId] === 'spiral';
+    const typeLabels = (key === 'stena' || key === 'podokonnik') ? TYPE_DIMENSION_LABELS[typeId] : null;
+    const dimensionLabels = isSpiral ? SPIRAL_DIMENSION_LABELS : (typeLabels || DIMENSION_LABELS[key] || DEFAULT_DIMENSION_LABELS);
+    const priced = ProjectPricing.priceItem(state);
+    const outcome = priced.kind === 'ok' && priced.result.total !== null ? { kind: 'ok', result: priced.result, message: null }
+      : priced.kind === 'incomplete' ? { kind: 'incomplete' } : { kind: 'manual', reason: priced.reason || 'unpriced_work', message: null };
+    const configuration = ResultModel.buildConfiguration({
+      state, productLabel: product.label,
+      subcategory: row ? { id: row.id, label: card ? card.title + (risers ? ', с подступенками' : '') : row.shape, unit: row.unit } : null,
+      edgeTitles: EDGE_TITLES, dimensionLabels, edgeLengthM: priced.edgeLengthM || 0,
+    });
+    return {
+      configuration, pricing: ResultModel.summarizePricing(outcome, UPDATED_AT),
+      result: outcome.kind === 'ok' ? priced.result : null,
+      pricingInputs: priced.inputs ? { rates: priced.inputs.rates, mainAreaM2: priced.inputs.job.mainAreaM2, complexEnabled: state.options.complexEnabled } : null,
+    };
+  }
+
+  // The project's passport (the owner, 2026-11-17): the project's page -- every product with its price
+  // in the project, the lines charged once, the total, the project's link -- then every product's own
+  // passport (its views, sizes, works; its price is the project's, on the first page). Each product's
+  // views are shot with the others hidden.
+  function buildProjectPassportFile() {
+    let passport, itemAssets, preview = null;
+    return Promise.resolve().then(() => {
+      const p = projectPricing;
+      if (!p) throw new Error('no project price yet');
+      const createdAt = new Date();
+      const random4 = crypto.getRandomValues(new Uint32Array(1))[0] % 10000;
+      const link = location.origin + location.pathname + '?' + currentShareQuery();
+      const activeId = project.items[project.active].id;
+      const made = [];
+      project.items.forEach((item, i) => {
+        const data = i === project.active ? currentResultData() : itemResultData(item);
+        if (!data) return;
+        const stone = item.stoneId ? STONES_BY_ID[item.stoneId] : null;
+        const one = PassportModel.buildPassport(Object.assign({}, data, {
+          view: ResultModel.buildResultView(data.configuration), stone, createdAt, random4, link,
+          defaultPreset: PRODUCTS[item.productKey].cameraPreset || 'iso',
+        }));
+        one.specification = { manual: 'Цена в проекте: ' + projectItemPriceText(i) + ' - общий расчёт на первой странице паспорта' };
+        made.push({ item, index: i, passport: one, stone });
+      });
+      const amount = (label, rub) => (rub > 0 ? [{ label, amountRub: rub }] : []);
+      passport = PassportModel.buildProjectPassport({
+        items: made.map(m => m.passport),
+        rows: made.map(m => {
+          const c = itemComputed(m.item);
+          return {
+            title: (m.index + 1) + '. ' + itemTitle(m.item),
+            meta: [m.stone ? m.stone.name : '', itemSizesText(c && c.state)].filter(Boolean).join(' · '),
+            priceRub: p.items[m.index] ? p.items[m.index].price : null,
+          };
+        }),
+        lines: amount('Замер на объекте', p.measure).concat(amount('Доставка', p.delivery), amount('До минимального заказа', p.minOrderTopUp)),
+        totalRub: p.kind === 'ok' ? Math.round(p.total) : null,
+        manual: p.kind === 'ok' ? null : 'Стоимость проекта рассчитает менеджер',
+        createdAt, random4, link, pricesDateText: made.length ? made[0].passport.pricesDateText : null,
+      });
+      // The shots first, while the scene is exactly what the client sees.
+      const shoot = (preset, i, only) => (viewerReady && window.ThreeScene
+        ? window.ThreeScene.capture(preset, i === 0 ? { width: 1820, height: Math.round(1820 / PassportPdf.MAIN_RATIO) } : { width: 900, height: Math.round(900 * PassportPdf.SMALL_RATIO) }, { only }) : null);
+      itemAssets = made.map(m => ({ shots: m.passport.shots.map((preset, i) => shoot(preset, i, m.item.id === activeId ? 'active' : m.item.id)) }));
+      preview = viewerReady && window.ThreeScene ? window.ThreeScene.capture('iso', { width: 1820, height: Math.round(1820 / PassportPdf.MAIN_RATIO) }, { only: 'all' }) : null;
+      return Promise.all([
+        loadPassportScript('vendor/jspdf/jspdf.umd.min.js'), loadPassportScript('vendor/qrcode/qrcode.js'),
+        loadPassportFonts(), Promise.all(made.map(m => passportStonePhoto(m.stone))),
+      ]);
+    }).then(([, , fonts, photos]) => {
+      const assets = { fonts, items: itemAssets.map((a, i) => ({ shots: a.shots, stonePhoto: photos[i] })) };
+      const bytes = PassportPdf.renderPassportPdf(passport, assets, { jsPDF: window.jspdf.jsPDF, qrcode: window.qrcode });
+      return { file: new File([bytes], passport.fileName, { type: 'application/pdf' }), preview: preview || (itemAssets[0] && itemAssets[0].shots[0]) || null };
+    });
+  }
+
   // The PDF of what the client sees now, and its main shot (the site's request shows it small).
   // Everything is in the chain, so any failure ends in its .catch.
   function buildPassportFile() {
+    if (project && project.items.length > 1) return buildProjectPassportFile();
     let passport, shots;
     return Promise.resolve().then(() => {
       const data = currentResultData();
@@ -5965,7 +6051,7 @@
   function downloadPassport() {
     const data = currentResultData();
     if (!data || passportBtn.disabled) return;
-    const key = JSON.stringify(data);
+    const key = JSON.stringify(data) + (project && project.items.length > 1 ? ProjectModel.serialize(project) : '');
     if (preparedPassport && preparedPassport.key === key) {
       savePassportFile(preparedPassport.file);
       return;

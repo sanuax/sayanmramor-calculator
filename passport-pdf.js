@@ -58,6 +58,7 @@
   const rub = n => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, NBSP);
   const qtyText = q => (q === null || q === undefined ? '' : String(q).replace('.', ','));
 
+  // A passport, or a project's (passport.project): the project's own page, then every product's.
   function renderPassportPdf(passport, assets, libs) {
     const doc = new libs.jsPDF({ unit: 'mm', format: 'a4', compress: true });
     doc.addFileToVFS('Montserrat-Regular.ttf', assets.fonts.regular);
@@ -67,7 +68,19 @@
     doc.addFileToVFS('Unbounded-Medium.ttf', assets.fonts.display);
     doc.addFont('Unbounded-Medium.ttf', 'Unbounded', 'normal');
     doc.setProperties({ title: passport.fileName.replace(/\.pdf$/, ''), creator: 'Саянмрамор' });
+    if (passport.project) {
+      drawProjectPage(doc, passport, libs);
+      passport.items.forEach((item, i) => {
+        doc.addPage();
+        drawPassport(doc, item, Object.assign({ fonts: assets.fonts }, (assets.items || [])[i] || {}), libs);
+      });
+    } else {
+      drawPassport(doc, passport, assets, libs);
+    }
+    return new Uint8Array(doc.output('arraybuffer'));
+  }
 
+  function toolsFor(doc) {
     // text(role, weight, color): role is a TYPE step; the display face only for the name and the title.
     const font = (role, weight, color) => {
       if (role === 'title' || weight === 'display') doc.setFont('Unbounded', 'normal');
@@ -77,6 +90,12 @@
     };
     const wrap = (text, width) => doc.splitTextToSize(String(text), width);
     const one = lines => (lines.length > 1 ? lines : lines[0]);
+    return { font, wrap, one };
+  }
+
+  // One product's passport, from the current page on.
+  function drawPassport(doc, passport, assets, libs) {
+    const { font, wrap, one } = toolsFor(doc);
     let page = 1;
     let y = 0;
 
@@ -287,14 +306,109 @@
     doc.textWithLink('Открыть 3D-модель', textX, footTop + LH(TYPE.heading) * 0.75, { url: passport.link });
     font('small', 'normal', MUTED);
     let fy = footTop + LH(TYPE.heading) + LH(TYPE.small) * 0.75 + 1;
-    const how = wrap('Наведите камеру телефона на код или нажмите на ссылку: откроется калькулятор с этим изделием, его можно вращать.', textW);
+    // A product of a project: its link is the project's (passport.inProject), and opens all of it.
+    const how = wrap(passport.inProject
+      ? 'Наведите камеру телефона на код или нажмите на ссылку: откроется калькулятор со всем проектом, каждое изделие можно вращать.'
+      : 'Наведите камеру телефона на код или нажмите на ссылку: откроется калькулятор с этим изделием, его можно вращать.', textW);
     doc.text(how, textX, fy);
     fy += how.length * LH(TYPE.small) + 1.5;
     const priceNote = (passport.pricesDateText ? 'Цены на ' + passport.pricesDateText + '. ' : '') +
       'Цена предварительная. Доставку и окончательную стоимость рассчитает менеджер.';
     doc.text(wrap(priceNote, textW), textX, fy);
+  }
 
-    return new Uint8Array(doc.output('arraybuffer'));
+  // The project's page: its products with their prices, the lines charged once, the total (or the
+  // manager's note), the link that opens the whole project.
+  function drawProjectPage(doc, p, libs) {
+    const { font, wrap, one } = toolsFor(doc);
+    let page = 1;
+    let y = 0;
+    function header() {
+      font('heading', 'display');
+      doc.text('САЯНМРАМОР', M, M + 3);
+      font('small', 'normal', MUTED);
+      doc.text('Паспорт № ' + p.number + ' · ' + p.dateText + (page > 1 ? ' · стр. ' + page : ''), PAGE_W - M, M + 3, { align: 'right' });
+      doc.setDrawColor.apply(doc, LINE);
+      doc.setLineWidth(0.3);
+      doc.line(M, M + 6, PAGE_W - M, M + 6);
+      y = M + 6 + GAP + 2;
+    }
+    const room = h => { if (y + h > BOTTOM - FOOT_H) { doc.addPage(); page += 1; header(); } };
+    header();
+    const n = p.items.length;
+    font('title');
+    doc.text('Проект · ' + n + ' ' + (n % 10 === 1 && n % 100 !== 11 ? 'изделие' : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? 'изделия' : 'изделий')), M, y + LH(TYPE.title) * 0.7);
+    y += LH(TYPE.title) + GAP;
+    font('heading', 'bold');
+    doc.text('Изделия проекта', M, y + LH(TYPE.heading) * 0.75);
+    y += LH(TYPE.heading) + GAP / 2;
+    (p.rows || []).forEach(r => {
+      const title = wrap(r.title, W - 40);
+      const meta = r.meta ? wrap(r.meta, W - 40) : [];
+      const h = title.length * LH(TYPE.body) + meta.length * LH(TYPE.small) + 2 * CELL_PAD + 1;
+      room(h);
+      font('body', 'bold');
+      doc.text(one(title), M, y + CELL_PAD + LH(TYPE.body) * 0.75);
+      doc.text(r.priceRub === null || r.priceRub === undefined ? 'уточнит менеджер' : rub(r.priceRub) + NBSP + '₽', PAGE_W - M, y + CELL_PAD + LH(TYPE.body) * 0.75, { align: 'right' });
+      if (meta.length) {
+        font('small', 'normal', MUTED);
+        doc.text(meta, M, y + CELL_PAD + title.length * LH(TYPE.body) + LH(TYPE.small) * 0.75);
+      }
+      y += h;
+      doc.setDrawColor.apply(doc, LINE);
+      doc.line(M, y, PAGE_W - M, y);
+    });
+    (p.lines || []).forEach(l => {
+      room(LH(TYPE.body) + 2 * CELL_PAD);
+      font('body', 'normal', MUTED);
+      doc.text(l.label, M, y + CELL_PAD + LH(TYPE.body) * 0.75);
+      doc.text(rub(l.amountRub) + NBSP + '₽', PAGE_W - M, y + CELL_PAD + LH(TYPE.body) * 0.75, { align: 'right' });
+      y += LH(TYPE.body) + 2 * CELL_PAD;
+    });
+    y += GAP;
+    const noteLines = p.note ? wrap(p.note, W) : [];
+    if (p.manual || p.totalRub === null || p.totalRub === undefined) {
+      font('heading', 'bold');
+      const lines = wrap(p.manual || 'Стоимость проекта рассчитает менеджер', W - 8);
+      const boxH = lines.length * LH(TYPE.heading) + 6;
+      room(boxH);
+      doc.setDrawColor.apply(doc, LINE);
+      doc.rect(M, y, W, boxH);
+      doc.text(one(lines), M + 4, y + 3 + LH(TYPE.heading) * 0.75);
+      y += boxH + GAP;
+    } else {
+      const totalH = 8;
+      room(totalH + 2 + noteLines.length * LH(TYPE.small));
+      doc.setFillColor.apply(doc, ACCENT);
+      doc.rect(M, y, W, totalH, 'F');
+      font('heading', 'bold', [255, 255, 255]);
+      doc.text('Всего', M + 3, y + totalH / 2 + LH(TYPE.heading) * 0.25);
+      doc.text(rub(p.totalRub) + NBSP + '₽' + (noteLines.length ? '*' : ''), PAGE_W - M - 3, y + totalH / 2 + LH(TYPE.heading) * 0.25, { align: 'right' });
+      y += totalH;
+      if (noteLines.length) {
+        font('small', 'normal', MUTED);
+        doc.text(noteLines, M + 3, y + 1 + LH(TYPE.small) * 0.75);
+        y += noteLines.length * LH(TYPE.small) + 2;
+      }
+    }
+
+    // The foot: the way back to the whole project in 3D.
+    const footTop = BOTTOM - QR;
+    doc.setDrawColor.apply(doc, LINE);
+    doc.line(M, footTop - GAP / 2, PAGE_W - M, footTop - GAP / 2);
+    drawQr(doc, libs.qrcode, p.link, M, footTop, QR);
+    const textX = M + QR + 2 * GAP;
+    const textW = W - QR - 2 * GAP;
+    font('heading', 'bold');
+    doc.textWithLink('Открыть 3D-модель', textX, footTop + LH(TYPE.heading) * 0.75, { url: p.link });
+    font('small', 'normal', MUTED);
+    let fy = footTop + LH(TYPE.heading) + LH(TYPE.small) * 0.75 + 1;
+    const how = wrap('Наведите камеру телефона на код или нажмите на ссылку: откроется калькулятор со всем проектом, каждое изделие можно вращать.', textW);
+    doc.text(how, textX, fy);
+    fy += how.length * LH(TYPE.small) + 1.5;
+    const priceNote = (p.pricesDateText ? 'Цены на ' + p.pricesDateText + '. ' : '') +
+      'Цена предварительная. Доставку и окончательную стоимость рассчитает менеджер.';
+    doc.text(wrap(priceNote, textW), textX, fy);
   }
 
   function drawQr(doc, qrcode, text, x, top, size) {
