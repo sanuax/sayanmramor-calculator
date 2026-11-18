@@ -480,21 +480,65 @@
   /* «Что будем считать?» (the owner, 2026-11-18): the whole page, two big cards. */
   .mode-choice[hidden], .mode-choice-new[hidden] { display: none; }
   body.choosing-mode .configurator, body.choosing-mode .wrap > h1:not(.mode-choice-title), body.choosing-mode .wrap > .subtitle { display: none; }
-  .mode-choice { padding: 8px 0 60px; }
-  .mode-choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin-top: 28px; max-width: 1100px; }
+  /* Everything in the middle of the page (the owner, 2026-11-18); two cards side by side on a phone too.
+     «Витрина» (the owner's pick of three, 2026-11-18): each card a dark showcase -- the picture to the
+     edges, melting into the card, the text in the light under it. */
+  .mode-choice { max-width: 1040px; margin: 0 auto; padding: 8px 0 60px; text-align: center; }
+  .mode-choice .mode-choice-title { margin-bottom: 10px; }
+  .mode-choice .subtitle { max-width: 34em; margin: 0 auto; text-wrap: balance; }
+  .mode-choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin: 32px auto 0; }
   .mode-card {
-    display: flex; flex-direction: column; gap: 14px; padding: 8px 8px 20px; text-align: left; cursor: pointer;
-    border: 1px solid var(--line); border-radius: 16px; background: var(--card); color: var(--ink); font: inherit;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    position: relative; display: flex; flex-direction: column; gap: 22px; padding: 0 0 26px; overflow: hidden;
+    text-align: center; cursor: pointer; font: inherit;
+    border: 0; border-radius: 20px; background: var(--dark-bg); color: var(--dark-text);
+    box-shadow: 0 30px 60px -34px rgba(20, 24, 21, 0.55);
+    transition: box-shadow 0.25s ease;
   }
-  .mode-card:hover, .mode-card:focus-visible { border-color: var(--accent); box-shadow: 0 8px 28px rgba(28, 29, 27, 0.08); outline: none; }
-  .mode-card-scene { display: flex; gap: 4px; aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden; background: #1e2320; }
-  .mode-card-scene svg { flex: 1 1 0; min-width: 0; height: 100%; display: block; }
-  .mode-card-text { display: flex; flex-direction: column; gap: 6px; padding: 0 12px; }
-  .mode-card-title { font-family: var(--font-display); font-size: clamp(20px, 2vw, 28px); font-weight: 600; letter-spacing: -0.015em; }
-  .mode-card-desc { color: var(--muted); font-size: var(--configurator-text); line-height: 1.45; }
+  /* The rim lies over the picture too (an inset shadow would be under it). */
+  .mode-card::before {
+    content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; border-radius: inherit;
+    box-shadow: inset 0 0 0 1px rgba(233, 231, 225, 0.07); transition: box-shadow 0.25s ease;
+  }
+  .mode-card:hover, .mode-card:focus-visible { outline: none; box-shadow: 0 36px 70px -34px rgba(20, 24, 21, 0.7); }
+  .mode-card:hover::before { box-shadow: inset 0 0 0 1px rgba(127, 166, 152, 0.6); }
+  .mode-card:focus-visible::before { box-shadow: inset 0 0 0 2px var(--dark-accent); }
+  /* The pictures: one scene, or a mosaic of three (a big one and two small) -- each tile cut from its
+     scene (slice), so no empty bands around a picture. */
+  .mode-card-scene {
+    position: relative; display: grid; gap: 2px; aspect-ratio: 3 / 2; overflow: hidden; background: #161a17;
+  }
+  .mode-card-scene[data-mode-scene="project"] { grid-template-columns: 2fr 1fr; grid-template-rows: 1fr 1fr; }
+  .mode-card-scene[data-mode-scene="project"] svg:first-child { grid-row: 1 / -1; }
+  .mode-card-scene svg { display: block; width: 100%; height: 100%; min-width: 0; min-height: 0; transition: transform 0.6s var(--pick-ease); transform-origin: 50% 70%; }
+  /* The picture melts into the card: no hard line between the room and the text. */
+  .mode-card-scene::before {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 38%; z-index: 1; pointer-events: none;
+    background: linear-gradient(rgba(30, 35, 32, 0), var(--dark-bg));
+  }
+  /* Warm light from above on hover (only the layer's opacity moves). */
+  .mode-card-scene::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(80% 70% at 50% 0%, rgba(240, 199, 149, 0.18), rgba(240, 199, 149, 0) 70%);
+    opacity: 0; transition: opacity 0.5s ease;
+  }
+  .mode-card:hover .mode-card-scene::after, .mode-card:focus-visible .mode-card-scene::after { opacity: 1; }
+  .mode-card:hover .mode-card-scene svg { transform: scale(1.03); }
+  .mode-card-text { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 0 16px; flex: 1 1 auto; }
+  .mode-card-title { font-family: var(--font-display); font-size: clamp(20px, 2vw, 28px); font-weight: 600; letter-spacing: -0.015em; line-height: 1.15; text-wrap: balance; }
+  .mode-card-desc { max-width: 30em; margin-bottom: 12px; color: var(--dark-text-muted); font-size: var(--configurator-text); line-height: 1.45; text-wrap: balance; }
+  .mode-card-cta {
+    display: inline-block; margin-top: auto; padding: 11px 22px; min-height: 44px; line-height: 20px; text-align: center;
+    border-radius: 999px; border: 1px solid rgba(233, 231, 225, 0.28); color: var(--dark-text);
+    font-size: 14px; font-weight: 600; letter-spacing: 0.005em; white-space: nowrap;
+    transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease;
+  }
+  .mode-card:hover .mode-card-cta, .mode-card:focus-visible .mode-card-cta { background: var(--dark-text); border-color: var(--dark-text); color: var(--dark-bg); }
+  @media (prefers-reduced-motion: reduce) {
+    .mode-card-scene svg { transition: none; }
+    .mode-card:hover .mode-card-scene svg { transform: none; }
+  }
   .mode-choice-new {
-    margin-top: 16px; padding: 0; border: 0; background: none; color: var(--muted); font: inherit;
+    margin-top: 22px; padding: 0; border: 0; background: none; color: var(--muted); font: inherit;
     font-size: var(--configurator-text); text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
   }
   .mode-choice-new:hover { color: var(--ink); }
@@ -503,8 +547,18 @@
     font-size: var(--configurator-muted); text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
   }
   .mode-switch:hover { color: var(--ink); }
+  /* A phone: the two cards stay side by side, as on a computer (the owner, 2026-11-18). */
   @media (max-width: 640px) {
-    .mode-choice-grid { grid-template-columns: 1fr; gap: 14px; margin-top: 20px; }
+    .mode-choice { padding-bottom: 40px; }
+    .mode-choice .mode-choice-title { font-size: 28px; }
+    .mode-choice .subtitle { font-size: var(--configurator-muted); }
+    .mode-choice-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 22px; }
+    .mode-card { padding: 0 0 14px; gap: 12px; border-radius: 14px; }
+    .mode-card-text { gap: 6px; padding: 0 10px; }
+    .mode-card-title { font-size: 16px; letter-spacing: -0.01em; }
+    .mode-card-desc { margin-bottom: 8px; font-size: 12px; line-height: 1.4; }
+    .mode-card-cta { display: block; width: 100%; padding: 9px 4px; min-height: 40px; font-size: 13px; letter-spacing: 0; }
+    .mode-card-cta-more { display: none; }   /* «Посчитать» / «Собрать»: the card's title says what */
   }
   .product-card {
     position: relative;
@@ -1607,13 +1661,14 @@
   <!-- «Одно изделие» or «Проект» (the owner, 2026-11-18): the calculator opened on its own starts here. -->
   <section class="mode-choice" id="modeChoice" hidden aria-labelledby="modeChoiceTitle">
     <h1 class="mode-choice-title" id="modeChoiceTitle">Что будем считать?</h1>
-    <p class="subtitle">Одну вещь - или весь проект: несколько изделий в одной 3D-сцене, общая цена и одна заявка.</p>
+    <p class="subtitle">Одну вещь - или весь проект: несколько изделий в одной <span style="white-space: nowrap">3D-сцене</span>, общая цена и одна заявка.</p>
     <div class="mode-choice-grid">
       <button type="button" class="mode-card" id="modeChoiceSingle">
         <span class="mode-card-scene" data-mode-scene="single"></span>
         <span class="mode-card-text">
           <span class="mode-card-title">Одно изделие</span>
           <span class="mode-card-desc">Столешница, подоконник, лестница или камин - одна вещь, одна цена</span>
+          <span class="mode-card-cta">Посчитать<span class="mode-card-cta-more"> изделие</span></span>
         </span>
       </button>
       <button type="button" class="mode-card" id="modeChoiceProject">
@@ -1621,6 +1676,7 @@
         <span class="mode-card-text">
           <span class="mode-card-title">Проект</span>
           <span class="mode-card-desc" id="modeChoiceProjectDesc">Несколько изделий в одной сцене, общая цена и одна заявка</span>
+          <span class="mode-card-cta" id="modeChoiceProjectCta">Собрать<span class="mode-card-cta-more"> проект</span></span>
         </span>
       </button>
     </div>
@@ -5752,11 +5808,12 @@
     try { return ProjectModel.deserialize(localStorage.getItem(PROJECT_STORE_KEY), isKnownProduct); } catch (e) { return null; }
   }
 
-  // The two cards' pictures: the product scenes of the calculator (one; three for a project).
+  // The two cards' pictures: the product scenes of the calculator (one; three for a project --
+  // a kitchen, a fireplace and steps, the owner, 2026-11-18).
   (function drawModeScenes() {
-    const scene = key => '<svg viewBox="0 0 120 80" aria-hidden="true">' + (PRODUCT_ICONS[key] || '') + '</svg>';
+    const scene = key => '<svg viewBox="0 0 120 80" preserveAspectRatio="xMidYMid slice" aria-hidden="true">' + (PRODUCT_ICONS[key] || '') + '</svg>';
     document.querySelector('[data-mode-scene="single"]').innerHTML = scene('stoleshnitsa_kuhnya');
-    document.querySelector('[data-mode-scene="project"]').innerHTML = scene('stoleshnitsa_kuhnya') + scene('podokonnik') + scene('stupeni');
+    document.querySelector('[data-mode-scene="project"]').innerHTML = scene('stoleshnitsa_kuhnya') + scene('kaminy') + scene('stupeni');
   })();
 
   function renderModeTexts() {
@@ -5767,6 +5824,7 @@
     document.getElementById('modeChoiceProjectDesc').textContent = n
       ? 'Продолжить проект: ' + n + ' ' + plural(n, 'изделие', 'изделия', 'изделий')
       : 'Несколько изделий в одной сцене, общая цена и одна заявка';
+    document.getElementById('modeChoiceProjectCta').innerHTML = (n ? 'Продолжить' : 'Собрать') + '<span class="mode-card-cta-more"> проект</span>';
     modeChoiceNewEl.hidden = !n;
   }
 
