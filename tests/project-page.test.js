@@ -90,7 +90,8 @@ test('the Result of a project lists its products, each with its price and a way 
 
 test('the Result has its own «+ Добавить изделие»; the panel of a project is «Ваш проект»', () => {
   assert.equal((html.match(/id="resultAddBtn"/g) || []).length, 1);
-  assert.match(html, /resultAddBtn'\)\.addEventListener\('click', addProjectItem\)/);
+  // In a project it adds a product; for one product it is «Сделать проектом» (2026-11-18, mode-choice.test.js).
+  assert.match(html, /resultAddBtn'\)\.addEventListener\('click', \(\) => \(calcMode === 'project' \? addProjectItem\(\) : makeProjectFromSingle\(\)\)\)/);
   assert.match(fn('renderProjectPricing'), /'Ваш проект'/);
 });
 

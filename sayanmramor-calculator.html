@@ -477,6 +477,35 @@
   .product-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   @media (min-width: 560px) { .product-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
   @media (min-width: 1100px) { .product-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+  /* «Что будем считать?» (the owner, 2026-11-18): the whole page, two big cards. */
+  .mode-choice[hidden], .mode-choice-new[hidden] { display: none; }
+  body.choosing-mode .configurator, body.choosing-mode .wrap > h1:not(.mode-choice-title), body.choosing-mode .wrap > .subtitle { display: none; }
+  .mode-choice { padding: 8px 0 60px; }
+  .mode-choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin-top: 28px; max-width: 1100px; }
+  .mode-card {
+    display: flex; flex-direction: column; gap: 14px; padding: 8px 8px 20px; text-align: left; cursor: pointer;
+    border: 1px solid var(--line); border-radius: 16px; background: var(--card); color: var(--ink); font: inherit;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  .mode-card:hover, .mode-card:focus-visible { border-color: var(--accent); box-shadow: 0 8px 28px rgba(28, 29, 27, 0.08); outline: none; }
+  .mode-card-scene { display: flex; gap: 4px; aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden; background: #1e2320; }
+  .mode-card-scene svg { flex: 1 1 0; min-width: 0; height: 100%; display: block; }
+  .mode-card-text { display: flex; flex-direction: column; gap: 6px; padding: 0 12px; }
+  .mode-card-title { font-family: var(--font-display); font-size: clamp(20px, 2vw, 28px); font-weight: 600; letter-spacing: -0.015em; }
+  .mode-card-desc { color: var(--muted); font-size: var(--configurator-text); line-height: 1.45; }
+  .mode-choice-new {
+    margin-top: 16px; padding: 0; border: 0; background: none; color: var(--muted); font: inherit;
+    font-size: var(--configurator-text); text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+  }
+  .mode-choice-new:hover { color: var(--ink); }
+  .mode-switch {
+    margin-left: auto; padding: 0; border: 0; background: none; color: var(--muted); font: inherit;
+    font-size: var(--configurator-muted); text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+  }
+  .mode-switch:hover { color: var(--ink); }
+  @media (max-width: 640px) {
+    .mode-choice-grid { grid-template-columns: 1fr; gap: 14px; margin-top: 20px; }
+  }
   .product-card {
     position: relative;
     display: flex; flex-direction: column;
@@ -1575,12 +1604,34 @@
   </div>
 </header>
 <div class="wrap">
+  <!-- «Одно изделие» or «Проект» (the owner, 2026-11-18): the calculator opened on its own starts here. -->
+  <section class="mode-choice" id="modeChoice" hidden aria-labelledby="modeChoiceTitle">
+    <h1 class="mode-choice-title" id="modeChoiceTitle">Что будем считать?</h1>
+    <p class="subtitle">Одну вещь - или весь проект: несколько изделий в одной 3D-сцене, общая цена и одна заявка.</p>
+    <div class="mode-choice-grid">
+      <button type="button" class="mode-card" id="modeChoiceSingle">
+        <span class="mode-card-scene" data-mode-scene="single"></span>
+        <span class="mode-card-text">
+          <span class="mode-card-title">Одно изделие</span>
+          <span class="mode-card-desc">Столешница, подоконник, лестница или камин - одна вещь, одна цена</span>
+        </span>
+      </button>
+      <button type="button" class="mode-card" id="modeChoiceProject">
+        <span class="mode-card-scene" data-mode-scene="project"></span>
+        <span class="mode-card-text">
+          <span class="mode-card-title">Проект</span>
+          <span class="mode-card-desc" id="modeChoiceProjectDesc">Несколько изделий в одной сцене, общая цена и одна заявка</span>
+        </span>
+      </button>
+    </div>
+    <button type="button" class="mode-choice-new" id="modeChoiceNew" hidden>Начать новый проект</button>
+  </section>
   <h1>Рассчитайте стоимость изделия</h1>
   <p class="subtitle">Выберите тип изделия, материал и размеры - получите ориентировочную стоимость за несколько секунд. Точную цену рассчитает наш специалист после уточнения деталей проекта.</p>
 
   <div class="configurator">
     <section class="step">
-      <div class="step-head"><span class="step-num">1</span><h2 class="step-title">Тип изделия</h2></div>
+      <div class="step-head"><span class="step-num">1</span><h2 class="step-title">Тип изделия</h2><button type="button" class="mode-switch" id="modeSwitch">Сменить режим</button></div>
       <div class="field">
         <label id="productLabel" class="visually-hidden-label">Тип изделия</label>
         <div class="product-grid" id="productGrid" role="radiogroup" aria-labelledby="productLabel"></div>
@@ -3570,7 +3621,7 @@
         loadItem(project.items[project.active]);
         if (selectedProductKey) openPassportStep();
       }
-      if (!passportLink && !projectLink && !bootstrapParams.get('product')) restoreStoredProject();
+      chooseStartMode();
     })
     .catch(() => {
       materialField.disabled = true;
@@ -5340,6 +5391,8 @@
   // A page opened for one product (a site link, a passport) never writes over a stored project of
   // several: only a project this page built or opened is stored (projectOwned).
   function storeProject() {
+    // One product (calcMode 'single'): as on the site, nothing is kept in the browser.
+    if (calcMode !== 'project') return;
     if (project.items.length > 1) projectOwned = true;
     try {
       if (!projectOwned) {
@@ -5383,7 +5436,7 @@
 
   function renderProjectBlock() {
     const items = project ? project.items : [];
-    projectAddBtn.hidden = !selectedProductKey;
+    projectAddBtn.hidden = calcMode !== 'project' || !selectedProductKey;
     projectBlock.hidden = !(items.length > 1);
     if (!(items.length > 1)) return;
     projectCount.textContent = items.length + ' ' + plural(items.length, 'изделие', 'изделия', 'изделий');
@@ -5670,7 +5723,8 @@
     productGrid.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
   projectAddBtn.addEventListener('click', addProjectItem);
-  document.getElementById('resultAddBtn').addEventListener('click', addProjectItem);
+  // The Result's button: «+ Добавить изделие» in a project, «Сделать проектом» for one product.
+  document.getElementById('resultAddBtn').addEventListener('click', () => (calcMode === 'project' ? addProjectItem() : makeProjectFromSingle()));
 
   function removeProjectItem(index) {
     if (!project || project.items.length < 2) return;
@@ -5683,6 +5737,126 @@
     if (wasActive) loadItem(project.items[project.active]);
     else calculate();
   }
+
+  // ---- «Одно изделие» or «Проект» (the owner, 2026-11-18) ----
+  // calcMode: 'single' -- the calculator as on the site; 'project' -- several products; null -- the choice
+  // is on screen. A link that says what it is skips the choice.
+  var calcMode = null;
+  const modeChoiceEl = document.getElementById('modeChoice');
+  const modeChoiceNewEl = document.getElementById('modeChoiceNew');
+  const pageTitleEl = document.querySelector('.wrap > h1:not(.mode-choice-title)');
+  const PAGE_TITLE_ONE = pageTitleEl.textContent;
+  const resultAddBtnEl = document.getElementById('resultAddBtn');
+
+  function storedProject() {
+    try { return ProjectModel.deserialize(localStorage.getItem(PROJECT_STORE_KEY), isKnownProduct); } catch (e) { return null; }
+  }
+
+  // The two cards' pictures: the product scenes of the calculator (one; three for a project).
+  (function drawModeScenes() {
+    const scene = key => '<svg viewBox="0 0 120 80" aria-hidden="true">' + (PRODUCT_ICONS[key] || '') + '</svg>';
+    document.querySelector('[data-mode-scene="single"]').innerHTML = scene('stoleshnitsa_kuhnya');
+    document.querySelector('[data-mode-scene="project"]').innerHTML = scene('stoleshnitsa_kuhnya') + scene('podokonnik') + scene('stupeni');
+  })();
+
+  function renderModeTexts() {
+    pageTitleEl.textContent = calcMode === 'project' ? 'Рассчитайте стоимость проекта' : PAGE_TITLE_ONE;
+    resultAddBtnEl.textContent = calcMode === 'project' ? '+ Добавить изделие' : 'Сделать проектом';
+    const stored = storedProject();
+    const n = stored && stored.items.length > 1 ? stored.items.length : 0;
+    document.getElementById('modeChoiceProjectDesc').textContent = n
+      ? 'Продолжить проект: ' + n + ' ' + plural(n, 'изделие', 'изделия', 'изделий')
+      : 'Несколько изделий в одной сцене, общая цена и одна заявка';
+    modeChoiceNewEl.hidden = !n;
+  }
+
+  // The choice on screen: the calculator hidden behind it (the project stays in the browser).
+  function showModeChoice() {
+    calcMode = null;
+    document.body.classList.add('choosing-mode');
+    modeChoiceEl.hidden = false;
+    renderModeTexts();
+    window.scrollTo(0, 0);
+  }
+
+  // A mode chosen (fromChoice: the client picked it on the choice screen -- one step in the browser's
+  // history, so «Назад» brings the choice back).
+  function setCalcMode(mode, fromChoice) {
+    calcMode = mode;
+    document.body.classList.remove('choosing-mode');
+    modeChoiceEl.hidden = true;
+    if (fromChoice) { try { history.pushState({ calcMode: mode }, ''); } catch (e) { /* no history: the choice is still there via «Сменить режим» */ } }
+    renderModeTexts();
+    renderProjectBlock();
+    renderViewerProject();
+  }
+
+  // At the start: a project link -> project; a product, a stone or a product's passport -> one product;
+  // else the choice.
+  function chooseStartMode() {
+    if (projectLink) { setCalcMode('project'); return; }
+    if (passportLink || bootstrapParams.get('product') || bootstrapParams.get('stone')) { setCalcMode('single'); return; }
+    showModeChoice();
+  }
+
+  // «Одно изделие» from the choice: a clean form, no project (the stored one stays in the browser).
+  function startSingle() {
+    projectSwitching = true;
+    try { resetFormToInitial(); } finally { projectSwitching = false; }
+    productGrid.querySelectorAll('input[name="product"]').forEach(r => { r.checked = false; });
+    selectedProductKey = null;
+    currentStepId = null;
+    project = null;
+    projectOwned = false;
+    itemCache.clear();
+    setCalcMode('single', true);
+    if (viewerReady && window.ThreeScene.setCompanions) { window.ThreeScene.clearActive(); window.ThreeScene.setCompanions([], 0, null); }
+    calculate();
+  }
+
+  // «Проект» from the choice: the stored project, or a new one.
+  function continueStoredProject() {
+    const stored = storedProject();
+    setCalcMode('project', true);
+    if (stored && stored.items.length > 1) { restoreStoredProject(); return; }
+    startNewProject();
+  }
+  function startNewProject() {
+    projectSwitching = true;
+    try { resetFormToInitial(); } finally { projectSwitching = false; }
+    productGrid.querySelectorAll('input[name="product"]').forEach(r => { r.checked = false; });
+    selectedProductKey = null;
+    currentStepId = null;
+    project = null;
+    projectOwned = true;
+    itemCache.clear();
+    if (calcMode !== 'project') setCalcMode('project', true);
+    if (viewerReady && window.ThreeScene.setCompanions) { window.ThreeScene.clearActive(); window.ThreeScene.setCompanions([], 0, null); }
+    calculate();
+  }
+
+  // «Сделать проектом» (one product's Result): the product counted becomes the project's first, a new
+  // one starts. A project already in the browser is replaced only when the client says so.
+  function makeProjectFromSingle() {
+    const stored = storedProject();
+    if (stored && stored.items.length > 1) {
+      const n = stored.items.length;
+      if (!confirm('В браузере есть начатый проект (' + n + ' ' + plural(n, 'изделие', 'изделия', 'изделий') + '). Заменить его новым проектом с этим изделием?')) return;
+    }
+    projectOwned = true;
+    setCalcMode('project');
+    addProjectItem();
+  }
+
+  document.getElementById('modeChoiceSingle').addEventListener('click', startSingle);
+  document.getElementById('modeChoiceProject').addEventListener('click', continueStoredProject);
+  modeChoiceNewEl.addEventListener('click', startNewProject);
+  document.getElementById('modeSwitch').addEventListener('click', showModeChoice);
+  // «Назад» in the browser after a choice: the choice again; «Вперёд»: the mode it was.
+  window.addEventListener('popstate', e => {
+    if (e.state && e.state.calcMode) setCalcMode(e.state.calcMode);
+    else if (calcMode !== null) showModeChoice();
+  });
 
   // A page opened on its own (no product, no passport link): the project the client was building.
   function restoreStoredProject() {
