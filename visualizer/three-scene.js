@@ -1484,6 +1484,11 @@ function setRoom({ mode, facade }) {
   if (facadeChanged) facadeId = facade;
   if (!modeChanged && !facadeChanged) return;
   fadeRoomTo(roomTarget(roomMode), modeChanged ? ROOM_FADE_S : FACADE_FADE_S);
+  // A project: a room is the active product's alone, so the camera leaves «Весь проект» for it.
+  if (modeChanged && roomMode !== 'studio' && framingAll) {
+    framingAll = false;
+    if (lastBounds) frame(viewDirection(), true);
+  }
 }
 
 // What the room offers for the current product: a room at all, and fronts

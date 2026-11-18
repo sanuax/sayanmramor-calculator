@@ -972,3 +972,10 @@ test('the project\'s 3D: companions, the whole project, the room shows the activ
   assert.match(body('focusActive'), /framingAll = false/);
   assert.match(body('update'), /instant/, 'switching products: no morph from the one before');
 });
+
+test('a room shows the active product alone, so the camera goes to it from «Весь проект»', () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'visualizer', 'three-scene.js'), 'utf8');
+  const s = src.indexOf('function setRoom(');
+  const body = src.slice(s, s + src.slice(s).search(/\r?\n\}\r?\n/));
+  assert.match(body, /framingAll = false/);
+});

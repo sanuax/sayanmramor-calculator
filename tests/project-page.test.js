@@ -101,3 +101,7 @@ test('the passport of a project: the project\'s page and each product\'s, shots 
   assert.match(project, /\{ only(: | \})/, 'each product shot alone');
   assert.match(fn('itemResultData'), /ProjectPricing\.priceItem\(/);
 });
+
+test('«Весь проект» in a room goes back to «Студия», where the whole project is', () => {
+  assert.match(fn('renderViewerProject'), /data-room="studio"/);
+});

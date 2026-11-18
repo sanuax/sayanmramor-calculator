@@ -2417,9 +2417,9 @@
 <script src="passport-pdf.js?v=de04eb04"></script>
 <script src="project-model.js?v=89d7396d"></script>
 <!-- IMPORTMAP -->
-<script type="importmap">{"imports":{"./visualizer/ar-view.js":"./visualizer/ar-view.js?v=49e075d1","./visualizer/three-scene.js":"./visualizer/three-scene.js?v=daa1d30b"}}</script>
+<script type="importmap">{"imports":{"./visualizer/ar-view.js":"./visualizer/ar-view.js?v=49e075d1","./visualizer/three-scene.js":"./visualizer/three-scene.js?v=82022a30"}}</script>
 <!-- /IMPORTMAP -->
-<script type="module" src="visualizer/three-scene.js?v=daa1d30b"></script>
+<script type="module" src="visualizer/three-scene.js?v=82022a30"></script>
 <script>
   const { PRODUCTS, hasAdditionalWork } = ProductTypes;
   const { getSubcategoriesForProduct, getAdditionalWorkRate } = RateCatalog;
@@ -3321,6 +3321,8 @@
       document.querySelectorAll('.viewer-room [data-room]').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
       window.ThreeScene.setRoom({ mode: viewerRoomMode });
       updateViewerRoom();
+      // A project's buttons: a room is the active product's alone (renderViewerProject).
+      renderViewerProject();
     }));
     facades.querySelectorAll('[data-facade]').forEach(btn => btn.addEventListener('click', () => {
       facades.querySelectorAll('[data-facade]').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
@@ -5388,6 +5390,9 @@
 
   function renderViewerProject() {
     const items = project ? project.items : [];
+    // A room shows the active product alone: «Весь проект» is not pressed there.
+    const studioOn = document.querySelector('.viewer-room-modes [data-room="studio"]');
+    if (studioOn && studioOn.getAttribute('aria-pressed') !== 'true') viewingAll = false;
     viewerProject.hidden = items.length < 2;
     if (items.length < 2) return;
     viewerProject.innerHTML = '';
@@ -5400,6 +5405,9 @@
     };
     button('Весь проект', viewingAll, () => {
       viewingAll = true;
+      // The whole project stands in «Студия»: a room shows the active product alone.
+      const studio = document.querySelector('.viewer-room-modes [data-room="studio"]');
+      if (studio && studio.getAttribute('aria-pressed') !== 'true') studio.click();
       if (viewerReady) window.ThreeScene.focusProject();
       renderViewerProject();
     });
