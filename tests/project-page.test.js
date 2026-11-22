@@ -81,11 +81,14 @@ test('«Получить расчёт» of a project: one card for the whole pro
   assert.match(fn('currentShareQuery'), /ProjectModel\.buildProjectQuery\(project\)/);
 });
 
-test('the Result of a project lists its products, each with its price and a way back to it', () => {
+test('the Result of a project keeps the stones, the lines charged once and the total; its products are the cards over the calculator', () => {
   assert.equal((html.match(/id="resultProject"/g) || []).length, 1);
+  assert.equal((html.match(/id="resultProjectCards"/g) || []).length, 0, 'no list of products is built to be hidden');
   const render = fn('renderResultProject');
-  assert.match(render, /switchToItem\(/);
-  assert.match(render, /Изделия проекта|resultProject/);
+  assert.match(render, /projectExtraLines\(/);
+  assert.doesNotMatch(render, /switchToItem\(/);
+  // a way back to a product: the cards over the calculator (a tap edits it)
+  assert.match(fn('renderProjectBlock'), /switchToItem\(/);
 });
 
 test('the Result has its own «+ Добавить изделие»; the panel of a project is «Ваш проект»', () => {

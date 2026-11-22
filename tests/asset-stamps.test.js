@@ -48,3 +48,11 @@ test('the 3D modules import each other by plain URLs: an import map sends each t
   // It must stand before the first module script, or it is ignored.
   assert.ok(html.indexOf('<!-- IMPORTMAP -->') < html.indexOf('<script type="module"'));
 });
+
+test('the product cards\' pictures: one file per product of the page, and the page carries the hash of them all', () => {
+  const keys = JSON.parse(html.match(/const PRODUCT_ICON_KEYS = (\[[^\]]*\]);/)[1].replace(/'/g, '"'));
+  const files = fs.readdirSync(path.join(root, stamps.ICONS_DIR)).filter(f => f.endsWith('.webp')).map(f => f.replace(/\.webp$/, '')).sort();
+  assert.deepEqual(files, keys.slice().sort(), 'a picture for every product and none left over');
+  assert.equal(html.match(/const PRODUCT_ICONS_V = '([0-9a-f]+)';/)[1], stamps.iconsStamp(), 'stale: run node scripts/stamp_assets.js');
+  assert.match(html, /\.webp\?v=' \+ PRODUCT_ICONS_V/, 'every picture\'s address carries the stamp');
+});

@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <title>Product icon studio</title>
+<link rel="icon" href="data:,">
 <style>html, body { margin: 0; background: #111; } canvas { display: block; }</style>
 </head>
 <body>
@@ -13,85 +14,28 @@
   shadows and one camera for the whole series. scripts/icon-studio/render.py opens this page for
   every product and look and saves the frames.
 
-    studio.html?p=<product key>&look=vecher|den&w=1440&h=960
+    studio.html?p=<product key>&w=1440&h=960
+
+  The look is one («Люкс», the owner's pick of several concepts, 2026-11-18): a near-black studio, the
+  product on a dark glossy floor, warm LED light built into it where it is really fitted. render.py also
+  asks for the passes it composes (window.__pass): the floor's and the mirror's reflections, the glow.
 -->
 <script type="module">
 import * as THREE from '../../vendor/three/three.module.js';
 
 const Q = new URLSearchParams(location.search);
 const KEY = Q.get('p') || 'stoleshnitsa_kuhnya';
-const LOOK = Q.get('look') || 'vecher';
 const W = +Q.get('w') || 1440, H = +Q.get('h') || 960;
 
-// ---------------------------------------------------------------- the two looks
-const LOOKS = {
-  // «Вечер»: a dark green-graphite room, one warm light from above, the stone glowing in it.
-  vecher: {
-    wall: '#3a423d', floor: '#434a44', exposure: 1.0,
-    key: { color: '#fff0dc', intensity: 3.1, pos: [-60, 330, 300], angle: 0.5, penumbra: 0.9 },
-    fill: { sky: '#a9bab2', ground: '#262b27', intensity: 0.9 },
-    stone: { veins: 1.6, sat: 0.85, gamma: 1.06 },
-    rim: { color: '#c9d6ff', intensity: 0.35, pos: [260, 160, -40] },
-    front: 0.35,
-    env: 0.5, bg: '#1e2320',
-  },
-  // «День»: a warm sand-grey studio a tone darker than the stone, soft daylight from the left.
-  den: {
-    wall: '#cbc2b3', floor: '#b7ad9d', exposure: 0.92,
-    key: { color: '#fff6ea', intensity: 2.9, pos: [-260, 300, 260], angle: 0.7, penumbra: 1.0 },
-    fill: { sky: '#eeebe4', ground: '#9d9484', intensity: 1.05 },
-    stone: { veins: 1.55, sat: 0.9, gamma: 1.04 },
-    rim: { color: '#ffffff', intensity: 0.35, pos: [300, 200, 200] },
-    front: 0.5,
-    env: 0.75, bg: '#c9c0b1',
-  },
-  // «Предмет»: the product alone on a seamless light ground, a soft shadow under it, large in the card.
-  predmet: {
-    iso: true, grad: ['#ece8e1', '#d9d3c8'], wall: '#f1eee8', exposure: 0.9, shadow: 0.22,
-    key: { color: '#fffaf2', intensity: 2.6, pos: [-70, 640, 230], angle: 0.55, penumbra: 1.0 },
-    fill: { sky: '#ffffff', ground: '#cfc8bb', intensity: 1.2 },
-    stone: { veins: 2.0, sat: 0.9, gamma: 1.06 },
-    rim: { color: '#ffffff', intensity: 0.4, pos: [300, 200, -100] },
-    front: 0.55, env: 0.85, bg: '#eeebe5',
-  },
-  // «Макет»: an architect's white model -- everything matte white clay, only the stone is stone.
-  maket: {
-    iso: true, clay: '#f4f2ed', grad: ['#e7e3db', '#d3cdc1'], wall: '#f4f2ed', exposure: 0.88, shadow: 0.24,
-    key: { color: '#fffaf2', intensity: 2.5, pos: [-70, 640, 230], angle: 0.55, penumbra: 1.0 },
-    fill: { sky: '#ffffff', ground: '#c9c2b5', intensity: 1.05 },
-    stone: { veins: 2.05, sat: 0.95, gamma: 1.06 },
-    rim: { color: '#ffffff', intensity: 0.45, pos: [300, 200, -100] },
-    front: 0.45, env: 0.8, bg: '#ebe8e2',
-  },
-  // «Тон»: each product on its own quiet colour, the stone light on it.
-  ton: {
-    iso: true, exposure: 0.9, shadow: 0.2,
-    key: { color: '#fffaf2', intensity: 2.6, pos: [-70, 640, 230], angle: 0.55, penumbra: 1.0 },
-    fill: { sky: '#ffffff', ground: '#c9c2b5', intensity: 1.15 },
-    stone: { veins: 2.0, sat: 0.9, gamma: 1.06 },
-    rim: { color: '#ffffff', intensity: 0.4, pos: [300, 200, -100] },
-    front: 0.55, env: 0.85,
-    tints: {
-      stoleshnitsa_kuhnya: ['#e3e9df', '#cdd9cb'], stoleshnitsa_vannaya: ['#e2e9eb', '#cad6da'],
-      kaminy: ['#f0e2d6', '#e1cbb9'], podokonnik: ['#e4e8ee', '#ced6df'], panno: ['#eee4da', '#ddcdbe'],
-      pol: ['#ece6da', '#dbd1bf'], stena: ['#e5e7e0', '#d1d6cb'], fasad: ['#efe0d4', '#dfc8b6'],
-      lestnitsa: ['#e3e6e6', '#ccd3d3'], stupeni: ['#e9e7d8', '#d6d3bd'],
-    },
-  },
-  // «Люкс»: a near-black studio, the product on a dark glossy floor, warm LED light built into it.
-  lux: {
-    iso: true, lux: true, wall: '#1d1b19', exposure: 1.0,
-    key: { color: '#ffe6c8', intensity: 2.7, pos: [-90, 520, 260], angle: 0.45, penumbra: 1.0 },
-    fill: { sky: '#8a847a', ground: '#0b0a09', intensity: 0.55 },
-    stone: { veins: 1.45, sat: 1.0, gamma: 1.06 },
-    rim: { color: '#ffd9ae', intensity: 1.1, pos: [260, 240, -260] },
-    front: 0.38, env: 0.85, bg: '#0d0c0b',
-  },
+// ---------------------------------------------------------------- the look
+const L = {
+  wall: '#1d1b19', exposure: 1.0,
+  key: { color: '#ffe6c8', intensity: 2.7, pos: [-90, 520, 260], angle: 0.45, penumbra: 1.0 },
+  fill: { sky: '#8a847a', ground: '#0b0a09', intensity: 0.55 },
+  stone: { veins: 1.45, sat: 1.0, gamma: 1.06 },
+  rim: { color: '#ffd9ae', intensity: 1.1, pos: [260, 240, -260] },
+  front: 0.38, env: 0.85,
 };
-const L = LOOKS[LOOK];
-const LUX = !!L.lux;
-const LIGHT = LOOK !== 'vecher' && !LUX;
-if (L.tints) { L.grad = L.tints[KEY]; L.wall = L.tints[KEY][1]; L.bg = L.tints[KEY][0]; }
 
 // ---------------------------------------------------------------- renderer, scene, camera
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
@@ -105,8 +49,8 @@ renderer.shadowMap.type = THREE.VSMShadowMap;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(L.bg);
-if (LUX) {
+{
+  // the studio's backdrop: a dark warm glow behind the product, falling off to black at the edges
   const c = document.createElement('canvas'); c.width = 768; c.height = 512;
   const g = c.getContext('2d'), gr = g.createRadialGradient(384, 200, 10, 384, 220, 520);
   gr.addColorStop(0, '#2b2723'); gr.addColorStop(0.55, '#141210'); gr.addColorStop(1, '#090807');
@@ -114,26 +58,18 @@ if (LUX) {
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
   scene.background = t;
 }
-if (L.grad) {
-  const c = document.createElement('canvas'); c.width = 4; c.height = 512;
-  const g = c.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 512);
-  gr.addColorStop(0, L.grad[0]); gr.addColorStop(1, L.grad[1]);
-  g.fillStyle = gr; g.fillRect(0, 0, 4, 512);
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
-  scene.background = t;
-}
 
 // A soft studio around the scene for the stone's reflections (a light box with two soft panels).
 function studioEnvironment() {
   const env = new THREE.Scene();
-  const box = new THREE.Mesh(new THREE.BoxGeometry(10, 10, 10), new THREE.MeshBasicMaterial({ color: LUX ? 0x15130f : L.iso ? 0xd8d4cc : LIGHT ? 0xb8b2a6 : 0x3a403c, side: THREE.BackSide }));
+  const box = new THREE.Mesh(new THREE.BoxGeometry(10, 10, 10), new THREE.MeshBasicMaterial({ color: 0x15130f, side: THREE.BackSide }));
   env.add(box);
   const panel = (w, h, c, pos, rot) => {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: c, side: THREE.DoubleSide }));
     m.position.set(...pos); m.rotation.set(...rot); env.add(m);
   };
-  panel(4, 2.6, LIGHT ? 0xffffff : 0xffe2bf, [-1.5, 4.6, 1], [Math.PI / 2, 0, 0]);
-  panel(2.4, 3, LIGHT ? 0xf2f4ff : 0x9fb0aa, [4.9, 1.5, 0], [0, -Math.PI / 2, 0]);
+  panel(4, 2.6, 0xffe2bf, [-1.5, 4.6, 1], [Math.PI / 2, 0, 0]);
+  panel(2.4, 3, 0x9fb0aa, [4.9, 1.5, 0], [0, -Math.PI / 2, 0]);
   panel(3, 1.6, 0xffffff, [0, 2, -4.9], [0, 0, 0]);
   const pmrem = new THREE.PMREMGenerator(renderer);
   return pmrem.fromScene(env, 0.04).texture;
@@ -141,8 +77,8 @@ function studioEnvironment() {
 scene.environment = studioEnvironment();
 
 // ---------------------------------------------------------------- textures
-const loader = new THREE.TextureLoader();
 const pending = [];
+window.__errors = [];
 function stoneTexture(name, own = {}) {
   const c = document.createElement('canvas');
   const t = new THREE.CanvasTexture(c);
@@ -169,7 +105,9 @@ function stoneTexture(name, own = {}) {
       t.needsUpdate = true;
       res();
     };
-    img.onerror = res;
+    // a photo that is not there (the weekly job may have renamed it) is an error render.py stops on:
+    // a flat blank stone would be committed unseen
+    img.onerror = () => { window.__errors.push('stone photo not loaded: ' + name); res(); };
   }));
   img.src = '../../data/images/' + name + '.webp';
   t.colorSpace = THREE.SRGBColorSpace;
@@ -177,15 +115,8 @@ function stoneTexture(name, own = {}) {
   t.anisotropy = renderer.capabilities.getMaxAnisotropy();
   return t;
 }
-function loadAll() {
-  return new Promise(res => {
-    THREE.DefaultLoadingManager.onLoad = res;
-    // nothing to load: resolve on the next frame
-    setTimeout(() => { if (!THREE.DefaultLoadingManager.isLoading) res(); }, 50);
-  });
-}
 
-// A canvas texture (procedural: wood, the cooktop's rings, a flame's gradient).
+// A canvas texture (procedural: the cooktop's rings, the flames, the logs).
 function canvasTexture(w, h, draw, srgb = true) {
   const c = document.createElement('canvas'); c.width = w; c.height = h;
   draw(c.getContext('2d'), w, h);
@@ -195,19 +126,6 @@ function canvasTexture(w, h, draw, srgb = true) {
   return t;
 }
 function rand(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
-const woodTex = canvasTexture(1024, 256, (g, w, h) => {
-  const r = rand(7);
-  g.fillStyle = '#8a6544'; g.fillRect(0, 0, w, h);
-  for (let i = 0; i < 160; i++) {
-    const y = r() * h, a = 0.05 + r() * 0.12;
-    g.strokeStyle = r() > 0.5 ? `rgba(60,38,20,${a})` : `rgba(190,150,105,${a})`;
-    g.lineWidth = 0.6 + r() * 2.2;
-    g.beginPath();
-    for (let x = 0; x <= w; x += 16) g.lineTo(x, y + Math.sin(x / (60 + r() * 30) + i) * 3);
-    g.stroke();
-  }
-});
-woodTex.wrapS = woodTex.wrapT = THREE.RepeatWrapping;
 
 // ---------------------------------------------------------------- materials
 const M = {};
@@ -221,35 +139,16 @@ function stone(name, opts = {}) {
   }));
 }
 const mat = {
-  wall: new THREE.MeshStandardMaterial({ color: L.wall, roughness: 0.95, envMapIntensity: 0.2 }),
-  floor: new THREE.MeshStandardMaterial({ color: L.floor, roughness: 0.8, envMapIntensity: 0.35 }),
-  dark: new THREE.MeshStandardMaterial({ color: '#323a35', roughness: 0.38, metalness: 0.05, envMapIntensity: L.env * 1.6 }),
-  darker: new THREE.MeshStandardMaterial({ color: '#141816', roughness: 0.6 }),
-  core: new THREE.MeshStandardMaterial({ color: LIGHT ? '#cfc8bb' : '#4a514c', roughness: 0.92 }),
+  dark: new THREE.MeshStandardMaterial({ color: '#262826', roughness: 0.34, metalness: 0.05, envMapIntensity: L.env * 1.6 }),
+  darker: new THREE.MeshStandardMaterial({ color: '#0f100f', roughness: 0.6 }),
+  core: new THREE.MeshStandardMaterial({ color: '#1b1a18', roughness: 0.92 }),
   brass: new THREE.MeshStandardMaterial({ color: '#c8a274', roughness: 0.3, metalness: 1, envMapIntensity: L.env * 2.5 }),
   steel: new THREE.MeshStandardMaterial({ color: '#c9ccce', roughness: 0.22, metalness: 1, envMapIntensity: L.env * 2.5 }),
-  chrome: new THREE.MeshStandardMaterial({ color: '#e8eaec', roughness: 0.08, metalness: 1, envMapIntensity: L.env * 3 }),
   blackGlass: new THREE.MeshPhysicalMaterial({ color: '#0b0d0c', roughness: 0.06, clearcoat: 1, clearcoatRoughness: 0.05, envMapIntensity: L.env * 2.5 }),
   ceramic: new THREE.MeshPhysicalMaterial({ color: '#f6f5f1', roughness: 0.2, clearcoat: 0.7, envMapIntensity: L.env * 1.6 }),
-  wood: new THREE.MeshStandardMaterial({ map: woodTex, roughness: 0.55, envMapIntensity: L.env }),
-  frame: new THREE.MeshStandardMaterial({ color: '#2b2e2d', roughness: 0.45, metalness: 0.4 }),
-  glass: new THREE.MeshPhysicalMaterial({ color: '#9fb4b0', roughness: 0.04, metalness: 0, transmission: 0, transparent: true, opacity: 0.35, envMapIntensity: 2 }),
   firebox: new THREE.MeshStandardMaterial({ color: '#141210', roughness: 0.7, metalness: 0.3 }),
   sinkSteel: new THREE.MeshStandardMaterial({ color: '#b9bcbd', roughness: 0.32, metalness: 0.85, envMapIntensity: L.env * 3.5 }),
 };
-if (LUX) {
-  mat.dark.color.set('#262826'); mat.dark.roughness = 0.34;
-  mat.darker.color.set('#0f100f');
-  mat.core.color.set('#1b1a18');
-  mat.wood.color.set('#a07a58');
-  mat.frame.color.set('#151615');
-}
-if (L.clay) {
-  const clay = (c, r = 0.85) => new THREE.MeshStandardMaterial({ color: c, roughness: r, envMapIntensity: 0.3 });
-  const white = clay(L.clay), shade = clay('#e6e3dc'), deep = clay('#d6d2c9');
-  Object.assign(mat, { wall: white, floor: white, dark: shade, darker: deep, core: white, brass: deep, steel: shade, chrome: shade,
-    blackGlass: deep, ceramic: white, wood: shade, frame: deep, glass: clay('#ffffff', 0.6), firebox: clay('#8f8a80', 0.95), sinkSteel: shade });
-}
 
 
 // ---------------------------------------------------------------- geometry helpers
@@ -328,11 +227,10 @@ function lathe(profile, material, pos) {
 
 // ---------------------------------------------------------------- the room
 let floorMesh = null;
-const glowMeshes = [];
-function shine(m) { m.userData.glow = true; glowMeshes.push(m); return m; }
-// A strip of warm LED light (only in «Люкс»): a thin bright box, and real light from it.
+// What glows (the LED, the fire, the lit windows): its own pass, bloomed by render.py.
+function shine(m) { m.userData.glow = true; return m; }
+// A strip of warm LED light: a thin bright box (its glow and the light it throws are the washes').
 function led(x0, x1, y0, y1, z0, z1, { color = '#ffc98c' } = {}) {
-  if (!LUX) return null;
   const m = new THREE.Mesh(boxGeo(x0, x1, y0, y1, z0, z1), new THREE.MeshBasicMaterial({ color }));
   scene.add(m); shine(m);
   return m;
@@ -354,7 +252,6 @@ const washTex = (() => {
   return t;
 })();
 function wash(o, u, v, { color = '#ffbf80', strength = 0.9, lift = 0.08 } = {}) {
-  if (!LUX) return null;
   const O = new THREE.Vector3(...o), U = new THREE.Vector3(...u), V = new THREE.Vector3(...v);
   const n = new THREE.Vector3().crossVectors(U, V).normalize();
   if (n.x + n.y + n.z < 0) n.negate();   // off the surface toward the viewer (front, right, above)
@@ -373,21 +270,11 @@ function wash(o, u, v, { color = '#ffbf80', strength = 0.9, lift = 0.08 } = {}) 
   return m;
 }
 
-function room({ back = true, left = true, floorMat = mat.floor, wallMat = mat.wall, holes = null } = {}) {
-  if (LUX) {
-    floorMesh = new THREE.Mesh(new THREE.PlaneGeometry(20000, 20000).rotateX(-Math.PI / 2),
-      new THREE.MeshPhysicalMaterial({ color: '#0f0e0d', roughness: 0.42, clearcoat: 0.6, clearcoatRoughness: 0.3, envMapIntensity: 0.25 }));
-    floorMesh.receiveShadow = true; scene.add(floorMesh);
-    return;
-  }
-  if (L.iso) {
-    const g = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000).rotateX(-Math.PI / 2).translate(500, 0, 500), new THREE.ShadowMaterial({ opacity: L.shadow, color: '#3a3226' }));
-    g.receiveShadow = true; scene.add(g);
-    return;
-  }
-  add(new THREE.PlaneGeometry(2000, 2000).rotateX(-Math.PI / 2).translate(500, 0, 500), floorMat, { cast: false, room: true });
-  if (back && !holes) add(new THREE.PlaneGeometry(2000, 1000).translate(500, 500, 0), wallMat, { cast: false, room: true });
-  if (left) add(new THREE.PlaneGeometry(2000, 1000).rotateY(Math.PI / 2).translate(0, 500, 500), wallMat, { cast: false, room: true });
+// The floor: dark and glossy; its reflection is a pass of its own (render.py lays it in).
+function room() {
+  floorMesh = new THREE.Mesh(new THREE.PlaneGeometry(20000, 20000).rotateX(-Math.PI / 2),
+    new THREE.MeshPhysicalMaterial({ color: '#0f0e0d', roughness: 0.42, clearcoat: 0.6, clearcoatRoughness: 0.3, envMapIntensity: 0.25 }));
+  floorMesh.receiveShadow = true; scene.add(floorMesh);
 }
 
 // ---------------------------------------------------------------- the products
@@ -406,7 +293,7 @@ P.stoleshnitsa_kuhnya = () => {
   const fronts = 4, fw = (X1 - t - X0 - 4) / fronts;
   for (let i = 0; i < fronts; i++) {
     const a = X0 + 4 + i * fw + 0.25, b = X0 + 4 + (i + 1) * fw - 0.25;
-    box(a, b, 11, Hh - t - 1, Z1 - 6, Z1 - 4.2, LUX ? stone('nero-portoro', { veins: 1.0, sat: 0.7, gamma: 1.0, roughness: 0.25, env: 1.2 }) : mat.dark, { bevel: 0.3, S: 160 });
+    box(a, b, 11, Hh - t - 1, Z1 - 6, Z1 - 4.2, stone('nero-portoro', { veins: 1.0, sat: 0.7, gamma: 1.0, roughness: 0.25, env: 1.2 }), { bevel: 0.3, S: 160 });
     box(a + 6, b - 6, Hh - t - 7, Hh - t - 5.6, Z1 - 4.2, Z1 - 3, mat.brass);
   }
   // the worktop with the sink's opening, and its waterfall end
@@ -439,161 +326,33 @@ P.stoleshnitsa_kuhnya = () => {
 
 // Столешница в ванную: a floating top with a vessel basin, the tap from the wall, an oak drawer
 // below and a round mirror with its light behind.
-P.stoleshnitsa_vannaya = () => {
-  if (LUX) return LX.vannaya();
-  room();
-  const X0 = 50, X1 = 190, D = 52, y0 = 82, t = 3.5;
-  const st = stone(LIGHT_STONE);
-  box(X0 + 12, X1 - 12, y0 - 26, y0 - t, 0, D - 6, mat.wood, { bevel: 0.4 });
-  box(X0 + 12, X1 - 12, y0 - 14.6, y0 - 14, D - 6, D - 5.8, mat.darker);
-  box(X0, X1, y0 - t, y0, 0, D, st, { S: 200, bevel: 0.25 });
-  // the basin: a shallow bowl standing on the stone
-  const bx = (X0 + X1) / 2, bz = D / 2 + 2;
-  lathe([[0, 0], [12, 0], [17, 3], [20, 9], [21, 13.5], [20, 13.5], [18.6, 9], [15.6, 4], [0, 3]], mat.ceramic, [bx, y0, bz]);
-  // the tap from the wall
-  const ty = y0 + 26;
-  tube([[bx, ty, 0], [bx, ty, 10], [bx, ty - 1, 15]], 1.2, mat.chrome);
-  add(new THREE.CylinderGeometry(3.4, 3.4, 0.8, 48).rotateX(Math.PI / 2).translate(bx, ty, 0.4), mat.chrome);
-  // the mirror with its halo
-  const mc = [bx, y0 + 56];
-  const glow = new THREE.Mesh(new THREE.CircleGeometry(30, 96), new THREE.MeshBasicMaterial({ color: '#ffd9a8', transparent: true, opacity: L.clay ? 0 : LIGHT ? 0.35 : 0.9 }));
-  glow.position.set(mc[0], mc[1], 0.2); scene.add(glow);
-  const halo = canvasTexture(512, 512, (g, w) => {
-    const gr = g.createRadialGradient(w / 2, w / 2, w * 0.28, w / 2, w / 2, w / 2);
-    gr.addColorStop(0, 'rgba(255,214,160,0.75)'); gr.addColorStop(1, 'rgba(255,214,160,0)');
-    g.fillStyle = gr; g.fillRect(0, 0, w, w);
-  });
-  const hm = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshBasicMaterial({ map: halo, transparent: true, depthWrite: false, opacity: LIGHT ? 0.35 : 1 }));
-  hm.position.set(mc[0], mc[1], 0.15); scene.add(hm);
-  const mirror = new THREE.Mesh(new THREE.CylinderGeometry(27, 27, 2, 96).rotateX(Math.PI / 2),
-    new THREE.MeshPhysicalMaterial({ color: '#b9c3bf', roughness: 0.12, metalness: 1, envMapIntensity: L.env * 3.2 }));
-  mirror.position.set(mc[0], mc[1], 3.2); mirror.castShadow = true; scene.add(mirror); productMeshes.push(mirror);
-  const ml = new THREE.PointLight('#ffd2a0', LIGHT ? 3000 : 9000, 220, 2); ml.position.set(mc[0], mc[1] + 40, 1.5); scene.add(ml);
-  if (LUX) {
-    mirror.material = new THREE.MeshBasicMaterial({ map: canvasTexture(256, 256, (g, w, h) => {
-      const gr = g.createLinearGradient(0, 0, w, h);
-      gr.addColorStop(0, '#4a4540'); gr.addColorStop(0.45, '#26231f'); gr.addColorStop(1, '#141210');
-      g.fillStyle = gr; g.fillRect(0, 0, w, h);
-      const sh = g.createLinearGradient(w * 0.2, 0, w * 0.55, h);
-      sh.addColorStop(0, 'rgba(255,240,220,0)'); sh.addColorStop(0.5, 'rgba(255,240,220,0.10)'); sh.addColorStop(1, 'rgba(255,240,220,0)');
-      g.fillStyle = sh; g.fillRect(0, 0, w, h);
-    }) });
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(27.4, 0.55, 12, 160), new THREE.MeshBasicMaterial({ color: '#ffd09a' }));
-    ring.position.set(mc[0], mc[1], 4.3); scene.add(ring); shine(ring);
-    led(X0 + 14, X1 - 14, y0 - 26.7, y0 - 26, 3, D - 8);
-    wash([X0 + 14, y0 - 26, 0], [X1 - X0 - 28, 0, 0], [0, -48, 0], { strength: 0.8 });
-  }
-  return { walls: 'back' };
-};
+P.stoleshnitsa_vannaya = () => vannaya();
 
 // Подоконник: a window opening in a thick wall, daylight coming in, the sill running out of it.
-P.podokonnik = () => {
-  if (LUX) return LX.podokonnik();
-  const T = 38, X0 = 80, X1 = 210, Y0 = 85, Y1 = 230;
-  room({ holes: true });
-  // the back wall with its opening (four pieces), T deep
-  const wallMat = L.iso ? new THREE.MeshStandardMaterial({ color: L.wall, roughness: 0.9 }) : mat.wall;
-  const pieces = LUX ? [[X0 - 700, X0, 0, 800], [X1, X1 + 700, 0, 800], [X0, X1, 0, Y0], [X0, X1, Y1, 800]]
-    : L.iso ? [[X0 - 45, X0, 0, Y1 + 40], [X1, X1 + 45, 0, Y1 + 40], [X0, X1, 0, Y0], [X0, X1, Y1, Y1 + 40]]
-    : [[-300, X0, 0, 1000], [X1, 1300, 0, 1000], [X0, X1, 0, Y0], [X0, X1, Y1, 1000]];
-  pieces.forEach(([a, b, c, d]) => box(a, b, c, d, -T, 0, wallMat, { room: !L.iso || LUX }));
-  // the window: a slim bronze frame with one mullion, the glass, and what is outside
-  const fr = LUX ? 3.2 : 5;
-  const frameMat = LUX ? new THREE.MeshStandardMaterial({ color: '#2a2622', roughness: 0.35, metalness: 0.7, envMapIntensity: 1.2 }) : mat.frame;
-  [[X0, X1, Y0, Y0 + fr], [X0, X1, Y1 - fr, Y1], [X0, X0 + fr, Y0, Y1], [X1 - fr, X1, Y0, Y1], [(X0 + X1) / 2 - fr / 2, (X0 + X1) / 2 + fr / 2, Y0, Y1]].forEach(([a, b, c, d]) => box(a, b, c, d, -T + 4, -T + 10, frameMat));
-  if (LUX) {
-    // blue hour behind the glass: the sky's last light, a line of trees out of focus, a few windows far off
-    const view = canvasTexture(1024, 768, (g, w, h) => {
-      const sky = g.createLinearGradient(0, 0, 0, h);
-      sky.addColorStop(0, '#16233a'); sky.addColorStop(0.42, '#2d4566'); sky.addColorStop(0.66, '#6b6f80'); sky.addColorStop(0.8, '#b98762'); sky.addColorStop(1, '#3a2c24');
-      g.fillStyle = sky; g.fillRect(0, 0, w, h);
-      const r = rand(11);
-      g.filter = 'blur(6px)';
-      // far trees: a soft ragged ridge
-      g.fillStyle = '#1b2230';
-      g.beginPath(); g.moveTo(0, h);
-      for (let x = 0; x <= w; x += 6) g.lineTo(x, h * 0.62 + Math.sin(x / 37) * 14 + Math.sin(x / 11 + 2) * 6 + r() * 10);
-      g.lineTo(w, h); g.fill();
-      // near trees: darker, taller, a few conifers
-      g.filter = 'blur(14px)';
-      g.fillStyle = '#0d1119';
-      for (let k = 0; k < 26; k++) {
-        const x = w * r(), y = h * (0.6 + 0.12 * r()), rr = 40 + 70 * r();
-        g.beginPath(); g.ellipse(x, y, rr, rr * (0.7 + 0.5 * r()), 0, 0, 7); g.fill();
-      }
-      g.fillRect(0, h * 0.72, w, h * 0.28);
-      // warm windows far off: bokeh
-      g.filter = 'blur(3px)';
-      for (let k = 0; k < 9; k++) {
-        const x = w * (0.05 + 0.9 * r()), y = h * (0.7 + 0.08 * r()), rr = 2.5 + 4 * r();
-        const gr = g.createRadialGradient(x, y, 0, x, y, rr * 2.4);
-        gr.addColorStop(0, 'rgba(255,200,130,0.95)'); gr.addColorStop(0.4, 'rgba(255,170,90,0.45)'); gr.addColorStop(1, 'rgba(255,150,80,0)');
-        g.fillStyle = gr; g.beginPath(); g.arc(x, y, rr * 2.4, 0, 7); g.fill();
-      }
-      g.filter = 'none';
-    });
-    const outside = new THREE.Mesh(new THREE.PlaneGeometry(3 * (X1 - X0), 3 * (Y1 - Y0) * 0.75),
-      new THREE.MeshBasicMaterial({ map: view, color: new THREE.Color(1.15, 1.15, 1.15) }));
-    outside.position.set((X0 + X1) / 2, (Y0 + Y1) / 2 + 10, -T - 160); scene.add(outside);
-    const cool = new THREE.SpotLight('#8fa8d0', 1.2, 0, 0.5, 0.9, 0);
-    cool.position.set((X0 + X1) / 2, Y1, -T - 200); cool.target.position.set((X0 + X1) / 2, Y0, 40);
-    scene.add(cool, cool.target);
-  } else {
-    const skyTex = canvasTexture(64, 256, (g, w, h) => {
-      const gr = g.createLinearGradient(0, 0, 0, h);
-      if (LIGHT) { gr.addColorStop(0, '#cfe0ea'); gr.addColorStop(0.55, '#eef3f4'); gr.addColorStop(1, '#f7f1e6'); }
-      else { gr.addColorStop(0, '#5e6f86'); gr.addColorStop(0.5, '#d9a37a'); gr.addColorStop(1, '#f3c890'); }
-      g.fillStyle = gr; g.fillRect(0, 0, w, h);
-    });
-    const sky = new THREE.Mesh(new THREE.PlaneGeometry(X1 - X0 + 4, Y1 - Y0 + 4), new THREE.MeshBasicMaterial({ map: skyTex, color: L.clay ? '#f4f6f6' : '#ffffff' }));
-    sky.position.set((X0 + X1) / 2, (Y0 + Y1) / 2, -T - 2); scene.add(sky);
-  }
-  led(X0 - 7, X1 + 7, Y0 - 4.7, Y0 - 4, 2.5, 6.4);
-  wash([X0 - 7, Y0 - 4.7, 0], [X1 - X0 + 14, 0, 0], [0, -52, 0], { strength: 0.8 });
-  add(new THREE.PlaneGeometry(X1 - X0 - 2 * fr, Y1 - Y0 - 2 * fr).translate((X0 + X1) / 2, (Y0 + Y1) / 2, -T + 7), LUX ? new THREE.MeshPhysicalMaterial({ color: '#203040', roughness: 0.02, transparent: true, opacity: 0.12, envMapIntensity: 2.5 }) : mat.glass, { cast: false });
-  // daylight through the opening onto the sill and the floor
-  const sun = new THREE.SpotLight(LIGHT ? '#fff8ee' : '#ffcf96', LIGHT ? 3.2 : 2.6, 0, 0.42, 0.7, 0);
-  sun.position.set((X0 + X1) / 2 - 40, Y1 + 160, -T - 260); sun.target.position.set((X0 + X1) / 2 + 30, 0, 140);
-  sun.castShadow = !L.iso; if (L.iso) sun.intensity *= 0.35; if (LUX) sun.intensity = 0; sun.shadow.mapSize.set(2048, 2048); sun.shadow.radius = 6; sun.shadow.blurSamples = 16; sun.shadow.bias = -0.0004;
-  scene.add(sun, sun.target);
-  // the sill: inside the opening and out into the room
-  slab([[X0 - 8, 7], [X1 + 8, 7], [X1 + 8, 0], [X1, 0], [X1, -T + 10], [X0, -T + 10], [X0, 0], [X0 - 8, 0]], Y0 - 4, Y0, stone(LIGHT_STONE), { S: 170, bevel: 0.25 });
-  return { target: [(X0 + X1) / 2, Y0 + 30, -6], radius: 125, keyScale: LUX ? 0.9 : 0.55, noContact: true };
-};
+P.podokonnik = () => podokonnik();
 
 // Пол: nine large slabs in the room's corner, the pattern running on over the joints.
 P.pol = () => {
   room();
   const N = 3, S = 80, g = 0.35, st = stone(LIGHT_STONE, { roughness: 0.22, clearcoat: 0.4 });
-  box(LUX ? 3 : 0, N * S - (LUX ? 3 : 0), 0, 0.6, LUX ? 3 : 0, N * S - (LUX ? 3 : 0), mat.darker, { cast: false });
-  if (LUX) {
-    led(3, N * S - 3, 0.05, 0.5, N * S - 3.6, N * S - 3);
-    led(N * S - 3.6, N * S - 3, 0.05, 0.5, 3, N * S - 3);
-    wash([3, 0, N * S - 3], [N * S - 6, 0, 0], [0, 0, 34], { strength: 0.75 });
-    wash([N * S - 3, 0, N * S - 3], [0, 0, -(N * S - 6)], [34, 0, 0], { strength: 0.75 });
-  }
+  box(3, N * S - 3, 0, 0.6, 3, N * S - 3, mat.darker, { cast: false });
+  led(3, N * S - 3, 0.05, 0.5, N * S - 3.6, N * S - 3);
+  led(N * S - 3.6, N * S - 3, 0.05, 0.5, 3, N * S - 3);
+  wash([3, 0, N * S - 3], [N * S - 6, 0, 0], [0, 0, 34], { strength: 0.75 });
+  wash([N * S - 3, 0, N * S - 3], [0, 0, -(N * S - 6)], [34, 0, 0], { strength: 0.75 });
   for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
     box(i * S + g, (i + 1) * S - g, 0.6, 2.4, j * S + g, (j + 1) * S - g, st, { S: 3 * S, bevel: 0.15, cast: false });
   }
-  return { el: LUX ? 26 : 36, az: 40, margin: 0.8, noContact: true };
+  return { el: 26, az: 40, margin: 0.8, noContact: true };
 };
 
 // Стены: both walls of the corner clad in large slabs, joints between them, the pattern over the corner.
 P.stena = () => {
-  room({ back: false, left: false });
+  room();
   const Hh = 210, A = 200, B = 160, sh = Hh / 3, sw = 100, th = 2;
   const st = stone(LIGHT_STONE, { roughness: 0.2 });
   const back = stone(LIGHT_STONE, { roughness: 0.2 });
-  if (LUX) {
-    // nothing behind: the corner of stone is the picture
-  } else if (L.iso) {
-    const wm = new THREE.MeshStandardMaterial({ color: L.wall, roughness: 0.9 });
-    box(-10, A + 30, 0, Hh + 25, -12, -2, wm);
-    box(-12, -2, 0, Hh + 25, -12, B + 30, wm);
-  } else {
-    add(new THREE.PlaneGeometry(2000, 1000).translate(500, 500, -2), mat.wall, { cast: false, room: true });
-    add(new THREE.PlaneGeometry(2000, 1000).rotateY(Math.PI / 2).translate(-2, 500, 500), mat.wall, { cast: false, room: true });
-  }
+  // nothing behind: the corner of stone is the picture
   for (let r = 0; r < 3; r++) {
     for (let c = 0; c * sw < A; c++) box(c * sw + 0.2, Math.min((c + 1) * sw, A) - 0.2, r * sh + 0.2, (r + 1) * sh - 0.2, -th, 0, back, { S: 300, bevel: 0.15 });
     for (let c = 0; c * sw < B; c++) box(-th, 0, r * sh + 0.2, (r + 1) * sh - 0.2, c * sw + 0.2, Math.min((c + 1) * sw, B) - 0.2, st, { S: 300, bevel: 0.15 });
@@ -613,10 +372,10 @@ P.fasad = () => {
   const st = stone('limestone-white', { roughness: 0.6, clearcoat: 0, env: 0.4, veins: 1.1, sat: 0.55 });
   const st2 = stone('crema-marfil', { roughness: 0.45, clearcoat: 0.1, env: 0.5, veins: 1.1, sat: 0.6 });
   const X0 = 80, X1 = 220, Z0 = 70, Z1 = 170, Hh = 120;
-  box(X0 - 14, X1 + 14, 0, 8, Z0 - 14, Z1 + 14, LIGHT ? new THREE.MeshStandardMaterial({ color: '#a59d8f', roughness: 0.7 }) : mat.darker);
+  box(X0 - 14, X1 + 14, 0, 8, Z0 - 14, Z1 + 14, mat.darker);
   box(X0 - 2, X1 + 2, 8, 24, Z0 - 2, Z1 + 2, st2, { S: 120 });
-  box(X0, X1, 24, Hh, Z0, LUX ? Z1 - 2 : Z1, st, { S: 140 });
-  if (LUX) {
+  box(X0, X1, 24, Hh, Z0, Z1 - 2, st, { S: 140 });
+  {
     // the front skin, 2 cm, with the openings: the windows sit 2 cm deep in it
     const sk = new THREE.Shape([[X0, 24], [X1, 24], [X1, Hh], [X0, Hh]].map(([x, y]) => new THREE.Vector2(x, y)));
     [X0 + 26, (X0 + X1) / 2, X1 - 26].forEach(cx => [32, 80].forEach(y => (cx === (X0 + X1) / 2 && y === 32) || sk.holes.push(new THREE.Path([[cx - 10, y], [cx + 10, y], [cx + 10, y + 28], [cx - 10, y + 28]].map(([x, yy]) => new THREE.Vector2(x, yy))))));
@@ -628,43 +387,38 @@ P.fasad = () => {
   box(X0 - 1.5, X1 + 1.5, 66, 70, Z0 - 1.5, Z1 + 1.5, st2, { S: 120 });
   box(X0 - 5, X1 + 5, Hh, Hh + 6, Z0 - 5, Z1 + 5, st2, { S: 120 });
   box(X0 - 2, X1 + 2, Hh + 6, Hh + 10, Z0 - 2, Z1 + 2, st2, { S: 120 });
-  const lit = LUX ? new THREE.MeshBasicMaterial({ map: canvasTexture(32, 64, (g, w, h) => {
+  const lit = new THREE.MeshBasicMaterial({ map: canvasTexture(32, 64, (g, w, h) => {
     const gr = g.createLinearGradient(0, 0, 0, h);
     gr.addColorStop(0, '#5a4330'); gr.addColorStop(0.55, '#b88456'); gr.addColorStop(1, '#e8b47c');
     g.fillStyle = gr; g.fillRect(0, 0, w, h);
-  }) }) : null;
-  const winFrame = LUX ? new THREE.MeshStandardMaterial({ color: '#24211e', roughness: 0.35, metalness: 0.7 }) : null;
-  const litVariants = LUX ? [0.75, 1, 0.55, 0.9, 1, 0.65].map(k => { const m = lit.clone(); m.color = new THREE.Color(k, k, k); return m; }) : null;
+  }) });
+  const winFrame = new THREE.MeshStandardMaterial({ color: '#24211e', roughness: 0.35, metalness: 0.7 });
+  const litVariants = [0.75, 1, 0.55, 0.9, 1, 0.65].map(k => { const m = lit.clone(); m.color = new THREE.Color(k, k, k); return m; });
   let winN = 0;
   const win = (cx, y0, face) => {
     const w = 20, h = 28, d = 2;
-    const glass = LUX ? litVariants[winN++ % litVariants.length] : lit || mat.blackGlass;
-    if (LUX) {
-      const f = 1.1, y1 = y0 + h;
-      if (face === 'front') {
-        [[cx - w / 2, cx - w / 2 + f, y0, y1], [cx + w / 2 - f, cx + w / 2, y0, y1], [cx - w / 2, cx + w / 2, y1 - f, y1], [cx - f / 2, cx + f / 2, y0, y1], [cx - w / 2, cx + w / 2, y0 + h * 0.62, y0 + h * 0.62 + f]]
-          .forEach(([a, b, c, e]) => box(a, b, c, e, Z1 - 1.6, Z1 - 0.4, winFrame, { cast: false }));
-      } else {
-        [[cx - w / 2, cx - w / 2 + f, y0, y1], [cx + w / 2 - f, cx + w / 2, y0, y1], [cx - w / 2, cx + w / 2, y1 - f, y1], [cx - f / 2, cx + f / 2, y0, y1], [cx - w / 2, cx + w / 2, y0 + h * 0.62, y0 + h * 0.62 + f]]
-          .forEach(([a, b, c, e]) => box(X1 + 0.3, X1 + 1.2, c, e, a, b, winFrame, { cast: false }));
-      }
-    }
+    const glass = litVariants[winN++ % litVariants.length];
+    // the bronze frame: two uprights, a head, a mullion and a transom bar (a, b: along the wall; c, e: up)
+    const f = 1.1, y1 = y0 + h;
+    const bars = [[cx - w / 2, cx - w / 2 + f, y0, y1], [cx + w / 2 - f, cx + w / 2, y0, y1], [cx - w / 2, cx + w / 2, y1 - f, y1], [cx - f / 2, cx + f / 2, y0, y1], [cx - w / 2, cx + w / 2, y0 + h * 0.62, y0 + h * 0.62 + f]];
+    if (face === 'front') bars.forEach(([a, b, c, e]) => box(a, b, c, e, Z1 - 1.6, Z1 - 0.4, winFrame, { cast: false }));
+    else bars.forEach(([a, b, c, e]) => box(X1 + 0.3, X1 + 1.2, c, e, a, b, winFrame, { cast: false }));
     if (face === 'front') {
-      shine(box(cx - w / 2, cx + w / 2, y0, y0 + h, Z1 - d, LUX ? Z1 - 1.6 : Z1 + 0.05, glass, { cast: false }));
+      shine(box(cx - w / 2, cx + w / 2, y0, y0 + h, Z1 - d, Z1 - 1.6, glass, { cast: false }));
       box(cx - w / 2 - 2, cx + w / 2 + 2, y0 - 2.5, y0, Z1, Z1 + 2.5, st2, { S: 120 });
       box(cx - w / 2 - 1.5, cx + w / 2 + 1.5, y0 + h, y0 + h + 2, Z1, Z1 + 1.2, st2, { S: 120 });
     } else {
-      shine(box(LUX ? X1 - 0.01 : X1 - d, LUX ? X1 + 0.3 : X1 + 0.05, y0, y0 + h, cx - w / 2, cx + w / 2, glass, { cast: false }));
+      shine(box(X1 - 0.01, X1 + 0.3, y0, y0 + h, cx - w / 2, cx + w / 2, glass, { cast: false }));
       box(X1, X1 + 2.5, y0 - 2.5, y0, cx - w / 2 - 2, cx + w / 2 + 2, st2, { S: 120 });
       box(X1, X1 + 1.2, y0 + h, y0 + h + 2, cx - w / 2 - 1.5, cx + w / 2 + 1.5, st2, { S: 120 });
     }
   };
-  [X0 + 26, (X0 + X1) / 2, X1 - 26].forEach(cx => { if (!(LUX && cx === (X0 + X1) / 2)) win(cx, 32, 'front'); win(cx, 80, 'front'); });
+  [X0 + 26, (X0 + X1) / 2, X1 - 26].forEach(cx => { if (cx !== (X0 + X1) / 2) win(cx, 32, 'front'); win(cx, 80, 'front'); });
   [Z0 + 28, Z1 - 28].forEach(cz => { win(cz, 32, 'side'); win(cz, 80, 'side'); });
   // the entrance: two stone steps, a stone portal standing out of the wall, a walnut door set back in
   // it with grooves and a long brass pull, a lit transom over it, a wall light either side
   const ex = (X0 + X1) / 2, dw = 26, dh = 38;
-  if (LUX) {
+  {
     box(ex - dw / 2 - 10, ex + dw / 2 + 10, 8, 16, Z1 + 2, Z1 + 14, st2, { S: 120, bevel: 0.3 });
     box(ex - dw / 2 - 7, ex + dw / 2 + 7, 16, 24, Z1 + 2, Z1 + 8, st2, { S: 120, bevel: 0.3 });
     box(ex - dw / 2 - 6, ex - dw / 2, 24, 24 + dh + 6, Z1, Z1 + 3.5, st2, { S: 120, bevel: 0.25 });
@@ -694,8 +448,6 @@ P.fasad = () => {
       wash([lx - 7, 24 + 22, Z1], [14, 0, 0], [0, -22, 0], { strength: 0.6, lift: 0.08 });
       wash([lx - 7, 24 + 34, Z1], [14, 0, 0], [0, 22, 0], { strength: 0.6, lift: 0.08 });
     });
-  } else {
-    box(ex - 12, ex + 12, 24, 58, Z1 - 1.5, Z1 + 0.05, mat.dark, { cast: false });
   }
   return { target: [(X0 + X1) / 2, 62, (Z0 + Z1) / 2], radius: 160 };
 };
@@ -735,11 +487,9 @@ P.stupeni = () => {
     wash([X0 + 2, i * h, zf], [W - 4, 0, 0], [0, h, 0], { strength: 0.6, lift: 0.06 });
     wash([X0 + 2, i * h, zf + 0.9], [W - 4, 0, 0], [0, 0, 16], { strength: 0.45 });
   }
-  if (LUX) {
-    // the lowest step floats on a line of light
-    led(X0 + 6, X0 + W - 6, 0.05, 0.6, Z0 + 3 * d - 2, Z0 + 3 * d - 1);
-    wash([X0 + 6, 0, Z0 + 3 * d + 10], [W - 12, 0, 0], [0, 0, 34], { strength: 0.6 });
-  }
+  // the lowest step floats on a line of light
+  led(X0 + 6, X0 + W - 6, 0.05, 0.6, Z0 + 3 * d - 2, Z0 + 3 * d - 1);
+  wash([X0 + 6, 0, Z0 + 3 * d + 10], [W - 12, 0, 0], [0, 0, 34], { strength: 0.6 });
   return { target: [X0 + W / 2, 18, Z0 + 1.6 * d], radius: 150 };
 };
 
@@ -824,44 +574,21 @@ P.kaminy = () => {
   const ember = new THREE.Mesh(new THREE.BoxGeometry(W - 92, 0.8, D - 16).translate(cx, 8.4, (D - 16) / 2 + 4),
     new THREE.MeshBasicMaterial({ map: emberTex, color: new THREE.Color(0.75, 0.6, 0.5) }));
   scene.add(ember); shine(ember);
-  const fire = new THREE.PointLight('#ff9a4a', LIGHT ? 7000 : 16000, 300, 2); fire.position.set(cx, 34, D - 6); scene.add(fire);
-  if (LUX) { fire.castShadow = true; fire.shadow.mapSize.set(1024, 1024); fire.shadow.radius = 6; }
-  const glowIn = new THREE.PointLight('#ff8a3a', LIGHT ? 2500 : 6000, 120, 2); glowIn.position.set(cx, 30, 6); scene.add(glowIn);
+  const fire = new THREE.PointLight('#ff9a4a', 16000, 300, 2); fire.position.set(cx, 34, D - 6); scene.add(fire);
+  fire.castShadow = true; fire.shadow.mapSize.set(1024, 1024); fire.shadow.radius = 6;
+  const glowIn = new THREE.PointLight('#ff8a3a', 6000, 120, 2); glowIn.position.set(cx, 30, 6); scene.add(glowIn);
   return { walls: 'back' };
 };
 
 // Панно: a book-matched panel of two slabs on the wall, lit from behind its edges.
-P.panno = () => {
-  if (LUX) return LX.panno();
-  room();
-  const cx = 140, y0 = 40, w = 70, h = 160, th = 3;
-  const halo = canvasTexture(512, 512, (g, s) => {
-    const gr = g.createRadialGradient(s / 2, s / 2, s * 0.2, s / 2, s / 2, s / 2);
-    gr.addColorStop(0, 'rgba(255,214,160,0.9)'); gr.addColorStop(1, 'rgba(255,214,160,0)');
-    g.fillStyle = gr; g.fillRect(0, 0, s, s);
-  });
-  const hm = new THREE.Mesh(new THREE.PlaneGeometry(2 * w + 90, h + 90), new THREE.MeshBasicMaterial({ map: halo, transparent: true, depthWrite: false, opacity: LIGHT ? 0.35 : 0.85 }));
-  hm.position.set(cx, y0 + h / 2, 0.2); scene.add(hm);
-  // the two halves: the right one is the left one mirrored at the seam
-  const stA = stone('calacatta-borghini-13', { sat: 0.55 });
-  box(cx - w, cx - 0.15, y0, y0 + h, 3, 3 + th, stA, { S: 150, ou: 0.5, ov: 0.35, bevel: 0.2 });
-  box(cx + 0.15, cx + w, y0, y0 + h, 3, 3 + th, stA, { S: 150, flipU: true, ou: 0.5 + 2 * cx / 150, ov: 0.35, bevel: 0.2 });
-  box(cx - w + 6, cx + w - 6, y0 + 6, y0 + h - 6, 0, 3, mat.darker, { cast: false });
-  led(cx - w + 1.5, cx - w + 2.6, y0 + 3, y0 + h - 3, 0.6, 2.4);
-  led(cx + w - 2.6, cx + w - 1.5, y0 + 3, y0 + h - 3, 0.6, 2.4);
-  wash([cx - w + 2, y0 + 2, 0], [0, h - 4, 0], [-46, 0, 0], { strength: 0.85 });
-  wash([cx + w - 2, y0 + h - 2, 0], [0, -(h - 4), 0], [46, 0, 0], { strength: 0.85 });
-  if (LUX) hm.visible = false;
-  return { walls: 'back', keyScale: 0.8, pad: 30 };
-};
+P.panno = () => panno();
 
-// ---------------------------------------------------------------- «Люкс»: the bath, the sill, the panel
-const LX = {};
+// ---------------------------------------------------------------- the bath, the sill, the panel
 
 // Столешница в ванную: a wall-hung vanity as big as the kitchen's island reads -- the stone top over
-// two deep drawers in dark marble (as the island's fronts), a vessel basin, a tap from the wall, a
+// two deep drawers in dark marble (as the island's fronts), a vessel basin, a tall tap on the stone, a
 // round mirror lit from behind; a line of light under the vanity on the wall.
-LX.vannaya = () => {
+function vannaya() {
   room();
   const X0 = 40, X1 = 200, D = 54, y0 = 88, t = 4, ch = 42;
   const st = stone(LIGHT_STONE);
@@ -912,17 +639,15 @@ LX.vannaya = () => {
   const behind = new THREE.Mesh(new THREE.PlaneGeometry(700, 350), new THREE.MeshBasicMaterial({ map: roomTex, fog: false, side: THREE.DoubleSide }));
   behind.position.set(bx, 150, 420); behind.rotation.y = Math.PI; behind.visible = false; scene.add(behind);
   return { walls: 'back', mirror: { mesh: mirror, plane: mz, hide: [ring, hm], show: [behind] }, az: 24, el: 9 };
-};
+}
 
-// Подоконник: the sill is the picture -- a deep, thick slab running out of a window in a thick wall;
-// the window bright (an evening sky, as a camera exposed for the room sees it), its light falling in
-// over the sill with the frame's shadow; the camera close on the sill, the window's top out of frame.
-LX.podokonnik = () => {
-  // a deep window in a thick wall, at night: the sill of marble runs through the reveal and out over
-  // the wall; a downlight hidden in the head of the reveal pours over it; the glass dark, holding the
-  // night and a few lights far off; a line of light under the sill's nose
+// Подоконник: a deep window in a thick wall, at night: the marble sill runs through the reveal and out
+// over the wall; a downlight hidden in the head of the reveal pours over it; the glass dark, holding the
+// night and a few lights far off; a line of light under the sill's nose; shot straight on and a little
+// from above, the window's top out of frame.
+function podokonnik() {
   const T = 42, X0 = 60, X1 = 200, Y0 = 84, Y1 = 226;
-  room({ holes: true });
+  room();
   const wallMat = new THREE.MeshStandardMaterial({ color: '#24211d', roughness: 0.85 });
   [[X0 - 700, X0, 0, 800], [X1, X1 + 700, 0, 800], [X0, X1, 0, Y0], [X0, X1, Y1, 800]].forEach(([a, b, c, d]) => box(a, b, c, d, -T, 0, wallMat, { room: true }));
   const fr = 3.4, fz0 = -T + 3, fz1 = -T + 9;
@@ -959,18 +684,18 @@ LX.podokonnik = () => {
   // its light on the two sides of the reveal and on the sill
   wash([X0 + 0.1, Y1, -T + 9], [0, 0, T - 9], [0, -(Y1 - Y0), 0], { strength: 0.2 });
   wash([X1 - 0.1, Y1, 0], [0, 0, -(T - 9)], [0, -(Y1 - Y0), 0], { strength: 0.2 });
-  // the sill: 4 cm thick, through the reveal and 6 cm out over the wall, 8 cm past it each side
-  // the owner, 2026-11-18: no ears round the wall's corners -- the sill is the opening's width
+  // the sill: 6 cm thick, through the reveal and 9 cm out over the wall, the opening's width (no ears
+  // round the wall's corners: the owner, 2026-11-18)
   slab([[X0, 9], [X1, 9], [X1, fz1], [X0, fz1]], Y0 - 6, Y0, stone(LIGHT_STONE), { S: 150, ou: 0.18, ov: 0.42, bevel: 0.45 });
   led(X0 + 2, X1 - 2, Y0 - 6.6, Y0 - 6, 2, 7.5);
   wash([X0 + 2, Y0 - 6, 0], [X1 - X0 - 4, 0, 0], [0, -46, 0], { strength: 0.6 });
   // straight on and a little from above (the owner, 2026-11-18: «криво, не читается»): the whole window, the sill under it
   return { focusBox: [X0 - 14, X1 + 14, Y0 - 10, Y0 + 92, -T, 9], noContact: true, keyScale: 0.4, az: 0, el: 22, margin: 0.9, lift: 0 };
-};
+}
 
 // Панно: two slabs book-matched, floating 4 cm off the wall, a strip of light hidden behind their edge
 // all round -- an even halo on the wall about the panel.
-LX.panno = () => {
+function panno() {
   room();
   const cx = 150, y0 = 48, w = 62, h = 172, th = 3, off = 4;
   const stA = stone('calacatta-borghini-13', { sat: 0.55 });
@@ -983,7 +708,7 @@ LX.panno = () => {
   wash([cx + w - 2, y0 + h, 0], [-(2 * w - 4), 0, 0], [0, d, 0], { strength: k });
   wash([cx - w + 2, y0, 0], [2 * w - 4, 0, 0], [0, -d, 0], { strength: k });
   return { walls: 'back', keyScale: 0.75, az: 30, el: 10, margin: 0.66 };
-};
+}
 
 // ---------------------------------------------------------------- lights and camera
 function lights(frame) {
@@ -992,21 +717,21 @@ function lights(frame) {
   key.position.set(frame.target[0] + k.pos[0], k.pos[1], frame.target[2] + k.pos[2]);
   key.target.position.set(...frame.target);
   key.castShadow = true; key.shadow.mapSize.set(4096, 4096);
-  key.shadow.radius = L.iso ? 22 : LIGHT ? 14 : 8; key.shadow.blurSamples = 24; key.shadow.bias = -0.0003;
+  key.shadow.radius = 22; key.shadow.blurSamples = 24; key.shadow.bias = -0.0003;
   key.shadow.camera.near = 50; key.shadow.camera.far = 1500;
   scene.add(key, key.target);
   scene.add(new THREE.HemisphereLight(L.fill.sky, L.fill.ground, L.fill.intensity));
   const rim = new THREE.DirectionalLight(L.rim.color, L.rim.intensity);
   rim.position.set(frame.target[0] + L.rim.pos[0], L.rim.pos[1], frame.target[2] + L.rim.pos[2]);
   scene.add(rim);
-  const front = new THREE.DirectionalLight(LIGHT ? '#ffffff' : '#ffe9d2', L.front);
+  const front = new THREE.DirectionalLight('#ffe9d2', L.front);
   front.position.set(frame.target[0] + 300, frame.target[1] + 120, frame.target[2] + 400);
   scene.add(front);
 }
 function camera(frame) {
   // one view for the series: from the front-right, a long lens; fitted to the product's box
   const cam = new THREE.PerspectiveCamera(24, W / H, 10, 6000);
-  const az = THREE.MathUtils.degToRad(frame.az ?? (LUX ? 30 : 38)), el = THREE.MathUtils.degToRad(frame.el ?? (LUX ? 13 : 24));
+  const az = THREE.MathUtils.degToRad(frame.az ?? 30), el = THREE.MathUtils.degToRad(frame.el ?? 13);
   const dir = new THREE.Vector3(Math.cos(el) * Math.sin(az), Math.sin(el), Math.cos(el) * Math.cos(az));
   const bb = new THREE.Box3();
   if (frame.focusBox) { const f = frame.focusBox; bb.set(new THREE.Vector3(f[0], f[2], f[4]), new THREE.Vector3(f[1], f[3], f[5])); }
@@ -1014,8 +739,8 @@ function camera(frame) {
   const corners = [];
   for (const x of [bb.min.x, bb.max.x]) for (const y of [bb.min.y, bb.max.y]) for (const z of [bb.min.z, bb.max.z]) corners.push(new THREE.Vector3(x, y, z));
   const target = bb.getCenter(new THREE.Vector3());
-  const margin = frame.margin ?? (LUX ? 0.76 : L.iso ? 0.88 : 0.84);
-  if (LUX && frame.lift === undefined) frame.lift = -0.1;
+  const margin = frame.margin ?? 0.76;
+  if (frame.lift === undefined) frame.lift = -0.1;
   let dist = 1500;
   for (let k = 0; k < 12; k++) {
     cam.position.copy(target).addScaledVector(dir, dist);
@@ -1034,17 +759,14 @@ function camera(frame) {
 }
 
 const frame = P[KEY]();
-if (L.iso && frame.walls === 'back') {
+if (frame.walls === 'back') {
+  // the wall the product hangs on runs out of the frame (the camera frames the product alone)
   const bb = new THREE.Box3();
   productMeshes.forEach(m => bb.expandByObject(m));
-  const wm = new THREE.MeshStandardMaterial({ color: L.wall, roughness: 0.9 });
-  const pad = frame.pad ?? 28;
-  // «Люкс»: the wall runs out of the frame and the camera frames the product alone
-  if (LUX) box(bb.min.x - 600, bb.max.x + 600, 0, 700, -10, 0, wm, { room: true });
-  else box(bb.min.x - pad, bb.max.x + pad, 0, bb.max.y + pad, -10, 0, wm);
+  box(bb.min.x - 600, bb.max.x + 600, 0, 700, -10, 0, new THREE.MeshStandardMaterial({ color: L.wall, roughness: 0.9 }), { room: true });
 }
-// «Люкс»: a soft contact shadow where the product stands on the floor
-if (LUX && !frame.noContact) {
+// a soft contact shadow where the product stands on the floor
+if (!frame.noContact) {
   const bb = new THREE.Box3();
   productMeshes.forEach(m => bb.expandByObject(m));
   if (bb.min.y < 2) {
@@ -1060,7 +782,7 @@ if (LUX && !frame.noContact) {
 }
 const cam = camera(frame);
 lights(frame);
-if (LUX) {
+{
   const d = cam.position.distanceTo(new THREE.Vector3(...frame.target));
   scene.fog = new THREE.Fog('#0c0b0a', d * 1.2, d * 2.6);
 }
@@ -1068,8 +790,8 @@ if (LUX) {
 const root = new THREE.Group();
 [...scene.children].forEach(c => root.add(c));
 scene.add(root);
-// The passes of «Люкс» (render.py composes them): the picture, its reflection in the floor, the
-// floor's mask (where the reflection shows), and the glow of the LED and the fire.
+// The passes (render.py composes them): the picture, its reflection in the floor, the floor's mask
+// (where the reflection shows), the glow of the LED and the fire, and the mirror's reflection and mask.
 const BLACK = new THREE.MeshBasicMaterial({ color: 0x000000 });
 const WHITE = new THREE.MeshBasicMaterial({ color: 0xffffff });
 function withMaterials(pick, fn) {
@@ -1089,25 +811,30 @@ window.__pass = name => {
     }
     if (name === 'mask') return withMaterials(o => (o === floorMesh ? WHITE : o.material.transparent ? null : BLACK), shot);
     if (name === 'mrefl' || name === 'mmask') {
-      const M = frame.mirror;
-      if (!M) return null;
-      if (name === 'mmask') return withMaterials(o => (o === M.mesh ? WHITE : o.material.transparent ? null : BLACK), shot);
-      // the world mirrored in the glass's plane; what is behind the glass (the wall, the halo) left out
-      const hidden = [];
+      const mir = frame.mirror;
+      if (!mir) return null;
+      if (name === 'mmask') return withMaterials(o => (o === mir.mesh ? WHITE : o.material.transparent ? null : BLACK), shot);
+      // the world mirrored in the glass's plane; what is behind the glass (the wall, the halo) left out,
+      // what the mirror sees (the room behind the camera) shown for this pass only
+      const hidden = [], shown = [];
       root.traverse(o => {
         if (!o.isMesh || !o.visible) return;
         const b = new THREE.Box3().setFromObject(o);
-        if (o === M.mesh || M.hide.includes(o) || b.max.z <= M.plane + 0.01) { hidden.push(o); o.visible = false; }
+        if (o === mir.mesh || mir.hide.includes(o) || b.max.z <= mir.plane + 0.01) { hidden.push(o); o.visible = false; }
       });
-      (M.show || []).forEach(o => { o.visible = true; hidden.push({ set visible(v) { o.visible = false; } }); });
-      root.scale.z = -1; root.position.z = 2 * M.plane;
+      (mir.show || []).forEach(o => { if (!o.visible) { o.visible = true; shown.push(o); } });
+      root.scale.z = -1; root.position.z = 2 * mir.plane;
       root.updateMatrixWorld(true);
-      try { return shot(); } finally { root.scale.z = 1; root.position.z = 0; root.updateMatrixWorld(true); hidden.forEach(o => { o.visible = true; }); }
+      try { return shot(); } finally {
+        root.scale.z = 1; root.position.z = 0; root.updateMatrixWorld(true);
+        hidden.forEach(o => { o.visible = true; });
+        shown.forEach(o => { o.visible = false; });
+      }
     }
     if (name === 'glow') return withMaterials(o => (o.userData.glow ? o.material : o.material.transparent ? null : BLACK), shot);
   } finally { scene.background = bg; scene.fog = fog; }
 };
-await Promise.race([Promise.all([loadAll(), ...pending]), new Promise(r => setTimeout(r, 15000))]);
+await Promise.race([Promise.all(pending), new Promise(r => setTimeout(() => { window.__errors.push('stone photos not loaded in 15 s'); r(); }, 15000))]);
 await new Promise(r => setTimeout(r, 100));
 renderer.render(scene, cam);
 renderer.render(scene, cam);

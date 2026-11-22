@@ -130,8 +130,8 @@ test('«Камины» are offered: the tenth product card, no showroom link', (
   assert.equal(offered.length, 10);
   assert.deepEqual(offered[offered.length - 1], ['kaminy', PRODUCTS.kaminy]);
   assert.equal(offered.filter(([, p]) => p.label === 'Камины').length, 1);
-  // Its card scene sits with the others' (PRODUCT_ICONS), in the same system.
-  assert.match(htmlBetween('const PRODUCT_ICONS = {', '// Типы изделий -- что выбирает клиент'), /\n    kaminy: '<defs>/);
+  // Its card picture sits with the others' (PRODUCT_ICON_KEYS), rendered in the same studio.
+  assert.match(html, /const PRODUCT_ICON_KEYS = \[[^\]]*'kaminy'/);
 });
 
 test('?product=kaminy selects the fireplace through its card', () => {
