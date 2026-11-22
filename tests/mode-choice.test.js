@@ -59,3 +59,15 @@ test('the choice is one step back in the browser; «Одно изделие» fr
   assert.match(single, /resetFormToInitial\(\)/);
   assert.match(single, /project = null/);
 });
+
+// 2026-11-22 (the owner): a client who comes back from the site's request («Изменить в калькуляторе») on a phone
+// was left at the page's top, a long scroll above the product. A passport or a project link takes him to the steps.
+test('a passport or a project link takes a phone to the product (the steps and the 3D), not the page\'s top', () => {
+  const land = fn('landOnProduct');
+  assert.match(land, /\(max-width: 980px\)/, 'the one-column layout: a phone and a tablet');
+  assert.match(land, /stepProgressEl\.scrollIntoView\(\{ block: 'start', behavior: 'instant' \}\)/);
+  assert.match(land, /\['touchstart', 'wheel', 'keydown', 'mousedown'\]/, 'never over the client\'s own scrolling');
+  assert.match(land, /document\.fonts\.ready\.then\(again\)/);
+  assert.match(html, /chooseStartMode\(\);\r?\n\s+if \(\(passportLink \|\| projectLink\) && selectedProductKey\) landOnProduct\(\);/, 'after the mode is set (a project\'s cards stand above the steps by then)');
+  assert.match(html, /\.step-progress \{[^}]*scroll-margin-top: var\(--track-top\);/, 'it lands where it sticks, under the header');
+});

@@ -186,7 +186,7 @@
      изделия" and the progress strip are full-width children of
      .configurator (outside .configurator-columns below); only the current
      step + its 3D/price companion split into two columns. */
-  .step-progress { position: sticky; top: var(--track-top); z-index: 6; margin: 0 0 28px; }
+  .step-progress { position: sticky; top: var(--track-top); z-index: 6; margin: 0 0 28px; scroll-margin-top: var(--track-top); }
 
   /* Desktop two-column working area: left = current step + Back/Next
      (.configurator-main), right = the existing 3D/price/summary panel
@@ -3757,6 +3757,7 @@
         if (selectedProductKey) openPassportStep();
       }
       chooseStartMode();
+      if ((passportLink || projectLink) && selectedProductKey) landOnProduct();
     })
     .catch(() => {
       materialField.disabled = true;
@@ -6186,6 +6187,21 @@
 
   // ...and straight to the Result, or to the first step still missing data
   // (a stone that has left the catalog).
+  // On a phone and a tablet the page is one long column: a client who comes in by a passport or a project link
+  // (the site's «Изменить в калькуляторе», or a link shared) is taken to the product -- the steps and the 3D --
+  // not left at the page's top with the heading and the products a long scroll above it (2026-11-22, the owner).
+  // The page above settles afterwards (fonts), so the scroll is repeated until the client touches the page.
+  function landOnProduct() {
+    if (!window.matchMedia || !window.matchMedia('(max-width: 980px)').matches) return;
+    let touched = false;
+    const stop = () => { touched = true; };
+    ['touchstart', 'wheel', 'keydown', 'mousedown'].forEach(ev => window.addEventListener(ev, stop, { once: true, passive: true, capture: true }));
+    const again = () => { if (!touched) stepProgressEl.scrollIntoView({ block: 'start', behavior: 'instant' }); };
+    requestAnimationFrame(() => requestAnimationFrame(again));
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(again);
+    if (document.readyState !== 'complete') window.addEventListener('load', again, { once: true });
+  }
+
   function openPassportStep() {
     const steps = StepEngine.getSteps(selectedProductKey);
     const missing = steps.find(id => id !== 'review' && isCurrentStepDataValid(id) === false);
