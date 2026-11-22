@@ -95,7 +95,7 @@ test('step count sits with the sizes (dimensions step), not on the type step', (
   assert.doesNotMatch(type, /stepCountInput/);
 });
 
-const TEXTURE_NOTE = 'Текстура камня на изделии носит ориентированный характер. Точная раскладка и направление рисунка будут согласованы с дизайнером при разработке проекта.';
+const TEXTURE_NOTE = 'Рисунок камня на изделии примерный: раскладку согласуем в проекте.';
 const sectionOf = stepId => {
   const start = html.indexOf('data-step-id="' + stepId + '"');
   return html.slice(start, html.indexOf('</section>', start));

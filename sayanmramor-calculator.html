@@ -563,7 +563,6 @@
      edges, melting into the card, the text in the light under it. */
   .mode-choice { max-width: 1040px; margin: 0 auto; padding: 8px 0 60px; text-align: center; }
   .mode-choice .mode-choice-title { margin-bottom: 10px; }
-  .mode-choice .subtitle { max-width: 34em; margin: 0 auto; text-wrap: balance; }
   .mode-choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin: 32px auto 0; }
   .mode-card {
     position: relative; display: flex; flex-direction: column; gap: 22px; padding: 0 0 26px; overflow: hidden;
@@ -639,7 +638,6 @@
     }
     .mode-choice-new { align-self: center; }
     .mode-choice .mode-choice-title { font-size: 28px; }
-    .mode-choice .subtitle { font-size: var(--configurator-muted); }
     .mode-choice-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 22px; }
     .mode-card { padding: 0 0 14px; gap: 12px; border-radius: 14px; }
     .mode-card-text { gap: 6px; padding: 0 10px; }
@@ -1751,7 +1749,6 @@
   <!-- «Одно изделие» or «Проект» (the owner, 2026-11-18): the calculator opened on its own starts here. -->
   <section class="mode-choice" id="modeChoice" hidden aria-labelledby="modeChoiceTitle">
     <h1 class="mode-choice-title" id="modeChoiceTitle">Что будем считать?</h1>
-    <p class="subtitle">Одну вещь - или весь проект: несколько изделий в одной <span style="white-space: nowrap">3D-сцене</span>, общая цена и одна заявка.</p>
     <div class="mode-choice-grid">
       <button type="button" class="mode-card" id="modeChoiceSingle">
         <span class="mode-card-scene" data-mode-scene="single"></span>
@@ -1773,7 +1770,7 @@
     <button type="button" class="mode-choice-new" id="modeChoiceNew" hidden>Начать новый проект</button>
   </section>
   <h1>Рассчитайте стоимость изделия</h1>
-  <p class="subtitle">Выберите тип изделия, материал и размеры - получите ориентировочную стоимость за несколько секунд. Точную цену рассчитает наш специалист после уточнения деталей проекта.</p>
+  <p class="subtitle">Ориентировочная стоимость за несколько секунд.</p>
   <!-- The project's products over the calculator («Состав», the owner, 2026-11-18): a card each, the
        one edited dark; a tap edits another; the total and the request beside them. -->
   <section class="project-rail" id="projectBlock" hidden aria-labelledby="projectRailTitle">
@@ -1893,7 +1890,7 @@
            предупреждение: спокойный текст с маленьким значком «i». -->
       <p class="stone-texture-note">
         <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="6.6" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M8 7.3v4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="4.9" r="0.9" fill="currentColor"/></svg>
-        <span>Текстура камня на изделии носит ориентированный характер. Точная раскладка и направление рисунка будут согласованы с дизайнером при разработке проекта.</span>
+        <span>Рисунок камня на изделии примерный: раскладку согласуем в проекте.</span>
       </p>
     </section>
 
@@ -2445,7 +2442,7 @@
         <!-- The same note as under the material choice, word for word. -->
         <p class="stone-texture-note result-texture-note">
           <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="6.6" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M8 7.3v4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="4.9" r="0.9" fill="currentColor"/></svg>
-          <span>Текстура камня на изделии носит ориентированный характер. Точная раскладка и направление рисунка будут согласованы с дизайнером при разработке проекта.</span>
+          <span>Рисунок камня на изделии примерный: раскладку согласуем в проекте.</span>
         </p>
       </div>
     </section>
@@ -2509,13 +2506,12 @@
                 <div class="warning-box" id="warningOut" style="display:none"></div>
                 <div class="result-breakdown" id="breakdown"></div>
                 <div class="remainder-line" id="remainderOut"></div>
-                <div class="info-block" id="infoBlock">Стоимость указана за весь слэб - остаток после раскроя бесплатно хранится на складе компании, клиент может использовать его для другого проекта или забрать себе.</div>
+                <div class="info-block" id="infoBlock">Цена за весь слэб; остаток хранится на складе, его можно забрать.</div>
               </div>
               <div>
                 <button type="button" class="project-add" id="projectAddBtn" hidden>+ Добавить изделие</button>
                 <button class="cta-btn" id="ctaBtn">Получить расчёт</button>
                 <div class="disclaimer" id="updatedAtOut"></div>
-                <div class="disclaimer">Расчёт ориентировочный. Финальная цена зависит от партии камня, сложности рисунка и логистики.</div>
               </div>
             </div>
           </div>
@@ -5147,7 +5143,7 @@
       warningOut.style.display = 'block';
     }
 
-    updatedAtOut.textContent = 'Расчёт по ценам на ' + formatDate(UPDATED_AT) + ', точная цена подтверждается менеджером.';
+    updatedAtOut.textContent = 'Цены на ' + formatDate(UPDATED_AT) + '. Расчёт ориентировочный: точную цену подтвердит менеджер.';
     // No company rate for the product's work yet (pricing.js `unpriced`):
     // the stone is priced, the work and the total are the manager's -- a
     // manual estimate, never «0 ₽».
@@ -5963,7 +5959,7 @@
   function renderModeTexts() {
     pageTitleEl.textContent = calcMode === 'project' ? 'Рассчитайте стоимость проекта' : PAGE_TITLE_ONE;
     pageSubtitleEl.textContent = calcMode === 'project'
-      ? 'Соберите все изделия в одном расчёте: у каждого свой камень и размеры, а цена и заявка общие.'
+      ? 'Несколько изделий: у каждого свой камень, цена и заявка общие.'
       : PAGE_SUBTITLE_ONE;
     resultAddBtnEl.textContent = calcMode === 'project' ? '+ Добавить изделие' : 'Сделать проектом';
     const stored = storedProject();
