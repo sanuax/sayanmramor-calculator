@@ -1769,6 +1769,17 @@
     </div>
     <button type="button" class="mode-choice-new" id="modeChoiceNew" hidden>Начать новый проект</button>
   </section>
+  <!-- A page opened on its own starts on the choice at once, not after the data loads (the owner,
+       2026-11-22: the product choice flashed first). A link naming a product, a stone or a passport/project
+       skips it, as chooseStartMode() does. -->
+  <script>
+    (function () {
+      var q = new URLSearchParams(location.search);
+      if (q.has('product') || q.has('stone') || q.has('pv')) return;
+      document.body.classList.add('choosing-mode');
+      document.getElementById('modeChoice').hidden = false;
+    })();
+  </script>
   <h1>Рассчитайте стоимость изделия</h1>
   <p class="subtitle">Ориентировочная стоимость за несколько секунд.</p>
   <!-- The project's products over the calculator («Состав», the owner, 2026-11-18): a card each, the
@@ -2580,6 +2591,7 @@
 <script src="rate-catalog.js?v=cce5c5cd"></script>
 <script src="facade-model.js?v=38b99136"></script>
 <script src="fireplace-model.js?v=f9c31096"></script>
+<script src="product-icons.js?v=166eb148"></script>
 <script src="dimension-diagram.js?v=308e699b"></script>
 <script src="step-engine.js?v=c21c885f"></script>
 <script src="result-model.js?v=b37a1345"></script>
@@ -2639,8 +2651,26 @@
   // Объявлено здесь, а не рядом с renderSubcategoryOptions(): URL-bootstrap
   // ниже синхронно выбирает изделие и доходит до этих данных.
   // A product's picture as an <svg> of its own (the mode choice and the project's cards show it).
-  function productSceneSvg(key) {
-    return '<svg viewBox="0 0 120 80" preserveAspectRatio="xMidYMid slice" aria-hidden="true">' + (PRODUCT_ICONS[key] || '') + '</svg>';
+  // zoom (> 1): the picture a little farther away in the same frame (the project card's kitchen, the owner,
+  // 2026-11-22) -- the frame shows more of it; the bands above and below it are the picture's own top and
+  // bottom edge drawn out (its backdrop is lighter in the middle, darker at the sides, so no flat colour matches).
+  let sceneBandSeq = 0;
+  function productSceneSvg(key, zoom) {
+    const z = zoom || 1, w = 120 * z, h = 80 * z, band = (h - 80) / 2;
+    const box = ((120 - w) / 2) + ' ' + (-band) + ' ' + w + ' ' + h;
+    const icon = PRODUCT_ICONS[key] || '';
+    let bands = '';
+    if (band > 0 && icon) {
+      const id = 'scene-band-' + (++sceneBandSeq);
+      const href = icon.match(/href="([^"]+)"/)[1];
+      // One unit (1/80) of the picture's edge stretched over the band.
+      const tall = 80 * band;
+      bands = '<defs><clipPath id="' + id + '-t"><rect x="-200" y="' + (-band) + '" width="520" height="' + band + '"/></clipPath>' +
+        '<clipPath id="' + id + '-b"><rect x="-200" y="80" width="520" height="' + band + '"/></clipPath></defs>' +
+        '<image href="' + href + '" x="0" y="' + (-band) + '" width="120" height="' + tall + '" preserveAspectRatio="none" clip-path="url(#' + id + '-t)"/>' +
+        '<image href="' + href + '" x="0" y="' + (80 + band - tall) + '" width="120" height="' + tall + '" preserveAspectRatio="none" clip-path="url(#' + id + '-b)"/>';
+    }
+    return '<svg viewBox="' + box + '" preserveAspectRatio="xMidYMid slice" aria-hidden="true">' + bands + icon + '</svg>';
   }
   function typeIcon(inner) {
     return '<svg viewBox="0 0 64 40" aria-hidden="true">' + inner + '</svg>';
@@ -3658,10 +3688,10 @@
 
     const scene = document.createElement('span');
     scene.className = 'product-card-scene';
-    // viewBox 0 0 120 80 -- общая система мини-сцен (см. PRODUCT_ICONS);
-    // цвета задают классы .ps-*, у самого <svg> заливки нет.
+    // The drawn pictures (product-icons.js, the owner, 2026-11-22); the rendered one for a product without one.
+    ProductIcons.install();
     scene.innerHTML =
-      '<svg viewBox="0 0 120 80" aria-hidden="true">' + (PRODUCT_ICONS[key] || '') + '</svg>' +
+      (ProductIcons.svg(key) || '<svg viewBox="0 0 120 80" aria-hidden="true">' + (PRODUCT_ICONS[key] || '') + '</svg>') +
       '<span class="product-card-check" aria-hidden="true"><svg viewBox="0 0 12 12"><path d="M2.5 6.2L5 8.5L9.5 3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>';
 
     const text = document.createElement('span');
@@ -5953,7 +5983,7 @@
   // a kitchen, a fireplace and steps, the owner, 2026-11-18).
   (function drawModeScenes() {
     document.querySelector('[data-mode-scene="single"]').innerHTML = productSceneSvg('stoleshnitsa_kuhnya');
-    document.querySelector('[data-mode-scene="project"]').innerHTML = productSceneSvg('stoleshnitsa_kuhnya') + productSceneSvg('kaminy') + productSceneSvg('stupeni');
+    document.querySelector('[data-mode-scene="project"]').innerHTML = productSceneSvg('stoleshnitsa_kuhnya', 1.2) + productSceneSvg('lestnitsa') + productSceneSvg('stupeni');
   })();
 
   function renderModeTexts() {
