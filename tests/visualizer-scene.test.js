@@ -508,7 +508,7 @@ test('«Подгиб камнем» on the main run and on every wing (2026-10-1
     wingParts.forEach(w => {
       const e = extent(w.outline);
       const front = e.z1 > 0 ? e.z0 : e.z1;   // the +Z wing faces -Z, the -Z wing faces +Z
-      const apron = wingWraps.find(p => Math.abs(p.center[2] - front) < 0.02);
+      const apron = wingWraps.find(p => Math.abs(p.center[2] - front) < 0.03);
       assert.ok(apron, shape + ': an apron along the wing\'s front edge');
       assert.ok(apron.center[2] - apron.size[2] / 2 >= e.z0 - 1e-9 && apron.center[2] + apron.size[2] / 2 <= e.z1 + 1e-9, shape + ': inside the wing');
       assert.ok(apron.center[0] + apron.size[0] / 2 >= e.x1 - 1e-9, shape + ': out to the wing\'s end');
@@ -957,3 +957,49 @@ test('the П landing: only the part of its front the upper march does not start 
   const lLanding = named(layoutFor('lestnitsa', { width: { value: '1000' }, length: { value: '3000' }, 'step-count': { value: '5' }, productSubcategory: { value: 'STAIR-03' } }), 'landing')[0];
   assert.equal(lLanding.openLengthM, undefined, 'a Г landing\'s front is open over its whole width');
 });
+
+// «Подгиб камнем» (the owner's drawing, 2026-11-23): the apron as thick as the slab, joined by a 45-degree
+// mitre -- a seam on the end faces from the apron's inner corner up to the slab's outer top corner.
+test('«Подгиб камнем»: the apron is as thick as the slab and meets it at 45 degrees (a mitre seam on each end)', () => {
+  const layout = layoutFor('stoleshnitsa_kuhnya', { width: { value: '600' }, length: { value: '2400' }, productShape: { value: 'straight' }, 'edge-type': { value: 'stone-wrap' } });
+  const main = named(layout, 'main')[0];
+  const T = main.y1 - main.y0;
+  const wrap = named(layout, 'wrap')[0];
+  assert.ok(Math.abs(wrap.size[0] - T) < 1e-9, 'as thick as the slab');
+  assert.ok(Math.abs(wrap.size[1] - T) < 1e-9, 'as deep as the slab');
+  const seams = named(layout, 'mitre');
+  assert.equal(seams.length, 1);
+  assert.equal(seams[0].segments.length, 2, 'both ends of the run');
+  seams[0].segments.forEach(([x1, y1, z1, x2, y2, z2]) => {
+    assert.ok(Math.abs((x2 - x1) - T) < 1e-6 && Math.abs((y2 - y1) - T) < 1e-6, '45 degrees: as far across as up');
+    assert.ok(Math.abs(y1 - main.y0) < 1e-9 && Math.abs(y2 - main.y1) < 1e-9, 'from the slab underside to its top');
+    assert.ok(Math.abs(Math.abs(z1) - 1.2) < 0.002 && z1 === z2, 'on the end face, a hair out of it');
+  });
+  // The other profiles have no mitre.
+  ['straight', 'rounding', 'bevel', 'figured'].forEach(edgeType => {
+    assert.equal(named(layoutFor('stoleshnitsa_kuhnya', { width: { value: '600' }, length: { value: '2400' }, productShape: { value: 'straight' }, 'edge-type': { value: edgeType } }), 'mitre').length, 0, edgeType);
+  });
+});
+
+// «Подгиб камнем» on steps and stairs (the owner, 2026-11-23): not the front edge only -- the open sides of a
+// tread get the apron too, a U as thick as the slab; the price still measures the front (openEdges).
+test('«Подгиб камнем» on a straight tread runs along the front and both sides, a U as thick as the slab', () => {
+  const T = 0.04;
+  ['stupeni', 'lestnitsa'].forEach(key => {
+    const layout = layoutFor(key, Object.assign({ width: { value: key === 'stupeni' ? '350' : '1000' }, length: { value: key === 'stupeni' ? '1200' : '3000' }, 'step-count': { value: '4' }, 'edge-type': { value: 'stone-wrap' } },
+      key === 'stupeni' ? { productSubcategory: { value: 'STEP-01' } } : { productSubcategory: { value: 'STAIR-01' } }));
+    const tread = named(layout, 'tread')[0], wrap = named(layout, 'wrap')[0];
+    const xs = wrap.outline.map(p => p[0]), zs = wrap.outline.map(p => p[1]);
+    const tx = tread.outline.map(p => p[0]), tz = tread.outline.map(p => p[1]);
+    // It reaches both side edges of the tread, and back along them well past the front strip's thickness.
+    assert.ok(Math.abs(Math.min(...zs) - Math.min(...tz)) < 1e-9 && Math.abs(Math.max(...zs) - Math.max(...tz)) < 1e-9, key + ': out to both sides');
+    assert.ok(Math.max(...xs) - Math.min(...xs) > 4 * T, key + ': the sides run back along the tread');
+    // Its inner outline is the slab's thickness in from the sides.
+    const widths = [...new Set(zs.map(z => Math.round(z * 1e6) / 1e6))].sort((a, b) => a - b);
+    assert.ok(widths.some(z => Math.abs(z - (Math.min(...tz) + T)) < 1e-6) && widths.some(z => Math.abs(z - (Math.max(...tz) - T)) < 1e-6), key + ': a slab thickness in from the sides');
+    // The price still measures the front only.
+    assert.equal(tread.openEdges.length, 1, key + ': openEdges is the front');
+    void tx;
+  });
+});
+

@@ -2350,11 +2350,11 @@
 <script src="visualizer/geometry-model.js?v=dfd4ea76"></script>
 <script src="product-parts.js?v=43685b60"></script>
 <script src="visualizer/material-adapter.js?v=52c5aea7"></script>
-<script src="visualizer/edge-profile.js?v=5381b565"></script>
+<script src="visualizer/edge-profile.js?v=8b2049bd"></script>
 <script src="visualizer/motion.js?v=6748e337"></script>
 <script src="visualizer/room-layout.js?v=071f4d13"></script>
 <script src="visualizer/dimensions-3d.js?v=3f42235f"></script>
-<script src="visualizer/scene-layout.js?v=4bb239a3"></script>
+<script src="visualizer/scene-layout.js?v=eacaed5a"></script>
 <script src="edge-length.js?v=d8830f9d"></script>
 <script src="visualizer/camera-framing.js?v=db6de54c"></script>
 <script src="visualizer/webgl-support.js?v=014e10bd"></script>
@@ -3084,15 +3084,15 @@
   // повторяет реальную кромку в 3D (three-scene.js bevelFor, scene-layout.js
   // stone-wrap): обработка на верхнем И нижнем углу торца.
   const EDGE_TYPES = [
-    // Прямая: прямой вертикальный торец.
-    { type: 'straight', title: 'Прямая', desc: 'Чёткий прямой край',
-      icon: svgIcon('<path d="M10 10 H64 V28 H10 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5" stroke-linejoin="round"/>', '4 4 66 46') },
-    // Скругление: плавный радиус на обоих углах (в 3D -- 12 мм на 40 мм).
+    // Прямая: прямой вертикальный торец и лёгкий срез сверху (в 3D -- 0,2 толщины, на иконке то же).
+    { type: 'straight', title: 'Прямая', desc: 'Прямой край с лёгким срезом сверху',
+      icon: svgIcon('<path d="M10 10 H60.4 L64 13.6 V28 H10 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5" stroke-linejoin="round"/>', '4 4 66 46') },
+    // Скругление: радиус только на верхнем крае, почти до половины толщины (в 3D -- 0,45 толщины).
     { type: 'rounding', title: 'Скругление', desc: 'Мягкий закруглённый край',
-      icon: svgIcon('<path d="M10 10 H57 A7 7 0 0 1 64 17 V21 A7 7 0 0 1 57 28 H10 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5" stroke-linejoin="round"/>', '4 4 66 46') },
-    // Скос: один прямой срез на каждом углу (в 3D -- фаска 8 мм).
+      icon: svgIcon('<path d="M10 10 H56 A8 8 0 0 1 64 18 V28 H10 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5" stroke-linejoin="round"/>', '4 4 66 46') },
+    // Скос: один прямой срез только на верхнем крае, до половины толщины (в 3D -- 0,45 толщины).
     { type: 'bevel', title: 'Скос (фаска)', desc: 'Срез под углом',
-      icon: svgIcon('<path d="M10 10 H58 L64 16 V22 L58 28 H10 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5" stroke-linejoin="round"/>', '4 4 66 46') },
+      icon: svgIcon('<path d="M10 10 H56 L64 18 V28 H10 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5" stroke-linejoin="round"/>', '4 4 66 46') },
     // Фигурная (чертёж владельца, 2026-11-17: «L(30)+НК(20) h40, подклейка
     // "сандвич"»): два слоя по 20 мм. В верхнем -- выборка R15 у переднего угла,
     // под ним подклеена полоса (50-80 мм) с уступом 2 мм и скруглением R12;
@@ -3100,10 +3100,11 @@
     // полоса снизу -- 60 мм. Тот же профиль в 3D (edge-profile.js figuredProfile).
     { type: 'figured', title: 'Фигурная', desc: 'Декоративный профиль',
       icon: svgIcon('<path d="M10 10 H50.95 A6.75 6.75 0 0 0 57.7 16.75 V19 H58.6 V19.9 A5.4 5.4 0 0 1 64 25.3 V28 H37 V19 H10 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5" stroke-linejoin="round"/><path d="M37 19 H57.7" fill="none" stroke="var(--stone-line)" stroke-width="1"/>', '4 4 66 46') },
-    // Подгиб камнем: камень возвращается вниз по торцу (в 3D -- каменный
-    // фартук высотой в толщину плиты под передним краем), торец вдвое выше.
+    // Подгиб камнем (чертёж владельца, 2026-11-23): камень возвращается вниз по торцу -- фартук такой же
+    // толщины, как плита, и высотой в толщину плиты; со плитой он стыкуется срезом под 45 градусов
+    // (линия от внутреннего угла подгиба к наружному верхнему углу плиты). То же в 3D (scene-layout.js).
     { type: 'stone-wrap', title: 'Подгиб камнем', desc: 'Визуально толстый торец',
-      icon: svgIcon('<path d="M10 10 H64 V46 H57 V28 H10 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5" stroke-linejoin="round"/>', '4 4 66 46') },
+      icon: svgIcon('<path d="M10 10 H64 V46 H46 V28 H10 Z" fill="var(--stone)" stroke="var(--stone-line)" stroke-width="1.5" stroke-linejoin="round"/><path d="M46 28 L64 10" fill="none" stroke="var(--stone-line)" stroke-width="1.5" stroke-linecap="round"/>', '4 4 66 46') },
   ];
 
   const edgeCardGrid = document.getElementById('edgeCardGrid');

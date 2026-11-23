@@ -57,18 +57,21 @@
     return pts;
   }
 
-  // The edge cards (sayanmramor-calculator.html EDGE_TYPES) draw these: the
-  // same treatment on the top and the bottom corner of the edge. «Подгиб
-  // камнем» is the arris on top only -- the stone apron continues the face
-  // below, glued flush; the apron ('apron') has it on the bottom only.
+  // The edge cards (sayanmramor-calculator.html EDGE_TYPES) draw these. The rounding and the bevel work
+  // the TOP rim only, reaching almost half the thickness down and in (the owner, 2026-11-23); the
+  // underside stays square. «Подгиб камнем» is the arris on top only -- the stone apron continues the
+  // face below, glued flush; the apron ('apron') has it on the bottom only.
   const ARRIS_M = 0.0015;
+  const TOP_TREATMENT = 0.45;   // of the slab's thickness
+  const STRAIGHT_CHAMFER = 0.2; // the «Прямая» edge's light cut on the top rim, of the thickness (about 8 mm on 40)
   function cornersFor(edge, depth) {
     if (depth < 0.015) return { top: ['square', 0], bottom: ['square', 0] };
     const cap = depth * 0.35;
     switch (edge) {
       case 'closed': return { top: ['square', 0], bottom: ['square', 0] };
-      case 'rounding': { const r = Math.min(cap, 0.012); return { top: ['round', r], bottom: ['round', r] }; }
-      case 'bevel': { const c = Math.min(cap, 0.008); return { top: ['facets', c, 1], bottom: ['facets', c, 1] }; }
+      case 'straight': return { top: ['facets', depth * STRAIGHT_CHAMFER, 1], bottom: ['square', 0] };
+      case 'rounding': return { top: ['round', depth * TOP_TREATMENT], bottom: ['square', 0] };
+      case 'bevel': return { top: ['facets', depth * TOP_TREATMENT, 1], bottom: ['square', 0] };
       case 'figured': { const f = Math.min(cap, 0.01); return { top: ['facets', f, 3], bottom: ['facets', f, 3] }; }
       case 'stone-wrap': return { top: ['facets', ARRIS_M, 1], bottom: ['square', 0] };
       case 'apron': return { top: ['square', 0], bottom: ['facets', ARRIS_M, 1] };

@@ -110,7 +110,8 @@ test('rounding: the rim sits the radius inside an open edge and on the outline o
   for (let i = 0; i < mesh.positions.length; i += 3) {
     if (Math.abs(mesh.positions[i + 1] - T / 2) < 1e-6 && mesh.normals[i + 1] > 0.999) top.push(mesh.positions[i]);
   }
-  assert.ok(Math.abs(Math.max(...top) - (W / 2 - 0.012)) < 1e-6, 'room side');
+  // The rounding works the top rim only and reaches 0.45 of the thickness in (the owner, 2026-11-23).
+  assert.ok(Math.abs(Math.max(...top) - (W / 2 - 0.45 * T)) < 1e-6, 'room side');
   assert.ok(Math.abs(Math.min(...top) + W / 2) < 1e-6, 'wall side');
 });
 
@@ -134,7 +135,7 @@ test('inside corner at a wing: the profile turns along the wing front and closes
   const expected = W * L * T - a * (z0 + L / 2) - a2;
   assert.ok(Math.abs(closedVolume(mesh) - expected) < 1e-7, closedVolume(mesh) + ' vs ' + expected);
   // The top rim turns at the mitre and meets the joint on the wing's rim line.
-  const r = 0.012;
+  const r = 0.45 * T;
   const at = (x, z) => {
     for (let i = 0; i < mesh.positions.length; i += 3) {
       if (Math.abs(mesh.positions[i] - x) < 1e-6 && Math.abs(mesh.positions[i + 1] - T / 2) < 1e-6 && Math.abs(mesh.positions[i + 2] - z) < 1e-6) return true;
@@ -192,4 +193,20 @@ test('figured: a sink or tap hole keeps the plain arris, the front gets the prof
   }
   assert.ok(Math.abs(topMinAroundHole - (0.2 + 0.0015)) < 1e-6, 'the hole\'s top rim: its own arris, ' + topMinAroundHole);
   closedVolume(mesh);
+});
+
+// The owner's edges (2026-11-23): the rounding and the bevel work the top rim only, almost half the
+// thickness deep; the underside stays square.
+test('the rounding and the bevel cut the top rim only, 0.45 of the thickness; the underside is square', () => {
+  ['rounding', 'bevel'].forEach(edge => {
+    const prof = EdgeProfile.profile(edge, -T / 2, T / 2);
+    assert.ok(Math.abs(prof.sTop - 0.45 * T) < 1e-9, edge + ': the top rim sits 0.45 T in');
+    assert.ok(Math.abs(prof.topSize - 0.45 * T) < 1e-9, edge + ': and reaches 0.45 T down');
+    assert.equal(prof.sBottom, 0, edge + ': the bottom rim is on the outline');
+    assert.equal(prof.bottomSize, 0, edge + ': nothing is cut from the underside');
+  });
+  // The bevel is one flat cut at 45 degrees: a facet, not a curve.
+  const bevel = EdgeProfile.profile('bevel', -T / 2, T / 2);
+  const slope = bevel.points.filter((p, i) => i > 0 && p.s > 0);
+  assert.ok(slope.every(p => Math.abs(p.o - p.u) < 1e-9 || p.u === 0 || p.o === 1), 'a single 45-degree face');
 });

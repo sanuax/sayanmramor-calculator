@@ -91,13 +91,22 @@
     return roundEndRect(z0, z1, x0, x1, r, 1).map(([a, b]) => [b, a]).reverse();
   }
 
-  // «Подгиб камнем»: a stone strip WRAP_T thick right under a slab's open
-  // edge, as deep as the slab -- the edge looks twice as thick. For a slab of
-  // any plan: `outline` is its plan, `isOpen(i)` says which of its edges
-  // (outline[i] -> outline[i + 1]) get it; consecutive open edges make one
-  // strip, mitred at the turns, laid inside the outline.
-  const WRAP_T = 0.02;
+  // «Подгиб камнем» (the owner's drawing, 2026-11-23): a stone strip right under a slab's open edge, as
+  // thick as the slab and as deep as the slab -- the edge looks twice as thick -- joined to the slab by a
+  // 45-degree mitre (the joint seen on the ends: a seam from the apron's inner corner up to the slab's
+  // outer top corner). For a slab of any plan: `outline` is its plan, `isOpen(i)` says which of its edges
+  // (outline[i] -> outline[i + 1]) get it; consecutive open edges make one strip, mitred at the turns,
+  // laid inside the outline.
+  const MITRE_NUDGE = 0.0006;   // the seam stands this far out of the end face, clear of its stone
+  // One mitre seam on an end face: from the apron's inner corner at the slab's underside up to the slab's
+  // outer top corner. outer/inner: plan points on the front line and `thickness` in from it; out: the unit
+  // plan direction pointing away from the strip.
+  function mitreSeam(outer, inner, out, yBottom, yTop) {
+    const n = MITRE_NUDGE;
+    return [inner[0] + out[0] * n, yBottom, inner[1] + out[1] * n, outer[0] + out[0] * n, yTop, outer[1] + out[1] * n];
+  }
   function wrapStrips(outline, isOpen, y0, y1, name) {
+    const WRAP_T = y1 - y0;
     const n = outline.length;
     let area = 0;
     outline.forEach(([x1, z1], i) => { const [x2, z2] = outline[(i + 1) % n]; area += x1 * z2 - x2 * z1; });
@@ -121,7 +130,14 @@
         const scale = Math.min(3, 1 / Math.max(0.33, mx * a[0] + mz * a[1]));
         return [pt[0] + mx * WRAP_T * scale, pt[1] + mz * WRAP_T * scale];
       });
-      strips.push(prism('stone', outer.concat(inner.reverse()), y0, y1, { edge: 'apron', name: name || 'wrap' }));
+      strips.push(prism('stone', outer.concat(inner.slice().reverse()), y0, y1, { edge: 'apron', name: name || 'wrap' }));
+      // The mitre on both ends of the strip.
+      const last = outer.length - 1;
+      const dir = (a, b) => { const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [(b[0] - a[0]) / l, (b[1] - a[1]) / l]; };
+      strips.push({ kind: 'seams', role: 'seam', name: 'mitre', segments: [
+        mitreSeam(outer[0], inner[0], dir(outer[1], outer[0]), y1, y1 + WRAP_T),
+        mitreSeam(outer[last], inner[last], dir(outer[last - 1], outer[last]), y1, y1 + WRAP_T),
+      ] });
     }
     return strips;
   }
@@ -191,7 +207,12 @@
         open = [].concat(...open.map(([s, e]) => [[s, Math.min(e, a)], [Math.max(s, b), e]].filter(([x0, x1]) => x1 - x0 > 1e-6)));
       });
       open.forEach(([s, e]) => {
-        parts.push(Object.assign(box('stone', [W / 2 - 0.01, bottom - T / 2, (s + e) / 2], [0.02, T, e - s]), { name: 'wrap' }));
+        parts.push(Object.assign(box('stone', [W / 2 - T / 2, bottom - T / 2, (s + e) / 2], [T, T, e - s]), { name: 'wrap' }));
+        // The mitre shows on the run's real ends (not where a wing takes over).
+        const seams = [];
+        if (Math.abs(s + L / 2) < 1e-6) seams.push(mitreSeam([W / 2, s], [W / 2 - T, s], [0, -1], bottom, top));
+        if (Math.abs(e - L / 2) < 1e-6) seams.push(mitreSeam([W / 2, e], [W / 2 - T, e], [0, 1], bottom, top));
+        if (seams.length) parts.push({ kind: 'seams', role: 'seam', name: 'mitre', segments: seams });
       });
     }
 
@@ -208,9 +229,12 @@
         // The wing's front edge: its long side facing the kitchen (the +Z
         // wing faces -Z, the -Z one +Z), out to its end; from the main run's
         // front line, so it meets the main run's apron at the inner corner.
-        const front = z1 > 0 ? z0 + WRAP_T / 2 : z1 - WRAP_T / 2;
-        const from = W / 2 - WRAP_T;
-        parts.push(Object.assign(box('stone', [(from + W / 2 + wl) / 2, bottom - T / 2, front], [W / 2 + wl - from, T, WRAP_T]), { name: 'wing-wrap' }));
+        const front = z1 > 0 ? z0 + T / 2 : z1 - T / 2;
+        const from = W / 2 - T;
+        parts.push(Object.assign(box('stone', [(from + W / 2 + wl) / 2, bottom - T / 2, front], [W / 2 + wl - from, T, T]), { name: 'wing-wrap' }));
+        // The mitre on the wing's far end: the front line is z0 (z1 > 0) or z1, the apron lies inside it.
+        const outerZ = z1 > 0 ? z0 : z1, innerZ = z1 > 0 ? z0 + T : z1 - T;
+        parts.push({ kind: 'seams', role: 'seam', name: 'mitre', segments: [mitreSeam([W / 2 + wl, outerZ], [W / 2 + wl, innerZ], [1, 0], bottom, top)] });
       }
     });
 
@@ -946,6 +970,20 @@
     return pts;
   }
 
+  // «Подгиб камнем» of a straight tread: a U under its open edges -- the front and both sides -- as thick as the
+  // slab; a radius step's front follows its arc. The body steps back inside it (wrapBody).
+  function wrapOutline(origin, dir, across, halfW, a0, a1, bulge, T) {
+    const at = (along, side) => [origin[0] + dir[0] * along + across[0] * side, origin[1] + dir[1] * along + across[1] * side];
+    const inner = halfW - T;
+    // The sides stop where the next tread's body takes over: a radius step's front bows back over this one.
+    const end = Math.max(a0 + T + 0.001, bulge > 0 ? a1 - bulge : a1);
+    const head = [at(end, -halfW), at(end, -inner)];
+    const tail = [at(end, inner), at(end, halfW)];
+    const outerFront = stepFootprint(origin, dir, across, halfW, a0, a1, bulge).slice(2);   // right to left
+    const innerFront = stepFootprint(origin, dir, across, inner, a0 + T, a1, bulge).slice(2).reverse();   // left to right
+    return head.concat(innerFront, tail, outerFront);
+  }
+
   function straightFlight(parts, o) {
     const { origin, dir, across, width, count, depth, level, risers, bulge, T } = o;
     const RISE = o.rise;
@@ -966,9 +1004,9 @@
       if (o.edge === 'stone-wrap' && !risers) {
         // «Подгиб камнем»: a stone strip under the tread's front edge; the body
         // steps back behind it (two pieces, so no two faces share a plane).
-        parts.push(prism('stone', bandOutline(stepFootprint(origin, dir, across, halfW, a0, a0 + WRAP_T, bulge), bulge), topY - 2 * T, topY - T, { edge: 'apron', name: 'wrap' }));
+        parts.push(prism('stone', wrapOutline(origin, dir, across, halfW, a0, a1, bulge, T), topY - 2 * T, topY - T, { edge: 'apron', name: 'wrap' }));
         parts.push(prism('body', stepFootprint(origin, dir, across, halfW, a0, a1, bulge), 0, topY - 2 * T, { name: 'body' }));
-        parts.push(prism('body', stepFootprint(origin, dir, across, halfW, a0 + WRAP_T, a1, bulge), topY - 2 * T, topY - T, { name: 'body' }));
+        parts.push(prism('body', stepFootprint(origin, dir, across, halfW - T, a0 + T, a1, bulge), topY - 2 * T, topY - T, { name: 'body' }));
         continue;
       }
       parts.push(prism('body', stepFootprint(origin, dir, across, halfW, bodyStart, a1, risers ? 0 : bulge), 0, topY - T, { name: 'body' }));
@@ -1021,7 +1059,7 @@
       if (o.edge === 'stone-wrap' && !risers) {
         // «Подгиб камнем»: a stone strip under the tread's front (radial) edge.
         const d = u(a0), t = [-Math.sin(a0), Math.cos(a0)];
-        const shift = ([x, z]) => [x + t[0] * WRAP_T, z + t[1] * WRAP_T];
+        const shift = ([x, z]) => [x + t[0] * T, z + t[1] * T];
         const band = [[d[0] * rIn, d[1] * rIn], [d[0] * rOut, d[1] * rOut], shift([d[0] * rOut, d[1] * rOut]), shift([d[0] * rIn, d[1] * rIn])];
         parts.push(prism('stone', band, topY - 2 * T, topY - T, { edge: 'apron', name: 'wrap' }));
         if (!column) {
@@ -1122,9 +1160,9 @@
         parts.push(prism('body', band(l, RISER_T, l.alongM), belowY, topY - T, { name: 'body' }));
       } else if (edge === 'stone-wrap') {
         // «Подгиб камнем» under the landing's front edge too.
-        parts.push(prism('stone', band(l, 0, WRAP_T), topY - 2 * T, topY - T, { name: 'wrap', landing: l.index }));
+        parts.push(prism('stone', band(l, 0, T), topY - 2 * T, topY - T, { name: 'wrap', landing: l.index }));
         parts.push(prism('body', l.outline, 0, topY - 2 * T, { name: 'body' }));
-        parts.push(prism('body', band(l, WRAP_T, l.alongM), topY - 2 * T, topY - T, { name: 'body' }));
+        parts.push(prism('body', band(l, T, l.alongM), topY - 2 * T, topY - T, { name: 'body' }));
       } else {
         parts.push(prism('body', l.outline, 0, topY - T, { name: 'body' }));
       }
