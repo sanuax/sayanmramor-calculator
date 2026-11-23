@@ -970,19 +970,10 @@
     return pts;
   }
 
-  // «Подгиб камнем» of a straight tread: a U under its open edges -- the front and both sides -- as thick as the
-  // slab; a radius step's front follows its arc. The body steps back inside it (wrapBody).
-  function wrapOutline(origin, dir, across, halfW, a0, a1, bulge, T) {
-    const at = (along, side) => [origin[0] + dir[0] * along + across[0] * side, origin[1] + dir[1] * along + across[1] * side];
-    const inner = halfW - T;
-    // The sides stop where the next tread's body takes over: a radius step's front bows back over this one.
-    const end = Math.max(a0 + T + 0.001, bulge > 0 ? a1 - bulge : a1);
-    const head = [at(end, -halfW), at(end, -inner)];
-    const tail = [at(end, inner), at(end, halfW)];
-    const outerFront = stepFootprint(origin, dir, across, halfW, a0, a1, bulge).slice(2);   // right to left
-    const innerFront = stepFootprint(origin, dir, across, inner, a0 + T, a1, bulge).slice(2).reverse();   // left to right
-    return head.concat(innerFront, tail, outerFront);
-  }
+  // A tread, a landing: the edge is the FRONT edge only (the owner, 2026-11-23: «кромка только у переднего
+  // ребра, заднее и боковые не нужны») -- the profile is cut there and nowhere else, and the price measures
+  // that one edge (openEdges). `closed` lists every other outline edge, the straight cuts of the 3D.
+  const closedExcept = (outline, open) => outline.map((_, i) => i).filter(i => !open.includes(i));
 
   function straightFlight(parts, o) {
     const { origin, dir, across, width, count, depth, level, risers, bulge, T } = o;
@@ -995,7 +986,7 @@
       // openEdges: the front edge (the arc of a radius step), where the wrap
       // goes -- what edge-length.js prices; metadata, the renderer ignores it.
       const front = footprint.slice(2).map((_, j) => j + 2).slice(0, -1);
-      parts.push(prism('stone', footprint, topY - T, topY, { edge: o.edge, name: 'tread', openEdges: front }));
+      parts.push(prism('stone', footprint, topY - T, topY, { edge: o.edge, name: 'tread', openEdges: front, closed: closedExcept(footprint, front) }));
       if (risers) {
         parts.push(prism('stone', bandOutline(stepFootprint(origin, dir, across, halfW, a0, a0 + RISER_T, bulge), bulge),
           (level + k) * RISE, topY - T, { name: 'riser' }));
@@ -1004,9 +995,9 @@
       if (o.edge === 'stone-wrap' && !risers) {
         // «Подгиб камнем»: a stone strip under the tread's front edge; the body
         // steps back behind it (two pieces, so no two faces share a plane).
-        parts.push(prism('stone', wrapOutline(origin, dir, across, halfW, a0, a1, bulge, T), topY - 2 * T, topY - T, { edge: 'apron', name: 'wrap' }));
+        parts.push(prism('stone', bandOutline(stepFootprint(origin, dir, across, halfW, a0, a0 + T, bulge), bulge, T), topY - 2 * T, topY - T, { edge: 'apron', name: 'wrap' }));
         parts.push(prism('body', stepFootprint(origin, dir, across, halfW, a0, a1, bulge), 0, topY - 2 * T, { name: 'body' }));
-        parts.push(prism('body', stepFootprint(origin, dir, across, halfW - T, a0 + T, a1, bulge), topY - 2 * T, topY - T, { name: 'body' }));
+        parts.push(prism('body', stepFootprint(origin, dir, across, halfW, a0 + T, a1, bulge), topY - 2 * T, topY - T, { name: 'body' }));
         continue;
       }
       parts.push(prism('body', stepFootprint(origin, dir, across, halfW, bodyStart, a1, risers ? 0 : bulge), 0, topY - T, { name: 'body' }));
@@ -1015,13 +1006,14 @@
 
   // A riser under a radius tread follows the tread's arc: a thin band whose
   // back edge is the same arc moved back by the riser thickness.
-  function bandOutline(footprint, bulge) {
+  function bandOutline(footprint, bulge, thickness) {
+    const t = thickness || RISER_T;
     if (!(bulge > 0)) return footprint;
     const front = footprint.slice(2);
     const dx = footprint[0][0] - front[front.length - 1][0];
     const dz = footprint[0][1] - front[front.length - 1][1];
     const len = Math.hypot(dx, dz) || 1;
-    const back = front.map(([x, z]) => [x + (dx / len) * RISER_T, z + (dz / len) * RISER_T]).reverse();
+    const back = front.map(([x, z]) => [x + (dx / len) * t, z + (dz / len) * t]).reverse();
     return front.concat(back);
   }
 
@@ -1047,7 +1039,7 @@
       pts.push([di1[0] * rIn, di1[1] * rIn], [di0[0] * rIn, di0[1] * rIn]);
       // openEdges: the front (radial) edge at a0 -- the outline's closing edge,
       // inner point back to the outer one -- where the wrap goes (edge-length.js).
-      parts.push(prism('stone', pts, topY - T, topY, { edge: o.edge, name: 'tread', openEdges: [pts.length - 1] }));
+      parts.push(prism('stone', pts, topY - T, topY, { edge: o.edge, name: 'tread', openEdges: [pts.length - 1], closed: closedExcept(pts, [pts.length - 1]) }));
       if (risers) {
         const d = u(a0), t = [-Math.sin(a0), Math.cos(a0)];
         const band = [
@@ -1149,7 +1141,7 @@
       // (openLengthM -- the arriving march and the gap over the well).
       const along = ([x, z]) => (x - l.edge[0]) * l.dir[0] + (z - l.edge[1]) * l.dir[1];
       const frontEdge = l.outline.findIndex((pt, i) => Math.abs(along(pt)) < 1e-9 && Math.abs(along(l.outline[(i + 1) % l.outline.length])) < 1e-9);
-      const meta = { edge, name: 'landing', index: l.index, openEdges: [frontEdge] };
+      const meta = { edge, name: 'landing', index: l.index, openEdges: [frontEdge], closed: closedExcept(l.outline, [frontEdge]) };
       if (l.turn === 'u') meta.openLengthM = (l.acrossMax - l.acrossMin) - width;
       parts.push(prism('stone', l.outline, topY - T, topY, meta));
       if (s.risers) {

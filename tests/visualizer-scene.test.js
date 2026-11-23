@@ -981,25 +981,37 @@ test('«Подгиб камнем»: the apron is as thick as the slab and meets
   });
 });
 
-// «Подгиб камнем» on steps and stairs (the owner, 2026-11-23): not the front edge only -- the open sides of a
-// tread get the apron too, a U as thick as the slab; the price still measures the front (openEdges).
-test('«Подгиб камнем» on a straight tread runs along the front and both sides, a U as thick as the slab', () => {
-  const T = 0.04;
-  ['stupeni', 'lestnitsa'].forEach(key => {
-    const layout = layoutFor(key, Object.assign({ width: { value: key === 'stupeni' ? '350' : '1000' }, length: { value: key === 'stupeni' ? '1200' : '3000' }, 'step-count': { value: '4' }, 'edge-type': { value: 'stone-wrap' } },
-      key === 'stupeni' ? { productSubcategory: { value: 'STEP-01' } } : { productSubcategory: { value: 'STAIR-01' } }));
-    const tread = named(layout, 'tread')[0], wrap = named(layout, 'wrap')[0];
-    const xs = wrap.outline.map(p => p[0]), zs = wrap.outline.map(p => p[1]);
-    const tx = tread.outline.map(p => p[0]), tz = tread.outline.map(p => p[1]);
-    // It reaches both side edges of the tread, and back along them well past the front strip's thickness.
-    assert.ok(Math.abs(Math.min(...zs) - Math.min(...tz)) < 1e-9 && Math.abs(Math.max(...zs) - Math.max(...tz)) < 1e-9, key + ': out to both sides');
-    assert.ok(Math.max(...xs) - Math.min(...xs) > 4 * T, key + ': the sides run back along the tread');
-    // Its inner outline is the slab's thickness in from the sides.
-    const widths = [...new Set(zs.map(z => Math.round(z * 1e6) / 1e6))].sort((a, b) => a - b);
-    assert.ok(widths.some(z => Math.abs(z - (Math.min(...tz) + T)) < 1e-6) && widths.some(z => Math.abs(z - (Math.max(...tz) - T)) < 1e-6), key + ': a slab thickness in from the sides');
-    // The price still measures the front only.
-    assert.equal(tread.openEdges.length, 1, key + ': openEdges is the front');
-    void tx;
+// Steps and stairs (the owner, 2026-11-23: «кромка только у переднего ребра, заднее и боковые не нужны»): the
+// edge profile and the apron are the FRONT edge of a tread or a landing and nothing else, in the 3D and in the
+// price -- one edge per step.
+test('steps and stairs: the edge is the one front edge of each tread -- the profile, the wrap and the price', () => {
+  const EdgeLength = require('../edge-length.js');
+  [
+    ['stupeni', { width: { value: '350' }, length: { value: '1200' }, 'step-count': { value: '4' }, productSubcategory: { value: 'STEP-01' } }, 4 * 1.2],
+    ['lestnitsa', { width: { value: '1000' }, length: { value: '3000' }, 'step-count': { value: '6' }, productSubcategory: { value: 'STAIR-01' } }, null],
+  ].forEach(([key, values, expectedM]) => {
+    ['rounding', 'bevel', 'straight', 'stone-wrap'].forEach(edgeType => {
+      const layout = layoutFor(key, Object.assign({ 'edge-type': { value: edgeType } }, values));
+      const treads = layout.parts.filter(p => p.name === 'tread' || p.name === 'landing');
+      assert.ok(treads.length > 0);
+      treads.forEach(p => {
+        assert.equal(p.openEdges.length, 1, key + ' ' + edgeType + ': one open edge');
+        // Every other outline edge is a straight cut: the profile is not cut on the sides or the back.
+        const all = p.outline.map((_, i) => i);
+        assert.deepEqual(p.closed.slice().sort((a, b) => a - b), all.filter(i => !p.openEdges.includes(i)), key + ' ' + edgeType + ': the rest is closed');
+      });
+      if (edgeType === 'stone-wrap') {
+        // The apron lies under the front only: as wide as the tread, a slab thickness deep.
+        named(layout, 'wrap').forEach(w => {
+          const xs = w.outline.map(p => p[0]);
+          assert.ok(Math.max(...xs) - Math.min(...xs) < 0.05, key + ': the apron is a front strip, not a U');
+        });
+      }
+      // The price measures the same one edge: the treads' width, once each.
+      const front = treads.reduce((sum, p) => { const i = p.openEdges[0], a = p.outline[i], b = p.outline[(i + 1) % p.outline.length]; return sum + Math.hypot(b[0] - a[0], b[1] - a[1]); }, 0);
+      const priced = EdgeLength.openEdgeLengthM(layout);
+      assert.ok(Math.abs(priced - front) < 1e-3, key + ' ' + edgeType + ': priced ' + priced + ' vs front ' + front);
+      if (expectedM) assert.ok(Math.abs(priced - expectedM) < 1e-3, key + ': 4 steps x 1.2 m');
+    });
   });
 });
-
