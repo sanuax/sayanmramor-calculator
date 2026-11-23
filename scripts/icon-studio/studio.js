@@ -126,6 +126,7 @@ M.soot = new THREE.MeshStandardMaterial({ color: 0x302e2c, roughness: 0.95 });
 M.frame = new THREE.MeshStandardMaterial({ color: 0x3a3b3c, metalness: 0.6, roughness: 0.45, envMap: ENV, envMapIntensity: 0.5 });
 // стекло как в архитектурном макете: светлое серо-зелёное, с отражением, без «чёрных дыр» в кадре
 M.glass = new THREE.MeshPhysicalMaterial({ color: 0x9fadac, roughness: 0.08, clearcoat: 1, clearcoatRoughness: 0.03, envMap: ENV, envMapIntensity: 0.8 });
+M.roof = new THREE.MeshStandardMaterial({ color: 0x45474a, roughness: 0.55, metalness: 0.3, envMap: ENV, envMapIntensity: 0.4, side: THREE.DoubleSide });
 M.ceramic = new THREE.MeshPhysicalMaterial({ color: 0xf2f1ee, roughness: 0.22, clearcoat: 0.6, clearcoatRoughness: 0.1, envMap: ENV, envMapIntensity: 0.35, side: THREE.DoubleSide });
 
 // ---- плита любой ориентации ----
@@ -317,42 +318,46 @@ function kitchenIsland() {
   return { group: g, camera: {} };
 }
 
-// ---- 2. Столешницы в ванную: подвесная тумба, накладная раковина, настенный излив ----
-// Фрагмент стены 1600×1550×120; тумба 1160×400×460 без фасадов (гипс); плита 1200×500×30, верх на 850;
-// чаша ⌀400×130; излив из стены на 1120.
+// ---- 2. Столешницы в ванную: двойная раковина на подвесной тумбе ----
+// Фрагмент стены 2800×1600×120; тумба 2340×400×460 без фасадов (гипс); плита 2400×500×30 (длина как
+// у кухонной), верх на 850; две накладные чаши ⌀400×130 по осям ±600, над каждой — излив из стены на 1120.
 function bathVanity() {
   const g = new THREE.Group();
   const top = 0.85;
-  g.add(panel(B(-0.8, 0.8, 0, 1.55, -0.12, 0), 'front', { mat: M.plaster }));
-  g.add(box(-0.58, 0.58, 0.42, top - 0.03, 0, 0.46, M.plaster));
-  g.add(panel(B(-0.6, 0.6, top - 0.03, top, 0, 0.5), 'up'));
+  g.add(panel(B(-1.4, 1.4, 0, 1.6, -0.12, 0), 'front', { mat: M.plaster }));
+  g.add(box(-1.17, 1.17, 0.42, top - 0.03, 0, 0.46, M.plaster));
+  g.add(panel(B(-1.2, 1.2, top - 0.03, top, 0, 0.5), 'up'));
   const prof = [[0, 0], [0.11, 0], [0.155, 0.035], [0.188, 0.095], [0.2, 0.13], [0.193, 0.13], [0.181, 0.097], [0.148, 0.042], [0.104, 0.011], [0, 0.011]]
     .map(([r, y]) => new THREE.Vector2(r, y));
-  const bowl = new THREE.Mesh(new THREE.LatheGeometry(prof, 128), M.ceramic);
-  bowl.position.set(0, top, 0.25); bowl.castShadow = bowl.receiveShadow = true; g.add(bowl);
-  const drain = cylinder(0.02, 0.002, M.steel, 48); drain.position.set(0, top + 0.012, 0.25); g.add(drain);
-  const sy = top + 0.27;
-  const plate = cylinder(0.032, 0.012, M.steel); plate.rotation.x = Math.PI / 2; plate.position.set(0, sy, 0.006); g.add(plate);
-  const spout = cylinder(0.011, 0.2, M.steel); spout.rotation.x = Math.PI / 2; spout.position.set(0, sy, 0.112); g.add(spout);
-  const plate2 = cylinder(0.028, 0.012, M.steel); plate2.rotation.x = Math.PI / 2; plate2.position.set(0, sy + 0.13, 0.006); g.add(plate2);
-  const lever = cylinder(0.005, 0.06, M.steel, 32); lever.rotation.x = Math.PI / 2; lever.position.set(0, sy + 0.13, 0.04); g.add(lever);
+  const bowlGeo = new THREE.LatheGeometry(prof, 128);
+  for (const x of [-0.6, 0.6]) {
+    const bowl = new THREE.Mesh(bowlGeo, M.ceramic);
+    bowl.position.set(x, top, 0.25); bowl.castShadow = bowl.receiveShadow = true; g.add(bowl);
+    const drain = cylinder(0.02, 0.002, M.steel, 48); drain.position.set(x, top + 0.012, 0.25); g.add(drain);
+    const sy = top + 0.27;
+    const plate = cylinder(0.032, 0.012, M.steel); plate.rotation.x = Math.PI / 2; plate.position.set(x, sy, 0.006); g.add(plate);
+    const spout = cylinder(0.011, 0.2, M.steel); spout.rotation.x = Math.PI / 2; spout.position.set(x, sy, 0.112); g.add(spout);
+    const plate2 = cylinder(0.028, 0.012, M.steel); plate2.rotation.x = Math.PI / 2; plate2.position.set(x, sy + 0.13, 0.006); g.add(plate2);
+    const lever = cylinder(0.005, 0.06, M.steel, 32); lever.rotation.x = Math.PI / 2; lever.position.set(x, sy + 0.13, 0.04); g.add(lever);
+  }
   return { group: g, camera: { azimuthDeg: 24, elevationDeg: 26 } };
 }
 
-// ---- 3. Подоконники: фрагмент стены 1900×2100×550 с проёмом 1200×1030, подоконник 1300×450×30 ----
-// с «ушами» по 50 мм в откосы и свесом 60 мм; графитовая рама 60 мм с импостом, стекло.
+// ---- 3. Подоконники: фрагмент стены 1900×2700×350 с проёмом 1200×1550, подоконник 1300×270×30 ----
+// с «ушами» по 50 мм в откосы и свесом 60 мм; графитовая рама 60 мм с импостом и фрамугой, стекло.
 function windowSill() {
   const g = new THREE.Group();
-  const [a, b, c, d] = [-0.6, 0.6, 0.85, 1.88], f = 0.06, fz0 = -0.45, fz1 = -0.39;
-  g.add(panel(B(-0.95, 0.95, 0, 2.1, -0.55, 0), 'front', { mat: M.plaster, holes: [{ rect: [a, b, c, d] }] }));
+  const [a, b, c, d] = [-0.6, 0.6, 0.85, 2.4], f = 0.06, fz0 = -0.27, fz1 = -0.21, tr = 1.95;
+  g.add(panel(B(-0.95, 0.95, 0, 2.7, -0.35, 0), 'front', { mat: M.plaster, holes: [{ rect: [a, b, c, d] }] }));
   g.add(panel(B(a - 0.05, b + 0.05, c, c + 0.03, fz1, 0.06), 'up'));
   g.add(box(a, b, c, c + 0.03 + f, fz0, fz1, M.frame));
   g.add(box(a, b, d - f, d, fz0, fz1, M.frame));
   g.add(box(a, a + f, c, d, fz0, fz1, M.frame));
   g.add(box(b - f, b, c, d, fz0, fz1, M.frame));
-  g.add(box(-0.03, 0.03, c, d, fz0, fz1, M.frame));
+  g.add(box(a, b, tr - f / 2, tr + f / 2, fz0, fz1, M.frame));   // фрамуга
+  g.add(box(-0.03, 0.03, c, tr, fz0, fz1, M.frame));             // импост под фрамугой
   g.add(box(a, b, c, d, fz0 + 0.025, fz0 + 0.035, M.glass));
-  return { group: g, camera: { azimuthDeg: 20, elevationDeg: 28 } };
+  return { group: g, camera: { azimuthDeg: 20, elevationDeg: 26 } };
 }
 
 // ---- 4. Полы: образец пола 2400×2400 — плиты 800×800×20 в раскладку со швом 3 мм на гипсовой стяжке 80 ----
@@ -395,58 +400,84 @@ function panno() {
   return { group: g, camera: { azimuthDeg: 18, elevationDeg: 12 } };
 }
 
-// ---- 7. Фасады: угол двухэтажного объёма 6000×3600×6100 в навесном фасаде — плиты 1200×600×30,
-// открытый шов 8 мм; окна 1200×1800 в откосах из камня глубиной 250, каменные отливы со свесом 40,
-// парапет с каменной крышкой, тёмный цоколь 100.
+// ---- 7. Фасады: двухэтажный дом 8400×6000 в навесном фасаде из камня ----
+// Снизу вверх: каменный цоколь 600 (выступает на 40), этаж 3000, межэтажный пояс 240 (выступает на 60),
+// этаж 3000. Плиты 1200×600×30, открытый шов 8 мм. Окна 1200×1800 в каменных откосах 250 с отливами
+// (свес 40); вход: дверь 1200×2400 в откосах, бетонный козырёк, каменное крыльцо — 4 подъёма по 150 до пола
+// на 600 и площадка 1200. Четырёхскатная кровля 30° графитового цвета, свес 500, белый карниз с подшивом.
 function facade() {
   const g = new THREE.Group();
-  const W0 = -3, W1 = 3, D0 = -3.6, Y0 = 0.1, ROW = 0.6, ROWS = 10, COL = 1.2, T = 0.03, gp = 0.008, DEP = 0.25, f = 0.06;
-  const Ytop = Y0 + ROW * ROWS;
-  const floors = [[1, 3], [6, 8]];
-  const winRow = r => floors.some(([p, q]) => r >= p && r <= q);
+  const X0 = -4.2, X1 = 4.2, Z0 = -6.0, COL = 1.2, ROW = 0.6, T = 0.03, gp = 0.008, DEP = 0.25, f = 0.06;
+  const PL = 0.6, F1 = [PL, PL + 3.0], BELT = [F1[1], F1[1] + 0.24], F2 = [BELT[1], BELT[1] + 3.0], EAVE = F2[1];
   let k = 0;
   const spot = () => ({ spot: k++ });
-  for (let c = 0; c < 5; c++) for (let r = 0; r < ROWS; r++) {
-    if ((c === 1 || c === 3) && winRow(r)) continue;
-    const x0 = W0 + c * COL + (c ? gp / 2 : 0), x1 = W0 + (c + 1) * COL - (c < 4 ? gp / 2 : 0);
-    const y0 = Y0 + r * ROW + gp / 2, y1 = Y0 + (r + 1) * ROW - gp / 2;
-    g.add(panel(B(x0, x1, y0, y1, -T, 0), 'front', { uv: spot() }));
-  }
-  for (let c = 0; c < 3; c++) for (let r = 0; r < ROWS; r++) {
-    if (c === 1 && winRow(r)) continue;
-    const z1 = -c * COL - (c ? gp / 2 : T + gp / 2), z0 = -(c + 1) * COL + gp / 2;
-    const y0 = Y0 + r * ROW + gp / 2, y1 = Y0 + (r + 1) * ROW - gp / 2;
-    g.add(panel(B(W1 - T, W1, y0, y1, z0, z1), 'right', { uv: spot() }));
-  }
-  for (const [p, q] of floors) {
-    const c = Y0 + p * ROW, d = Y0 + (q + 1) * ROW;
-    for (const [a, b] of [[-1.8, -0.6], [0.6, 1.8]]) {           // окна фасада
-      g.add(panel(B(a - 0.04, b + 0.04, c - 0.04, c, -DEP, 0.04), 'up'));
-      g.add(panel(B(a - 0.03, a, c, d, -DEP, -T), 'right'));
-      g.add(panel(B(b, b + 0.03, c, d, -DEP, -T), 'left'));
-      const z0 = -DEP, z1 = -DEP + 0.07;
-      g.add(box(a, b, c, c + f, z0, z1, M.frame), box(a, b, d - f, d, z0, z1, M.frame),
-        box(a, a + f, c, d, z0, z1, M.frame), box(b - f, b, c, d, z0, z1, M.frame),
-        box((a + b) / 2 - 0.03, (a + b) / 2 + 0.03, c, d, z0, z1, M.frame),
-        box(a, b, c, d, z0 + 0.02, z0 + 0.03, M.glass));
+  // проёмы: [этаж, колонка, первый ряд, последний ряд, вид]
+  const front = [[F1, 1, 1, 3, 'win'], [F1, 5, 1, 3, 'win'], [F1, 3, 0, 3, 'door'], [F2, 1, 1, 3, 'win'], [F2, 3, 1, 3, 'win'], [F2, 5, 1, 3, 'win']];
+  const side = [[F1, 2, 1, 3, 'win'], [F2, 2, 1, 3, 'win']];
+  const isHole = (list, fl, c, r) => list.some(([F, cc, r0, r1]) => F === fl && cc === c && r >= r0 && r <= r1);
+  const fx = c => [X0 + c * COL + (c ? gp / 2 : 0), X0 + (c + 1) * COL - gp / 2];          // колонка фасада
+  const sz = c => [-(c + 1) * COL + gp / 2, -c * COL - (c ? gp / 2 : T + gp / 2)];            // колонка торца
+
+  // облицовка этажей
+  for (const fl of [F1, F2]) for (let r = 0; r < 5; r++) {
+    const y0 = fl[0] + r * ROW + gp / 2, y1 = fl[0] + (r + 1) * ROW - gp / 2;
+    for (let c = 0; c < 7; c++) {
+      if (isHole(front, fl, c, r)) continue;
+      const [x0, x1] = fx(c);
+      g.add(panel(B(x0, c < 6 ? x1 : X1, y0, y1, -T, 0), 'front', { uv: spot() }));
     }
-    const [a, b] = [-2.4, -1.2];                                   // окно торца
-    g.add(panel(B(W1 - DEP, W1 + 0.04, c - 0.04, c, a - 0.04, b + 0.04), 'up'));
-    g.add(panel(B(W1 - DEP, W1 - T, c, d, a - 0.03, a), 'front'));
-    g.add(panel(B(W1 - DEP, W1 - T, c, d, b, b + 0.03), 'back'));
-    const x1 = W1 - DEP + 0.07, x0 = W1 - DEP;
+    for (let c = 0; c < 5; c++) {
+      if (isHole(side, fl, c, r)) continue;
+      const [z0, z1] = sz(c);
+      g.add(panel(B(X1 - T, X1, y0, y1, z0, z1), 'right', { uv: spot() }));
+    }
+  }
+  // цоколь (выступ 40) и межэтажный пояс (выступ 60): камень, огибает угол
+  for (const [y0, y1, out] of [[0, PL - gp / 2, 0.04], [BELT[0], BELT[1], 0.06]]) {
+    for (let c = 0; c < 7; c++) { const [x0, x1] = fx(c); g.add(panel(B(x0, c < 6 ? x1 : X1 + out, y0, y1, -T, out), 'front', { uv: spot() })); }
+    for (let c = 0; c < 5; c++) { const [z0, z1] = sz(c); g.add(panel(B(X1 - T, X1 + out, y0, y1, z0, z1), 'right', { uv: spot() })); }
+  }
+
+  // проёмы фасада: каменные откосы и отлив (у двери — порог), рама, стекло
+  function openFront(a, b, c, d, kind) {
+    if (kind === 'win') g.add(panel(B(a - 0.04, b + 0.04, c - 0.04, c, -DEP, 0.04), 'up'));
+    else g.add(panel(B(a, b, c - 0.03, c, -DEP, 0.04), 'up'));
+    g.add(panel(B(a - 0.03, a, c, d, -DEP, -T), 'right'), panel(B(b, b + 0.03, c, d, -DEP, -T), 'left'));
+    const z0 = -DEP, z1 = -DEP + 0.07, m = (a + b) / 2;
+    g.add(box(a, b, c, c + f, z0, z1, M.frame), box(a, b, d - f, d, z0, z1, M.frame),
+      box(a, a + f, c, d, z0, z1, M.frame), box(b - f, b, c, d, z0, z1, M.frame),
+      box(a, b, c, d, z0 + 0.02, z0 + 0.03, M.glass));
+    if (kind === 'win') g.add(box(m - 0.03, m + 0.03, c, d, z0, z1, M.frame));
+    else g.add(box(a, b, c + 0.95, c + 1.05, z0, z1, M.frame), box(m + 0.3, m + 0.32, c + 0.8, c + 1.9, z1, z1 + 0.05, M.steel));
+  }
+  function openSide(a, b, c, d) {
+    g.add(panel(B(X1 - DEP, X1 + 0.04, c - 0.04, c, a - 0.04, b + 0.04), 'up'));
+    g.add(panel(B(X1 - DEP, X1 - T, c, d, a - 0.03, a), 'front'), panel(B(X1 - DEP, X1 - T, c, d, b, b + 0.03), 'back'));
+    const x0 = X1 - DEP, x1 = x0 + 0.07, m = (a + b) / 2;
     g.add(box(x0, x1, c, c + f, a, b, M.frame), box(x0, x1, d - f, d, a, b, M.frame),
       box(x0, x1, c, d, a, a + f, M.frame), box(x0, x1, c, d, b - f, b, M.frame),
-      box(x0, x1, c, d, (a + b) / 2 - 0.03, (a + b) / 2 + 0.03, M.frame),
-      box(x0 + 0.02, x0 + 0.03, c, d, a, b, M.glass));
+      box(x0, x1, c, d, m - 0.03, m + 0.03, M.frame), box(x0 + 0.02, x0 + 0.03, c, d, a, b, M.glass));
   }
-  // замкнутый объём: крыша, глухие тыльная и левая стороны (их не видно), тёмный цоколь, каменная крышка парапета
-  g.add(box(W0, W1 - T, Ytop - 0.2, Ytop, D0, -T, M.plaster));
-  g.add(box(W0, W1, 0, Ytop, D0 - 0.02, D0, M.plaster), box(W0 - 0.02, W0, 0, Ytop, D0, 0, M.plaster));
-  g.add(box(W0 + 0.05, W1 - 0.05, 0, Y0, D0, -0.05, M.shadowGap));
-  g.add(panel(B(W0, W1 + 0.02, Ytop, Ytop + 0.04, -0.32, 0.02), 'up'));
-  g.add(panel(B(W1 - 0.32, W1 + 0.02, Ytop, Ytop + 0.04, D0, -0.32), 'up'));
-  return { group: g, camera: { azimuthDeg: 25, elevationDeg: 16 } };
+  for (const [F, c, r0, r1, kind] of front) openFront(X0 + c * COL, X0 + (c + 1) * COL, F[0] + r0 * ROW, F[0] + (r1 + 1) * ROW, kind);
+  for (const [F, c, r0, r1] of side) openSide(-(c + 1) * COL, -c * COL, F[0] + r0 * ROW, F[0] + (r1 + 1) * ROW);
+
+  // вход: бетонный козырёк над дверью и каменное крыльцо до уровня пола
+  g.add(box(-1.3, 1.3, F1[0] + 2.55, F1[0] + 2.73, -T, 1.3, M.plaster));
+  flight(g, { x0: -1.4, x1: 1.4, zFront: 0.04 + 1.2 + 3 * 0.32, n: 4, rise: 0.15, going: 0.32, landing: 1.2 });
+
+  // замкнутый объём (тыльная и левая стороны не видны) и кровля: карниз с подшивом, четыре ската по 30°
+  g.add(box(X0, X1, 0, EAVE, Z0 - 0.02, Z0, M.plaster), box(X0 - 0.02, X0, 0, EAVE, Z0, 0, M.plaster));
+  const ov = 0.5, rx0 = X0 - ov, rx1 = X1 + ov, rz0 = Z0 - ov, rz1 = ov, ry = EAVE + 0.22;
+  g.add(box(rx0, rx1, EAVE, ry, rz0, rz1, M.plaster));
+  const half = (rz1 - rz0) / 2, top = ry + half * Math.tan(rad(30)), zc = (rz0 + rz1) / 2;
+  const A = [rx0, ry, rz1], Bf = [rx1, ry, rz1], C = [rx1, ry, rz0], D = [rx0, ry, rz0];
+  const R0 = [rx0 + half, top, zc], R1 = [rx1 - half, top, zc];
+  const tris = [A, Bf, R1, A, R1, R0, C, D, R0, C, R0, R1, Bf, C, R1, D, A, R0];
+  const roofGeo = new THREE.BufferGeometry();
+  roofGeo.setAttribute('position', new THREE.Float32BufferAttribute(tris.flat(), 3));
+  roofGeo.computeVertexNormals();
+  const roof = new THREE.Mesh(roofGeo, M.roof); roof.castShadow = roof.receiveShadow = true; g.add(roof);
+  return { group: g, camera: { azimuthDeg: 28, elevationDeg: 14 } };
 }
 
 // ---- лестничный марш: гипсовое основание + каменные проступи (40 мм, свес 25) и подступенки (20 мм) ----
