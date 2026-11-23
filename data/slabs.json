@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-17T14:23:54+00:00",
+  "updated_at": "2026-11-23T13:05:21+00:00",
   "stones": [
     {
       "id": "delicato-brown",
@@ -280288,8 +280288,8 @@
           "city": "Москва",
           "width_cm": 302,
           "length_cm": 160,
-          "price_per_m2_rub": 364780.0,
-          "price_total_rub": 1762613.0
+          "price_per_m2_rub": 361378.0,
+          "price_total_rub": 1746179.0
         },
         {
           "article": "M0636796",
@@ -280298,8 +280298,8 @@
           "city": "Москва",
           "width_cm": 302,
           "length_cm": 160,
-          "price_per_m2_rub": 383019.0,
-          "price_total_rub": 1850744.0
+          "price_per_m2_rub": 379447.0,
+          "price_total_rub": 1833488.0
         }
       ],
       "image": "images/agate-ambra-gold.webp",
@@ -280338,7 +280338,7 @@
         }
       ],
       "image": "images/agate-ambra.webp",
-      "consecutive_empty_scrapes": 0,
+      "consecutive_empty_scrapes": 1,
       "available": true
     },
     {
@@ -280368,18 +280368,8 @@
           "city": "Краснодар",
           "width_cm": 302,
           "length_cm": 160,
-          "price_per_m2_rub": 346267.0,
-          "price_total_rub": 1673161.0
-        },
-        {
-          "article": "M0636783",
-          "party": "15188",
-          "pachka": "BLM25689",
-          "city": "Москва",
-          "width_cm": 302,
-          "length_cm": 160,
-          "price_per_m2_rub": 383019.0,
-          "price_total_rub": 1850744.0
+          "price_per_m2_rub": 343038.0,
+          "price_total_rub": 1657560.0
         }
       ],
       "image": "images/agate-athena.webp",
@@ -280428,7 +280418,7 @@
         }
       ],
       "image": "images/agate-aura.webp",
-      "consecutive_empty_scrapes": 0,
+      "consecutive_empty_scrapes": 1,
       "available": true
     },
     {
@@ -280458,8 +280448,8 @@
           "city": "Краснодар",
           "width_cm": 302,
           "length_cm": 160,
-          "price_per_m2_rub": 362956.0,
-          "price_total_rub": 1753800.0
+          "price_per_m2_rub": 359572.0,
+          "price_total_rub": 1737448.0
         }
       ],
       "image": "images/agate-black-galaxy-special-design.webp",
@@ -280487,24 +280477,14 @@
       "source_url": "https://veneziastone.com/agate/agate-blue-tornada/slabs/",
       "slabs": [
         {
-          "article": "M0636780",
-          "party": "15188",
-          "pachka": "BLM25687",
-          "city": "Москва",
-          "width_cm": 302,
-          "length_cm": 160,
-          "price_per_m2_rub": 328302.0,
-          "price_total_rub": 1586352.0
-        },
-        {
           "article": "M0636785",
           "party": "15188",
           "pachka": "BLM25691",
           "city": "Москва",
           "width_cm": 302,
           "length_cm": 160,
-          "price_per_m2_rub": 328302.0,
-          "price_total_rub": 1586352.0
+          "price_per_m2_rub": 325241.0,
+          "price_total_rub": 1571561.0
         },
         {
           "article": "M0636797",
@@ -280513,8 +280493,8 @@
           "city": "Москва",
           "width_cm": 302,
           "length_cm": 160,
-          "price_per_m2_rub": 328302.0,
-          "price_total_rub": 1586352.0
+          "price_per_m2_rub": 325241.0,
+          "price_total_rub": 1571561.0
         },
         {
           "article": "M0442301",
@@ -280523,8 +280503,8 @@
           "city": "МО, Бузланово",
           "width_cm": 302,
           "length_cm": 160,
-          "price_per_m2_rub": 355660.0,
-          "price_total_rub": 1718548.0
+          "price_per_m2_rub": 352344.0,
+          "price_total_rub": 1702524.0
         }
       ],
       "image": "images/agate-blue-tornada.webp",
@@ -280558,8 +280538,8 @@
           "city": "МО, Бузланово",
           "width_cm": 302,
           "length_cm": 160,
-          "price_per_m2_rub": 273585.0,
-          "price_total_rub": 1321960.0
+          "price_per_m2_rub": 271034.0,
+          "price_total_rub": 1309634.0
         },
         {
           "article": "M0382989",
@@ -280568,8 +280548,8 @@
           "city": "Москва",
           "width_cm": 302,
           "length_cm": 160,
-          "price_per_m2_rub": 300943.0,
-          "price_total_rub": 1454156.0
+          "price_per_m2_rub": 298137.0,
+          "price_total_rub": 1440598.0
         },
         {
           "article": "M0278438",
@@ -280578,28 +280558,8 @@
           "city": "Москва",
           "width_cm": 302,
           "length_cm": 160,
-          "price_per_m2_rub": 323377.0,
-          "price_total_rub": 1562557.0
-        },
-        {
-          "article": "M0442302",
-          "party": "13286",
-          "pachka": "BLM14598",
-          "city": "Москва",
-          "width_cm": 302,
-          "length_cm": 160,
-          "price_per_m2_rub": 328302.0,
-          "price_total_rub": 1586352.0
-        },
-        {
-          "article": "M0442303",
-          "party": "13286",
-          "pachka": "BLM14598",
-          "city": "Краснодар",
-          "width_cm": 302,
-          "length_cm": 160,
-          "price_per_m2_rub": 328302.0,
-          "price_total_rub": 1586352.0
+          "price_per_m2_rub": 320362.0,
+          "price_total_rub": 1547988.0
         },
         {
           "article": "C0002985",
@@ -280608,8 +280568,8 @@
           "city": "Москва",
           "width_cm": 302,
           "length_cm": 160,
-          "price_per_m2_rub": 326569.0,
-          "price_total_rub": 1577980.0
+          "price_per_m2_rub": 323524.0,
+          "price_total_rub": 1563267.0
         },
         {
           "article": "C0002984",
@@ -280618,8 +280578,8 @@
           "city": "Санкт-Петербург",
           "width_cm": 302,
           "length_cm": 160,
-          "price_per_m2_rub": 326569.0,
-          "price_total_rub": 1577980.0
+          "price_per_m2_rub": 323524.0,
+          "price_total_rub": 1563267.0
         },
         {
           "article": "00207145",
@@ -280628,8 +280588,8 @@
           "city": "Краснодар",
           "width_cm": 302,
           "length_cm": 160,
-          "price_per_m2_rub": 326569.0,
-          "price_total_rub": 1577980.0
+          "price_per_m2_rub": 323524.0,
+          "price_total_rub": 1563267.0
         },
         {
           "article": "00207144",
@@ -280638,8 +280598,8 @@
           "city": "МО, Бузланово",
           "width_cm": 302,
           "length_cm": 160,
-          "price_per_m2_rub": 326569.0,
-          "price_total_rub": 1577980.0
+          "price_per_m2_rub": 323524.0,
+          "price_total_rub": 1563267.0
         },
         {
           "article": "C0002986",
@@ -280648,8 +280608,8 @@
           "city": "Москва",
           "width_cm": 302,
           "length_cm": 160,
-          "price_per_m2_rub": 326569.0,
-          "price_total_rub": 1577980.0
+          "price_per_m2_rub": 323524.0,
+          "price_total_rub": 1563267.0
         },
         {
           "article": "M0278439",
@@ -280658,8 +280618,8 @@
           "city": "Москва",
           "width_cm": 302,
           "length_cm": 160,
-          "price_per_m2_rub": 342163.0,
-          "price_total_rub": 1653331.0
+          "price_per_m2_rub": 338973.0,
+          "price_total_rub": 1637916.0
         },
         {
           "article": "M0636801",
@@ -280668,8 +280628,8 @@
           "city": "Москва",
           "width_cm": 302,
           "length_cm": 160,
-          "price_per_m2_rub": 364780.0,
-          "price_total_rub": 1762613.0
+          "price_per_m2_rub": 361378.0,
+          "price_total_rub": 1746179.0
         },
         {
           "article": "M0636787",
@@ -280678,28 +280638,8 @@
           "city": "Москва",
           "width_cm": 302,
           "length_cm": 160,
-          "price_per_m2_rub": 364780.0,
-          "price_total_rub": 1762613.0
-        },
-        {
-          "article": "M0636799",
-          "party": "15188",
-          "pachka": "BLM25702",
-          "city": "Москва",
-          "width_cm": 302,
-          "length_cm": 160,
-          "price_per_m2_rub": 364780.0,
-          "price_total_rub": 1762613.0
-        },
-        {
-          "article": "M0636800",
-          "party": "15188",
-          "pachka": "BLM25702",
-          "city": "Москва",
-          "width_cm": 302,
-          "length_cm": 160,
-          "price_per_m2_rub": 364780.0,
-          "price_total_rub": 1762613.0
+          "price_per_m2_rub": 361378.0,
+          "price_total_rub": 1746179.0
         }
       ],
       "image": "images/agate-blue.webp",
@@ -280733,8 +280673,8 @@
           "city": "Краснодар",
           "width_cm": 302,
           "length_cm": 160,
-          "price_per_m2_rub": 349368.0,
-          "price_total_rub": 1688143.0
+          "price_per_m2_rub": 346110.0,
+          "price_total_rub": 1672403.0
         }
       ],
       "image": "images/agate-carnelian.webp",
@@ -280773,7 +280713,7 @@
         }
       ],
       "image": "images/agate-cezanne-light-with-gold.webp",
-      "consecutive_empty_scrapes": 0,
+      "consecutive_empty_scrapes": 1,
       "available": true
     },
     {
@@ -280803,8 +280743,8 @@
           "city": "Москва",
           "width_cm": 302,
           "length_cm": 160,
-          "price_per_m2_rub": 346541.0,
-          "price_total_rub": 1674483.0
+          "price_per_m2_rub": 343310.0,
+          "price_total_rub": 1658870.0
         }
       ],
       "image": "images/agate-cezanne-with-gold-inlay.webp",
@@ -280838,8 +280778,8 @@
           "city": "МО, Бузланово",
           "width_cm": 302,
           "length_cm": 160,
-          "price_per_m2_rub": 218868.0,
-          "price_total_rub": 1057568.0
+          "price_per_m2_rub": 216827.0,
+          "price_total_rub": 1047707.0
         },
         {
           "article": "M0611372",
@@ -280848,8 +280788,8 @@
           "city": "Москва",
           "width_cm": 302,
           "length_cm": 160,
-          "price_per_m2_rub": 255346.0,
-          "price_total_rub": 1233830.0
+          "price_per_m2_rub": 252965.0,
+          "price_total_rub": 1222325.0
         },
         {
           "article": "M0382982",
@@ -280858,8 +280798,8 @@
           "city": "Санкт-Петербург",
           "width_cm": 302,
           "length_cm": 160,
-          "price_per_m2_rub": 264465.0,
-          "price_total_rub": 1277895.0
+          "price_per_m2_rub": 261999.0,
+          "price_total_rub": 1265980.0
         }
       ],
       "image": "images/agate-cezanne.webp",
@@ -280898,7 +280838,7 @@
         }
       ],
       "image": "images/agate-chocolate.webp",
-      "consecutive_empty_scrapes": 0,
+      "consecutive_empty_scrapes": 1,
       "available": true
     },
     {
@@ -280928,8 +280868,8 @@
           "city": "Москва",
           "width_cm": 302,
           "length_cm": 160,
-          "price_per_m2_rub": 287446.0,
-          "price_total_rub": 1388940.0
+          "price_per_m2_rub": 284766.0,
+          "price_total_rub": 1375989.0
         }
       ],
       "image": "images/agate-crystal-with-gold-inlay.webp",
@@ -280963,8 +280903,8 @@
           "city": "Краснодар",
           "width_cm": 302,
           "length_cm": 160,
-          "price_per_m2_rub": 310975.0,
-          "price_total_rub": 1502628.0
+          "price_per_m2_rub": 308075.0,
+          "price_total_rub": 1488618.0
         }
       ],
       "image": "images/agate-delta-light-giant.webp",
@@ -280998,8 +280938,8 @@
           "city": "Москва",
           "width_cm": 302,
           "length_cm": 160,
-          "price_per_m2_rub": 310975.0,
-          "price_total_rub": 1502628.0
+          "price_per_m2_rub": 308075.0,
+          "price_total_rub": 1488618.0
         },
         {
           "article": "M0552342",
@@ -281008,8 +280948,8 @@
           "city": "Москва",
           "width_cm": 302,
           "length_cm": 160,
-          "price_per_m2_rub": 337421.0,
-          "price_total_rub": 1630418.0
+          "price_per_m2_rub": 334275.0,
+          "price_total_rub": 1615216.0
         }
       ],
       "image": "images/agate-delta-light-with-gold-inlay.webp",
