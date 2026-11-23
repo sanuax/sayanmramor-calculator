@@ -14,10 +14,6 @@
 // carries an import map (between the IMPORTMAP markers) that sends every module's plain URL to its stamped one.
 // It is written before the first module script, where it must stand to count. The third-party files
 // (vendor/three/...) are not stamped: they do not change with the configurator.
-//
-// The product cards' pictures (icons/products/lux/*.webp, rendered by scripts/icon-studio) are stamped as one:
-// PRODUCT_ICONS_V in the page is the hash of all of them, and every picture's address carries it, so a
-// re-rendered picture is a new address (2026-11-22: they had none, and a browser would have kept the old ones).
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -28,19 +24,10 @@ const PAGE = 'sayanmramor-calculator.html';
 // (a path with no leading slash and no scheme).
 const ASSET = /(<script(?:\s+type="module")?\s+src=")((?!\/|https?:)[\w./-]+\.js)(?:\?v=[0-9a-f]+)?"/g;
 const IMPORTMAP = /(<!-- IMPORTMAP -->\n)[^]*?(\n<!-- \/IMPORTMAP -->)/;
-const ICONS_DIR = 'icons/products/lux';
-const ICONS_STAMP = /(const PRODUCT_ICONS_V = ')[0-9a-f]*(')/;
 
 // The repository keeps LF and a Windows checkout writes CRLF: the stamp is of the LF text, so it is the same on both.
 const hashOf = text => crypto.createHash('sha256').update(String(text).replace(/\r\n/g, '\n')).digest('hex').slice(0, 8);
 const stampOf = file => hashOf(fs.readFileSync(path.join(root, file), 'utf8'));
-// The pictures of the product cards: the hash of every file's name and bytes, in the order of the names.
-const iconsStamp = () => {
-  const h = crypto.createHash('sha256');
-  fs.readdirSync(path.join(root, ICONS_DIR)).filter(f => f.endsWith('.webp')).sort()
-    .forEach(f => { h.update(f); h.update(fs.readFileSync(path.join(root, ICONS_DIR, f))); });
-  return h.digest('hex').slice(0, 8);
-};
 // The 3D modules: every file in visualizer/ written as an ES module.
 const modules = () => fs.readdirSync(path.join(root, 'visualizer')).filter(f => f.endsWith('.js'))
   .map(f => 'visualizer/' + f).filter(f => /^(?:import|export) /m.test(fs.readFileSync(path.join(root, f), 'utf8'))).sort();
@@ -51,7 +38,6 @@ const importMapBlock = () => '<!-- IMPORTMAP -->\n<script type="importmap">' + J
 // html: the page as LF text -> the page with every stamp and the import map current.
 function stamped(html) {
   let out = html.replace(ASSET, (m, head, file) => head + file + '?v=' + stampOf(file) + '"');
-  out = out.replace(ICONS_STAMP, (m, open, close) => open + iconsStamp() + close);
   if (IMPORTMAP.test(out)) {
     out = out.replace(IMPORTMAP, (m, open, close) => open + importMapBlock().split('\n').slice(1, 2).join('\n') + close);
   } else {
@@ -75,4 +61,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { PAGE, ASSET, ICONS_DIR, hashOf, stampOf, iconsStamp, modules, importMapBlock, stamped };
+module.exports = { PAGE, ASSET, hashOf, stampOf, modules, importMapBlock, stamped };

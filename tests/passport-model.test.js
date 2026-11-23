@@ -281,19 +281,3 @@ test('passport carries the Moscow note under the total', () => {
   assert.equal(doc.specification.note, NOTE);
   assert.equal(PassportModel.buildSpecification({ result: null, pricing: { status: 'manual', message: 'm' } }).note, undefined, 'no total, no note');
 });
-
-test('the project\'s passport: its number and file name as a passport\'s, every product\'s passport numbered as the project', () => {
-  const at = new Date(2026, 10, 17, 12, 0, 0);
-  const item = { number: 'x', dateText: 'y', title: 'Подоконник' };
-  const p = PassportModel.buildProjectPassport({
-    items: [item, Object.assign({}, item, { title: 'Ступени' })], rows: [], lines: [], totalRub: 1000, manual: null,
-    createdAt: at, random4: 42, link: 'L', pricesDateText: '15.09.2026',
-  });
-  assert.equal(p.project, true);
-  assert.equal(p.number, '261117-0042');
-  assert.equal(p.fileName, 'Паспорт - Проект - 17.11.2026.pdf');
-  assert.equal(p.items.length, 2);
-  assert.ok(p.items.every(i => i.number === '261117-0042' && i.dateText === '17.11.2026'));
-  assert.equal(item.number, 'x', 'the products\' own passports are not changed');
-  assert.equal(p.totalRub, 1000);
-});

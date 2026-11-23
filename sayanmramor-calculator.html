@@ -370,112 +370,6 @@
   .viewer-facades[hidden] { display: none; }
   .viewer-facades-label { font-size: var(--configurator-muted); color: var(--dark-text-muted); margin-right: 2px; }
   .viewer-controls .viewer-swatch { width: 26px; height: 26px; padding: 0; background: var(--swatch); }
-  /* The project (the owner, 2026-11-17): its products in the panel, «+ Добавить изделие», the 3D's buttons. */
-  .viewer-project[hidden], .project-add[hidden] { display: none; }
-  /* The project, redesigned (the owner, 2026-11-18, «Состав» of two concepts): the products as a row
-     of cards over the calculator, the one edited a dark showcase, the total and «Получить расчёт»
-     beside them, «Добавить изделие» the row's last card -- the panel's dashed button gives way to it. */
-  body.calc-project .project-add { display: none; }
-  .result-project .result-lines { margin-top: 0; }
-  /* A price the manager gives: words, not a figure -- no figure's size. */
-  .result-price.is-manual { font-size: var(--configurator-title); font-weight: 700; color: var(--dark-text); min-height: 0; }
-
-  .project-rail { margin: 0 0 36px; }
-  .project-rail[hidden] { display: none; }
-  .project-rail-head { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 14px 28px; margin-bottom: 16px; }
-  .project-rail-titles { flex: 1 1 auto; display: flex; align-items: baseline; gap: 12px; min-width: 0; }
-  .project-rail-title { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.015em; }
-  .project-rail-count { color: var(--muted); font-size: var(--configurator-muted); white-space: nowrap; }
-  .project-rail-total { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; text-align: right; }
-  .project-rail-total-label { font-size: var(--configurator-muted); color: var(--muted); }
-  .project-rail-total-value { font-family: var(--font-display); font-size: 24px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .project-rail-total-value.is-manual { font-size: 17px; letter-spacing: -0.01em; }
-  .project-rail-cta {
-    min-height: 48px; padding: 0 26px; border: 0; border-radius: 999px; background: var(--accent); color: #fff;
-    font-family: var(--font-display); font-size: 14px; font-weight: 500; letter-spacing: -0.01em; cursor: pointer;
-    transition: background-color 0.2s ease;
-  }
-  .project-rail-cta:hover { background: var(--accent-hover); }
-  .project-rail-cta:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-  .project-rail-list {
-    list-style: none; margin: 0; padding: 2px 2px 10px; display: grid; grid-auto-flow: column; grid-auto-columns: 232px; gap: 14px;
-    overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: thin; scrollbar-color: var(--stone-line) transparent;
-  }
-  .project-tile { position: relative; scroll-snap-align: start; }
-  .project-tile-open {
-    width: 100%; height: 100%; display: flex; flex-direction: column; gap: 12px; padding: 6px 6px 16px; text-align: left; cursor: pointer;
-    border: 1px solid var(--line); border-radius: 16px; background: var(--card); color: var(--ink); font: inherit;
-    transition: border-color 0.2s ease, box-shadow 0.25s ease;
-  }
-  .project-tile-open:hover { border-color: var(--stone-line); }
-  .project-tile-open:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .project-tile-scene { position: relative; display: block; aspect-ratio: 3 / 2; border-radius: 11px; overflow: hidden; background: var(--dark-bg); }
-  .project-tile-scene svg { display: block; width: 100%; height: 100%; }
-  .project-tile-scene.is-empty { display: grid; place-items: center; padding: 0 12px; text-align: center; border: 1px dashed rgba(233, 231, 225, 0.22); background: #262c28; color: var(--dark-text-muted); font-size: var(--configurator-muted); }
-  .project-tile-badge {
-    position: absolute; left: 10px; top: 10px; padding: 4px 9px; border-radius: 999px;
-    background: rgba(22, 26, 23, 0.72); color: var(--dark-text); font-size: 11.5px; font-weight: 600; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
-  }
-  .project-tile-body { flex: 1 1 auto; display: flex; flex-direction: column; gap: 6px; padding: 0 8px; min-width: 0; }
-  .project-tile-name { font-size: var(--configurator-text); font-weight: 700; line-height: 1.3; }
-  .project-tile-num { margin-right: 6px; color: var(--muted); font-variant-numeric: tabular-nums; }
-  .project-tile-stone { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: var(--configurator-muted); color: var(--muted); }
-  .project-tile-stone span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .project-swatch { flex: none; width: 18px; height: 18px; border-radius: 50%; background: var(--stone) center / cover no-repeat; box-shadow: inset 0 0 0 1px rgba(28, 29, 27, 0.14); }
-  .project-swatch.is-empty { background: none; box-shadow: inset 0 0 0 1px currentColor; opacity: 0.45; }
-  .project-tile-sizes { font-size: var(--configurator-muted); color: var(--muted); font-variant-numeric: tabular-nums; }
-  .project-tile-price { margin-top: auto; padding-top: 8px; font-size: var(--configurator-text); font-weight: 700; font-variant-numeric: tabular-nums; }
-  .project-tile-price.is-manual { font-weight: 600; color: var(--muted); }
-  /* The one edited: a dark showcase, as the choice's cards. */
-  .project-tile.is-active .project-tile-open { border-color: transparent; background: var(--dark-bg); color: var(--dark-text); box-shadow: 0 22px 40px -28px rgba(20, 24, 21, 0.7); }
-  .project-tile.is-active .project-tile-num, .project-tile.is-active .project-tile-stone,
-  .project-tile.is-active .project-tile-sizes, .project-tile.is-active .project-tile-price.is-manual { color: var(--dark-text-muted); }
-  .project-tile.is-active .project-swatch { box-shadow: inset 0 0 0 1px rgba(233, 231, 225, 0.25); }
-  .project-tile-remove {
-    position: absolute; top: 12px; right: 12px; z-index: 1; width: 30px; height: 30px; display: grid; place-items: center; padding: 0;
-    border: 0; border-radius: 50%; background: rgba(22, 26, 23, 0.66); color: #e9e7e1; cursor: pointer;
-    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); opacity: 0; transition: opacity 0.2s ease, background-color 0.2s ease;
-  }
-  .project-tile-remove svg { width: 12px; height: 12px; }
-  .project-tile:hover .project-tile-remove, .project-tile-remove:focus-visible { opacity: 1; }
-  .project-tile-remove:hover { background: rgba(22, 26, 23, 0.9); }
-  @media (hover: none) { .project-tile-remove { opacity: 1; } }
-  .project-tile-add {
-    width: 100%; height: 100%; min-height: 250px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
-    border: 1.5px dashed var(--stone-line); border-radius: 16px; background: none; color: var(--ink); font: inherit; font-weight: 600; cursor: pointer;
-    transition: border-color 0.2s ease, background-color 0.2s ease;
-  }
-  .project-tile-add-plus { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--accent); color: var(--accent); transition: background-color 0.2s ease, color 0.2s ease; }
-  .project-tile-add-plus svg { width: 16px; height: 16px; }
-  .project-tile-add:hover { border-color: var(--accent); background: rgba(42, 84, 70, 0.04); }
-  .project-tile-add:hover .project-tile-add-plus { background: var(--accent); color: #fff; }
-  .project-tile-add:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .project-rail-extras { display: flex; flex-wrap: wrap; gap: 4px 22px; margin-top: 10px; font-size: var(--configurator-muted); color: var(--muted); }
-  .project-rail-extras[hidden] { display: none; }
-  .project-rail-extras b { font-weight: 600; color: var(--ink); }
-  @media (max-width: 640px) {
-    .project-rail { margin-bottom: 28px; }
-    .project-rail-head { align-items: center; gap: 12px 16px; }
-    .project-rail-titles { flex-basis: 100%; }
-    .project-rail-title { font-size: 19px; }
-    .project-rail-total { flex: 1 1 auto; align-items: flex-start; text-align: left; }
-    .project-rail-total-value { font-size: 20px; }
-    .project-rail-total-value.is-manual { font-size: 15px; }
-    .project-rail-cta { min-height: 44px; padding: 0 20px; font-size: 13px; }
-    /* The row runs to the screen's edges and scrolls sideways. */
-    .project-rail-list { grid-auto-columns: 158px; gap: 10px; margin: 0 -20px; padding: 2px 20px 10px; scroll-padding: 0 20px; }
-    .project-tile-open { padding: 5px 5px 12px; gap: 10px; border-radius: 14px; }
-    .project-tile-scene { border-radius: 9px; }
-    .project-tile-body { padding: 0 6px; gap: 5px; }
-    .project-tile-name { font-size: 13.5px; }
-    .project-tile-stone, .project-tile-sizes { font-size: 12px; }
-    .project-tile-price { font-size: 13.5px; }
-    .project-tile-badge { left: 7px; top: 7px; padding: 3px 7px; font-size: 10.5px; }
-    .project-tile-remove { top: 9px; right: 9px; width: 28px; height: 28px; }
-    .project-tile-add { min-height: 200px; font-size: 13.5px; }
-  }
-  .result-project[hidden] { display: none; }
-  .result-project { margin-top: 28px; }
   .viewer-controls .viewer-swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--dark-bg-2), 0 0 0 3px var(--dark-accent); }
   /* AR «Поставить у себя в комнате»: only on a phone or tablet where AR works
      (WebglSupport.arMode) -- the main action there, so a wide button of its own. */
@@ -543,8 +437,8 @@
 
   /* Тип изделия: карточка = мини-сцена изделия + подпись. Концепт
      «Интерьер» (владелец, 2026-10-21): изделие в углу тёмной комнаты, тёплый
-     свет, у камня рисунок мрамора. Сейчас картинки -- рендер «Люкс» (см.
-     PRODUCT_ICONS); одна студия и один ракурс, поэтому читаются как одна
+     свет, у камня рисунок мрамора. Все сцены в одном viewBox 120x80 и одной
+     изометрии (scripts/gen_product_icons.py), поэтому читаются как одна
      серия. Выбор -- по-прежнему radio + :has(); hover/selected меняют
      только цвет рамки/тени и свет внутри сцены, но не размеры карточки. */
   /* Фиксированное число колонок вместо auto-fill: 9 карточек ложатся ровно
@@ -552,100 +446,6 @@
   .product-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   @media (min-width: 560px) { .product-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
   @media (min-width: 1100px) { .product-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
-  /* The cards' rendered pictures («Люкс», 2026-11-18): the studio's black while one loads. */
-  .product-card .product-card-scene { --ps-bg: #0d0c0b; }
-  .mode-card-scene, .project-tile-scene { background: #0d0c0b; }
-  /* «Что будем считать?» (the owner, 2026-11-18): the whole page, two big cards. */
-  .mode-choice[hidden], .mode-choice-new[hidden] { display: none; }
-  body.choosing-mode .configurator, body.choosing-mode .wrap > h1:not(.mode-choice-title), body.choosing-mode .wrap > .subtitle { display: none; }
-  /* Everything in the middle of the page (the owner, 2026-11-18); two cards side by side on a phone too.
-     «Витрина» (the owner's pick of three, 2026-11-18): each card a dark showcase -- the picture to the
-     edges, melting into the card, the text in the light under it. */
-  .mode-choice { max-width: 1040px; margin: 0 auto; padding: 8px 0 60px; text-align: center; }
-  .mode-choice .mode-choice-title { margin-bottom: 10px; }
-  .mode-choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin: 32px auto 0; }
-  .mode-card {
-    position: relative; display: flex; flex-direction: column; gap: 22px; padding: 0 0 26px; overflow: hidden;
-    text-align: center; cursor: pointer; font: inherit;
-    border: 0; border-radius: 20px; background: #0f0e0c; color: var(--dark-text);   /* the pictures' studio black */
-    box-shadow: 0 30px 60px -34px rgba(20, 24, 21, 0.55);
-    transition: box-shadow 0.25s ease;
-  }
-  /* The rim lies over the picture too (an inset shadow would be under it). */
-  .mode-card::before {
-    content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; border-radius: inherit;
-    box-shadow: inset 0 0 0 1px rgba(233, 231, 225, 0.07); transition: box-shadow 0.25s ease;
-  }
-  .mode-card:hover, .mode-card:focus-visible { outline: none; box-shadow: 0 36px 70px -34px rgba(20, 24, 21, 0.7); }
-  .mode-card:hover::before { box-shadow: inset 0 0 0 1px rgba(127, 166, 152, 0.6); }
-  .mode-card:focus-visible::before { box-shadow: inset 0 0 0 2px var(--dark-accent); }
-  /* The pictures: one scene, or a mosaic of three (a big one and two small) -- each tile cut from its
-     scene (slice), so no empty bands around a picture. */
-  .mode-card-scene {
-    position: relative; display: grid; gap: 2px; aspect-ratio: 3 / 2; overflow: hidden; background: #161a17;
-  }
-  .mode-card-scene[data-mode-scene="project"] { grid-template-columns: 2fr 1fr; grid-template-rows: 1fr 1fr; }
-  .mode-card-scene[data-mode-scene="project"] svg:first-child { grid-row: 1 / -1; }
-  .mode-card-scene svg { display: block; width: 100%; height: 100%; min-width: 0; min-height: 0; transition: transform 0.6s var(--pick-ease); transform-origin: 50% 70%; }
-  /* The picture melts into the card: no hard line between the room and the text. */
-  .mode-card-scene::before {
-    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 38%; z-index: 1; pointer-events: none;
-    background: linear-gradient(rgba(15, 14, 12, 0), #0f0e0c);
-  }
-  /* Warm light from above on hover (only the layer's opacity moves). */
-  .mode-card-scene::after {
-    content: ""; position: absolute; inset: 0; pointer-events: none;
-    background: radial-gradient(80% 70% at 50% 0%, rgba(240, 199, 149, 0.18), rgba(240, 199, 149, 0) 70%);
-    opacity: 0; transition: opacity 0.5s ease;
-  }
-  .mode-card:hover .mode-card-scene::after, .mode-card:focus-visible .mode-card-scene::after { opacity: 1; }
-  .mode-card:hover .mode-card-scene svg { transform: scale(1.03); }
-  .mode-card-text { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 0 16px; flex: 1 1 auto; }
-  .mode-card-title { font-family: var(--font-display); font-size: clamp(20px, 2vw, 28px); font-weight: 600; letter-spacing: -0.015em; line-height: 1.15; text-wrap: balance; }
-  .mode-card-desc { max-width: 30em; margin-bottom: 12px; color: var(--dark-text-muted); font-size: var(--configurator-text); line-height: 1.45; text-wrap: balance; }
-  .mode-card-cta {
-    display: inline-block; margin-top: auto; padding: 11px 22px; min-height: 44px; line-height: 20px; text-align: center;
-    border-radius: 999px; border: 1px solid rgba(233, 231, 225, 0.28); color: var(--dark-text);
-    font-size: 14px; font-weight: 600; letter-spacing: 0.005em; white-space: nowrap;
-    transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease;
-  }
-  .mode-card:hover .mode-card-cta, .mode-card:focus-visible .mode-card-cta { background: var(--dark-text); border-color: var(--dark-text); color: var(--dark-bg); }
-  @media (prefers-reduced-motion: reduce) {
-    .mode-card-scene svg { transition: none; }
-    .mode-card:hover .mode-card-scene svg { transform: none; }
-  }
-  .mode-choice-new {
-    margin-top: 22px; padding: 0; border: 0; background: none; color: var(--muted); font: inherit;
-    font-size: var(--configurator-text); text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
-  }
-  .mode-choice-new:hover { color: var(--ink); }
-  .mode-switch {
-    margin-left: auto; padding: 0; border: 0; background: none; color: var(--muted); font: inherit;
-    font-size: var(--configurator-muted); text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
-  }
-  .mode-switch:hover { color: var(--ink); }
-  /* A phone: the two cards stay side by side, as on a computer (the owner, 2026-11-18). */
-  @media (max-width: 640px) {
-    /* In the middle of the screen, a little above it (the owner, 2026-11-18): the room under the header,
-       the block centered in it, the extra bottom padding lifting it (less of it on a short screen, where
-       it would only make the page scroll). --mc-chrome is what the page keeps above and below the block
-       (the header, the page's top padding, the body's bottom padding): the script measures it (fitModeChoice);
-       146px is the same sum for a page that has not run it yet. */
-    .mode-choice {
-      display: flex; flex-direction: column; justify-content: center;
-      min-height: calc(100vh - var(--mc-chrome, 146px)); min-height: calc(100svh - var(--mc-chrome, 146px));
-      padding-bottom: clamp(40px, calc(100vh - 700px), 116px); padding-bottom: clamp(40px, calc(100svh - 700px), 116px);
-    }
-    .mode-choice-new { align-self: center; }
-    .mode-choice .mode-choice-title { font-size: 28px; }
-    .mode-choice-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 22px; }
-    .mode-card { padding: 0 0 14px; gap: 12px; border-radius: 14px; }
-    .mode-card-text { gap: 6px; padding: 0 10px; }
-    .mode-card-title { font-size: 16px; letter-spacing: -0.01em; }
-    .mode-card-desc { margin-bottom: 8px; font-size: 12px; line-height: 1.4; }
-    .mode-card-cta { display: block; width: 100%; padding: 9px 4px; min-height: 40px; font-size: 13px; letter-spacing: 0; }
-    .mode-card-cta-more { display: none; }   /* «Посчитать» / «Собрать»: the card's title says what */
-  }
   .product-card {
     position: relative;
     display: flex; flex-direction: column;
@@ -1455,8 +1255,6 @@
     @media (prefers-reduced-motion: no-preference) {
       .product-card:hover .product-card-scene > svg { transform: scale(1.035) perspective(2000px); }
       .stone-card:hover .stone-card-image img { transform: scale(1.06) perspective(2000px); }
-      /* The same for the scenes of «Что будем считать?» (the owner, 2026-11-18: «иконки дрожат»). */
-      .mode-card:hover .mode-card-scene svg { transform: scale(1.03) perspective(2000px); }
     }
   }
 
@@ -1746,57 +1544,12 @@
   </div>
 </header>
 <div class="wrap">
-  <!-- «Одно изделие» or «Проект» (the owner, 2026-11-18): the calculator opened on its own starts here. -->
-  <section class="mode-choice" id="modeChoice" hidden aria-labelledby="modeChoiceTitle">
-    <h1 class="mode-choice-title" id="modeChoiceTitle">Что будем считать?</h1>
-    <div class="mode-choice-grid">
-      <button type="button" class="mode-card" id="modeChoiceSingle">
-        <span class="mode-card-scene" data-mode-scene="single"></span>
-        <span class="mode-card-text">
-          <span class="mode-card-title">Одно изделие</span>
-          <span class="mode-card-desc">Столешница, подоконник, лестница или камин - одна вещь, одна цена</span>
-          <span class="mode-card-cta">Посчитать<span class="mode-card-cta-more"> изделие</span></span>
-        </span>
-      </button>
-      <button type="button" class="mode-card" id="modeChoiceProject">
-        <span class="mode-card-scene" data-mode-scene="project"></span>
-        <span class="mode-card-text">
-          <span class="mode-card-title">Проект</span>
-          <span class="mode-card-desc" id="modeChoiceProjectDesc">Несколько изделий в одной сцене, общая цена и одна заявка</span>
-          <span class="mode-card-cta" id="modeChoiceProjectCta">Собрать<span class="mode-card-cta-more"> проект</span></span>
-        </span>
-      </button>
-    </div>
-    <button type="button" class="mode-choice-new" id="modeChoiceNew" hidden>Начать новый проект</button>
-  </section>
-  <!-- A page opened on its own starts on the choice at once, not after the data loads (the owner,
-       2026-11-22: the product choice flashed first). A link naming a product, a stone or a passport/project
-       skips it, as chooseStartMode() does. -->
-  <script>
-    (function () {
-      var q = new URLSearchParams(location.search);
-      if (q.has('product') || q.has('stone') || q.has('pv')) return;
-      document.body.classList.add('choosing-mode');
-      document.getElementById('modeChoice').hidden = false;
-    })();
-  </script>
   <h1>Рассчитайте стоимость изделия</h1>
   <p class="subtitle">Ориентировочная стоимость за несколько секунд.</p>
-  <!-- The project's products over the calculator («Состав», the owner, 2026-11-18): a card each, the
-       one edited dark; a tap edits another; the total and the request beside them. -->
-  <section class="project-rail" id="projectBlock" hidden aria-labelledby="projectRailTitle">
-    <div class="project-rail-head">
-      <div class="project-rail-titles"><h2 class="project-rail-title" id="projectRailTitle">Изделия проекта</h2><span class="project-rail-count" id="projectCount"></span></div>
-      <div class="project-rail-total"><span class="project-rail-total-label">Стоимость проекта</span><span class="project-rail-total-value" id="projectRailTotal"></span></div>
-      <button type="button" class="project-rail-cta" id="projectRailCta">Получить расчёт</button>
-    </div>
-    <ol class="project-rail-list" id="projectList"></ol>
-    <div class="project-rail-extras" id="projectRailExtras" hidden></div>
-  </section>
 
   <div class="configurator">
     <section class="step">
-      <div class="step-head"><span class="step-num">1</span><h2 class="step-title">Тип изделия</h2><button type="button" class="mode-switch" id="modeSwitch">Сменить режим</button></div>
+      <div class="step-head"><span class="step-num">1</span><h2 class="step-title">Тип изделия</h2></div>
       <div class="field">
         <label id="productLabel" class="visually-hidden-label">Тип изделия</label>
         <div class="product-grid" id="productGrid" role="radiogroup" aria-labelledby="productLabel"></div>
@@ -2423,19 +2176,11 @@
           <p class="lead-note">Откроется заявка на расчёт, изделие уже будет в ней.</p>
           <div class="result-secondary">
             <button type="button" class="lead-secondary-btn passport-btn" id="passportBtn">Скачать паспорт</button>
-            <!-- The project (2026-11-17): the next product, straight from the Result. -->
-            <button type="button" class="lead-secondary-btn" id="resultAddBtn">+ Добавить изделие</button>
             <!-- The same product in the site's 3D house. A plain link (URL contract only). -->
             <a class="result-showroom-link" id="resultShowroomLink" href="#" hidden>Посмотреть в доме <span aria-hidden="true">→</span></a>
           </div>
           <p class="passport-error" id="passportError" hidden>Не удалось подготовить паспорт, попробуйте ещё раз</p>
 
-        </div>
-
-        <!-- The project (2026-11-17): the stones, the lines charged once, the total. Its products are
-             the cards over the calculator («Состав», 2026-11-18), with their prices and a way back. -->
-        <div class="result-built result-project" id="resultProject" hidden>
-          <dl class="result-lines" id="resultProjectLines"></dl>
         </div>
 
         <details class="result-price-parts" id="resultPriceParts">
@@ -2474,8 +2219,6 @@
                 <div class="viewer-canvas-wrap">
                   <canvas id="viewerCanvas"></canvas>
                 </div>
-                <!-- The project (2026-11-17): «Весь проект» and a button for each product -- a tap makes it the one edited. -->
-                <div class="viewer-controls viewer-project" id="viewerProject" role="group" aria-label="Изделия проекта" hidden></div>
                 <div class="viewer-controls">
                   <button type="button" data-view="top">Сверху</button>
                   <button type="button" data-view="front">Спереди</button>
@@ -2511,7 +2254,7 @@
 
             <div class="summary-info">
               <div>
-                <div class="result-label" id="priceLabel">Ориентировочная стоимость</div>
+                <div class="result-label">Ориентировочная стоимость</div>
                 <div class="result-price placeholder" id="priceOut">Выберите тип изделия, материал и размеры, чтобы увидеть расчёт</div>
                 <p class="price-note" id="priceRegionNote">* Расчёт указан для объектов, находящихся в Москве и Московской области</p>
                 <div class="warning-box" id="warningOut" style="display:none"></div>
@@ -2520,7 +2263,6 @@
                 <div class="info-block" id="infoBlock">Цена за весь слэб; остаток хранится на складе, его можно забрать.</div>
               </div>
               <div>
-                <button type="button" class="project-add" id="projectAddBtn" hidden>+ Добавить изделие</button>
                 <button class="cta-btn" id="ctaBtn">Получить расчёт</button>
                 <div class="disclaimer" id="updatedAtOut"></div>
               </div>
@@ -2602,7 +2344,7 @@
 <script src="/sayanmramor-site/js/offer-handoff.js"></script>
 <script src="transition-layer.js?v=9687eaa7"></script>
 <script src="constructor-state.js?v=d27799d7"></script>
-<script src="visualizer/constants.js?v=6bbb4bc2"></script>
+<script src="visualizer/constants.js?v=6bc5cd23"></script>
 <script src="visualizer/cutout-geometry.js?v=bf2f8360"></script>
 <script src="visualizer/attachment-geometry.js?v=18c7db98"></script>
 <script src="visualizer/geometry-model.js?v=dfd4ea76"></script>
@@ -2613,35 +2355,22 @@
 <script src="visualizer/room-layout.js?v=071f4d13"></script>
 <script src="visualizer/dimensions-3d.js?v=3f42235f"></script>
 <script src="visualizer/scene-layout.js?v=4bb239a3"></script>
-<script src="visualizer/project-layout.js?v=f2b025b1"></script>
 <script src="edge-length.js?v=d8830f9d"></script>
-<script src="project-pricing.js?v=242c15e2"></script>
 <script src="visualizer/camera-framing.js?v=db6de54c"></script>
 <script src="visualizer/webgl-support.js?v=014e10bd"></script>
 <script src="visualizer/camera-preset-tracker.js?v=6235ae21"></script>
 <script src="url-bootstrap.js?v=d580d613"></script>
 <script src="passport-link.js?v=f148d340"></script>
-<script src="passport-model.js?v=66c7942d"></script>
-<script src="passport-pdf.js?v=de04eb04"></script>
-<script src="project-model.js?v=b1becc52"></script>
+<script src="passport-model.js?v=44779720"></script>
+<script src="passport-pdf.js?v=880d1d48"></script>
 <!-- IMPORTMAP -->
-<script type="importmap">{"imports":{"./visualizer/ar-view.js":"./visualizer/ar-view.js?v=49e075d1","./visualizer/three-scene.js":"./visualizer/three-scene.js?v=8f92c8bb"}}</script>
+<script type="importmap">{"imports":{"./visualizer/ar-view.js":"./visualizer/ar-view.js?v=49e075d1","./visualizer/three-scene.js":"./visualizer/three-scene.js?v=4e4b5ead"}}</script>
 <!-- /IMPORTMAP -->
-<script type="module" src="visualizer/three-scene.js?v=8f92c8bb"></script>
+<script type="module" src="visualizer/three-scene.js?v=4e4b5ead"></script>
 <script>
   const { PRODUCTS, hasAdditionalWork } = ProductTypes;
   const { getSubcategoriesForProduct, getAdditionalWorkRate } = RateCatalog;
 
-  // Картинки карточек изделий («Люкс», владелец, 2026-11-18): изделие в почти чёрной студии на глянцевом
-  // полу, тёплая LED-подсветка там, где её ставят на деле, мрамор из каталога. Их рисует scripts/icon-studio
-  // (studio.html + render.py): icons/products/lux/<изделие>.webp, у каждого изделия своя картинка 3:2.
-  // PRODUCT_ICONS_V -- хэш картинок (node scripts/stamp_assets.js): перерисованная картинка -- новый адрес,
-  // и браузер с кэшем не покажет старую.
-  const PRODUCT_ICONS_V = '7139b454';
-  const PRODUCT_ICON_KEYS = ['lestnitsa', 'panno', 'podokonnik', 'pol', 'stena', 'fasad',
-    'stoleshnitsa_vannaya', 'stoleshnitsa_kuhnya', 'stupeni', 'kaminy'];
-  const PRODUCT_ICONS = Object.fromEntries(PRODUCT_ICON_KEYS.map(k => [k,
-    '<image href="icons/products/lux/' + k + '.webp?v=' + PRODUCT_ICONS_V + '" width="120" height="80" preserveAspectRatio="xMidYMid slice"/>']));
   // Типы изделий -- что выбирает клиент: чистое название, короткое пояснение
   // и иконка в общей сетке (viewBox 64x40, ось x = 32). `ids` -- строки
   // PRODUCT_SUBCATEGORIES (rate-catalog.js, таблица v2); у лестницы тип --
@@ -2650,28 +2379,6 @@
   // выбором клиента (STAIR-11 -- площадка между маршами), здесь не показывается.
   // Объявлено здесь, а не рядом с renderSubcategoryOptions(): URL-bootstrap
   // ниже синхронно выбирает изделие и доходит до этих данных.
-  // A product's picture as an <svg> of its own (the mode choice and the project's cards show it).
-  // zoom (> 1): the picture a little farther away in the same frame (the project card's kitchen, the owner,
-  // 2026-11-22) -- the frame shows more of it; the bands above and below it are the picture's own top and
-  // bottom edge drawn out (its backdrop is lighter in the middle, darker at the sides, so no flat colour matches).
-  let sceneBandSeq = 0;
-  function productSceneSvg(key, zoom) {
-    const z = zoom || 1, w = 120 * z, h = 80 * z, band = (h - 80) / 2;
-    const box = ((120 - w) / 2) + ' ' + (-band) + ' ' + w + ' ' + h;
-    const icon = PRODUCT_ICONS[key] || '';
-    let bands = '';
-    if (band > 0 && icon) {
-      const id = 'scene-band-' + (++sceneBandSeq);
-      const href = icon.match(/href="([^"]+)"/)[1];
-      // One unit (1/80) of the picture's edge stretched over the band.
-      const tall = 80 * band;
-      bands = '<defs><clipPath id="' + id + '-t"><rect x="-200" y="' + (-band) + '" width="520" height="' + band + '"/></clipPath>' +
-        '<clipPath id="' + id + '-b"><rect x="-200" y="80" width="520" height="' + band + '"/></clipPath></defs>' +
-        '<image href="' + href + '" x="0" y="' + (-band) + '" width="120" height="' + tall + '" preserveAspectRatio="none" clip-path="url(#' + id + '-t)"/>' +
-        '<image href="' + href + '" x="0" y="' + (80 + band - tall) + '" width="120" height="' + tall + '" preserveAspectRatio="none" clip-path="url(#' + id + '-b)"/>';
-    }
-    return '<svg viewBox="' + box + '" preserveAspectRatio="xMidYMid slice" aria-hidden="true">' + bands + icon + '</svg>';
-  }
   function typeIcon(inner) {
     return '<svg viewBox="0 0 64 40" aria-hidden="true">' + inner + '</svg>';
   }
@@ -3533,8 +3240,6 @@
       document.querySelectorAll('.viewer-room [data-room]').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
       window.ThreeScene.setRoom({ mode: viewerRoomMode });
       updateViewerRoom();
-      // A project's buttons: a room is the active product's alone (renderViewerProject).
-      renderViewerProject();
     }));
     facades.querySelectorAll('[data-facade]').forEach(btn => btn.addEventListener('click', () => {
       facades.querySelectorAll('[data-facade]').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
@@ -3688,10 +3393,10 @@
 
     const scene = document.createElement('span');
     scene.className = 'product-card-scene';
-    // The drawn pictures (product-icons.js, the owner, 2026-11-22); the rendered one for a product without one.
+    // The drawn pictures (product-icons.js, the owner, 2026-11-22/23).
     ProductIcons.install();
     scene.innerHTML =
-      (ProductIcons.svg(key) || '<svg viewBox="0 0 120 80" aria-hidden="true">' + (PRODUCT_ICONS[key] || '') + '</svg>') +
+      ProductIcons.svg(key) +
       '<span class="product-card-check" aria-hidden="true"><svg viewBox="0 0 12 12"><path d="M2.5 6.2L5 8.5L9.5 3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>';
 
     const text = document.createElement('span');
@@ -3736,11 +3441,7 @@
   }
   const passportInitial = new Map(passportFieldControls().map(el => [el.id, { value: el.value, checked: el.checked }]));
   const bootstrapParams = new URLSearchParams(window.location.search);
-  // A project's link (pv=2, the owner, 2026-11-17) opens the whole project; a passport link (pv=1) one product.
-  // A product the calculator offers -- a stored project or a link with another one leaves it out.
-  const isKnownProduct = key => !!(PRODUCTS[key] && !PRODUCTS[key].configuratorHidden);
-  const projectLink = ProjectModel.readProjectQuery(bootstrapParams, passportFieldControls().map(el => el.id), isKnownProduct);
-  const passportLink = projectLink ? null : PassportLink.readPassportQuery(bootstrapParams, passportFieldControls().map(el => el.id));
+  const passportLink = PassportLink.readPassportQuery(bootstrapParams, passportFieldControls().map(el => el.id));
   const initialProductKey = UrlBootstrap.resolveInitialProductKey(bootstrapParams.get('product'), PRODUCTS);
   if (initialProductKey) {
     const initialProductInput = productGrid.querySelector('input[value="' + initialProductKey + '"]');
@@ -3775,15 +3476,7 @@
       if (initialStoneId && !stoneGone) handleMaterialSelected(initialStoneId);
       document.getElementById('stoneGoneNote').hidden = !stoneGone;
       calculate();
-      if (passportLink && selectedProductKey) openPassportStep();
-      if (projectLink) {
-        project = projectLink;
-        projectOwned = true;
-        loadItem(project.items[project.active]);
-        if (selectedProductKey) openPassportStep();
-      }
-      chooseStartMode();
-      if ((passportLink || projectLink) && selectedProductKey) landOnProduct();
+      if (passportLink && selectedProductKey) { openPassportStep(); landOnProduct(); }
     })
     .catch(() => {
       materialField.disabled = true;
@@ -4780,11 +4473,7 @@
   // (constructor state + pricing outcome) for the Result screen.
   function calculate() {
     if (!DATA_LOADED) return;
-    // A product of the project being loaded into the form: once, when it is all in (loadItem).
-    if (projectSwitching) return;
-    sceneUpdatedThisCalc = false;
     lastCalcSnapshot = computeAndRenderSummary();
-    syncProject();
     if (currentStepId === 'review') renderResult();
   }
 
@@ -4815,19 +4504,6 @@
     const caps = state.product && state.product.capabilities;
     if (!(caps && caps.supportsEdgeWork && state.edge && state.edge.type)) return 0;
     return EdgeLength.openEdgeLengthM(SceneLayout.buildSceneLayout(GeometryModel.buildGeometryModel(state)));
-  }
-
-  // The 3D's buttons for the product on screen (edge, rooms, AR, sizes) -- after a new model, or none.
-  function updateViewerButtons() {
-    document.getElementById('viewerEdge').hidden = !window.ThreeScene.canShowEdge();
-    updateViewerRoom();
-    updateViewerAr();
-    const dimsBtn = document.getElementById('viewerDims');
-    dimsBtn.hidden = !window.ThreeScene.canShowDimensions();
-    if (dimsBtn.hidden && dimsBtn.getAttribute('aria-pressed') === 'true') {
-      dimsBtn.setAttribute('aria-pressed', 'false');
-      window.ThreeScene.setDimensions(false);
-    }
   }
 
   // Returns { state, outcome } -- outcome.kind is 'incomplete' | 'manual' |
@@ -4889,12 +4565,16 @@
     if (viewerReady) {
       const geometryModel = GeometryModel.buildGeometryModel(constructorState);
       const materialDescriptor = MaterialAdapter.resolveMaterial(constructorState.stone, constructorState.bookmatchMode);
-      // Another product of the project became the one edited: it is shown at once, not eased from the one before.
-      const activeId = project ? project.items[project.active].id : null;
-      window.ThreeScene.update(geometryModel, materialDescriptor, { instant: sceneActiveId !== null && activeId !== sceneActiveId });
-      sceneActiveId = activeId;
-      sceneUpdatedThisCalc = true;
-      updateViewerButtons();
+      window.ThreeScene.update(geometryModel, materialDescriptor);
+      document.getElementById('viewerEdge').hidden = !window.ThreeScene.canShowEdge();
+      updateViewerRoom();
+      updateViewerAr();
+      const dimsBtn = document.getElementById('viewerDims');
+      dimsBtn.hidden = !window.ThreeScene.canShowDimensions();
+      if (dimsBtn.hidden && dimsBtn.getAttribute('aria-pressed') === 'true') {
+        dimsBtn.setAttribute('aria-pressed', 'false');
+        window.ThreeScene.setDimensions(false);
+      }
     }
 
     if (!selectedProductKey) {
@@ -5316,8 +4996,8 @@
       if (group && group.style.display === 'none') return;
       if (el.dataset.needs && !(parseFloat(document.getElementById(el.dataset.needs).value) > 0)) return;
       if (el.dataset.cleared === '1') return;
+      if (el.value !== '' && el.value !== (el.dataset.autoValue || '')) return;
       const next = auto[el.dataset.autoLength] > 0 ? String(auto[el.dataset.autoLength]) : '';
-      if (el.value !== '' && el.value !== (el.dataset.autoValue || '') && el.value !== next) return;
       el.value = next;
       el.dataset.autoValue = next;
     });
@@ -5490,627 +5170,6 @@
   ['wing-width', 'wing-length'].forEach(id => document.getElementById(id).addEventListener('input', () => { updateDimDiagram(); calculate(); }));
   shapeCornerSelect.addEventListener('change', () => { updateDimDiagram(); calculate(); });
 
-  // ===== Проект: несколько изделий в одном расчёте (владелец, 2026-11-17) =====
-  // The form edits one product, the active one; every product of the project is a snapshot of its
-  // choices (ProjectModel -- as a passport link keeps them). Another product is loaded into the form
-  // through the same controls a click uses (restorePassportChoices), the form first back to the page's
-  // own start (resetFormToInitial) -- so nothing of one product leaks into another. The 3D shows the
-  // others beside it (ThreeScene.setCompanions). The project is kept in the browser.
-  // `var`: calculate() may run before this part of the script has (DATA_LOADED guards it, but not a TDZ).
-  const PROJECT_STORE_KEY = 'sayan-calc-project';
-  // Hidden fields the page keeps equal to a visible one: a snapshot has the visible one only.
-  const PROJECT_MIRRORS = { 'step-count': 'stepCountInput', 'facade-quantity': 'facadeQtyInput' };
-  var project = null;
-  var projectOwned = false;   // this page built or opened a project of several products: it may store it
-  var projectSwitching = false;
-  var sceneUpdatedThisCalc = false;
-  var sceneActiveId = null;
-  var viewingAll = false;
-  const projectBlock = document.getElementById('projectBlock');
-  const projectList = document.getElementById('projectList');
-  const projectCount = document.getElementById('projectCount');
-  const projectAddBtn = document.getElementById('projectAddBtn');
-  const viewerProject = document.getElementById('viewerProject');
-  // Every control as the page starts -- what a snapshot leaves out (ProjectModel.snapshotDoc).
-  const PROJECT_INITIAL = {};
-  passportFieldControls().forEach(control => {
-    const start = passportInitial.get(control.id);
-    if (start) PROJECT_INITIAL[control.id] = { value: start.value, checked: start.checked, type: control.type };
-  });
-  const itemCache = new Map();   // id -> { sig, state, geometryModel, materialDescriptor }
-
-  function itemTitle(item) {
-    return item.productKey ? (PassportModel.PASSPORT_TITLES[item.productKey] || PRODUCTS[item.productKey].label) : 'Новое изделие';
-  }
-
-  // The active product's choices, as a snapshot.
-  function captureActiveItem() {
-    const controls = passportFieldControls().map(control => {
-      const initial = passportInitial.get(control.id) || { value: '', checked: false };
-      return { id: control.id, type: control.type, value: control.value, checked: control.checked, defaultValue: initial.value, defaultChecked: initial.checked };
-    });
-    return { productKey: selectedProductKey, stoneId: selectedStoneId, fields: PassportLink.collectFields(controls), stepId: currentStepId };
-  }
-
-  // A product not being edited, as the price and the 3D read it -- from its snapshot.
-  function itemComputed(item) {
-    if (!item.productKey) return null;
-    const sig = JSON.stringify([item.productKey, item.stoneId, item.fields]);
-    const hit = itemCache.get(item.id);
-    if (hit && hit.sig === sig) return hit;
-    const stone = item.stoneId ? STONES_BY_ID[item.stoneId] || null : null;
-    const state = ConstructorState.readConstructorState({
-      doc: ProjectModel.snapshotDoc(item.fields, PROJECT_INITIAL, PROJECT_MIRRORS), selectedProductKey: item.productKey,
-      product: PRODUCTS[item.productKey], stone, hasAdditionalWork,
-    });
-    const geometryModel = ProjectPricing.sizesReady(state) ? GeometryModel.buildGeometryModel(state) : null;
-    const materialDescriptor = geometryModel ? MaterialAdapter.resolveMaterial(state.stone, state.bookmatchMode) : null;
-    const entry = { sig, state, geometryModel, materialDescriptor };
-    itemCache.set(item.id, entry);
-    return entry;
-  }
-
-  // A page opened for one product (a site link, a passport) never writes over a stored project of
-  // several: only a project this page built or opened is stored (projectOwned).
-  function storeProject() {
-    // One product (calcMode 'single'): as on the site, nothing is kept in the browser.
-    if (calcMode !== 'project') return;
-    if (project.items.length > 1) projectOwned = true;
-    try {
-      if (!projectOwned) {
-        const stored = ProjectModel.deserialize(localStorage.getItem(PROJECT_STORE_KEY), isKnownProduct);
-        if (stored && stored.items.length > 1) return;
-      }
-      localStorage.setItem(PROJECT_STORE_KEY, ProjectModel.serialize(project));
-    } catch (e) { /* the project still works on the page */ }
-  }
-
-  // After every calculation: the active product's snapshot, the list, the 3D, the browser's copy.
-  function syncProject() {
-    if (!project) {
-      if (!selectedProductKey) return;
-      project = ProjectModel.createProject(Object.assign({ id: ProjectModel.newItemId() }, captureActiveItem()));
-    } else {
-      project = ProjectModel.updateItem(project, project.active, captureActiveItem());
-    }
-    storeProject();
-    priceProjectNow();
-    renderProjectBlock();
-    renderProjectPricing();
-    renderViewerProject();
-    updateProjectScene();
-  }
-
-  function updateProjectScene() {
-    if (!viewerReady || !window.ThreeScene || !window.ThreeScene.setCompanions || !project) return;
-    // A product with no model yet (a new one being chosen): no stale one left on screen.
-    if (project.items.length > 1 && !sceneUpdatedThisCalc) {
-      window.ThreeScene.clearActive();
-      updateViewerButtons();
-    }
-    const list = project.items.map((item, i) => {
-      if (i === project.active) return { key: item.id };
-      const c = itemComputed(item);
-      return { key: item.id, geometryModel: c && c.geometryModel, materialDescriptor: c && c.materialDescriptor };
-    });
-    window.ThreeScene.setCompanions(list, project.active, project.items[project.active].id);
-  }
-
-  // The project's products as cards over the calculator («Состав», the owner, 2026-11-18), from the
-  // first product on: a project of one is a project too. A tap edits a product; × takes it out (there
-  // is no × while it is the only one).
-  const projectRailTotal = document.getElementById('projectRailTotal');
-  const projectRailExtras = document.getElementById('projectRailExtras');
-  const ICON_X = '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
-  const ICON_PLUS = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v12M2 8h12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
-
-  // A project of one product is priced on its own here (priceProjectNow prices two and more).
-  function railPricing(items) {
-    if (items.length > 1) return projectPricing;
-    const live = lastCalcSnapshot && lastCalcSnapshot.state;
-    if (!live || !live.product) return null;
-    try { return ProjectPricing.priceProject([live]); } catch (e) { return null; }
-  }
-
-  function projectItemView(item, i, pricing) {
-    const stone = item.stoneId ? STONES_BY_ID[item.stoneId] : null;
-    const c = itemComputed(item);
-    const price = item.productKey ? itemPriceText(pricing, i) : 'не заполнено';
-    return {
-      title: itemTitle(item), productKey: item.productKey, active: i === project.active,
-      stoneName: stone ? stone.name : 'Камень не выбран', stoneImage: stone && stone.image ? 'data/' + stone.image : '',
-      // the sizes never broken over two lines («2400 × 600» and «мм» apart)
-      sizes: itemSizesText(c && c.state).replace(/ /g, String.fromCharCode(160)), price, priced: !!item.productKey && itemIsPriced(pricing, i),
-    };
-  }
-
-  function projectSwatch(v) {
-    const sw = el('span', 'project-swatch' + (v.stoneImage ? '' : ' is-empty'));
-    if (v.stoneImage) sw.style.backgroundImage = 'url("' + v.stoneImage + '")';
-    return sw;
-  }
-
-  function projectRemoveButton(v, i) {
-    const remove = el('button', 'project-tile-remove');
-    remove.type = 'button';
-    remove.innerHTML = ICON_X;
-    remove.setAttribute('aria-label', 'Убрать «' + v.title + '» из проекта');
-    remove.title = 'Убрать из проекта';
-    remove.addEventListener('click', () => removeProjectItem(i));
-    return remove;
-  }
-
-  function renderProjectBlock() {
-    const items = project ? project.items : [];
-    const inProject = calcMode === 'project' && items.length > 0;
-    projectAddBtn.hidden = calcMode !== 'project' || !selectedProductKey;
-    projectBlock.hidden = !inProject;
-    if (!inProject) return;
-    const pricing = railPricing(items);
-    const views = items.map((item, i) => projectItemView(item, i, pricing));
-    const canRemove = items.length > 1;
-    const canAdd = !!selectedProductKey;
-    projectCount.textContent = items.length + ' ' + plural(items.length, 'изделие', 'изделия', 'изделий');
-
-    // A card each: the product's scene, its name, its stone and sizes, its price; the one edited dark.
-    const tiles = views.map((v, i) => {
-      const li = el('li', 'project-tile' + (v.active ? ' is-active' : ''));
-      const open = el('button', 'project-tile-open');
-      open.type = 'button';
-      if (v.active) open.setAttribute('aria-current', 'true');
-      const scene = el('span', 'project-tile-scene' + (v.productKey ? '' : ' is-empty'));
-      if (v.productKey) scene.innerHTML = productSceneSvg(v.productKey);
-      else scene.textContent = 'Выберите тип изделия';
-      if (v.active) scene.appendChild(el('span', 'project-tile-badge', 'Редактируется'));
-      const body = el('span', 'project-tile-body');
-      const name = el('span', 'project-tile-name');
-      name.append(el('span', 'project-tile-num', String(i + 1)), document.createTextNode(v.title));
-      const stoneLine = el('span', 'project-tile-stone');
-      stoneLine.append(projectSwatch(v), el('span', null, v.stoneName));
-      body.append(name, stoneLine);
-      if (v.sizes) body.appendChild(el('span', 'project-tile-sizes', v.sizes));
-      body.appendChild(el('span', 'project-tile-price' + (v.priced ? '' : ' is-manual'), v.price));
-      open.append(scene, body);
-      open.addEventListener('click', () => switchToItem(i));
-      li.appendChild(open);
-      if (canRemove) li.appendChild(projectRemoveButton(v, i));
-      return li;
-    });
-    if (canAdd) {
-      const li = el('li', 'project-tile');
-      const add = el('button', 'project-tile-add');
-      add.type = 'button';
-      add.innerHTML = '<span class="project-tile-add-plus">' + ICON_PLUS + '</span><span>Добавить изделие</span>';
-      add.addEventListener('click', addProjectItem);
-      li.appendChild(add);
-      tiles.push(li);
-    }
-    projectList.replaceChildren(...tiles);
-    const total = !pricing ? { text: 'Заполните изделие', manual: true }
-      : pricing.kind === 'ok' ? { text: '≈ ' + formatRub(pricing.total), manual: false }
-      : pricing.kind === 'manual' ? { text: 'Уточнит менеджер', manual: true }
-      : { text: 'Заполните все изделия', manual: true };
-    projectRailTotal.textContent = total.text;
-    projectRailTotal.classList.toggle('is-manual', total.manual);
-    const reason = pricing && pricing.kind === 'manual' ? projectReasonText(pricing) : '';
-    const extras = (reason ? [el('span', null, reason)] : []).concat((pricing ? projectExtraLines(pricing) : []).map(line => {
-      const span = el('span', null, line.label + ': ');
-      span.appendChild(el('b', null, line.value));
-      return span;
-    }));
-    projectRailExtras.replaceChildren(...extras);
-    projectRailExtras.hidden = !extras.length;
-  }
-
-  function renderViewerProject() {
-    const items = project ? project.items : [];
-    // A room shows the active product alone: «Весь проект» is not pressed there.
-    const studioOn = document.querySelector('.viewer-room-modes [data-room="studio"]');
-    if (studioOn && studioOn.getAttribute('aria-pressed') !== 'true') viewingAll = false;
-    viewerProject.hidden = items.length < 2;
-    if (items.length < 2) return;
-    viewerProject.innerHTML = '';
-    const button = (text, pressed, onClick) => {
-      const b = el('button', '', text);
-      b.type = 'button';
-      b.setAttribute('aria-pressed', String(pressed));
-      b.addEventListener('click', onClick);
-      viewerProject.appendChild(b);
-    };
-    button('Весь проект', viewingAll, () => {
-      viewingAll = true;
-      // The whole project stands in «Студия»: a room shows the active product alone.
-      const studio = document.querySelector('.viewer-room-modes [data-room="studio"]');
-      if (studio && studio.getAttribute('aria-pressed') !== 'true') studio.click();
-      if (viewerReady) window.ThreeScene.focusProject();
-      renderViewerProject();
-    });
-    // The other products are a tap away in the project's list; here only the one edited (2026-11-18).
-    button((project.active + 1) + '. ' + itemTitle(project.items[project.active]), !viewingAll, () => switchToItem(project.active));
-  }
-
-  // The form back to the page's own start: every card-driven choice through its own control, every
-  // other field to the value it had when the page opened, no stone.
-  function resetFormToInitial() {
-    if (selectedEdgeType) {
-      const card = edgeCardGrid.querySelector('[data-edge-type="' + selectedEdgeType + '"]');
-      if (card) card.click();
-    }
-    SINK_VARIANTS.forEach(v => { if (parseFloat(sinkFieldFor(v).value) > 0) selectSinkVariant(v); });
-    document.querySelectorAll('#countertopExtras [data-toggle-field]').forEach(card => {
-      const input = document.getElementById(card.dataset.toggleField);
-      if (input && parseFloat(input.value) > 0) card.click();
-    });
-    wingRowsAll.forEach(row => clearWingRow(row));
-    // The per-product memories: the count of steps, a facade's / fireplace's sizes and quantity by type.
-    [facadeFormByType, fireplaceFormByType, facadeQtyByType, facadeSizesByType, fireplaceSizesByType, stepCountByProduct].forEach(map => {
-      Object.keys(map).forEach(k => { delete map[k]; });
-    });
-    Object.assign(stepCountByProduct, ConstructorState.STEP_COUNT_DEFAULTS);
-    facadeFieldsOwner.typeId = null;
-    fireplaceFieldsOwner.typeId = null;
-    passportFieldControls().forEach(control => {
-      const start = passportInitial.get(control.id) || { value: '', checked: false };
-      const isBox = control.type === 'checkbox' || control.type === 'radio';
-      if (isBox ? control.checked === start.checked : control.value === start.value) return;
-      if (isBox) control.checked = start.checked;
-      else control.value = start.value;
-      control.dispatchEvent(new Event('input', { bubbles: true }));
-      control.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-    selectShapeCard((passportInitial.get('productShape') || { value: 'straight' }).value);
-    document.querySelectorAll('[data-auto-length]').forEach(f => { f.dataset.autoValue = ''; f.dataset.cleared = ''; });
-    dimsTouched = false;
-    selectedStoneId = null;
-    materialFieldText.textContent = 'Выберите камень';
-    materialFieldThumb.hidden = true;
-    materialPreviewEl.hidden = true;
-  }
-
-  // A product of the project into the form: its product, its choices, its stone, the step it was on.
-  function loadItem(item) {
-    projectSwitching = true;
-    try {
-      resetFormToInitial();
-      const radio = item.productKey && productGrid.querySelector('input[value="' + item.productKey + '"]');
-      if (radio) {
-        radio.checked = true;
-        radio.dispatchEvent(new Event('change', { bubbles: true }));
-        restorePassportChoices(item.fields);
-      } else {
-        productGrid.querySelectorAll('input[name="product"]').forEach(r => { r.checked = false; });
-        selectedProductKey = null;
-        currentStepId = null;
-      }
-      if (item.stoneId && STONES_BY_ID[item.stoneId]) handleMaterialSelected(item.stoneId);
-    } finally {
-      projectSwitching = false;
-    }
-    calculate();
-    if (selectedProductKey) {
-      const steps = StepEngine.getSteps(selectedProductKey);
-      applyStep(selectedProductKey, item.stepId && steps.includes(item.stepId) ? item.stepId : steps[0], null);
-    }
-  }
-
-  function switchToItem(index) {
-    if (!project) return;
-    if (index === project.active) {
-      viewingAll = false;
-      if (viewerReady) window.ThreeScene.focusActive();
-      renderViewerProject();
-      return;
-    }
-    project = ProjectModel.updateItem(project, project.active, captureActiveItem());
-    project = ProjectModel.setActive(project, index);
-    viewingAll = false;
-    loadItem(project.items[index]);
-  }
-
-  // ---- the project's price (ProjectPricing): one total; each product its work and its share of the stone ----
-  var projectPricing = null;
-  let projectPricingKey = null;
-  function priceProjectNow() {
-    if (!project || project.items.length < 2) { projectPricing = null; projectPricingKey = null; return; }
-    const computed = project.items.map(item => itemComputed(item));
-    const key = computed.map(c => (c ? c.sig : '-')).join('|');
-    if (key === projectPricingKey && projectPricing) return;
-    // The edited product as the page reads it -- the form itself (lastCalcSnapshot); the others from their snapshots.
-    const live = lastCalcSnapshot && lastCalcSnapshot.state;
-    const activeKey = project.items[project.active].productKey;
-    projectPricing = ProjectPricing.priceProject(computed.map((c, i) => (i === project.active && live && live.product && live.product.key === activeKey ? live : (c ? c.state : null))));
-    projectPricingKey = key;
-  }
-
-  // A product with a figure of its own (not «не заполнено», not the manager's).
-  function itemIsPriced(pricing, i) {
-    const it = pricing && pricing.items[i];
-    return !!it && it.kind !== 'incomplete' && it.kind !== 'manual' && it.price !== null;
-  }
-  function itemPriceText(pricing, i) {
-    const it = pricing && pricing.items[i];
-    if (!it || it.kind === 'incomplete') return 'не заполнено';
-    if (!itemIsPriced(pricing, i)) return 'уточнит менеджер';
-    return '≈ ' + formatRub(it.price);
-  }
-  function projectItemPriceText(i) { return itemPriceText(projectPricing, i); }
-
-  const priceLabelEl = document.getElementById('priceLabel');
-  // What the stones take and what is charged once for the project, as lines.
-  function projectExtraLines(p) {
-    const lines = [];
-    p.groups.forEach(g => {
-      const stone = STONES_BY_ID[g.stoneId];
-      if (g.ok) lines.push({ label: 'Камень ' + (stone ? stone.name : g.stoneId), value: g.nSlabs + ' ' + pluralizeSlabs(g.nSlabs) });
-    });
-    if (p.measure > 0) lines.push({ label: 'Замер на объекте', value: formatRub(p.measure) });
-    if (p.delivery > 0) lines.push({ label: 'Доставка', value: formatRub(p.delivery) });
-    if (p.minOrderTopUp > 0) lines.push({ label: 'До минимального заказа', value: formatRub(p.minOrderTopUp) });
-    return lines;
-  }
-  // Why the project's total is the manager's, in words: a stone whose stock is short for all its
-  // products together, or a product the manager prices.
-  function projectReasonText(p) {
-    const failed = p.groups.find(g => g.ok === false);
-    if (failed) {
-      const stone = STONES_BY_ID[failed.stoneId];
-      return 'На складе не хватает плит ' + (stone ? stone.name : '') + ' на все изделия из этого камня вместе - раскрой подберёт менеджер.';
-    }
-    const i = p.items.findIndex(it => it.kind === 'manual' || (it.kind === 'ok' && it.price === null));
-    return i >= 0 ? 'Цену изделия «' + itemTitle(project.items[i]) + '» уточнит менеджер.' : '';
-  }
-
-  function renderProjectPricing() {
-    const inProject = !!(project && project.items.length > 1 && projectPricing);
-    priceLabelEl.textContent = inProject ? 'Стоимость проекта' : 'Ориентировочная стоимость';
-    if (selectedProductKey || inProject) summaryTitleEl.textContent = inProject ? 'Ваш проект' : ResultModel.resultTitle(selectedProductKey);
-    priceOut.classList.toggle('is-manual', inProject && projectPricing.kind === 'manual');
-    if (!inProject) return;
-    const p = projectPricing;
-    if (p.kind === 'ok') setPriceValue('≈ ' + formatRub(p.total) + '*');
-    else if (p.kind === 'manual') setPriceValue('Нужно уточнить у менеджера');
-    else setPriceHint('Заполните все изделия проекта, чтобы увидеть общую стоимость');
-    remainderOut.textContent = '';
-  }
-
-  // The share link: the project's (pv=2) once there are two products, the product's own (pv=1) before.
-  function currentShareQuery() {
-    return project && project.items.length > 1 ? ProjectModel.buildProjectQuery(project) : currentPassportQuery();
-  }
-
-  // The request's card for the whole project (the site's offer takes one card).
-  function projectPiece() {
-    const n = project.items.length;
-    const stones = Array.from(new Set(project.items.map(it => (it.stoneId && STONES_BY_ID[it.stoneId] ? STONES_BY_ID[it.stoneId].name : null)).filter(Boolean)));
-    const first = project.items.map(it => STONES_BY_ID[it.stoneId]).find(s => s && s.image);
-    const p = projectPricing;
-    return {
-      kind: 'calc', query: ProjectModel.buildProjectQuery(project),
-      product: 'Проект: ' + n + ' ' + plural(n, 'изделие', 'изделия', 'изделий'),
-      stone: stones.join(', '), stoneImage: first ? '/sayanmramor-calculator/data/' + first.image : '',
-      sizes: project.items.map(itemTitle).join(' · '),
-      price: p && p.kind === 'ok' ? '≈ ' + formatRub(p.total) : 'Стоимость уточнит менеджер',
-      priced: !!(p && p.kind === 'ok'),
-    };
-  }
-
-  // The sizes of a product of the project, in a line (a facade's or a fireplace's are its own -- left out).
-  function itemSizesText(state) {
-    if (!state || !state.product || state.productConfig.fasad || state.productConfig.kaminy) return '';
-    const L = Math.round(state.dimensions.lengthM * 1000), W = Math.round(state.dimensions.widthM * 1000);
-    return L > 0 && W > 0 ? L + ' × ' + W + ' мм' : '';
-  }
-
-  // The Result of a project: the stones, the lines charged once and the total (its products are the cards
-  // over the calculator). The active product's own cards stay below (what was built).
-  const resultProjectEl = document.getElementById('resultProject');
-  const resultProjectLines = document.getElementById('resultProjectLines');
-  const leadNoteEl = document.querySelector('#leadArea .lead-note');
-  const LEAD_NOTE_ONE = leadNoteEl.textContent;
-  const builtTitleEl = document.querySelector('.result-built:not(.result-project) .result-built-title');
-  const BUILT_TITLE_ONE = builtTitleEl.textContent;
-  function renderResultProject() {
-    const inProject = !!(project && project.items.length > 1 && projectPricing);
-    resultProjectEl.hidden = !inProject;
-    document.getElementById('resultPriceParts').hidden = inProject;
-    leadNoteEl.textContent = inProject ? 'Откроется заявка на расчёт, весь проект уже будет в ней.' : LEAD_NOTE_ONE;
-    builtTitleEl.textContent = inProject ? 'Что вы собрали: ' + itemTitle(project.items[project.active]) : BUILT_TITLE_ONE;
-    if (!inProject) return;
-    const p = projectPricing, n = project.items.length;
-    resultHeroKicker.textContent = 'Проект · ' + n + ' ' + plural(n, 'изделие', 'изделия', 'изделий');
-    const priced = p.kind === 'ok';
-    resultTotalEl.textContent = priced ? '≈ ' + ResultModel.formatRub(p.total) + '*' : 'Стоимость уточнит менеджер';
-    resultTotalEl.classList.toggle('is-manual', !priced);
-    document.getElementById('resultRegionNote').hidden = !priced;
-    const manual = p.kind === 'incomplete' ? 'Заполните все изделия проекта, чтобы увидеть общую стоимость.' : (priced ? '' : (projectReasonText(p) || 'Стоимость части проекта уточнит менеджер.'));
-    resultManualEl.textContent = manual;
-    resultManualEl.hidden = !manual;
-    const lines = projectExtraLines(p);
-    if (priced) lines.push({ label: 'Итого по проекту', value: '≈ ' + ResultModel.formatRub(p.total) });
-    resultProjectLines.replaceChildren(...lines.map(line => {
-      const row = el('div', 'result-line');
-      row.append(el('dt', null, line.label), el('dd', null, line.value));
-      return row;
-    }));
-  }
-
-  // «+ Добавить изделие»: the product edited now is kept; a new one starts with the product's choice,
-  // the stone of the one before already chosen.
-  function addProjectItem() {
-    if (!project) syncProject();
-    if (!project) return;
-    project = ProjectModel.updateItem(project, project.active, captureActiveItem());
-    project = ProjectModel.addItem(project, { id: ProjectModel.newItemId(), productKey: null, stoneId: selectedStoneId, fields: {}, stepId: null });
-    viewingAll = false;
-    loadItem(project.items[project.active]);
-    productGrid.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-  projectAddBtn.addEventListener('click', addProjectItem);
-  document.getElementById('projectRailCta').addEventListener('click', () => ctaBtn.click());
-
-  // The Result's button: «+ Добавить изделие» in a project, «Сделать проектом» for one product.
-  document.getElementById('resultAddBtn').addEventListener('click', () => (calcMode === 'project' ? addProjectItem() : makeProjectFromSingle()));
-
-  function removeProjectItem(index) {
-    if (!project || project.items.length < 2) return;
-    const item = project.items[index];
-    if (!confirm('Убрать «' + itemTitle(item) + '» из проекта?')) return;
-    const wasActive = index === project.active;
-    if (!wasActive) project = ProjectModel.updateItem(project, project.active, captureActiveItem());
-    project = ProjectModel.removeItem(project, index);
-    itemCache.delete(item.id);
-    if (wasActive) loadItem(project.items[project.active]);
-    else calculate();
-  }
-
-  // ---- «Одно изделие» or «Проект» (the owner, 2026-11-18) ----
-  // calcMode: 'single' -- the calculator as on the site; 'project' -- several products; null -- the choice
-  // is on screen. A link that says what it is skips the choice.
-  var calcMode = null;
-  const modeChoiceEl = document.getElementById('modeChoice');
-  const modeChoiceNewEl = document.getElementById('modeChoiceNew');
-  const pageTitleEl = document.querySelector('.wrap > h1:not(.mode-choice-title)');
-  const PAGE_TITLE_ONE = pageTitleEl.textContent;
-  const pageSubtitleEl = document.querySelector('.wrap > .subtitle');
-  const PAGE_SUBTITLE_ONE = pageSubtitleEl.textContent;
-  const resultAddBtnEl = document.getElementById('resultAddBtn');
-
-  function storedProject() {
-    try { return ProjectModel.deserialize(localStorage.getItem(PROJECT_STORE_KEY), isKnownProduct); } catch (e) { return null; }
-  }
-
-  // The two cards' pictures: the product scenes of the calculator (one; three for a project --
-  // a kitchen, a fireplace and steps, the owner, 2026-11-18).
-  (function drawModeScenes() {
-    document.querySelector('[data-mode-scene="single"]').innerHTML = productSceneSvg('stoleshnitsa_kuhnya');
-    document.querySelector('[data-mode-scene="project"]').innerHTML = productSceneSvg('stoleshnitsa_kuhnya', 1.2) + productSceneSvg('lestnitsa') + productSceneSvg('stupeni');
-  })();
-
-  function renderModeTexts() {
-    pageTitleEl.textContent = calcMode === 'project' ? 'Рассчитайте стоимость проекта' : PAGE_TITLE_ONE;
-    pageSubtitleEl.textContent = calcMode === 'project'
-      ? 'Несколько изделий: у каждого свой камень, цена и заявка общие.'
-      : PAGE_SUBTITLE_ONE;
-    resultAddBtnEl.textContent = calcMode === 'project' ? '+ Добавить изделие' : 'Сделать проектом';
-    const stored = storedProject();
-    const n = stored && stored.items.length > 1 ? stored.items.length : 0;
-    document.getElementById('modeChoiceProjectDesc').textContent = n
-      ? 'Продолжить проект: ' + n + ' ' + plural(n, 'изделие', 'изделия', 'изделий')
-      : 'Несколько изделий в одной сцене, общая цена и одна заявка';
-    document.getElementById('modeChoiceProjectCta').innerHTML = (n ? 'Продолжить' : 'Собрать') + '<span class="mode-card-cta-more"> проект</span>';
-    modeChoiceNewEl.hidden = !n;
-  }
-
-  // What the page keeps above and below the choice (CSS centers the block in the rest of the screen).
-  function fitModeChoice() {
-    if (modeChoiceEl.hidden) return;
-    const above = modeChoiceEl.getBoundingClientRect().top + window.scrollY;
-    const below = parseFloat(getComputedStyle(document.body).paddingBottom) || 0;
-    modeChoiceEl.style.setProperty('--mc-chrome', Math.round(above + below) + 'px');
-  }
-  window.addEventListener('resize', fitModeChoice);
-
-  // The choice on screen: the calculator hidden behind it (the project stays in the browser).
-  function showModeChoice() {
-    calcMode = null;
-    document.body.classList.add('choosing-mode');
-    document.body.classList.remove('calc-project');
-    modeChoiceEl.hidden = false;
-    renderModeTexts();
-    fitModeChoice();
-    window.scrollTo(0, 0);
-  }
-
-  // A mode chosen (fromChoice: the client picked it on the choice screen -- one step in the browser's
-  // history, so «Назад» brings the choice back).
-  function setCalcMode(mode, fromChoice) {
-    calcMode = mode;
-    document.body.classList.remove('choosing-mode');
-    document.body.classList.toggle('calc-project', mode === 'project');
-    modeChoiceEl.hidden = true;
-    if (fromChoice) { try { history.pushState({ calcMode: mode }, ''); } catch (e) { /* no history: the choice is still there via «Сменить режим» */ } }
-    renderModeTexts();
-    renderProjectBlock();
-    renderViewerProject();
-  }
-
-  // At the start: a project link -> project; a product, a stone or a product's passport -> one product;
-  // else the choice.
-  function chooseStartMode() {
-    if (projectLink) { setCalcMode('project'); return; }
-    if (passportLink || bootstrapParams.get('product') || bootstrapParams.get('stone')) { setCalcMode('single'); return; }
-    showModeChoice();
-  }
-
-  // «Одно изделие» from the choice: a clean form, no project (the stored one stays in the browser).
-  function startSingle() {
-    projectSwitching = true;
-    try { resetFormToInitial(); } finally { projectSwitching = false; }
-    productGrid.querySelectorAll('input[name="product"]').forEach(r => { r.checked = false; });
-    selectedProductKey = null;
-    currentStepId = null;
-    project = null;
-    projectOwned = false;
-    itemCache.clear();
-    setCalcMode('single', true);
-    if (viewerReady && window.ThreeScene.setCompanions) { window.ThreeScene.clearActive(); window.ThreeScene.setCompanions([], 0, null); }
-    calculate();
-  }
-
-  // «Проект» from the choice: the stored project, or a new one.
-  function continueStoredProject() {
-    const stored = storedProject();
-    setCalcMode('project', true);
-    if (stored && stored.items.length > 1) { restoreStoredProject(); return; }
-    startNewProject();
-  }
-  function startNewProject() {
-    projectSwitching = true;
-    try { resetFormToInitial(); } finally { projectSwitching = false; }
-    productGrid.querySelectorAll('input[name="product"]').forEach(r => { r.checked = false; });
-    selectedProductKey = null;
-    currentStepId = null;
-    project = null;
-    projectOwned = true;
-    itemCache.clear();
-    if (calcMode !== 'project') setCalcMode('project', true);
-    if (viewerReady && window.ThreeScene.setCompanions) { window.ThreeScene.clearActive(); window.ThreeScene.setCompanions([], 0, null); }
-    calculate();
-  }
-
-  // «Сделать проектом» (one product's Result): the product counted becomes the project's first, a new
-  // one starts. A project already in the browser is replaced only when the client says so.
-  function makeProjectFromSingle() {
-    const stored = storedProject();
-    if (stored && stored.items.length > 1) {
-      const n = stored.items.length;
-      if (!confirm('В браузере есть начатый проект (' + n + ' ' + plural(n, 'изделие', 'изделия', 'изделий') + '). Заменить его новым проектом с этим изделием?')) return;
-    }
-    projectOwned = true;
-    setCalcMode('project');
-    addProjectItem();
-  }
-
-  document.getElementById('modeChoiceSingle').addEventListener('click', startSingle);
-  document.getElementById('modeChoiceProject').addEventListener('click', continueStoredProject);
-  modeChoiceNewEl.addEventListener('click', startNewProject);
-  document.getElementById('modeSwitch').addEventListener('click', showModeChoice);
-  // «Назад» in the browser after a choice: the choice again; «Вперёд»: the mode it was.
-  window.addEventListener('popstate', e => {
-    if (e.state && e.state.calcMode) setCalcMode(e.state.calcMode);
-    else if (calcMode !== null) showModeChoice();
-  });
-
-  // A page opened on its own (no product, no passport link): the project the client was building.
-  function restoreStoredProject() {
-    let stored = null;
-    try { stored = ProjectModel.deserialize(localStorage.getItem(PROJECT_STORE_KEY), isKnownProduct); } catch (e) { stored = null; }
-    if (!stored || stored.items.length < 2) return;
-    project = stored;
-    projectOwned = true;
-    loadItem(project.items[project.active]);
-  }
-
   // ===== Result + lead =====
   const resultHeroImg = document.getElementById('resultHeroImg');
   const resultHeroKicker = document.getElementById('resultHeroKicker');
@@ -6211,11 +5270,9 @@
     });
   }
 
-  // ...and straight to the Result, or to the first step still missing data
-  // (a stone that has left the catalog).
-  // On a phone and a tablet the page is one long column: a client who comes in by a passport or a project link
-  // (the site's «Изменить в калькуляторе», or a link shared) is taken to the product -- the steps and the 3D --
-  // not left at the page's top with the heading and the products a long scroll above it (2026-11-22, the owner).
+  // On a phone and a tablet the page is one long column: a client who comes in by a passport link (the site's
+  // «Изменить в калькуляторе», or a link shared) is taken to the product -- the steps and the 3D -- not left at
+  // the page's top with the heading and the products a long scroll above it (2026-11-22, the owner).
   // The page above settles afterwards (fonts), so the scroll is repeated until the client touches the page.
   function landOnProduct() {
     if (!window.matchMedia || !window.matchMedia('(max-width: 980px)').matches) return;
@@ -6228,6 +5285,8 @@
     if (document.readyState !== 'complete') window.addEventListener('load', again, { once: true });
   }
 
+  // ...and straight to the Result, or to the first step still missing data
+  // (a stone that has left the catalog).
   function openPassportStep() {
     const steps = StepEngine.getSteps(selectedProductKey);
     const missing = steps.find(id => id !== 'review' && isCurrentStepDataValid(id) === false);
@@ -6324,8 +5383,6 @@
       return row;
     }));
 
-    renderResultProject();
-
     const showroomUrl = UrlBootstrap.buildShowroomUrl(selectedProductKey, selectedStoneId, PRODUCTS, STONES_BY_ID);
     resultShowroomLink.hidden = !showroomUrl;
     if (showroomUrl) resultShowroomLink.href = showroomUrl;
@@ -6421,95 +5478,9 @@
     }
     downloadPassportFile(file);
   }
-  // A product of the project that is not being edited, as the Result and the passport read it: its
-  // configuration and its price alone (ProjectPricing.priceItem -- the same calculation as the page's).
-  function itemResultData(item) {
-    const c = itemComputed(item);
-    if (!c) return null;
-    const state = c.state, key = item.productKey, product = PRODUCTS[key];
-    const typeId = state.subcategory.id;
-    const row = typeId ? getSubcategoriesForProduct(product.label).find(r => r.id === typeId) : null;
-    const card = row ? (TYPE_CARDS[key] || []).find(cd => cd.ids.includes(row.id)) : null;
-    const risers = key === 'lestnitsa' && state.productConfig.lestnitsa && state.productConfig.lestnitsa.risers;
-    const isSpiral = key === 'lestnitsa' && GeometryModel.STAIR_SHAPES[typeId] === 'spiral';
-    const typeLabels = (key === 'stena' || key === 'podokonnik') ? TYPE_DIMENSION_LABELS[typeId] : null;
-    const dimensionLabels = isSpiral ? SPIRAL_DIMENSION_LABELS : (typeLabels || DIMENSION_LABELS[key] || DEFAULT_DIMENSION_LABELS);
-    const priced = ProjectPricing.priceItem(state);
-    const outcome = priced.kind === 'ok' && priced.result.total !== null ? { kind: 'ok', result: priced.result, message: null }
-      : priced.kind === 'incomplete' ? { kind: 'incomplete' } : { kind: 'manual', reason: priced.reason || 'unpriced_work', message: null };
-    const configuration = ResultModel.buildConfiguration({
-      state, productLabel: product.label,
-      subcategory: row ? { id: row.id, label: card ? card.title + (risers ? ', с подступенками' : '') : row.shape, unit: row.unit } : null,
-      edgeTitles: EDGE_TITLES, dimensionLabels, edgeLengthM: priced.edgeLengthM || 0,
-    });
-    return {
-      configuration, pricing: ResultModel.summarizePricing(outcome, UPDATED_AT),
-      result: outcome.kind === 'ok' ? priced.result : null,
-      pricingInputs: priced.inputs ? { rates: priced.inputs.rates, mainAreaM2: priced.inputs.job.mainAreaM2, complexEnabled: state.options.complexEnabled } : null,
-    };
-  }
-
-  // The project's passport (the owner, 2026-11-17): the project's page -- every product with its price
-  // in the project, the lines charged once, the total, the project's link -- then every product's own
-  // passport (its views, sizes, works; its price is the project's, on the first page). Each product's
-  // views are shot with the others hidden.
-  function buildProjectPassportFile() {
-    let passport, itemAssets, preview = null;
-    return Promise.resolve().then(() => {
-      const p = projectPricing;
-      if (!p) throw new Error('no project price yet');
-      const createdAt = new Date();
-      const random4 = crypto.getRandomValues(new Uint32Array(1))[0] % 10000;
-      const link = location.origin + location.pathname + '?' + currentShareQuery();
-      const activeId = project.items[project.active].id;
-      const made = [];
-      project.items.forEach((item, i) => {
-        const data = i === project.active ? currentResultData() : itemResultData(item);
-        if (!data) return;
-        const stone = item.stoneId ? STONES_BY_ID[item.stoneId] : null;
-        const one = PassportModel.buildPassport(Object.assign({}, data, {
-          view: ResultModel.buildResultView(data.configuration), stone, createdAt, random4, link,
-          defaultPreset: PRODUCTS[item.productKey].cameraPreset || 'iso',
-        }));
-        one.specification = { manual: 'Цена в проекте: ' + projectItemPriceText(i) + ' - общий расчёт на первой странице паспорта' };
-        made.push({ item, index: i, passport: one, stone });
-      });
-      const amount = (label, rub) => (rub > 0 ? [{ label, amountRub: rub }] : []);
-      passport = PassportModel.buildProjectPassport({
-        items: made.map(m => m.passport),
-        rows: made.map(m => {
-          const c = itemComputed(m.item);
-          return {
-            title: (m.index + 1) + '. ' + itemTitle(m.item),
-            meta: [m.stone ? m.stone.name : '', itemSizesText(c && c.state)].filter(Boolean).join(' · '),
-            priceRub: p.items[m.index] ? p.items[m.index].price : null,
-          };
-        }),
-        lines: amount('Замер на объекте', p.measure).concat(amount('Доставка', p.delivery), amount('До минимального заказа', p.minOrderTopUp)),
-        totalRub: p.kind === 'ok' ? Math.round(p.total) : null,
-        manual: p.kind === 'ok' ? null : 'Стоимость проекта рассчитает менеджер',
-        createdAt, random4, link, pricesDateText: made.length ? made[0].passport.pricesDateText : null,
-      });
-      // The shots first, while the scene is exactly what the client sees.
-      const shoot = (preset, i, only) => (viewerReady && window.ThreeScene
-        ? window.ThreeScene.capture(preset, i === 0 ? { width: 1820, height: Math.round(1820 / PassportPdf.MAIN_RATIO) } : { width: 900, height: Math.round(900 * PassportPdf.SMALL_RATIO) }, { only }) : null);
-      itemAssets = made.map(m => ({ shots: m.passport.shots.map((preset, i) => shoot(preset, i, m.item.id === activeId ? 'active' : m.item.id)) }));
-      preview = viewerReady && window.ThreeScene ? window.ThreeScene.capture('iso', { width: 1820, height: Math.round(1820 / PassportPdf.MAIN_RATIO) }, { only: 'all' }) : null;
-      return Promise.all([
-        loadPassportScript('vendor/jspdf/jspdf.umd.min.js'), loadPassportScript('vendor/qrcode/qrcode.js'),
-        loadPassportFonts(), Promise.all(made.map(m => passportStonePhoto(m.stone))),
-      ]);
-    }).then(([, , fonts, photos]) => {
-      const assets = { fonts, items: itemAssets.map((a, i) => ({ shots: a.shots, stonePhoto: photos[i] })) };
-      const bytes = PassportPdf.renderPassportPdf(passport, assets, { jsPDF: window.jspdf.jsPDF, qrcode: window.qrcode });
-      return { file: new File([bytes], passport.fileName, { type: 'application/pdf' }), preview: preview || (itemAssets[0] && itemAssets[0].shots[0]) || null };
-    });
-  }
-
   // The PDF of what the client sees now, and its main shot (the site's request shows it small).
   // Everything is in the chain, so any failure ends in its .catch.
   function buildPassportFile() {
-    if (project && project.items.length > 1) return buildProjectPassportFile();
     let passport, shots;
     return Promise.resolve().then(() => {
       const data = currentResultData();
@@ -6518,7 +5489,7 @@
       const random4 = crypto.getRandomValues(new Uint32Array(1))[0] % 10000;
       passport = PassportModel.buildPassport(Object.assign({}, data, {
         view: ResultModel.buildResultView(data.configuration), stone, createdAt: new Date(), random4,
-        link: location.origin + location.pathname + '?' + currentShareQuery(),
+        link: location.origin + location.pathname + '?' + currentPassportQuery(),
         defaultPreset: PRODUCTS[selectedProductKey].cameraPreset || 'iso',
       }));
       // The shots first, while the scene is exactly what the client sees.
@@ -6536,7 +5507,7 @@
   function downloadPassport() {
     const data = currentResultData();
     if (!data || passportBtn.disabled) return;
-    const key = JSON.stringify(data) + (project && project.items.length > 1 ? ProjectModel.serialize(project) : '');
+    const key = JSON.stringify(data);
     if (preparedPassport && preparedPassport.key === key) {
       savePassportFile(preparedPassport.file);
       return;
@@ -6574,11 +5545,10 @@
       location.assign('/sayanmramor-site/index.html#offer');
       return;
     }
-    const query = currentShareQuery();
+    const query = currentPassportQuery();
     const view = ResultModel.buildResultView(data.configuration);
     const stone = selectedStoneId ? STONES_BY_ID[selectedStoneId] : null;
-    // A project: one card for all of it (the owner, 2026-11-17).
-    OfferHandoff.putCalcPiece(webStore('localStorage'), project && project.items.length > 1 ? projectPiece() : {
+    OfferHandoff.putCalcPiece(webStore('localStorage'), {
       kind: 'calc', query, product: data.configuration.product.label || '', stone: stone ? stone.name : '',
       stoneImage: stone && stone.image ? '/sayanmramor-calculator/data/' + stone.image : '',
       sizes: (view.specs.find(spec => spec.key === 'dimensions') || view.specs[0] || {}).value || '',

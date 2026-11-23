@@ -57,8 +57,6 @@
   // fallback here -- both its dimensions are real (see attachment-geometry.js).
   const VISUAL_FALLBACK_CURB_HEIGHT_M = 0.03;
   const VISUAL_FALLBACK_ISLAND_GAP_M = 0.9;
-  // A project's products in the 3D (the owner, 2026-11-17): in a row, this much apart (project-layout.js).
-  const PROJECT_GAP_M = 0.8;
   // The bar counter stands a step above the worktop (a bar top is some
   // 15 cm higher than a kitchen worktop) -- the cue that it is a bar, not
   // more countertop. No real height input: a visual fallback.
@@ -105,6 +103,5 @@
     VISUAL_FALLBACK_FLOOR_THICKNESS_M,
     VISUAL_STAIR_RISE_M, VISUAL_STAIR_TREAD_DEPTH_M, VISUAL_RISER_THICKNESS_M,
     VISUAL_LAYOUT_MODULE_M, VISUAL_LARGE_FORMAT_MODULE_M,
-    PROJECT_GAP_M,
   };
 });

@@ -507,25 +507,21 @@ test('the fireplace sizes carry their «?» like every other product\'s', () => 
 // 170-670 pixels, a stone photo stepped back against its motion. A 3D transform that changes nothing
 // (perspective(2000px), as on the site's photos) makes both move on smoothly -- only while hovered:
 // at rest the photo would be softer with it and the scene would settle half a pixel off.
-test('Firefox: product scenes, the scenes of the mode choice and stone photos grow smoothly on hover, at rest they are untouched', () => {
+test('Firefox: product scenes and stone photos grow smoothly on hover, at rest they are untouched', () => {
   const at = html.indexOf('@supports (-moz-appearance: none) {\n    @media (prefers-reduced-motion: no-preference) {\n      .product-card:hover');
   assert.ok(at > 0);
   // after the flat hover rules it overrides (the same selectors), or it would lose to them
   assert.ok(at > html.indexOf('.stone-card:hover .stone-card-image img { transform: scale(1.06); }'));
   assert.ok(at > html.indexOf('.product-card:hover .product-card-scene svg { transform: scale(1.035); }'));
-  assert.ok(at > html.indexOf('.mode-card:hover .mode-card-scene svg { transform: scale(1.03); }'));
   const block = html.slice(at, html.indexOf('\n  }\n', at));
   assert.match(block, /\.product-card:hover \.product-card-scene > svg \{ transform: scale\(1\.035\) perspective\(2000px\); \}/);
   assert.match(block, /\.stone-card:hover \.stone-card-image img \{ transform: scale\(1\.06\) perspective\(2000px\); \}/);
-  assert.match(block, /\.mode-card:hover \.mode-card-scene svg \{ transform: scale\(1\.03\) perspective\(2000px\); \}/);
   // nothing at rest: no perspective outside the hover rules
   assert.doesNotMatch(html, /\.product-card-scene > svg \{ transform: perspective/);
   assert.doesNotMatch(html, /\.stone-card-image img \{ transform: perspective/);
-  assert.doesNotMatch(html, /\.mode-card-scene svg \{ transform: perspective/);
   // the other browsers keep their flat scale
   assert.match(html, /\.product-card:hover \.product-card-scene svg \{ transform: scale\(1\.035\); \}/);
   assert.match(html, /\.stone-card:hover \.stone-card-image img \{ transform: scale\(1\.06\); \}/);
-  assert.match(html, /\.mode-card:hover \.mode-card-scene svg \{ transform: scale\(1\.03\); \}/);
 });
 
 // Final review (2026-10-26): the way to the request never hangs, never dies on a missing hand-off,
