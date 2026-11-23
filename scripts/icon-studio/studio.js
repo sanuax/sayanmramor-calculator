@@ -21,6 +21,8 @@ const H = +q.get('h') || 1600;
 const FRAMES = +q.get('frames') || 512;
 const PRODUCT = q.get('product') || 'kitchen';
 const STONE = q.get('stone') || 'calacatta-aella';
+// plaster = А «Камень на гипсе» (по умолчанию), drawing = В «Чертёж и материал» (контекст линиями); Б «Свет из проёма» — только правила света/камеры (--rules)
+const CONCEPT = q.get('concept') || 'plaster';
 
 // ---- правила серии ----
 const RULES = {
@@ -190,6 +192,7 @@ function hobTexture() {
 
 function kitchenIsland(stone) {
   const g = new THREE.Group();
+  const lineMat = new THREE.LineBasicMaterial({ color: 0x4a4946, transparent: true, opacity: 0.85 });
   const top = 0.90, t = 0.03, under = top - t;
   const sink = { cx: 0.56, cz: 0.08, w: 0.50, d: 0.40 };
   const hob = { cx: -0.56, cz: 0.06, w: 0.59, d: 0.52 };
@@ -203,8 +206,16 @@ function kitchenIsland(stone) {
 
   // Опора: гипсовый объём без фасадов (контекст, а не мебель); верхней грани нет — сверху камень.
   const body = box(-1.17, 1.17, 0.10, under, -0.20, 0.47, [M.plaster, M.plaster, M.hidden, M.plaster, M.plaster, M.plaster]);
-  g.add(body);
-  g.add(box(-1.10, 1.10, 0, 0.10, -0.13, 0.40, M.shadowGap));
+  const plinth = box(-1.10, 1.10, 0, 0.10, -0.13, 0.40, M.shadowGap);
+  g.add(body, plinth);
+  if (CONCEPT === 'drawing') {
+    // В: опора и цоколь не объёмы, а тонкие линии рёбер (в т.ч. задние), как на чертеже
+    for (const m of [body, plinth]) {
+      m.visible = false;
+      const l = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), lineMat);
+      l.position.copy(m.position); g.add(l);
+    }
+  }
 
   // Мойка: стальная чаша под камнем, чуть шире выреза, глубина 190 мм.
   const bw = sink.w + 0.02, bd = sink.d + 0.02, bh = 0.19, by = under - bh;
@@ -219,6 +230,11 @@ function kitchenIsland(stone) {
   drain.position.set(0, by + 0.0015, 0.05); bowl.add(drain);
   bowl.position.set(sink.cx, 0, sink.cz);
   g.add(bowl);
+  if (CONCEPT === 'drawing') { // чаша тоже линией: в кадре в материале только камень, стекло и сталь смесителя
+    bowl.visible = false;
+    const l = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(bw, bh, bd)), lineMat);
+    l.position.set(sink.cx, by + bh / 2, sink.cz); g.add(l);
+  }
 
   // Индукционная панель: чёрное стекло 5 мм поверх плиты, шлифованная кромка.
   const glassTop = new THREE.MeshPhysicalMaterial({ color: 0xffffff, map: hobTexture(), roughness: 0.1, clearcoat: 1, clearcoatRoughness: 0.04, envMap: ENV, envMapIntensity: 0.55 });
@@ -262,7 +278,7 @@ const { group, focus } = PRODUCTS[PRODUCT](stone);
 scene.add(group);
 
 const floor = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), M.floor);
-floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true;
+floor.rotation.x = -Math.PI / 2; floor.receiveShadow = CONCEPT !== 'drawing';
 scene.add(floor);
 
 // Камера: длинный фокус, без перспективных искажений; дистанция подбирается так,
@@ -294,7 +310,7 @@ function shadowLight(color) {
   const l = new THREE.DirectionalLight(color, 1);
   l.castShadow = true;
   l.shadow.mapSize.set(4096, 4096);
-  const s = 2.3; Object.assign(l.shadow.camera, { left: -s, right: s, top: s, bottom: -s, near: 0.5, far: 20 });
+  const s = 3.6; Object.assign(l.shadow.camera, { left: -s, right: s, top: s, bottom: -s, near: 0.5, far: 20 });
   l.shadow.bias = -0.00015; l.shadow.normalBias = 0.004;
   l.target.position.set(0, 0.45, 0);
   scene.add(l, l.target);

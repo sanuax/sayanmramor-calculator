@@ -18,6 +18,7 @@ ap.add_argument('--frames', type=int, default=512)
 ap.add_argument('--w', type=int, default=2400)
 ap.add_argument('--h', type=int, default=1600)
 ap.add_argument('--rules', default='')
+ap.add_argument('--concept', default='plaster')
 a = ap.parse_args()
 
 
@@ -29,7 +30,7 @@ class Quiet(http.server.SimpleHTTPRequestHandler):
 srv = http.server.ThreadingHTTPServer(('127.0.0.1', 0), functools.partial(Quiet, directory=str(ROOT)))
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 url = (f'http://127.0.0.1:{srv.server_port}/scripts/icon-studio/studio.html'
-       f'?product={a.product}&stone={a.stone}&frames={a.frames}&w={a.w}&h={a.h}'
+       f'?product={a.product}&concept={a.concept}&stone={a.stone}&frames={a.frames}&w={a.w}&h={a.h}'
        + (f'&rules={urllib.parse.quote(a.rules)}' if a.rules else ''))
 
 with sync_playwright() as p:
