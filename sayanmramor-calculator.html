@@ -7,6 +7,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Конфигуратор изделий из камня - Саянмрамор</title>
 <link rel="icon" href="/sayanmramor-site/assets/brand/favicon.ico">
+<link rel="preload" href="vendor/fonts/unbounded-cyrillic-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<!-- search snippet and link preview in messengers (2026-11-24); the picture is the kitchen island of the product cards -->
+<meta name="description" content="Рассчитайте изделие из натурального камня онлайн: выберите изделие, камень и размеры, посмотрите его в 3D и узнайте цену. Столешницы, лестницы, полы, камины, фасады.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Саянмрамор">
+<meta property="og:locale" content="ru_RU">
+<meta property="og:title" content="Конфигуратор изделий из камня - Саянмрамор">
+<meta property="og:description" content="Рассчитайте изделие из натурального камня онлайн: выберите изделие, камень и размеры, посмотрите его в 3D и узнайте цену. Столешницы, лестницы, полы, камины, фасады.">
+<meta property="og:image" content="https://sayanmramor.ru/studio/icons/og-studio.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Кухонный остров со столешницей из мрамора">
+<meta name="twitter:card" content="summary_large_image">
 <script>document.documentElement.classList.add('js');</script>
 <!-- The site's header (2026-10-10, the owner's request): drawn by the site's own
      css/header.css and js/header.js, so it is the same capsule and menu as on every
@@ -214,6 +227,10 @@
      Hidden, the 3D canvas has no size; three-scene.js's ResizeObserver sizes
      it the moment the panel appears. */
   .configurator-columns:not(.has-product) .configurator-side { display: none; }
+  /* Before the page script runs, every step section is still visible: without this the
+     empty steps flashed below the cards and then vanished, a layout jump on every visit
+     (CLS 0.44 on a phone, 2026-11-24). Without a product the columns hold nothing to show. */
+  .configurator-columns:not(.has-product) { display: none; }
   @media (max-width: 980px) {
     /* Below this, two columns no longer have room to breathe -- summary
        drops below the step, same stacked order as before this task. */
