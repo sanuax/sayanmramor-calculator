@@ -5,7 +5,8 @@
 // so the geometry is exact and the ten read as one set. The look «Макет» (the owner's pick of three,
 // 2026-11-23): an architectural white model -- no lights, no gradients, no outline, three flat tones per
 // material (top, left face, right face) in the calculator's colours.
-// The «Одно изделие / Проект» cards and the project's cards keep the rendered pictures (icons/products/lux).
+// Since 2026-11-23 the cards show rendered pictures instead («Камень на гипсе», picture() at the end); the
+// drawn models stay as the fallback for a product that has no picture yet.
 (function (root, factory) {
   if (typeof module !== 'undefined' && module.exports) module.exports = factory();
   else root.ProductIcons = factory();
@@ -274,8 +275,26 @@
       '<rect width="120" height="80" fill="' + theme.bg + '"/>' + out + '</svg>';
   }
 
+  // ---- the rendered pictures «Камень на гипсе» (the owner's pick, 2026-11-23) ----
+  // Rendered by the offline studio (scripts/icon-studio: render.py <key>) and exported as
+  // icons/products/<key>.webp (480x320) and <key>@2x.webp (960x640). `version` is the first 8 hex of the
+  // sha256 over the folder's files (name, then bytes, sorted by name), so a browser that keeps an old copy
+  // fetches the new one; tests/product-pictures.test.js fails while it is stale or a picture is missing.
+  // A product without a picture keeps its drawn «Макет» (svg above).
+  const PICTURES = {
+    version: 'edaf8127',
+    keys: ['lestnitsa', 'panno', 'podokonnik', 'pol', 'stena', 'fasad', 'stoleshnitsa_vannaya', 'stoleshnitsa_kuhnya', 'stupeni', 'kaminy'],
+  };
+  // The card's picture: the rendered one where there is one, else the drawn one.
+  function picture(key) {
+    if (!PICTURES.keys.includes(key)) return svg(key);
+    const v = '?v=' + PICTURES.version, base = 'icons/products/' + key;
+    return '<img class="pi-img" src="' + base + '.webp' + v + '" srcset="' + base + '.webp' + v + ' 480w, ' + base + '@2x.webp' + v + ' 960w"' +
+      ' sizes="(min-width: 1100px) 260px, (min-width: 560px) 31vw, 46vw" width="480" height="320" alt="" decoding="async">';
+  }
+
   // Kept for the page's call: nothing shared to install any more.
   function install() {}
 
-  return { install, svg, keys: Object.keys(MODELS), themes: Object.keys(THEMES).map(id => ({ id, name: THEMES[id].name })) };
+  return { install, svg, picture, pictures: PICTURES, keys: Object.keys(MODELS), themes: Object.keys(THEMES).map(id => ({ id, name: THEMES[id].name })) };
 });
