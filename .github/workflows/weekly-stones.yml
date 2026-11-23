@@ -92,7 +92,7 @@ jobs:
             attempted=$total; partial=
           fi
           python scripts/ci_weekly.py check --before "$RUNNER_TEMP/w/slabs.before.json" --after data/slabs.json \
-            --failed "$RUNNER_TEMP/w/failed.txt" --attempted "$attempted" \
+            --failed "$RUNNER_TEMP/w/failed.txt" --failed-images "$RUNNER_TEMP/w/failed_img.txt" --attempted "$attempted" \
             --catalog "$(grep -c '^https' "$RUNNER_TEMP/w/catalog.txt")" $partial
           if [ -s "$RUNNER_TEMP/w/failed_img.txt" ]; then
             echo "Картинки не скачались: $(grep -c '^https' "$RUNNER_TEMP/w/failed_img.txt")" >> "$GITHUB_STEP_SUMMARY"

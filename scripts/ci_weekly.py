@@ -6,7 +6,7 @@
       marked as not available by the scraper's own rule).
 
   python scripts/ci_weekly.py check --before <old slabs.json> --after data/slabs.json
-        --failed <failed_urls.txt> --attempted N --catalog N [--partial]
+        --failed <failed_urls.txt> [--failed-images <failed_image_urls.txt>] --attempted N --catalog N [--partial]
       The safety gate. Exits 1, and prints why, when the new data looks broken: then nothing
       is committed and nothing is uploaded to the hosting.
 
@@ -84,6 +84,12 @@ def cmd_check(args):
     if args.attempted and failed > args.attempted * max_failed:
         problems.append(f'не открылось {failed} страниц из {args.attempted} (допустимо не больше {int(max_failed * 100)}%)')
 
+    if args.failed_images:
+        failed_images = len(read_urls(args.failed_images)) if Path(args.failed_images).exists() else 0
+        if args.attempted and failed_images > args.attempted * max_failed:
+            problems.append(f'не скачались фото {failed_images} камней из {args.attempted} '
+                            f'(допустимо не больше {int(max_failed * 100)}%): похоже, сайт поставщика не отдаёт фото серверам GitHub; '
+                            'старые фото остались, но обновление остановлено')
     ok_before = sum(1 for s in before if usable(s))
     ok_after = sum(1 for s in after if usable(s))
     if not args.partial:
@@ -116,6 +122,7 @@ def main():
     c.add_argument('--before', required=True)
     c.add_argument('--after', required=True)
     c.add_argument('--failed', required=True)
+    c.add_argument('--failed-images')
     c.add_argument('--attempted', type=int, required=True)
     c.add_argument('--catalog', type=int, default=0)
     c.add_argument('--min-catalog', type=float, default=0.8)

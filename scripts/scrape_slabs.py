@@ -1,3 +1,4 @@
+import hashlib
 import mimetypes
 import re
 from urllib.parse import urljoin
@@ -176,7 +177,38 @@ def replace_stone_image_file(images_dir, stone_id, image_bytes, extension):
     return dest_path
 
 
-def download_stone_image(browser, image_url, images_dir, stone_id, max_attempts=3, retry_delay_s=2.0):
+class ImageGuard:
+    """Refuses a downloaded picture that cannot be a stone's photo, so the old photo stays.
+
+    When the supplier's CDN blocks us it answers HTTP 200 with one and the same picture (or a page)
+    for every stone: 2026-11-23 the weekly run overwrote ~960 photos that way and the colour gradient
+    lost every stone. So: a body that is not an image is refused, and so is a body identical to one
+    already accepted for ANOTHER stone in this run (at most one stone can carry a placeholder)."""
+
+    def __init__(self):
+        self._owner = {}
+
+    def __call__(self, stone_id, body):
+        if not body:
+            raise RuntimeError('image download failed: empty body')
+        try:
+            import io
+            from PIL import Image
+        except ImportError:
+            pass
+        else:
+            try:
+                with Image.open(io.BytesIO(body)) as im:
+                    im.verify()
+            except Exception as e:
+                raise RuntimeError(f'image download failed: not a readable picture ({e!r})')
+        digest = hashlib.sha256(body).hexdigest()
+        owner = self._owner.setdefault(digest, stone_id)
+        if owner != stone_id:
+            raise RuntimeError(f'image download failed: the same picture as {owner} (a CDN placeholder?)')
+
+
+def download_stone_image(browser, image_url, images_dir, stone_id, max_attempts=3, retry_delay_s=2.0, accept=None):
     # Downloads through an actual browser page (Chromium's network stack)
     # rather than APIRequestContext (Node's own TLS client): the CDN's WAF
     # fingerprints TLS handshakes and silently drops non-browser clients --
@@ -210,7 +242,10 @@ def download_stone_image(browser, image_url, images_dir, stone_id, max_attempts=
                 status = response.status if response else 'no response'
                 raise RuntimeError(f'image download failed: HTTP {status} for {image_url}')
             extension = content_type_to_extension(response.headers.get('content-type')) or '.jpg'
-            return replace_stone_image_file(images_dir, stone_id, response.body(), extension)
+            body = response.body()
+            if accept is not None:
+                accept(stone_id, body)
+            return replace_stone_image_file(images_dir, stone_id, body, extension)
         except Exception as e:
             last_error = e
             if attempt < max_attempts and retry_delay_s:
@@ -558,6 +593,7 @@ def main(argv=None):
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
+        image_guard = ImageGuard()
         page = browser.new_page()
 
         for i, url in enumerate(batch):
@@ -583,7 +619,7 @@ def main(argv=None):
                     if args.fetch_images and image_url:
                         try:
                             images_dir = output_path.parent / 'images'
-                            dest_path = download_stone_image(browser, image_url, images_dir, stone['id'])
+                            dest_path = download_stone_image(browser, image_url, images_dir, stone['id'], accept=image_guard)
                             stone['image'] = f'images/{dest_path.name}'
                         except Exception as e:
                             print(f'  ERROR downloading image for {url}: {e!r}', file=sys.stderr)

@@ -672,6 +672,50 @@ class ReplaceStoneImageFileTests(unittest.TestCase):
             self.assertTrue((images_dir / 'other-stone.jpg').exists())
 
 
+class ImageGuardTests(unittest.TestCase):
+    @staticmethod
+    def png(color):
+        import io
+        from PIL import Image
+        buf = io.BytesIO()
+        Image.new('RGB', (8, 8), color).save(buf, 'PNG')
+        return buf.getvalue()
+
+    def test_accepts_different_pictures(self):
+        guard = scrape_slabs.ImageGuard()
+        guard('a', self.png((255, 0, 0)))
+        guard('b', self.png((0, 255, 0)))
+
+    def test_refuses_a_non_picture_and_an_empty_body(self):
+        guard = scrape_slabs.ImageGuard()
+        with self.assertRaises(RuntimeError):
+            guard('a', b'<html>blocked</html>')
+        with self.assertRaises(RuntimeError):
+            guard('a', b'')
+
+    def test_refuses_the_same_picture_for_another_stone_but_not_again_for_the_same_one(self):
+        guard = scrape_slabs.ImageGuard()
+        body = self.png((1, 2, 3))
+        guard('a', body)
+        guard('a', body)
+        with self.assertRaises(RuntimeError):
+            guard('b', body)
+
+    def test_a_refused_picture_keeps_the_old_photo(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            images_dir = Path(tmp)
+            (images_dir / 'b.webp').write_bytes(b'old photo')
+            guard = scrape_slabs.ImageGuard()
+            body = self.png((1, 2, 3))
+            guard('a', body)
+            browser = FakeBrowser(FakeImageResponse(ok=True, status=200, content_type='image/png', body_bytes=body))
+            with self.assertRaises(RuntimeError):
+                scrape_slabs.download_stone_image(browser, 'https://example.test/i.png', images_dir, 'b',
+                                                  retry_delay_s=0, accept=guard)
+            self.assertEqual((images_dir / 'b.webp').read_bytes(), b'old photo')
+            self.assertFalse((images_dir / 'b.png').exists())
+
+
 NEW_MARKUP_FIXTURE_PATH = Path(__file__).resolve().parent / 'fixtures' / 'delicato-brown-slabs-2026-11.html'
 
 
