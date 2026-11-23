@@ -177,6 +177,10 @@ def replace_stone_image_file(images_dir, stone_id, image_bytes, extension):
     return dest_path
 
 
+def has_photo(images_dir, stone_id):
+    return images_dir.is_dir() and any(images_dir.glob(f'{stone_id}.*'))
+
+
 class ImageGuard:
     """Refuses a downloaded picture that cannot be a stone's photo, so the old photo stays.
 
@@ -566,6 +570,10 @@ def main(argv=None):
     parser.add_argument('--urls', default=str(DEFAULT_URLS_PATH))
     parser.add_argument('--output', default=str(DEFAULT_OUTPUT_PATH))
     parser.add_argument('--debug', action='store_true')
+    parser.add_argument('--images-missing-only', action='store_true',
+                         help="with --fetch-images: download a photo only for a stone that has none on disk "
+                              "(the weekly GitHub run: the supplier's CDN serves GitHub's servers a placeholder "
+                              "instead of the photos, so the photos we have are kept as they are)")
     parser.add_argument('--fetch-images', action='store_true',
                          help="also download each stone's main texture image; run this on its own, less "
                               "frequent schedule than the price scrape (e.g. weekly) since it downloads "
@@ -616,7 +624,8 @@ def main(argv=None):
                         print(f'  {stone["id"]}: kept {len(stone["slabs"])}, skipped {len(skipped)}')
                         for row in skipped:
                             print('   skipped:', row)
-                    if args.fetch_images and image_url:
+                    if args.fetch_images and image_url and not (
+                            args.images_missing_only and has_photo(output_path.parent / 'images', stone['id'])):
                         try:
                             images_dir = output_path.parent / 'images'
                             dest_path = download_stone_image(browser, image_url, images_dir, stone['id'], accept=image_guard)

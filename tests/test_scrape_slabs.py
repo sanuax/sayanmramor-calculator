@@ -716,6 +716,16 @@ class ImageGuardTests(unittest.TestCase):
             self.assertFalse((images_dir / 'b.png').exists())
 
 
+class HasPhotoTests(unittest.TestCase):
+    def test_finds_a_photo_of_any_extension_only_for_that_stone(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            images_dir = Path(tmp)
+            self.assertFalse(scrape_slabs.has_photo(images_dir / 'nope', 'a'))
+            (images_dir / 'a.webp').write_bytes(b'x')
+            self.assertTrue(scrape_slabs.has_photo(images_dir, 'a'))
+            self.assertFalse(scrape_slabs.has_photo(images_dir, 'a-gold'))
+
+
 NEW_MARKUP_FIXTURE_PATH = Path(__file__).resolve().parent / 'fixtures' / 'delicato-brown-slabs-2026-11.html'
 
 

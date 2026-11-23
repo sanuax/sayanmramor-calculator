@@ -75,11 +75,14 @@ jobs:
             --slabs data/slabs.json --out "$RUNNER_TEMP/w/queue.txt"
 
       - name: Scrape stones
+        # No --fetch-images here: the supplier's CDN serves GitHub's servers one placeholder picture instead of
+        # the photos (run #11, 2026-11-23). The photos stay as they are; new stones get theirs by a run on the
+        # owner's PC (scrape_slabs.py --fetch-images --images-missing-only).
         timeout-minutes: 330
         run: |
           args=()
           if [ -n "$LIMIT" ]; then args+=(--limit "$LIMIT"); fi
-          python scripts/scrape_slabs.py --urls "$RUNNER_TEMP/w/queue.txt" --fetch-images \
+          python scripts/scrape_slabs.py --urls "$RUNNER_TEMP/w/queue.txt" \
             --failed-log "$RUNNER_TEMP/w/failed.txt" --failed-image-log "$RUNNER_TEMP/w/failed_img.txt" \
             "${args[@]}"
 
